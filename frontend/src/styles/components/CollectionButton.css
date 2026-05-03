@@ -1,0 +1,47 @@
+.collection-mini {
+  display: grid;
+  gap: 6px;
+  justify-items: end;
+}
+
+.collection-mini-button {
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: var(--radius-pill);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--point-hover);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: var(--shadow-card);
+}
+
+.collection-mini-button.is-added {
+  background: var(--point-color);
+  border-color: var(--point-color);
+  color: var(--text-inverse);
+}
+
+.collection-mini-button.is-login {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+.collection-mini-button:active {
+  transform: scale(0.95);
+}
+
+.collection-mini-message {
+  max-width: 140px;
+  padding: 4px 8px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 251, 235, 0.96);
+  border: 1px solid var(--point-border);
+  color: var(--text-on-point-soft);
+  font-size: 0.72rem;
+  text-align: right;
+}

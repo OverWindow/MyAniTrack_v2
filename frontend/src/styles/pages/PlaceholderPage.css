@@ -1,0 +1,25 @@
+.placeholder-page {
+  display: grid;
+  gap: 14px;
+  padding: 32px;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-card);
+}
+
+.placeholder-page h1 {
+  color: var(--point-hover);
+}
+
+.placeholder-page p {
+  max-width: 62ch;
+  color: var(--text-secondary);
+  line-height: 1.8;
+}
+
+@media (max-width: 760px) {
+  .placeholder-page {
+    padding: 24px;
+  }
+}

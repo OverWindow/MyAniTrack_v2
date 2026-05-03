@@ -1,0 +1,127 @@
+.explore-toolbar-shell {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: var(--space-5);
+}
+
+.explore-summary {
+  min-height: 88px;
+  padding: 18px 22px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-secondary);
+  background: var(--bg-card);
+  border: 1px solid rgba(120, 113, 108, 0.16);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+.explore-summary strong {
+  color: var(--point-hover);
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.summary-label {
+  font-size: 0.96rem;
+  font-weight: 700;
+}
+
+.explore-toolbar {
+  min-height: 88px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  gap: 16px;
+  align-items: center;
+  padding: 18px 22px;
+  background: var(--bg-card);
+  border: 1px solid rgba(120, 113, 108, 0.16);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+.search-group {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.search-field,
+.sort-field {
+  display: grid;
+}
+
+.search-field input,
+.sort-field select {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid rgba(120, 113, 108, 0.2);
+  border-radius: var(--radius-pill);
+  padding: 0 18px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font: inherit;
+}
+
+.search-field input:focus,
+.sort-field select:focus {
+  border-color: var(--point-color);
+  box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.18);
+  outline: none;
+}
+
+.minimalist-search {
+  width: min(100%, 460px);
+}
+
+.results-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 4px;
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+}
+
+.refresh-button {
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 50%;
+  border: 1px solid #d6d3d1;
+  background: #fff;
+  color: var(--text-primary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.refresh-button:active {
+  transform: scale(0.97);
+}
+
+@media (max-width: 1180px) {
+  .explore-toolbar-shell,
+  .explore-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .search-group {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 760px) {
+  .search-group {
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .minimalist-search {
+    width: 100%;
+  }
+
+  .results-meta {
+    flex-direction: column;
+  }
+}
