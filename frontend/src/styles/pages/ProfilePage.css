@@ -4,8 +4,7 @@
 }
 
 .profile-hero-card,
-.profile-badge-section,
-.profile-analysis-card {
+.profile-badge-section {
   border: 1px solid rgba(120, 113, 108, 0.16);
   border-radius: 20px;
   box-shadow: var(--shadow-card);
@@ -60,7 +59,14 @@
   line-height: 1.7;
 }
 
-.profile-edit-button {
+.profile-hero-actions {
+  display: flex;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.profile-edit-button,
+.profile-analysis-button {
   min-width: 144px;
 }
 
@@ -78,13 +84,11 @@
   margin-bottom: 18px;
 }
 
-.profile-section-heading h2,
-.profile-analysis-card h3 {
+.profile-section-heading h2 {
   margin: 6px 0 0;
 }
 
-.profile-coming-soon,
-.profile-mock-badge {
+.profile-coming-soon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -97,27 +101,19 @@
   font-weight: 700;
 }
 
-.badge-grid,
-.profile-analysis-grid {
-  display: grid;
-  gap: 18px;
-}
-
 .badge-grid {
+  display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-.badge-card,
-.analysis-highlight-item {
-  border-radius: var(--radius-card);
-  padding: 18px;
-  background: var(--bg-card);
-  border: 1px solid rgba(120, 113, 108, 0.14);
+  gap: 18px;
 }
 
 .badge-card {
   display: grid;
   gap: 10px;
+  border-radius: var(--radius-card);
+  padding: 18px;
+  background: var(--bg-card);
+  border: 1px solid rgba(120, 113, 108, 0.14);
 }
 
 .badge-card p {
@@ -131,97 +127,6 @@
   height: 12px;
   border-radius: 50%;
   background: var(--point-color);
-}
-
-.profile-analysis-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.profile-analysis-card {
-  padding: 24px;
-  background: var(--bg-card);
-}
-
-.profile-analysis-highlights {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
-}
-
-.analysis-highlight-item {
-  display: grid;
-  gap: 8px;
-}
-
-.analysis-highlight-item span,
-.analysis-bar-header span,
-.analysis-era-item p {
-  color: var(--text-secondary);
-}
-
-.analysis-highlight-item strong {
-  font-size: 1.5rem;
-  color: var(--point-hover);
-}
-
-.analysis-highlight-item p,
-.analysis-era-item p {
-  line-height: 1.6;
-  font-size: 0.92rem;
-}
-
-.analysis-bar-list,
-.analysis-era-list {
-  display: grid;
-  gap: 14px;
-  margin-top: 18px;
-}
-
-.analysis-bar-item {
-  display: grid;
-  gap: 8px;
-}
-
-.analysis-bar-header,
-.analysis-era-item {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.analysis-bar-track {
-  height: 10px;
-  border-radius: var(--radius-pill);
-  background: var(--bg-soft-beige);
-  overflow: hidden;
-}
-
-.analysis-bar-fill {
-  height: 100%;
-  border-radius: inherit;
-  background: var(--point-color);
-}
-
-.analysis-era-item {
-  align-items: center;
-  padding: 16px 0;
-  border-bottom: 1px solid rgba(120, 113, 108, 0.14);
-}
-
-.analysis-era-item:last-child {
-  border-bottom: 0;
-  padding-bottom: 0;
-}
-
-.analysis-era-item span {
-  font-weight: 700;
-  color: var(--point-hover);
-}
-
-.profile-analysis-note {
-  margin-top: 18px;
-  color: var(--text-secondary);
-  line-height: 1.8;
 }
 
 .profile-edit-page {
@@ -268,8 +173,6 @@
 }
 
 @media (max-width: 1180px) {
-  .profile-analysis-grid,
-  .profile-analysis-highlights,
   .badge-grid {
     grid-template-columns: 1fr;
   }
@@ -286,15 +189,13 @@
 
 @media (max-width: 760px) {
   .profile-hero-card,
-  .profile-badge-section,
-  .profile-analysis-card {
+  .profile-badge-section {
     padding: 22px;
   }
 
   .profile-hero-main,
   .profile-section-heading,
-  .analysis-era-item,
-  .analysis-bar-header {
+  .profile-hero-actions {
     flex-direction: column;
     align-items: flex-start;
   }
@@ -306,6 +207,7 @@
   }
 
   .profile-edit-button,
+  .profile-analysis-button,
   .profile-edit-preview,
   .profile-edit-actions,
   .profile-edit-cancel {

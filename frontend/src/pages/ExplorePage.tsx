@@ -3,12 +3,13 @@ import { Link } from 'react-router-dom'
 import { CollectionButton } from '../components/CollectionButton'
 import {
   fetchAnimeList,
+  genreOptions,
   getDisplayTitle,
   getPrimaryPoster,
   searchAnime,
   sortOptions,
 } from '../lib/anime'
-import type { AnimeListItem, AnimeSort } from '../types/anime'
+import type { AnimeGenre, AnimeListItem, AnimeSort } from '../types/anime'
 import '../styles/pages/CatalogPage.css'
 import '../styles/pages/ExplorePage.css'
 
@@ -42,11 +43,17 @@ function formatFivePointScore(score?: number | null) {
 
 export function ExplorePage() {
   const [sort, setSort] = useState<AnimeSort>('score')
+  const [genre, setGenre] = useState<AnimeGenre | 'all'>('all')
   const [searchTerm, setSearchTerm] = useState('')
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
   const [searchLanguage, setSearchLanguage] = useState<'ko' | 'en'>('ko')
   const normalizedQuery = debouncedSearchTerm.trim()
-  const requestKey = `${sort}:${normalizedQuery}:${searchLanguage}`
+  const selectedGenre = genre === 'all' ? null : genre
+  const selectedGenreLabel =
+    genre === 'all'
+      ? '전체 장르'
+      : genreOptions.find((option) => option.value === genre)?.label ?? genre
+  const requestKey = `${sort}:${normalizedQuery}:${searchLanguage}:${genre}`
   const [state, setState] = useState<ExploreState>(() =>
     createInitialExploreState(requestKey),
   )
@@ -73,12 +80,14 @@ export function ExplorePage() {
           ? await searchAnime({
               query: normalizedQuery,
               sort,
+              genre: selectedGenre,
               titleLanguage: searchLanguage,
               limit: 24,
               signal: controller.signal,
             })
           : await fetchAnimeList({
               sort,
+              genre: selectedGenre,
               limit: 24,
               signal: controller.signal,
             })
@@ -115,7 +124,7 @@ export function ExplorePage() {
     void loadFirstPage()
 
     return () => controller.abort()
-  }, [normalizedQuery, requestKey, searchLanguage, sort])
+  }, [normalizedQuery, requestKey, searchLanguage, selectedGenre, sort])
 
   useEffect(() => {
     const node = sentinelRef.current
@@ -147,12 +156,14 @@ export function ExplorePage() {
               ? await searchAnime({
                   query: normalizedQuery,
                   sort,
+                  genre: selectedGenre,
                   titleLanguage: searchLanguage,
                   limit: 24,
                   cursor: nextCursor,
                 })
               : await fetchAnimeList({
                   sort,
+                  genre: selectedGenre,
                   limit: 24,
                   cursor: nextCursor,
                 })
@@ -205,6 +216,7 @@ export function ExplorePage() {
     nextCursor,
     normalizedQuery,
     searchLanguage,
+    selectedGenre,
     sort,
   ])
 
@@ -257,19 +269,36 @@ export function ExplorePage() {
             </div>
           </div>
 
-          <label className="sort-field" htmlFor="anime-sort">
-            <select
-              id="anime-sort"
-              value={sort}
-              onChange={(event) => setSort(event.target.value as AnimeSort)}
-            >
-              {sortOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="catalog-control-group">
+            <label className="sort-field" htmlFor="anime-genre">
+              <select
+                id="anime-genre"
+                value={genre}
+                onChange={(event) => setGenre(event.target.value as AnimeGenre | 'all')}
+              >
+                <option value="all">전체 장르</option>
+                {genreOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="sort-field" htmlFor="anime-sort">
+              <select
+                id="anime-sort"
+                value={sort}
+                onChange={(event) => setSort(event.target.value as AnimeSort)}
+              >
+                {sortOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
         </div>
       </div>
 
@@ -296,6 +325,7 @@ export function ExplorePage() {
                 ? `"${normalizedQuery}" 검색 결과 · ${searchLanguage === 'ko' ? '한국어' : '영어'}`
                 : '전체 작품 목록'}
             </span>
+            <span>{selectedGenreLabel}</span>
           </div>
 
           {animeItems.length === 0 ? (

@@ -32,7 +32,7 @@
 .explore-toolbar {
   min-height: 88px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 220px;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 16px;
   align-items: center;
   padding: 18px 22px;
@@ -46,6 +46,12 @@
   display: flex;
   align-items: center;
   gap: 14px;
+}
+
+.catalog-control-group {
+  display: grid;
+  grid-template-columns: repeat(2, 180px);
+  gap: 12px;
 }
 
 .search-field,
@@ -109,6 +115,10 @@
   .search-group {
     justify-content: flex-start;
   }
+
+  .catalog-control-group {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 760px) {
@@ -123,5 +133,9 @@
 
   .results-meta {
     flex-direction: column;
+  }
+
+  .catalog-control-group {
+    grid-template-columns: 1fr;
   }
 }

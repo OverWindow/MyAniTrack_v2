@@ -3,6 +3,26 @@ import { RowDataPacket } from 'mysql2/promise';
 
 export type AnimeSortOption = 'latest' | 'score' | 'season';
 export type AnimeTitleLanguage = 'ko' | 'en' | 'ja';
+export type AnimeGenre =
+  | 'Action'
+  | 'Adventure'
+  | 'Drama'
+  | 'Sci-Fi'
+  | 'Mystery'
+  | 'Comedy'
+  | 'Supernatural'
+  | 'Fantasy'
+  | 'Sports'
+  | 'Romance'
+  | 'Slice of Life'
+  | 'Horror'
+  | 'Psychological'
+  | 'Thriller'
+  | 'Ecchi'
+  | 'Mecha'
+  | 'Music'
+  | 'Mahou Shoujo'
+  | 'Hentai';
 
 const SCORE_SORT_SQL = 'COALESCE(a.average_score, -1)';
 const SEASON_YEAR_SORT_SQL = 'COALESCE(a.season_year, 0)';
@@ -17,6 +37,7 @@ END`;
 interface AnimeListCursorPayload {
   sort: AnimeSortOption;
   query?: string | null;
+  genre?: AnimeGenre | null;
   createdAt?: string;
   score?: number | null;
   seasonYear?: number | null;
@@ -28,6 +49,7 @@ export interface AnimeListParams {
   sort: AnimeSortOption;
   titleLanguage: AnimeTitleLanguage;
   query?: string;
+  genre?: AnimeGenre;
   cursor?: string;
   limit: number;
 }
@@ -223,6 +245,30 @@ function normalizeSearchQuery(query?: string) {
   return normalizedQuery ? normalizedQuery : undefined;
 }
 
+function buildGenreWhereClause(
+  genre: AnimeGenre | undefined,
+  cursor: AnimeListCursorPayload | null,
+  params: Array<string | number | null>
+) {
+  if (cursor && (cursor.genre ?? null) !== (genre ?? null)) {
+    throw new Error('Cursor genre does not match requested genre');
+  }
+
+  if (!genre) {
+    return '';
+  }
+
+  params.push(genre);
+  return `
+    AND EXISTS (
+      SELECT 1
+      FROM anime_genres ag
+      WHERE ag.anime_id = a.id
+        AND ag.genre = ?
+    )
+  `;
+}
+
 function buildSearchWhereClause(
   titleLanguage: AnimeTitleLanguage,
   query: string | undefined,
@@ -279,6 +325,7 @@ function buildSearchWhereClause(
 export async function getAnimeList(params: AnimeListParams) {
   const decodedCursor = decodeCursor(params.cursor);
   const queryParams: Array<string | number | null> = [];
+  const genreWhereClause = buildGenreWhereClause(params.genre, decodedCursor, queryParams);
   const searchWhereClause = buildSearchWhereClause(params.titleLanguage, params.query, decodedCursor, queryParams);
   const cursorWhereClause = buildCursorWhereClause(params.sort, decodedCursor, queryParams);
   const orderByClause = buildListOrderClause(params.sort);
@@ -319,6 +366,7 @@ export async function getAnimeList(params: AnimeListParams) {
       AND akt.is_primary = TRUE
     WHERE 1 = 1
       AND a.is_adult = FALSE
+      ${genreWhereClause}
       ${searchWhereClause}
       ${cursorWhereClause}
     ORDER BY ${orderByClause}
@@ -335,6 +383,7 @@ export async function getAnimeList(params: AnimeListParams) {
     ? encodeCursor({
         sort: params.sort,
         query: normalizeSearchQuery(params.query) ?? null,
+        genre: params.genre ?? null,
         createdAt: lastItem.createdAt,
         score: lastItem.scoreSortValue,
         seasonYear: lastItem.seasonYear,

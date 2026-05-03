@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { fetchMyCollection } from '../lib/collection'
+import { genreOptions } from '../lib/anime'
+import type { AnimeGenre } from '../types/anime'
 import type { UserAnimeListItem, UserAnimeListSort } from '../types/collection'
 import '../styles/pages/CatalogPage.css'
 import '../styles/pages/CollectionPage.css'
@@ -84,9 +86,15 @@ function formatScore(score?: number | null) {
 export function CollectionPage() {
   const { isAuthenticated } = useAuth()
   const [sort, setSort] = useState<UserAnimeListSort>('latest')
+  const [genre, setGenre] = useState<AnimeGenre | 'all'>('all')
   const [searchTerm, setSearchTerm] = useState('')
   const [reloadKey, setReloadKey] = useState(0)
-  const requestKey = `${sort}:${reloadKey}`
+  const selectedGenre = genre === 'all' ? null : genre
+  const selectedGenreLabel =
+    genre === 'all'
+      ? '전체 장르'
+      : genreOptions.find((option) => option.value === genre)?.label ?? genre
+  const requestKey = `${sort}:${genre}:${reloadKey}`
   const [state, setState] = useState<CollectionState>(() =>
     createInitialCollectionState(requestKey),
   )
@@ -109,6 +117,7 @@ export function CollectionPage() {
       try {
         const data = await fetchMyCollection({
           sort,
+          genre: selectedGenre,
           limit: 24,
           signal: controller.signal,
         })
@@ -145,7 +154,7 @@ export function CollectionPage() {
     void loadFirstPage()
 
     return () => controller.abort()
-  }, [isAuthenticated, requestKey, sort])
+  }, [isAuthenticated, requestKey, selectedGenre, sort])
 
   useEffect(() => {
     const node = sentinelRef.current
@@ -176,6 +185,7 @@ export function CollectionPage() {
           try {
             const data = await fetchMyCollection({
               sort,
+              genre: selectedGenre,
               limit: 24,
               cursor: nextCursor,
             })
@@ -227,6 +237,7 @@ export function CollectionPage() {
     isLoadingMore,
     isRefreshingQuery,
     nextCursor,
+    selectedGenre,
     sort,
   ])
 
@@ -271,19 +282,36 @@ export function CollectionPage() {
             </button>
           </div>
 
-          <label className="sort-field" htmlFor="collection-sort">
-            <select
-              id="collection-sort"
-              value={sort}
-              onChange={(event) => setSort(event.target.value as UserAnimeListSort)}
-            >
-              {sortOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="catalog-control-group">
+            <label className="sort-field" htmlFor="collection-genre">
+              <select
+                id="collection-genre"
+                value={genre}
+                onChange={(event) => setGenre(event.target.value as AnimeGenre | 'all')}
+              >
+                <option value="all">전체 장르</option>
+                {genreOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="sort-field" htmlFor="collection-sort">
+              <select
+                id="collection-sort"
+                value={sort}
+                onChange={(event) => setSort(event.target.value as UserAnimeListSort)}
+              >
+                {sortOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
         </div>
       </div>
 
@@ -306,6 +334,7 @@ export function CollectionPage() {
           <div className="results-meta minimalist-meta">
             <span>{filteredItems.length}개의 작품 표시 중</span>
             <span>제목 우선순위: 한국어 → 영어</span>
+            <span>{selectedGenreLabel}</span>
           </div>
 
           {filteredItems.length === 0 ? (

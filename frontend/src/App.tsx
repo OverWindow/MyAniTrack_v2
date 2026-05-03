@@ -2,6 +2,7 @@ import { Link, Route, Routes, useLocation } from 'react-router-dom'
 import { Header } from './components/Header'
 import { useAuth } from './contexts/AuthContext'
 import { AnimeDetailPage } from './pages/AnimeDetailPage'
+import { AnalysisPage } from './pages/AnalysisPage'
 import { CollectionPage } from './pages/CollectionPage'
 import { ExplorePage } from './pages/ExplorePage'
 import { HomePage } from './pages/HomePage'
@@ -26,6 +27,7 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
           <Route path="/explore" element={<ExplorePage />} />
+          <Route path="/analysis" element={<AnalysisPage />} />
           <Route path="/anime/:id" element={<AnimeDetailPage />} />
           <Route
             path="/profile"

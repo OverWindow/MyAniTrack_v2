@@ -1,4 +1,5 @@
 import { authFetch } from './auth'
+import type { AnimeGenre } from '../types/anime'
 import type {
   UserAnimeListEntry,
   UserAnimeListPayload,
@@ -180,6 +181,7 @@ export async function deleteCollectionEntry(animeId: number) {
 export async function fetchMyCollection(params: {
   sort: UserAnimeListSort
   limit: number
+  genre?: AnimeGenre | null
   cursor?: string | null
   signal?: AbortSignal
 }) {
@@ -187,6 +189,10 @@ export async function fetchMyCollection(params: {
   url.searchParams.set('sort', params.sort)
   url.searchParams.set('titleLanguage', 'ko')
   url.searchParams.set('limit', String(params.limit))
+
+  if (params.genre) {
+    url.searchParams.set('genre', params.genre)
+  }
 
   if (params.cursor) {
     url.searchParams.set('cursor', params.cursor)

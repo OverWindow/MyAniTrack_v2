@@ -1,5 +1,7 @@
 import { ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import { pool } from '../../config/db';
+import { AnimeGenre } from './anime.service';
+import { recalculateUserAnimeStats } from './recommendation.service';
 
 const LIST_STATUS_OPTIONS = ['planned', 'watching', 'completed', 'paused', 'dropped'] as const;
 const USER_ANIME_LIST_SORT_OPTIONS = ['latest', 'added', 'score'] as const;
@@ -60,6 +62,7 @@ interface UserAnimeListListRow extends RowDataPacket {
 
 interface UserAnimeListCursorPayload {
   sort: UserAnimeListSortOption;
+  genre?: AnimeGenre | null;
   score?: number | null;
   createdAt?: string;
   updatedAt?: string;
@@ -70,6 +73,7 @@ export interface GetUserAnimeListParams {
   userId: number;
   sort: UserAnimeListSortOption;
   titleLanguage: UserAnimeListTitleLanguage;
+  genre?: AnimeGenre;
   limit: number;
   cursor?: string;
 }
@@ -124,6 +128,40 @@ export function validateUserAnimeListLimit(value: unknown): number {
   }
 
   return limit;
+}
+
+export function validateUserAnimeListGenre(value: unknown): AnimeGenre | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const genres: AnimeGenre[] = [
+    'Action',
+    'Adventure',
+    'Drama',
+    'Sci-Fi',
+    'Mystery',
+    'Comedy',
+    'Supernatural',
+    'Fantasy',
+    'Sports',
+    'Romance',
+    'Slice of Life',
+    'Horror',
+    'Psychological',
+    'Thriller',
+    'Ecchi',
+    'Mecha',
+    'Music',
+    'Mahou Shoujo',
+    'Hentai',
+  ];
+
+  if (typeof value !== 'string' || !genres.includes(value as AnimeGenre)) {
+    throw new Error(`genre must be one of ${genres.join(', ')}`);
+  }
+
+  return value as AnimeGenre;
 }
 
 function validateStatus(status: unknown): ListStatus {
@@ -393,9 +431,34 @@ function buildCursorWhereClause(
   `;
 }
 
+function buildGenreWhereClause(
+  genre: AnimeGenre | undefined,
+  cursor: UserAnimeListCursorPayload | null,
+  params: Array<string | number | null>
+) {
+  if (cursor && (cursor.genre ?? null) !== (genre ?? null)) {
+    throw new Error('Cursor genre does not match requested genre');
+  }
+
+  if (!genre) {
+    return '';
+  }
+
+  params.push(genre);
+  return `
+    AND EXISTS (
+      SELECT 1
+      FROM anime_genres ag
+      WHERE ag.anime_id = a.id
+        AND ag.genre = ?
+    )
+  `;
+}
+
 export async function getUserAnimeList(params: GetUserAnimeListParams) {
   const decodedCursor = decodeCursor(params.cursor);
   const queryParams: Array<string | number | null> = [params.userId];
+  const genreWhereClause = buildGenreWhereClause(params.genre, decodedCursor, queryParams);
   const cursorWhereClause = buildCursorWhereClause(params.sort, decodedCursor, queryParams);
   const orderByClause = buildOrderClause(params.sort);
 
@@ -444,6 +507,7 @@ export async function getUserAnimeList(params: GetUserAnimeListParams) {
       ON akt.anime_id = a.id
       AND akt.is_primary = TRUE
     WHERE ual.user_id = ?
+      ${genreWhereClause}
       ${cursorWhereClause}
     ORDER BY ${orderByClause}
     LIMIT ?
@@ -458,6 +522,7 @@ export async function getUserAnimeList(params: GetUserAnimeListParams) {
   const nextCursor = lastItem
     ? encodeCursor({
         sort: params.sort,
+        genre: params.genre ?? null,
         score: lastItem.sortScoreValue,
         createdAt: lastItem.createdAt,
         updatedAt: lastItem.updatedAt,
@@ -562,6 +627,8 @@ export async function addAnimeToUserList(userId: number, animeId: number, input:
     throw new Error('Failed to create user anime list item');
   }
 
+  await recalculateUserAnimeStats(userId);
+
   return mapUserAnimeListItem(item);
 }
 
@@ -625,6 +692,8 @@ export async function updateUserAnimeListItem(userId: number, animeId: number, i
     throw new Error('User anime list item not found');
   }
 
+  await recalculateUserAnimeStats(userId);
+
   return mapUserAnimeListItem(item);
 }
 
@@ -642,4 +711,6 @@ export async function removeAnimeFromUserList(userId: number, animeId: number) {
   if (result.affectedRows === 0) {
     throw new Error('User anime list item not found');
   }
+
+  await recalculateUserAnimeStats(userId);
 }

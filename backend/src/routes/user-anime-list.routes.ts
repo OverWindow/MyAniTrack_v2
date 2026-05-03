@@ -5,6 +5,7 @@ import {
   getUserAnimeList,
   removeAnimeFromUserList,
   updateUserAnimeListItem,
+  validateUserAnimeListGenre,
   validateUserAnimeListLimit,
   validateUserAnimeListSort,
   validateUserAnimeListTitleLanguage,
@@ -28,7 +29,8 @@ function getErrorStatus(message: string) {
     message.includes('required') ||
     message === 'At least one field is required to update' ||
     message === 'Invalid cursor' ||
-    message.includes('Cursor sort')
+    message.includes('Cursor sort') ||
+    message.includes('Cursor genre')
   ) {
     return 400;
   }
@@ -103,6 +105,7 @@ router.get('/me/anime-list', requireAuth, async (req: Request, res: Response) =>
     const titleLanguage = validateUserAnimeListTitleLanguage(
       typeof req.query.titleLanguage === 'string' ? req.query.titleLanguage : 'ko'
     );
+    const genre = validateUserAnimeListGenre(req.query.genre);
     const limit = validateUserAnimeListLimit(req.query.limit);
     const cursor = typeof req.query.cursor === 'string' ? req.query.cursor : undefined;
 
@@ -110,6 +113,7 @@ router.get('/me/anime-list', requireAuth, async (req: Request, res: Response) =>
       userId: authUser.userId,
       sort,
       titleLanguage,
+      genre,
       limit,
       cursor,
     });

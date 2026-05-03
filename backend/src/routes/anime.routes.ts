@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import {
+  AnimeGenre,
   AnimeSortOption,
   AnimeTitleLanguage,
   getAnimeDetailById,
@@ -10,6 +11,27 @@ const router = Router();
 
 const SORT_OPTIONS: AnimeSortOption[] = ['latest', 'score', 'season'];
 const TITLE_LANGUAGE_OPTIONS: AnimeTitleLanguage[] = ['ko', 'en', 'ja'];
+const GENRE_OPTIONS: AnimeGenre[] = [
+  'Action',
+  'Adventure',
+  'Drama',
+  'Sci-Fi',
+  'Mystery',
+  'Comedy',
+  'Supernatural',
+  'Fantasy',
+  'Sports',
+  'Romance',
+  'Slice of Life',
+  'Horror',
+  'Psychological',
+  'Thriller',
+  'Ecchi',
+  'Mecha',
+  'Music',
+  'Mahou Shoujo',
+  'Hentai',
+];
 
 function parseSort(value: unknown): AnimeSortOption {
   const sort = typeof value === 'string' ? value : 'latest';
@@ -51,6 +73,18 @@ function parseSearchQuery(value: unknown): string {
   return query;
 }
 
+function parseGenre(value: unknown): AnimeGenre | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (typeof value !== 'string' || !GENRE_OPTIONS.includes(value as AnimeGenre)) {
+    throw new Error(`genre must be one of ${GENRE_OPTIONS.join(', ')}`);
+  }
+
+  return value as AnimeGenre;
+}
+
 function parseAnimeId(value: string): number {
   const id = Number(value);
 
@@ -65,12 +99,14 @@ router.get('/anime', async (req: Request, res: Response) => {
   try {
     const sort = parseSort(req.query.sort);
     const titleLanguage = parseTitleLanguage(req.query.titleLanguage);
+    const genre = parseGenre(req.query.genre);
     const limit = parseLimit(req.query.limit);
     const cursor = typeof req.query.cursor === 'string' ? req.query.cursor : undefined;
 
     const result = await getAnimeList({
       sort,
       titleLanguage,
+      genre,
       limit,
       cursor,
     });
@@ -100,6 +136,7 @@ router.get('/anime/search', async (req: Request, res: Response) => {
   try {
     const sort = parseSort(req.query.sort);
     const titleLanguage = parseTitleLanguage(req.query.titleLanguage);
+    const genre = parseGenre(req.query.genre);
     const limit = parseLimit(req.query.limit);
     const query = parseSearchQuery(req.query.query);
     const cursor = typeof req.query.cursor === 'string' ? req.query.cursor : undefined;
@@ -108,6 +145,7 @@ router.get('/anime/search', async (req: Request, res: Response) => {
       sort,
       titleLanguage,
       query,
+      genre,
       limit,
       cursor,
     });
@@ -123,6 +161,7 @@ router.get('/anime/search', async (req: Request, res: Response) => {
       || message === 'Invalid cursor'
       || message.includes('Cursor sort')
       || message.includes('Cursor query')
+      || message.includes('Cursor genre')
       || message === 'query is required'
     )
       ? 400

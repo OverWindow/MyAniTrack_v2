@@ -1,5 +1,26 @@
 export type AnimeSort = 'latest' | 'score' | 'season'
 
+export type AnimeGenre =
+  | 'Action'
+  | 'Adventure'
+  | 'Drama'
+  | 'Sci-Fi'
+  | 'Mystery'
+  | 'Comedy'
+  | 'Supernatural'
+  | 'Fantasy'
+  | 'Sports'
+  | 'Romance'
+  | 'Slice of Life'
+  | 'Horror'
+  | 'Psychological'
+  | 'Thriller'
+  | 'Ecchi'
+  | 'Mecha'
+  | 'Music'
+  | 'Mahou Shoujo'
+  | 'Hentai'
+
 export type AnimeListItem = {
   id: number
   anilistId: number
