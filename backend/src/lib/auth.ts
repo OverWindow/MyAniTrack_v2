@@ -8,6 +8,7 @@ interface AccessTokenPayload {
   userId: number;
   email: string;
   username: string;
+  role?: string;
   type: 'access';
   exp: number;
 }
@@ -73,7 +74,7 @@ export async function verifyPassword(password: string, storedHash: string): Prom
   return crypto.timingSafeEqual(originalBuffer, derivedKey);
 }
 
-export function createAccessToken(user: { id: number; email: string; username: string }) {
+export function createAccessToken(user: { id: number; email: string; username: string; role?: string }) {
   const header = {
     alg: 'HS256',
     typ: 'JWT',
@@ -83,6 +84,7 @@ export function createAccessToken(user: { id: number; email: string; username: s
     userId: user.id,
     email: user.email,
     username: user.username,
+    role: user.role,
     type: 'access',
     exp: Math.floor(Date.now() / 1000) + ACCESS_TOKEN_EXPIRES_IN_SECONDS,
   };

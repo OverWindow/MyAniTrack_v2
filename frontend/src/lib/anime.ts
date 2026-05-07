@@ -72,18 +72,12 @@ export function getPrimaryPoster(item: { coverImageExtraLarge?: string | null; c
   return item.coverImageExtraLarge || item.coverImageLarge
 }
 
-export function stripDescriptionMarkup(description?: string | null) {
-  if (!description) {
-    return '아직 등록된 설명이 없어요.'
+export function getGenreLabel(genre?: string | null) {
+  if (!genre) {
+    return '정보 없음'
   }
 
-  return description
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&quot;/g, '"')
-    .replace(/&#039;/g, "'")
-    .replace(/&amp;/g, '&')
-    .trim()
+  return genreOptions.find((option) => option.value === genre)?.label ?? genre
 }
 
 export async function fetchAnimeList(params: {

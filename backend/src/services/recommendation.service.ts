@@ -3,6 +3,14 @@ import { pool } from '../../config/db';
 
 type JsonMap = Record<string, number>;
 
+interface TopGenreAnimeItem {
+  animeId: number;
+  title: string;
+  coverImageLarge: string | null;
+  score: number | null;
+  genre: string;
+}
+
 interface UserHistoryAnimeRow extends RowDataPacket {
   animeId: number;
   status: string;
@@ -14,6 +22,12 @@ interface UserHistoryAnimeRow extends RowDataPacket {
   episodes: number | null;
   duration: number | null;
   seasonYear: number | null;
+  titleRomaji: string | null;
+  titleEnglish: string | null;
+  titleNative: string | null;
+  titleUserPreferred: string | null;
+  titleKorean: string | null;
+  coverImageLarge: string | null;
   genre: string | null;
 }
 
@@ -34,6 +48,8 @@ interface UserAnimeStatsRow extends RowDataPacket {
   releaseYearDistribution: string | JsonMap | null;
   avgReleaseYear: number | string | null;
   scoreDistribution: string | JsonMap | null;
+  topWatchedGenreTopAnime: string | TopGenreAnimeItem[] | null;
+  topRatedGenreTopAnime: string | TopGenreAnimeItem[] | null;
   preferenceSummary: string | null;
   recommendationContext: string | null;
   updatedAt: string;
@@ -81,6 +97,8 @@ export interface UserAnimeStats {
   releaseYearDistribution: JsonMap;
   avgReleaseYear: number | null;
   scoreDistribution: JsonMap;
+  topWatchedGenreTopAnime: TopGenreAnimeItem[];
+  topRatedGenreTopAnime: TopGenreAnimeItem[];
   preferenceSummary: string;
   recommendationContext: string;
   updatedAt: string;
@@ -113,21 +131,48 @@ function parseNullableNumber(value: number | string | null): number | null {
   return Number.isFinite(parsedNumber) ? parsedNumber : null;
 }
 
-function toReleasePeriod(seasonYear: number | null) {
-  if (!seasonYear) {
-    return null;
+function parseTopGenreAnimeList(
+  value: string | TopGenreAnimeItem[] | null
+): TopGenreAnimeItem[] {
+  if (!value) {
+    return [];
   }
 
-  const decade = Math.floor(seasonYear / 10) * 10;
-  return `${decade}s`;
+  const normalizeList = (items: unknown[]) =>
+    items
+      .filter((item): item is Record<string, unknown> => !!item && typeof item === 'object')
+      .map((item) => ({
+        animeId: Number(item.animeId) || 0,
+        title: typeof item.title === 'string' ? item.title : '',
+        coverImageLarge:
+          typeof item.coverImageLarge === 'string' ? item.coverImageLarge : null,
+        score: parseNullableNumber(
+          typeof item.score === 'number' || typeof item.score === 'string'
+            ? item.score
+            : null
+        ),
+        genre: typeof item.genre === 'string' ? item.genre : '',
+      }))
+      .filter((item) => item.animeId > 0 && item.title && item.genre);
+
+  if (Array.isArray(value)) {
+    return normalizeList(value);
+  }
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed) ? normalizeList(parsed) : [];
+  } catch {
+    return [];
+  }
 }
 
-function toReleaseYearBucket(seasonYear: number | null) {
+function toReleaseYearKey(seasonYear: number | null) {
   if (!seasonYear) {
     return null;
   }
 
-  return String(Math.floor(seasonYear / 10) * 10);
+  return String(seasonYear);
 }
 
 function incrementMap(map: JsonMap, key: string, amount: number) {
@@ -195,6 +240,48 @@ function pickDisplayTitle(
     ?? row.titleKorean;
 }
 
+function pickStatsTitle(row: Pick<
+  UserHistoryAnimeRow,
+  'titleKorean' | 'titleEnglish' | 'titleRomaji' | 'titleUserPreferred' | 'titleNative'
+>) {
+  return row.titleKorean
+    ?? row.titleEnglish
+    ?? row.titleRomaji
+    ?? row.titleUserPreferred
+    ?? row.titleNative
+    ?? 'Unknown title';
+}
+
+function buildTopGenreAnimeList(
+  genre: string | null,
+  uniqueAnime: Map<number, {
+    score: number | null;
+    title: string;
+    coverImageLarge: string | null;
+  }>,
+  animeGenres: Map<number, Set<string>>
+): TopGenreAnimeItem[] {
+  if (!genre) {
+    return [];
+  }
+
+  return Array.from(uniqueAnime.entries())
+    .filter(([animeId]) => animeGenres.get(animeId)?.has(genre))
+    .map(([animeId, anime]) => ({
+      animeId,
+      title: anime.title,
+      coverImageLarge: anime.coverImageLarge,
+      score: anime.score,
+      genre,
+    }))
+    .sort((a, b) => {
+      const scoreA = a.score ?? -Infinity;
+      const scoreB = b.score ?? -Infinity;
+      return scoreB - scoreA || a.title.localeCompare(b.title) || b.animeId - a.animeId;
+    })
+    .slice(0, 5);
+}
+
 function mapStatsRow(row: UserAnimeStatsRow): UserAnimeStats {
   return {
     userId: row.userId,
@@ -213,6 +300,8 @@ function mapStatsRow(row: UserAnimeStatsRow): UserAnimeStats {
     releaseYearDistribution: parseJsonMap(row.releaseYearDistribution),
     avgReleaseYear: parseNullableNumber(row.avgReleaseYear),
     scoreDistribution: parseJsonMap(row.scoreDistribution),
+    topWatchedGenreTopAnime: parseTopGenreAnimeList(row.topWatchedGenreTopAnime),
+    topRatedGenreTopAnime: parseTopGenreAnimeList(row.topRatedGenreTopAnime),
     preferenceSummary: row.preferenceSummary ?? '',
     recommendationContext: row.recommendationContext ?? '',
     updatedAt: row.updatedAt,
@@ -226,7 +315,7 @@ export function buildPreferenceSummary(userStats: Omit<UserAnimeStats, 'preferen
 
   return [
     `This user has ${userStats.totalCount} anime records and prefers ${topGenre}.`,
-    `They mainly enjoy titles from ${releasePeriod}.`,
+    `They mainly enjoy titles from release year ${releasePeriod}.`,
     `Average user score is ${avgScoreText} with ${userStats.totalWatchMinutes} total watch minutes.`,
   ].join(' ');
 }
@@ -246,7 +335,7 @@ export function buildRecommendationContext(userStats: Omit<UserAnimeStats, 'pref
 
   return [
     `Top genres => ${topGenres || 'none'}`,
-    `Preferred release periods => ${topPeriods || 'none'}`,
+    `Preferred release years => ${topPeriods || 'none'}`,
     `Average score => ${userStats.avgScore ?? 'none'}`,
     `Watch minutes => ${userStats.totalWatchMinutes}`,
   ].join(' | ');
@@ -266,12 +355,21 @@ export async function recalculateUserAnimeStats(userId: number) {
       a.episodes,
       a.duration,
       a.season_year AS seasonYear,
+      a.title_romaji AS titleRomaji,
+      a.title_english AS titleEnglish,
+      a.title_native AS titleNative,
+      a.title_user_preferred AS titleUserPreferred,
+      akt.full_title AS titleKorean,
+      a.cover_image_large AS coverImageLarge,
       ag.genre
     FROM user_anime_lists ual
     INNER JOIN anime a
       ON a.id = ual.anime_id
     LEFT JOIN anime_genres ag
       ON ag.anime_id = a.id
+    LEFT JOIN anime_korean_titles akt
+      ON akt.anime_id = a.id
+      AND akt.is_primary = TRUE
     WHERE ual.user_id = ?
     `,
     [userId]
@@ -284,6 +382,8 @@ export async function recalculateUserAnimeStats(userId: number) {
     episodes: number | null;
     duration: number | null;
     seasonYear: number | null;
+    title: string;
+    coverImageLarge: string | null;
   }>();
   const animeGenres = new Map<number, Set<string>>();
 
@@ -296,6 +396,8 @@ export async function recalculateUserAnimeStats(userId: number) {
         episodes: row.episodes,
         duration: row.duration,
         seasonYear: row.seasonYear,
+        title: pickStatsTitle(row),
+        coverImageLarge: row.coverImageLarge,
       });
     }
 
@@ -352,7 +454,7 @@ export async function recalculateUserAnimeStats(userId: number) {
     if (anime.seasonYear) {
       totalReleaseYear += anime.seasonYear;
       releaseYearCount += 1;
-      const bucket = toReleaseYearBucket(anime.seasonYear);
+      const bucket = toReleaseYearKey(anime.seasonYear);
 
       if (bucket) {
         incrementMap(releaseYearDistribution, bucket, 1);
@@ -386,8 +488,18 @@ export async function recalculateUserAnimeStats(userId: number) {
   const avgScore = scoredCount > 0 ? round2(totalScore / scoredCount) : null;
   const avgReleaseYear = releaseYearCount > 0 ? round2(totalReleaseYear / releaseYearCount) : null;
   const favoriteGenre = pickFavoriteKey(genreDistribution);
-  const favoriteReleasePeriodBucket = pickFavoriteKey(releaseYearDistribution);
-  const favoriteReleasePeriod = favoriteReleasePeriodBucket ? `${favoriteReleasePeriodBucket}s` : null;
+  const topRatedGenre = pickFavoriteKey(genreAvgScore);
+  const favoriteReleasePeriod = pickFavoriteKey(releaseYearDistribution);
+  const topWatchedGenreTopAnime = buildTopGenreAnimeList(
+    favoriteGenre,
+    uniqueAnime,
+    animeGenres
+  );
+  const topRatedGenreTopAnime = buildTopGenreAnimeList(
+    topRatedGenre,
+    uniqueAnime,
+    animeGenres
+  );
 
   const computedStats = {
     userId,
@@ -406,6 +518,8 @@ export async function recalculateUserAnimeStats(userId: number) {
     releaseYearDistribution,
     avgReleaseYear,
     scoreDistribution,
+    topWatchedGenreTopAnime,
+    topRatedGenreTopAnime,
   };
 
   const preferenceSummary = buildPreferenceSummary({
@@ -440,10 +554,12 @@ export async function recalculateUserAnimeStats(userId: number) {
       release_year_distribution,
       avg_release_year,
       score_distribution,
+      top_watched_genre_top_anime,
+      top_rated_genre_top_anime,
       preference_summary,
       recommendation_context
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON DUPLICATE KEY UPDATE
       total_count = VALUES(total_count),
       completed_count = VALUES(completed_count),
@@ -460,6 +576,8 @@ export async function recalculateUserAnimeStats(userId: number) {
       release_year_distribution = VALUES(release_year_distribution),
       avg_release_year = VALUES(avg_release_year),
       score_distribution = VALUES(score_distribution),
+      top_watched_genre_top_anime = VALUES(top_watched_genre_top_anime),
+      top_rated_genre_top_anime = VALUES(top_rated_genre_top_anime),
       preference_summary = VALUES(preference_summary),
       recommendation_context = VALUES(recommendation_context),
       updated_at = CURRENT_TIMESTAMP
@@ -481,6 +599,8 @@ export async function recalculateUserAnimeStats(userId: number) {
       JSON.stringify(releaseYearDistribution),
       avgReleaseYear,
       JSON.stringify(scoreDistribution),
+      JSON.stringify(topWatchedGenreTopAnime),
+      JSON.stringify(topRatedGenreTopAnime),
       preferenceSummary,
       recommendationContext,
     ]
@@ -509,6 +629,8 @@ export async function getUserAnimeStats(userId: number, skipRecalculate = false)
       release_year_distribution AS releaseYearDistribution,
       avg_release_year AS avgReleaseYear,
       score_distribution AS scoreDistribution,
+      top_watched_genre_top_anime AS topWatchedGenreTopAnime,
+      top_rated_genre_top_anime AS topRatedGenreTopAnime,
       preference_summary AS preferenceSummary,
       recommendation_context AS recommendationContext,
       updated_at AS updatedAt
@@ -541,6 +663,8 @@ export async function getUserAnimeStats(userId: number, skipRecalculate = false)
       releaseYearDistribution: {},
       avgReleaseYear: null,
       scoreDistribution: {},
+      topWatchedGenreTopAnime: [],
+      topRatedGenreTopAnime: [],
       preferenceSummary: '',
       recommendationContext: '',
       updatedAt: new Date().toISOString(),
@@ -567,7 +691,7 @@ function computeRecommendationScore(
     genreScore += avgGenreScore * 4;
   }
 
-  const releaseBucket = toReleaseYearBucket(candidate.seasonYear);
+  const releaseBucket = toReleaseYearKey(candidate.seasonYear);
   const releasePeriodScore = releaseBucket
     ? (stats.releaseYearDistribution[releaseBucket] ?? 0) * 2
     : 0;
@@ -689,3 +813,4 @@ export async function getRecommendedAnime(
     items: scoredItems,
   };
 }
+

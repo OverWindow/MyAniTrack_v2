@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useLocation, useParams } from 'react-router-dom'
 import { CollectionEditor } from '../components/CollectionEditor'
 import {
   fetchAnimeDetail,
   getDetailMetaTitle,
+  getGenreLabel,
   getPrimaryPoster,
-  stripDescriptionMarkup,
 } from '../lib/anime'
 import type { AnimeDetailItem } from '../types/anime'
 import '../styles/pages/AnimeDetailPage.css'
@@ -38,12 +38,16 @@ function getQuarterLabel(season?: string | null, seasonYear?: number | null) {
 
 export function AnimeDetailPage() {
   const { id } = useParams<{ id: string }>()
+  const location = useLocation()
   const requestKey = id ?? 'invalid'
   const [state, setState] = useState<DetailState>(() =>
     createInitialDetailState(requestKey),
   )
   const { item, isLoading, error } = state
   const isRefreshingDetail = state.requestKey !== requestKey
+  const fromPage = (location.state as { fromPage?: 'explore' | 'collection' } | null)?.fromPage
+  const backPath = fromPage === 'collection' ? '/collection' : '/explore'
+  const backLabel = fromPage === 'collection' ? '컬렉션으로 돌아가기' : '탐색으로 돌아가기'
 
   useEffect(() => {
     if (!id) {
@@ -119,8 +123,8 @@ export function AnimeDetailPage() {
 
   return (
     <section className="detail-page">
-      <Link className="detail-back-link" to="/explore">
-        탐색으로 돌아가기
+      <Link className="detail-back-link" to={backPath}>
+        {backLabel}
       </Link>
 
       <div className="detail-hero">
@@ -162,7 +166,7 @@ export function AnimeDetailPage() {
               </div>
               <div>
                 <span>평점</span>
-                <strong>{item.averageScore ? `${item.averageScore} / 100` : '미집계'}</strong>
+                <strong>{item.averageScore ? `${(item.averageScore / 10).toFixed(1)} / 10` : '미집계'}</strong>
               </div>
             </div>
 
@@ -172,7 +176,7 @@ export function AnimeDetailPage() {
                   원본 페이지 보기
                 </a>
               )}
-              <Link className="secondary-button" to="/explore">
+              <Link className="secondary-button" to={backPath}>
                 다른 작품 더 보기
               </Link>
             </div>
@@ -182,9 +186,19 @@ export function AnimeDetailPage() {
 
       <div className="detail-layout">
         <article className="detail-section detail-description">
-          <span className="detail-label">Description</span>
-          <h2>작품 소개</h2>
-          <p className="detail-description-text">{stripDescriptionMarkup(item.description)}</p>
+          <span className="detail-label">Genres</span>
+          <h2>장르</h2>
+          {!!item.genres?.length ? (
+            <div className="chip-list detail-chip-list-spacious">
+              {item.genres.map((genre) => (
+                <span className="info-chip" key={genre}>
+                  {getGenreLabel(genre)}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p className="detail-description-text">아직 등록된 장르 정보가 없어요.</p>
+          )}
         </article>
 
         <aside className="detail-sidebar">
@@ -227,32 +241,6 @@ export function AnimeDetailPage() {
                 {koreanTitles.map((title) => (
                   <span className="info-chip" key={title.fullTitle}>
                     {title.fullTitle}
-                  </span>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {!!item.genres?.length && (
-            <section className="detail-section">
-              <span className="detail-label">Genres</span>
-              <div className="chip-list">
-                {item.genres.map((genre) => (
-                  <span className="info-chip" key={genre}>
-                    {genre}
-                  </span>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {!!item.tags?.length && (
-            <section className="detail-section">
-              <span className="detail-label">Tags</span>
-              <div className="chip-list">
-                {item.tags.map((tag) => (
-                  <span className="info-chip" key={tag.name}>
-                    {tag.name}
                   </span>
                 ))}
               </div>

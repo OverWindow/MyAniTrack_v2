@@ -8,13 +8,19 @@ import {
 } from 'react'
 import {
   clearStoredSession,
+  consumePendingAgreements,
+  createStoredSession,
   fetchMe,
+  getSessionRefreshDelay,
   getStoredSession,
+  isSessionExpiredError,
   login,
   logoutAllDevices,
   logoutCurrentDevice,
+  refreshStoredSession,
   saveStoredSession,
   signup,
+  updateMyAgreements,
   updateProfile,
 } from '../lib/auth'
 import type {
@@ -22,6 +28,7 @@ import type {
   AuthUser,
   LoginPayload,
   SignupPayload,
+  SignupResponse,
   UpdateProfilePayload,
 } from '../types/auth'
 
@@ -30,7 +37,7 @@ type AuthContextValue = {
   isAuthenticated: boolean
   isBootstrapping: boolean
   loginWithEmail: (payload: LoginPayload) => Promise<void>
-  signupWithEmail: (payload: SignupPayload) => Promise<void>
+  signupWithEmail: (payload: SignupPayload) => Promise<SignupResponse>
   logout: () => Promise<void>
   logoutEverywhere: () => Promise<void>
   refreshMe: () => Promise<void>
@@ -40,12 +47,19 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | null>(null)
 
 function persistSession(response: AuthResponse) {
+  saveStoredSession(createStoredSession(response, response.user))
+}
+
+function replaceStoredSessionUser(nextUser: AuthUser | null) {
+  const session = getStoredSession()
+
+  if (!session) {
+    return
+  }
+
   saveStoredSession({
-    accessToken: response.accessToken,
-    refreshToken: response.refreshToken,
-    accessTokenExpiresIn: response.accessTokenExpiresIn,
-    tokenType: response.tokenType,
-    user: response.user,
+    ...session,
+    user: nextUser,
   })
 }
 
@@ -58,6 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const session = getStoredSession()
 
     if (!session?.accessToken) {
+      setIsBootstrapping(false)
       return
     }
 
@@ -65,10 +80,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const me = await fetchMe(session.accessToken)
         setUser(me)
-        saveStoredSession({ ...session, user: me })
-      } catch {
-        clearStoredSession()
-        setUser(null)
+        replaceStoredSessionUser(me)
+      } catch (error) {
+        if (isSessionExpiredError(error)) {
+          clearStoredSession()
+          setUser(null)
+        } else {
+          setUser((current) => current ?? session.user ?? null)
+        }
       } finally {
         setIsBootstrapping(false)
       }
@@ -76,6 +95,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     void loadMe()
   }, [])
+
+  useEffect(() => {
+    if (!user) {
+      return
+    }
+
+    const session = getStoredSession()
+
+    if (!session?.refreshToken) {
+      return
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      const refreshInBackground = async () => {
+        try {
+          const nextSession = await refreshStoredSession()
+          setUser((current) => current ?? nextSession.user ?? null)
+        } catch (error) {
+          if (isSessionExpiredError(error)) {
+            clearStoredSession()
+            setUser(null)
+          }
+        }
+      }
+
+      void refreshInBackground()
+    }, getSessionRefreshDelay(session))
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [user])
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -86,11 +137,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const response = await login(payload)
         persistSession(response)
         setUser(response.user)
+
+        const pendingAgreements = consumePendingAgreements(response.user.email)
+
+        if (pendingAgreements) {
+          try {
+            await updateMyAgreements(pendingAgreements)
+          } catch {
+            // Ignore agreement sync failures during login; the user can retry later.
+          }
+        }
       },
       async signupWithEmail(payload) {
-        const response = await signup(payload)
-        persistSession(response)
-        setUser(response.user)
+        return signup(payload)
       },
       async logout() {
         const session = getStoredSession()
@@ -136,7 +195,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         const me = await fetchMe(session.accessToken)
         setUser(me)
-        saveStoredSession({ ...session, user: me })
+        replaceStoredSessionUser(me)
       },
       async updateMyProfile(payload) {
         const session = getStoredSession()

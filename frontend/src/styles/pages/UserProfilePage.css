@@ -1,0 +1,24 @@
+.user-profile-page {
+  display: grid;
+  gap: 22px;
+}
+
+.user-profile-hero-card {
+  align-items: center;
+}
+
+.user-profile-meta-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.user-profile-actions {
+  align-items: center;
+}
+
+@media (max-width: 760px) {
+  .user-profile-actions {
+    width: 100%;
+  }
+}

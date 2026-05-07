@@ -1,4 +1,4 @@
-import { ANILIST_ANIME_PAGE_QUERY } from './anilist.queries';
+import { ANILIST_ANIME_PAGE_QUERY, ANILIST_SEASON_ANIME_PAGE_QUERY } from './anilist.queries';
 
 const ANILIST_URL = 'https://graphql.anilist.co';
 
@@ -39,7 +39,7 @@ export interface AniListAnime {
   synonyms?: string[] | null;
   bannerImage?: string | null;
   siteUrl?: string | null;
-  updatedAt?: number | null; // unix timestamp
+  updatedAt?: number | null;
 }
 
 interface AniListPageResponse {
@@ -88,6 +88,52 @@ export async function fetchAnimePage(page: number, perPage: number): Promise<{
   const pageData = json.data?.Page;
   if (!pageData?.pageInfo) {
     throw new Error('Invalid AniList response: missing pageInfo');
+  }
+
+  return {
+    media: pageData.media ?? [],
+    hasNextPage: pageData.pageInfo.hasNextPage,
+    currentPage: pageData.pageInfo.currentPage,
+    lastPage: pageData.pageInfo.lastPage,
+  };
+}
+
+export async function fetchSeasonAnimePage(
+  season: 'WINTER' | 'SPRING' | 'SUMMER' | 'FALL',
+  seasonYear: number,
+  page: number,
+  perPage: number
+): Promise<{
+  media: AniListAnime[];
+  hasNextPage: boolean;
+  currentPage: number;
+  lastPage: number;
+}> {
+  const response = await fetch(ANILIST_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
+    body: JSON.stringify({
+      query: ANILIST_SEASON_ANIME_PAGE_QUERY,
+      variables: { page, perPage, season, seasonYear },
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`AniList seasonal request failed: ${response.status} ${response.statusText}`);
+  }
+
+  const json = (await response.json()) as AniListPageResponse;
+
+  if (json.errors?.length) {
+    throw new Error(`AniList GraphQL error: ${json.errors.map(e => e.message).join(', ')}`);
+  }
+
+  const pageData = json.data?.Page;
+  if (!pageData?.pageInfo) {
+    throw new Error('Invalid AniList seasonal response: missing pageInfo');
   }
 
   return {

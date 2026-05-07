@@ -12,6 +12,16 @@ interface UserProfileRow extends RowDataPacket {
   updatedAt: string;
 }
 
+interface PublicUserProfileRow extends RowDataPacket {
+  id: number;
+  username: string;
+  profileImageUrl: string | null;
+  bio: string | null;
+  animeListCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 interface UploadedProfileImageFile {
   buffer: Buffer;
   mimetype: string;
@@ -81,6 +91,31 @@ async function findUserById(userId: number) {
   return rows[0] ?? null;
 }
 
+async function findPublicUserById(userId: number) {
+  const [rows] = await pool.query<PublicUserProfileRow[]>(
+    `
+    SELECT
+      u.id,
+      u.username,
+      u.profile_image_url AS profileImageUrl,
+      u.bio,
+      (
+        SELECT COUNT(*)
+        FROM user_anime_lists ual
+        WHERE ual.user_id = u.id
+      ) AS animeListCount,
+      u.created_at AS createdAt,
+      u.updated_at AS updatedAt
+    FROM users u
+    WHERE u.id = ?
+    LIMIT 1
+    `,
+    [userId]
+  );
+
+  return rows[0] ?? null;
+}
+
 function mapUserProfile(user: UserProfileRow) {
   return {
     id: user.id,
@@ -91,6 +126,28 @@ function mapUserProfile(user: UserProfileRow) {
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };
+}
+
+function mapPublicUserProfile(user: PublicUserProfileRow) {
+  return {
+    id: user.id,
+    username: user.username,
+    profileImageUrl: user.profileImageUrl,
+    bio: user.bio,
+    animeListCount: user.animeListCount,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
+  };
+}
+
+export async function getPublicUserProfile(userId: number) {
+  const user = await findPublicUserById(userId);
+
+  if (!user) {
+    throw new Error('User not found');
+  }
+
+  return mapPublicUserProfile(user);
 }
 
 export async function updateUserProfile(params: UpdateUserProfileParams) {

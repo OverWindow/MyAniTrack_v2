@@ -23,13 +23,27 @@ type CollectionEditorProps = {
   maxProgress?: number | null
 }
 
+function getInitialScore(score?: number | null) {
+  if (typeof score !== 'number' || score <= 0) {
+    return 0
+  }
+
+  return Math.min(10, Math.max(0, score))
+}
+
+function getStarFillPercent(score: number, starIndex: number) {
+  const scoreInStars = score / 2
+  const fill = Math.max(0, Math.min(1, scoreInStars - starIndex))
+  return `${fill * 100}%`
+}
+
 export function CollectionEditor({ animeId, maxProgress }: CollectionEditorProps) {
   const { isAuthenticated } = useAuth()
   const cached = getCachedCollectionEntry(animeId)
   const totalProgress = maxProgress && maxProgress > 0 ? maxProgress : null
   const defaultCompletedProgress = totalProgress ?? 0
   const [status, setStatus] = useState<UserAnimeStatus>(cached?.status ?? 'completed')
-  const [score, setScore] = useState<number>(cached?.score ? Math.round(cached.score / 2) : 0)
+  const [score, setScore] = useState<number>(getInitialScore(cached?.score))
   const [progress, setProgress] = useState<number>(cached?.progress ?? defaultCompletedProgress)
   const [startedAt, setStartedAt] = useState(cached?.startedAt ?? '')
   const [completedAt, setCompletedAt] = useState(cached?.completedAt ?? '')
@@ -40,7 +54,7 @@ export function CollectionEditor({ animeId, maxProgress }: CollectionEditorProps
 
   const payload = {
     status,
-    ...(score > 0 ? { score: score * 2 } : {}),
+    ...(score > 0 ? { score } : {}),
     ...((progress > 0 || status === 'completed') ? { progress } : {}),
     ...(startedAt ? { startedAt } : {}),
     ...(completedAt ? { completedAt } : {}),
@@ -53,6 +67,10 @@ export function CollectionEditor({ animeId, maxProgress }: CollectionEditorProps
     if (nextStatus === 'completed' && totalProgress) {
       setProgress(totalProgress)
     }
+  }
+
+  const handleScoreSelect = (nextScore: number) => {
+    setScore(nextScore)
   }
 
   const handleSave = async () => {
@@ -139,32 +157,46 @@ export function CollectionEditor({ animeId, maxProgress }: CollectionEditorProps
           </select>
         </label>
 
-        <div className="auth-field">
+        <div className="auth-field collection-score-field">
           <span>별점</span>
-          <div className="star-rating" role="radiogroup" aria-label="별점 선택">
-            {Array.from({ length: 5 }).map((_, index) => {
-              const starValue = index + 1
+          <div className="star-rating-card">
+            <div className="star-rating-display" role="radiogroup" aria-label="별점 선택">
+              <div className="star-rating-stars">
+                {Array.from({ length: 5 }).map((_, index) => {
+                  const leftValue = index * 2 + 1.5
+                  const rightValue = index * 2 + 2
 
-              return (
-                <button
-                  key={starValue}
-                  className={score >= starValue ? 'star-button is-active' : 'star-button'}
-                  type="button"
-                  aria-label={`${starValue}점`}
-                  aria-pressed={score === starValue}
-                  onClick={() => setScore(starValue)}
-                >
-                  ★
-                </button>
-              )
-            })}
-            <button
-              className="star-reset-button"
-              type="button"
-              onClick={() => setScore(0)}
-            >
-              초기화
-            </button>
+                  return (
+                    <div className="star-button-shell" key={index}>
+                      <span className="star-button-base" aria-hidden="true">★</span>
+                      <span
+                        className="star-button-fill"
+                        aria-hidden="true"
+                        style={{ width: getStarFillPercent(score, index) }}
+                      >
+                        ★
+                      </span>
+                      <button
+                        className="star-button-hit is-left"
+                        type="button"
+                        aria-label={`${leftValue.toFixed(1)}점 선택`}
+                        onClick={() => handleScoreSelect(leftValue)}
+                      />
+                      <button
+                        className="star-button-hit is-right"
+                        type="button"
+                        aria-label={`${rightValue.toFixed(1)}점 선택`}
+                        onClick={() => handleScoreSelect(rightValue)}
+                      />
+                    </div>
+                  )
+                })}
+              </div>
+              <strong className="star-score-value">{score > 0 ? score.toFixed(1) : '--'}</strong>
+            </div>
+            <p className="star-rating-help">
+              {score > 0 ? `${score.toFixed(1)}점을 선택했어요.` : '별 왼쪽/오른쪽을 눌러 점수를 선택해 주세요'}
+            </p>
           </div>
         </div>
 

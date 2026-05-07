@@ -4,7 +4,7 @@ import { AnimeGenre } from './anime.service';
 import { recalculateUserAnimeStats } from './recommendation.service';
 
 const LIST_STATUS_OPTIONS = ['planned', 'watching', 'completed', 'paused', 'dropped'] as const;
-const USER_ANIME_LIST_SORT_OPTIONS = ['latest', 'added', 'score'] as const;
+const USER_ANIME_LIST_SORT_OPTIONS = ['latest', 'added', 'score', 'scoreAsc'] as const;
 
 type ListStatus = typeof LIST_STATUS_OPTIONS[number];
 export type UserAnimeListSortOption = typeof USER_ANIME_LIST_SORT_OPTIONS[number];
@@ -106,7 +106,7 @@ function validateAnimeId(animeId: number) {
 
 export function validateUserAnimeListSort(sort: unknown): UserAnimeListSortOption {
   if (typeof sort !== 'string' || !USER_ANIME_LIST_SORT_OPTIONS.includes(sort as UserAnimeListSortOption)) {
-    throw new Error('sort must be one of latest, added, score');
+    throw new Error('sort must be one of latest, added, score, scoreAsc');
   }
 
   return sort as UserAnimeListSortOption;
@@ -374,6 +374,10 @@ function buildOrderClause(sort: UserAnimeListSortOption) {
     return 'COALESCE(ual.score, -1) DESC, ual.anime_id DESC';
   }
 
+  if (sort === 'scoreAsc') {
+    return 'COALESCE(ual.score, 11) ASC, ual.anime_id DESC';
+  }
+
   if (sort === 'added') {
     return 'ual.created_at DESC, ual.anime_id DESC';
   }
@@ -581,6 +585,108 @@ export async function getUserAnimeList(params: GetUserAnimeListParams) {
   };
 }
 
+export async function getMyAnimeRelation(
+  userId: number,
+  animeId: number,
+  titleLanguage: UserAnimeListTitleLanguage
+) {
+  const validatedAnimeId = validateAnimeId(animeId);
+  const [rows] = await pool.query<UserAnimeListListRow[]>(
+    `
+    SELECT
+      ual.id,
+      ual.user_id AS userId,
+      ual.anime_id AS animeId,
+      ual.status,
+      ual.score,
+      ual.progress,
+      ual.started_at AS startedAt,
+      ual.completed_at AS completedAt,
+      ual.notes,
+      ual.created_at AS createdAt,
+      ual.updated_at AS updatedAt,
+      a.anilist_id AS animeAnilistId,
+      a.title_romaji AS animeTitleRomaji,
+      a.title_english AS animeTitleEnglish,
+      a.title_native AS animeTitleNative,
+      a.title_user_preferred AS animeTitleUserPreferred,
+      akt.full_title AS animeTitleKorean,
+      a.episodes AS animeEpisodes,
+      a.duration AS animeDuration,
+      a.season AS animeSeason,
+      a.season_year AS animeSeasonYear,
+      a.format AS animeFormat,
+      a.status AS animeStatus,
+      a.average_score AS animeAverageScore,
+      a.mean_score AS animeMeanScore,
+      a.popularity AS animePopularity,
+      a.favourites AS animeFavourites,
+      a.cover_image_large AS animeCoverImageLarge,
+      a.cover_image_extra_large AS animeCoverImageExtraLarge,
+      a.banner_image AS animeBannerImage,
+      a.site_url AS animeSiteUrl,
+      a.is_adult AS animeIsAdult,
+      COALESCE(ual.score, -1) AS sortScoreValue
+    FROM user_anime_lists ual
+    INNER JOIN anime a
+      ON a.id = ual.anime_id
+    LEFT JOIN anime_korean_titles akt
+      ON akt.anime_id = a.id
+      AND akt.is_primary = TRUE
+    WHERE ual.user_id = ?
+      AND ual.anime_id = ?
+    LIMIT 1
+    `,
+    [userId, validatedAnimeId]
+  );
+
+  const row = rows[0];
+
+  if (!row) {
+    throw new Error('User anime list item not found');
+  }
+
+  return {
+    id: row.id,
+    userId: row.userId,
+    animeId: row.animeId,
+    status: row.status,
+    score: row.score,
+    progress: row.progress,
+    startedAt: row.startedAt,
+    completedAt: row.completedAt,
+    notes: row.notes,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    anime: {
+      id: row.animeId,
+      anilistId: row.animeAnilistId,
+      title: pickDisplayTitle(row, titleLanguage),
+      titles: {
+        korean: row.animeTitleKorean,
+        english: row.animeTitleEnglish,
+        native: row.animeTitleNative,
+        romaji: row.animeTitleRomaji,
+        userPreferred: row.animeTitleUserPreferred,
+      },
+      episodes: row.animeEpisodes,
+      duration: row.animeDuration,
+      season: row.animeSeason,
+      seasonYear: row.animeSeasonYear,
+      format: row.animeFormat,
+      status: row.animeStatus,
+      averageScore: row.animeAverageScore,
+      meanScore: row.animeMeanScore,
+      popularity: row.animePopularity,
+      favourites: row.animeFavourites,
+      coverImageLarge: row.animeCoverImageLarge,
+      coverImageExtraLarge: row.animeCoverImageExtraLarge,
+      bannerImage: row.animeBannerImage,
+      siteUrl: row.animeSiteUrl,
+      isAdult: Boolean(row.animeIsAdult),
+    },
+  };
+}
 export async function addAnimeToUserList(userId: number, animeId: number, input: UserAnimeListInput) {
   const validatedAnimeId = validateAnimeId(animeId);
   const values = buildFullInput(input);
@@ -714,3 +820,5 @@ export async function removeAnimeFromUserList(userId: number, animeId: number) {
 
   await recalculateUserAnimeStats(userId);
 }
+
+

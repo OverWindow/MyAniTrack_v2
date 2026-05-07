@@ -1,5 +1,16 @@
 import { NextFunction, Request, Response } from 'express';
+import { RowDataPacket } from 'mysql2/promise';
+import { pool } from '../../config/db';
 import { verifyAccessToken } from '../lib/auth';
+
+type UserRole = 'USER' | 'ADMIN';
+
+interface AuthUserRow extends RowDataPacket {
+  id: number;
+  email: string;
+  username: string;
+  role: UserRole;
+}
 
 declare global {
   namespace Express {
@@ -8,12 +19,31 @@ declare global {
         userId: number;
         email: string;
         username: string;
+        role: UserRole;
       };
     }
   }
 }
 
-export function requireAuth(req: Request, res: Response, next: NextFunction) {
+async function findAuthUserById(userId: number) {
+  const [rows] = await pool.query<AuthUserRow[]>(
+    `
+    SELECT
+      id,
+      email,
+      username,
+      role
+    FROM users
+    WHERE id = ?
+    LIMIT 1
+    `,
+    [userId]
+  );
+
+  return rows[0] ?? null;
+}
+
+export async function requireAuth(req: Request, res: Response, next: NextFunction) {
   const authorization = req.header('Authorization');
 
   if (!authorization?.startsWith('Bearer ')) {
@@ -27,10 +57,20 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
 
   try {
     const payload = verifyAccessToken(token);
+    const user = await findAuthUserById(payload.userId);
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'User not found',
+      });
+    }
+
     req.authUser = {
-      userId: payload.userId,
-      email: payload.email,
-      username: payload.username,
+      userId: user.id,
+      email: user.email,
+      username: user.username,
+      role: user.role,
     };
 
     return next();
@@ -42,4 +82,17 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
       message,
     });
   }
+}
+
+export async function requireAdmin(req: Request, res: Response, next: NextFunction) {
+  await requireAuth(req, res, async () => {
+    if (!req.authUser || req.authUser.role !== 'ADMIN') {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin access required',
+      });
+    }
+
+    return next();
+  });
 }

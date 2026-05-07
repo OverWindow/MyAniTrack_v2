@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { getProfileImageSrc, handleProfileImageError } from '../lib/avatar'
 import '../styles/pages/AuthPage.css'
 import '../styles/pages/ProfilePage.css'
 
@@ -25,10 +26,17 @@ export function ProfileEditPage() {
     return null
   }, [removeProfileImage, selectedFile, user?.profileImageUrl])
 
-  const displayName = username.trim() || user?.username || ''
-  const initials = displayName.slice(0, 2).toUpperCase()
+  const displayName = username.trim() || user?.username || 'MyAniTrack User'
   const hasChanges =
     username.trim() !== user?.username || Boolean(selectedFile) || removeProfileImage
+
+  useEffect(() => {
+    return () => {
+      if (selectedFile && previewUrl) {
+        URL.revokeObjectURL(previewUrl)
+      }
+    }
+  }, [previewUrl, selectedFile])
 
   if (!isAuthenticated || !user) {
     return <Navigate to="/login" replace state={{ from: '/profile/edit' }} />
@@ -67,13 +75,12 @@ export function ProfileEditPage() {
 
         <form className="auth-form" onSubmit={handleSubmit}>
           <div className="profile-edit-preview">
-            {previewUrl ? (
-              <img className="profile-hero-avatar profile-hero-avatar-image" src={previewUrl} alt={username} />
-            ) : (
-              <div className="profile-hero-avatar" aria-hidden="true">
-                <span>{initials}</span>
-              </div>
-            )}
+            <img
+              className="profile-hero-avatar profile-hero-avatar-image"
+              src={getProfileImageSrc(previewUrl)}
+              alt={displayName}
+              onError={handleProfileImageError}
+            />
 
             <div className="profile-edit-preview-copy">
               <strong>{displayName}</strong>

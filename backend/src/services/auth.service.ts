@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { PoolConnection, ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import { pool } from '../../config/db';
 import {
@@ -8,16 +9,33 @@ import {
   hashRefreshToken,
   verifyPassword,
 } from '../lib/auth';
+import { sendPasswordResetEmail, sendVerifyEmail } from '../lib/mail';
+
+type UserRole = 'USER' | 'ADMIN';
+type EmailTokenPurpose = 'SIGNUP_VERIFY' | 'PASSWORD_RESET';
 
 interface UserRow extends RowDataPacket {
   id: number;
   email: string;
   username: string;
+  role: UserRole;
   passwordHash: string;
   profileImageUrl: string | null;
   bio: string | null;
+  emailVerified: number | boolean;
+  emailVerifiedAt: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+interface EmailVerificationTokenRow extends RowDataPacket {
+  id: number;
+  userId: number | null;
+  email: string;
+  purpose: EmailTokenPurpose;
+  tokenHash: string;
+  expiresAt: string;
+  usedAt: string | null;
 }
 
 export interface SignUpParams {
@@ -45,6 +63,18 @@ export interface RefreshSessionParams {
   refreshToken: string;
   deviceType?: string | null;
   deviceName?: string | null;
+  userAgent?: string | null;
+  ipAddress?: string | null;
+}
+
+export interface SendVerificationEmailParams {
+  email: string;
+  userAgent?: string | null;
+  ipAddress?: string | null;
+}
+
+export interface RequestPasswordResetParams {
+  email: string;
   userAgent?: string | null;
   ipAddress?: string | null;
 }
@@ -129,6 +159,24 @@ function toMysqlDateTime(date: Date): string {
   return date.toISOString().slice(0, 19).replace('T', ' ');
 }
 
+function hashEmailToken(token: string) {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
+function createEmailTokenValue() {
+  return crypto.randomBytes(32).toString('base64url');
+}
+
+function getSignupVerifyExpiresAt() {
+  const hours = Number(process.env.EMAIL_SIGNUP_VERIFY_EXPIRES_HOURS || 24);
+  return new Date(Date.now() + hours * 60 * 60 * 1000);
+}
+
+function getPasswordResetExpiresAt() {
+  const minutes = Number(process.env.EMAIL_PASSWORD_RESET_EXPIRES_MINUTES || 60);
+  return new Date(Date.now() + minutes * 60 * 1000);
+}
+
 async function findUserByEmail(email: string) {
   const [rows] = await pool.query<UserRow[]>(
     `
@@ -136,9 +184,12 @@ async function findUserByEmail(email: string) {
       id,
       email,
       username,
+      role,
       password_hash AS passwordHash,
       profile_image_url AS profileImageUrl,
       bio,
+      email_verified AS emailVerified,
+      email_verified_at AS emailVerifiedAt,
       created_at AS createdAt,
       updated_at AS updatedAt
     FROM users
@@ -151,6 +202,31 @@ async function findUserByEmail(email: string) {
   return rows[0] ?? null;
 }
 
+async function findUserByUsername(username: string) {
+  const [rows] = await pool.query<UserRow[]>(
+    `
+    SELECT
+      id,
+      email,
+      username,
+      role,
+      password_hash AS passwordHash,
+      profile_image_url AS profileImageUrl,
+      bio,
+      email_verified AS emailVerified,
+      email_verified_at AS emailVerifiedAt,
+      created_at AS createdAt,
+      updated_at AS updatedAt
+    FROM users
+    WHERE username = ?
+    LIMIT 1
+    `,
+    [username]
+  );
+
+  return rows[0] ?? null;
+}
+
 async function findUserById(id: number) {
   const [rows] = await pool.query<UserRow[]>(
     `
@@ -158,9 +234,12 @@ async function findUserById(id: number) {
       id,
       email,
       username,
+      role,
       password_hash AS passwordHash,
       profile_image_url AS profileImageUrl,
       bio,
+      email_verified AS emailVerified,
+      email_verified_at AS emailVerifiedAt,
       created_at AS createdAt,
       updated_at AS updatedAt
     FROM users
@@ -173,11 +252,37 @@ async function findUserById(id: number) {
   return rows[0] ?? null;
 }
 
+async function findEmailTokenByHash(tokenHash: string, purpose: EmailTokenPurpose) {
+  const [rows] = await pool.query<EmailVerificationTokenRow[]>(
+    `
+    SELECT
+      id,
+      user_id AS userId,
+      email,
+      purpose,
+      token_hash AS tokenHash,
+      expires_at AS expiresAt,
+      used_at AS usedAt
+    FROM email_verification_tokens
+    WHERE token_hash = ?
+      AND purpose = ?
+    LIMIT 1
+    `,
+    [tokenHash, purpose]
+  );
+
+  return rows[0] ?? null;
+}
+
 function mapUserProfile(user: UserRow) {
   return {
     id: user.id,
     email: user.email,
     username: user.username,
+    role: user.role,
+    isAdmin: user.role === 'ADMIN',
+    emailVerified: Boolean(user.emailVerified),
+    emailVerifiedAt: user.emailVerifiedAt,
     profileImageUrl: user.profileImageUrl,
     bio: user.bio,
     createdAt: user.createdAt,
@@ -244,6 +349,49 @@ async function createRefreshTokenRecord(
   };
 }
 
+async function createEmailTokenRecord(
+  conn: PoolConnection,
+  params: {
+    userId: number | null;
+    email: string;
+    purpose: EmailTokenPurpose;
+    expiresAt: Date;
+    ipAddress?: string | null;
+    userAgent?: string | null;
+  }
+) {
+  const token = createEmailTokenValue();
+  const tokenHash = hashEmailToken(token);
+  const requestIp = normalizeOptionalText(params.ipAddress, 45);
+  const userAgent = normalizeOptionalText(params.userAgent, 500);
+
+  await conn.execute<ResultSetHeader>(
+    `
+    INSERT INTO email_verification_tokens (
+      user_id,
+      email,
+      purpose,
+      token_hash,
+      expires_at,
+      request_ip,
+      user_agent
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    `,
+    [
+      params.userId,
+      params.email,
+      params.purpose,
+      tokenHash,
+      toMysqlDateTime(params.expiresAt),
+      requestIp,
+      userAgent,
+    ]
+  );
+
+  return token;
+}
+
 async function findRefreshTokenByTokenHash(tokenHash: string) {
   const [rows] = await pool.query<RefreshTokenRow[]>(
     `
@@ -279,69 +427,92 @@ export async function signUp(params: SignUpParams) {
   const bio = normalizeOptionalText(params.bio, 500);
 
   const passwordHash = await hashPassword(password);
+  const conn = await pool.getConnection();
+  let user: UserRow | null = null;
+  let verifyToken = '';
 
   try {
-    const conn = await pool.getConnection();
+    await conn.beginTransaction();
 
-    try {
-      await conn.beginTransaction();
+    const [result] = await conn.execute<ResultSetHeader>(
+      `
+      INSERT INTO users (
+        email,
+        username,
+        password_hash,
+        profile_image_url,
+        bio,
+        role,
+        email_verified,
+        email_verified_at
+      )
+      VALUES (?, ?, ?, ?, ?, 'USER', FALSE, NULL)
+      `,
+      [email, username, passwordHash, profileImageUrl, bio]
+    );
 
-      const [result] = await conn.execute<ResultSetHeader>(
-        `
-        INSERT INTO users (
-          email,
-          username,
-          password_hash,
-          profile_image_url,
-          bio
-        )
-        VALUES (?, ?, ?, ?, ?)
-        `,
-        [email, username, passwordHash, profileImageUrl, bio]
-      );
+    const [userRows] = await conn.query<UserRow[]>(
+      `
+      SELECT
+        id,
+        email,
+        username,
+        role,
+        password_hash AS passwordHash,
+        profile_image_url AS profileImageUrl,
+        bio,
+        email_verified AS emailVerified,
+        email_verified_at AS emailVerifiedAt,
+        created_at AS createdAt,
+        updated_at AS updatedAt
+      FROM users
+      WHERE id = ?
+      LIMIT 1
+      `,
+      [result.insertId]
+    );
 
-      const [userRows] = await conn.query<UserRow[]>(
-        `
-        SELECT
-          id,
-          email,
-          username,
-          password_hash AS passwordHash,
-          profile_image_url AS profileImageUrl,
-          bio,
-          created_at AS createdAt,
-          updated_at AS updatedAt
-        FROM users
-        WHERE id = ?
-        LIMIT 1
-        `,
-        [result.insertId]
-      );
+    user = userRows[0] ?? null;
 
-      const user = userRows[0];
-
-      if (!user) {
-        throw new Error('Failed to create user');
-      }
-
-      const refreshTokenRecord = await createRefreshTokenRecord(conn, user.id, params);
-
-      await conn.commit();
-
-      return buildAuthResponse(user, refreshTokenRecord.token);
-    } catch (error) {
-      await conn.rollback();
-      throw error;
-    } finally {
-      conn.release();
+    if (!user) {
+      throw new Error('Failed to create user');
     }
+
+    verifyToken = await createEmailTokenRecord(conn, {
+      userId: user.id,
+      email: user.email,
+      purpose: 'SIGNUP_VERIFY',
+      expiresAt: getSignupVerifyExpiresAt(),
+      ipAddress: params.ipAddress,
+      userAgent: params.userAgent,
+    });
+
+    await conn.commit();
   } catch (error) {
+    await conn.rollback();
+
     if ((error as { code?: string }).code === 'ER_DUP_ENTRY') {
       throw new Error('Email or username already exists');
     }
 
     throw error;
+  } finally {
+    conn.release();
   }
+
+  if (!user) {
+    throw new Error('Failed to create user');
+  }
+
+  await sendVerifyEmail({
+    to: user.email,
+    token: verifyToken,
+  });
+
+  return {
+    requiresEmailVerification: true,
+    user: mapUserProfile(user),
+  };
 }
 
 export async function login(params: LoginParams) {
@@ -357,6 +528,10 @@ export async function login(params: LoginParams) {
 
   if (!isValidPassword) {
     throw new Error('Invalid email or password');
+  }
+
+  if (!user.emailVerified) {
+    throw new Error('Email verification required');
   }
 
   const conn = await pool.getConnection();
@@ -375,6 +550,16 @@ export async function login(params: LoginParams) {
   }
 }
 
+export async function checkUsernameAvailability(username: string) {
+  const normalizedUsername = validateUsername(username);
+  const user = await findUserByUsername(normalizedUsername);
+
+  return {
+    username: normalizedUsername,
+    available: !user,
+  };
+}
+
 export async function getMyProfile(userId: number) {
   const user = await findUserById(userId);
 
@@ -383,6 +568,257 @@ export async function getMyProfile(userId: number) {
   }
 
   return mapUserProfile(user);
+}
+
+export async function sendSignupVerificationEmail(params: SendVerificationEmailParams) {
+  const email = validateEmail(params.email);
+  const user = await findUserByEmail(email);
+
+  if (!user) {
+    throw new Error('User not found');
+  }
+
+  if (user.emailVerified) {
+    throw new Error('Email already verified');
+  }
+
+  const conn = await pool.getConnection();
+  let token = '';
+
+  try {
+    await conn.beginTransaction();
+    token = await createEmailTokenRecord(conn, {
+      userId: user.id,
+      email: user.email,
+      purpose: 'SIGNUP_VERIFY',
+      expiresAt: getSignupVerifyExpiresAt(),
+      ipAddress: params.ipAddress,
+      userAgent: params.userAgent,
+    });
+    await conn.commit();
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
+  }
+
+  await sendVerifyEmail({
+    to: user.email,
+    token,
+  });
+
+  return {
+    email: user.email,
+    requiresEmailVerification: true,
+  };
+}
+
+export async function verifySignupEmail(token: string) {
+  const normalizedToken = normalizeOptionalText(token, 5000);
+
+  if (!normalizedToken) {
+    throw new Error('token is required');
+  }
+
+  const tokenHash = hashEmailToken(normalizedToken);
+  const verificationToken = await findEmailTokenByHash(tokenHash, 'SIGNUP_VERIFY');
+
+  if (!verificationToken) {
+    throw new Error('Invalid verification token');
+  }
+
+  if (verificationToken.usedAt) {
+    throw new Error('Verification token has already been used');
+  }
+
+  if (new Date(verificationToken.expiresAt).getTime() <= Date.now()) {
+    throw new Error('Verification token has expired');
+  }
+
+  if (!verificationToken.userId) {
+    throw new Error('Invalid verification token');
+  }
+
+  const user = await findUserById(verificationToken.userId);
+
+  if (!user) {
+    throw new Error('User not found');
+  }
+
+  const conn = await pool.getConnection();
+
+  try {
+    await conn.beginTransaction();
+
+    await conn.execute(
+      `
+      UPDATE users
+      SET
+        email_verified = TRUE,
+        email_verified_at = CURRENT_TIMESTAMP,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+      `,
+      [user.id]
+    );
+
+    await conn.execute(
+      `
+      UPDATE email_verification_tokens
+      SET used_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+      `,
+      [verificationToken.id]
+    );
+
+    await conn.commit();
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
+  }
+
+  const verifiedUser = await findUserById(user.id);
+
+  if (!verifiedUser) {
+    throw new Error('User not found');
+  }
+
+  return {
+    user: mapUserProfile(verifiedUser),
+  };
+}
+
+export async function requestPasswordReset(params: RequestPasswordResetParams) {
+  const email = validateEmail(params.email);
+  const user = await findUserByEmail(email);
+
+  if (!user || !user.emailVerified) {
+    return {
+      email,
+      sent: true,
+    };
+  }
+
+  const conn = await pool.getConnection();
+  let token = '';
+
+  try {
+    await conn.beginTransaction();
+    token = await createEmailTokenRecord(conn, {
+      userId: user.id,
+      email: user.email,
+      purpose: 'PASSWORD_RESET',
+      expiresAt: getPasswordResetExpiresAt(),
+      ipAddress: params.ipAddress,
+      userAgent: params.userAgent,
+    });
+    await conn.commit();
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
+  }
+
+  await sendPasswordResetEmail({
+    to: user.email,
+    token,
+    email: user.email,
+  });
+
+  return {
+    email,
+    sent: true,
+  };
+}
+
+export async function resetPasswordWithEmailToken(token: string, newPassword: string) {
+  const normalizedToken = normalizeOptionalText(token, 5000);
+
+  if (!normalizedToken) {
+    throw new Error('token is required');
+  }
+
+  const password = validatePassword(newPassword);
+  const passwordHash = await hashPassword(password);
+  const tokenHash = hashEmailToken(normalizedToken);
+  const resetToken = await findEmailTokenByHash(tokenHash, 'PASSWORD_RESET');
+
+  if (!resetToken) {
+    throw new Error('Invalid password reset token');
+  }
+
+  if (resetToken.usedAt) {
+    throw new Error('Password reset token has already been used');
+  }
+
+  if (new Date(resetToken.expiresAt).getTime() <= Date.now()) {
+    throw new Error('Password reset token has expired');
+  }
+
+  if (!resetToken.userId) {
+    throw new Error('Invalid password reset token');
+  }
+
+  const user = await findUserById(resetToken.userId);
+
+  if (!user) {
+    throw new Error('User not found');
+  }
+
+  const conn = await pool.getConnection();
+
+  try {
+    await conn.beginTransaction();
+
+    await conn.execute(
+      `
+      UPDATE users
+      SET
+        password_hash = ?,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+      `,
+      [passwordHash, user.id]
+    );
+
+    await conn.execute(
+      `
+      UPDATE email_verification_tokens
+      SET used_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+      `,
+      [resetToken.id]
+    );
+
+    await conn.execute(
+      `
+      UPDATE refresh_tokens
+      SET
+        revoked_at = COALESCE(revoked_at, CURRENT_TIMESTAMP),
+        revoke_reason = COALESCE(revoke_reason, 'password_reset'),
+        updated_at = CURRENT_TIMESTAMP
+      WHERE user_id = ?
+        AND revoked_at IS NULL
+      `,
+      [user.id]
+    );
+
+    await conn.commit();
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
+  }
+
+  return {
+    email: user.email,
+    reset: true,
+  };
 }
 
 export async function refreshSession(params: RefreshSessionParams) {
@@ -411,6 +847,10 @@ export async function refreshSession(params: RefreshSessionParams) {
 
   if (!user) {
     throw new Error('User not found');
+  }
+
+  if (!user.emailVerified) {
+    throw new Error('Email verification required');
   }
 
   const conn = await pool.getConnection();
@@ -490,3 +930,4 @@ export async function logoutAll(userId: number) {
     [userId]
   );
 }
+

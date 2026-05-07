@@ -84,14 +84,14 @@
   position: absolute;
   top: 12px;
   right: 12px;
-  z-index: 2;
+  z-index: 3;
 }
 
 .anime-card-rating {
   position: absolute;
   top: 12px;
   left: 12px;
-  z-index: 2;
+  z-index: 3;
   min-height: 28px;
   padding: 0 10px;
   border-radius: var(--radius-pill);
@@ -102,6 +102,84 @@
   color: var(--text-on-point-soft);
   font-size: 0.76rem;
   font-weight: 700;
+}
+
+.anime-hover-rating {
+  position: absolute;
+  inset: auto 0 0;
+  z-index: 2;
+  display: flex;
+  justify-content: center;
+  padding: 16px 14px 14px;
+  background: linear-gradient(180deg, rgba(17, 24, 39, 0) 0%, rgba(17, 24, 39, 0.72) 38%, rgba(17, 24, 39, 0.82) 100%);
+  opacity: 0;
+  transform: translateY(12px);
+  transition:
+    opacity var(--duration-normal) ease,
+    transform var(--duration-normal) ease;
+}
+
+.anime-card:hover .anime-hover-rating,
+.anime-card:focus-within .anime-hover-rating {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.anime-hover-rating-stars {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.anime-hover-star {
+  position: relative;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.anime-hover-star-base,
+.anime-hover-star-fill {
+  position: absolute;
+  inset: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.35rem;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.anime-hover-star-base {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.anime-hover-star-fill {
+  width: 0;
+  overflow: hidden;
+  justify-content: flex-start;
+  color: #fbbf24;
+}
+
+.anime-hover-star-hit {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 50%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.anime-hover-star-hit.is-left {
+  left: 0;
+}
+
+.anime-hover-star-hit.is-right {
+  right: 0;
 }
 
 .anime-poster {

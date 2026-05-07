@@ -102,7 +102,6 @@ export async function fetchMyAnimeStats(signal?: AbortSignal) {
   }
 
   const payload = await response.json()
-  console.log('[MyAniTrack] GET /api/me/anime-stats response', payload)
   return normalizeStatsItem(payload)
 }
 

@@ -3,7 +3,10 @@ import dotenv from 'dotenv';
 import adminRoutes from './routes/admin.routes';
 import animeRoutes from './src/routes/anime.routes';
 import authRoutes from './src/routes/auth.routes';
+import friendRoutes from './src/routes/friend.routes';
+import platformStatsRoutes from './src/routes/platform-stats.routes';
 import recommendationRoutes from './src/routes/recommendation.routes';
+import userAgreementRoutes from './src/routes/user-agreement.routes';
 import userAnimeListRoutes from './src/routes/user-anime-list.routes';
 import userProfileRoutes from './src/routes/user-profile.routes';
 
@@ -32,7 +35,10 @@ app.get('/health', (_req, res) => {
 app.use(adminRoutes);
 app.use('/api', animeRoutes);
 app.use('/api', authRoutes);
+app.use('/api', friendRoutes);
+app.use('/api', platformStatsRoutes);
 app.use('/api', recommendationRoutes);
+app.use('/api', userAgreementRoutes);
 app.use('/api', userAnimeListRoutes);
 app.use('/api', userProfileRoutes);
 

@@ -1,4 +1,4 @@
-import { authFetch } from './auth'
+import { authFetch, getStoredSession } from './auth'
 import type { AnimeGenre } from '../types/anime'
 import type {
   UserAnimeListEntry,
@@ -7,7 +7,8 @@ import type {
   UserAnimeListSort,
 } from '../types/collection'
 
-const COLLECTION_STORAGE_KEY = 'myanitrack.collection.cache'
+const COLLECTION_STORAGE_KEY_PREFIX = 'myanitrack.collection.cache'
+export const COLLECTION_CACHE_UPDATED_EVENT = 'myanitrack:collection-cache-updated'
 
 function getApiBaseUrl() {
   const baseUrl = import.meta.env.VITE_API_BASE_URL
@@ -23,8 +24,28 @@ function createUrl(path: string) {
   return new URL(path, getApiBaseUrl()).toString()
 }
 
+function getCollectionStorageKey() {
+  const session = getStoredSession()
+  const userId = session?.user?.id
+
+  return userId
+    ? `${COLLECTION_STORAGE_KEY_PREFIX}:${String(userId)}`
+    : `${COLLECTION_STORAGE_KEY_PREFIX}:guest`
+}
+
+function dispatchCollectionCacheUpdated(animeId?: number) {
+  window.dispatchEvent(
+    new CustomEvent(COLLECTION_CACHE_UPDATED_EVENT, {
+      detail: {
+        animeId,
+        storageKey: getCollectionStorageKey(),
+      },
+    }),
+  )
+}
+
 export function getCollectionCache() {
-  const raw = window.localStorage.getItem(COLLECTION_STORAGE_KEY)
+  const raw = window.localStorage.getItem(getCollectionStorageKey())
 
   if (!raw) {
     return {} as Record<number, UserAnimeListEntry>
@@ -33,13 +54,13 @@ export function getCollectionCache() {
   try {
     return JSON.parse(raw) as Record<number, UserAnimeListEntry>
   } catch {
-    window.localStorage.removeItem(COLLECTION_STORAGE_KEY)
+    window.localStorage.removeItem(getCollectionStorageKey())
     return {} as Record<number, UserAnimeListEntry>
   }
 }
 
 function saveCollectionCache(cache: Record<number, UserAnimeListEntry>) {
-  window.localStorage.setItem(COLLECTION_STORAGE_KEY, JSON.stringify(cache))
+  window.localStorage.setItem(getCollectionStorageKey(), JSON.stringify(cache))
 }
 
 export function getCachedCollectionEntry(animeId: number) {
@@ -50,12 +71,14 @@ function updateCachedCollectionEntry(entry: UserAnimeListEntry) {
   const cache = getCollectionCache()
   cache[entry.animeId] = entry
   saveCollectionCache(cache)
+  dispatchCollectionCacheUpdated(entry.animeId)
 }
 
 export function removeCachedCollectionEntry(animeId: number) {
   const cache = getCollectionCache()
   delete cache[animeId]
   saveCollectionCache(cache)
+  dispatchCollectionCacheUpdated(animeId)
 }
 
 function normalizePayload(payload: UserAnimeListPayload) {
@@ -224,6 +247,7 @@ export async function fetchMyCollection(params: {
   }
 
   saveCollectionCache(cache)
+  dispatchCollectionCacheUpdated()
 
   return {
     ...data,

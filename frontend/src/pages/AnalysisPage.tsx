@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import {
   fetchMyAnimeStats,
   formatUpdatedAt,
-  formatWatchHours,
   getGenreLabel,
   recalculateMyAnimeStats,
 } from '../lib/stats'
@@ -17,16 +16,39 @@ type AnalysisState = {
   error: string | null
 }
 
-const RECALCULATE_COOLDOWN_SECONDS = 15
+type ReleaseYearChartDatum = {
+  year: string
+  count: number
+}
 
-function getTopEntries(record: Record<string, number>, limit = 6) {
+type PieDatum = {
+  label: string
+  value: number
+}
+
+const GenreDistributionPieChart = lazy(async () => {
+  const module = await import('../components/AnalysisCharts')
+  return { default: module.GenreDistributionPieChart }
+})
+const GenreWatchMinutesPieChart = lazy(async () => {
+  const module = await import('../components/AnalysisCharts')
+  return { default: module.GenreWatchMinutesPieChart }
+})
+const ReleaseYearBarChart = lazy(async () => {
+  const module = await import('../components/AnalysisCharts')
+  return { default: module.ReleaseYearBarChart }
+})
+
+const RECALCULATE_COOLDOWN_SECONDS = 30
+
+function getTopEntries(record: Record<string, number>, limit = 8) {
   return Object.entries(record)
     .sort(([, leftValue], [, rightValue]) => rightValue - leftValue)
     .slice(0, limit)
 }
 
-function getMaxValue(entries: Array<[string, number]>) {
-  return entries.reduce((max, [, value]) => Math.max(max, value), 0)
+function getYearEntries(record: Record<string, number>) {
+  return Object.entries(record).sort(([leftYear], [rightYear]) => Number(leftYear) - Number(rightYear))
 }
 
 function toFiniteNumber(value: unknown) {
@@ -44,6 +66,16 @@ function toFiniteNumber(value: unknown) {
 
 function renderEmptyMessage(message: string) {
   return <div className="analysis-empty-state">{message}</div>
+}
+
+function getPieData(entries: Array<[string, number]>) {
+  return entries.map(([label, value]) => ({ label, value }))
+}
+
+function getStarFillPercent(score: number, starIndex: number) {
+  const scoreInStars = score / 2
+  const fill = Math.max(0, Math.min(1, scoreInStars - starIndex))
+  return `${fill * 100}%`
 }
 
 export function AnalysisPage() {
@@ -117,8 +149,20 @@ export function AnalysisPage() {
     [state.item?.genreAvgScore],
   )
   const releaseDistribution = useMemo(
-    () => getTopEntries(state.item?.releaseYearDistribution ?? {}),
+    () => getYearEntries(state.item?.releaseYearDistribution ?? {}),
     [state.item?.releaseYearDistribution],
+  )
+  const releaseYearChartData = useMemo<ReleaseYearChartDatum[]>(
+    () => releaseDistribution.map(([year, count]) => ({ year, count })),
+    [releaseDistribution],
+  )
+  const genreDistributionChartData = useMemo<PieDatum[]>(
+    () => getPieData(genreDistribution).map((entry) => ({ ...entry, label: getGenreLabel(entry.label) })),
+    [genreDistribution],
+  )
+  const genreWatchMinutesChartData = useMemo<PieDatum[]>(
+    () => getPieData(genreWatchMinutes).map((entry) => ({ ...entry, label: getGenreLabel(entry.label) })),
+    [genreWatchMinutes],
   )
   const scoreDistribution = useMemo(
     () =>
@@ -229,7 +273,7 @@ export function AnalysisPage() {
                 ? `${cooldownLeft}초 후 다시 계산`
                 : '분석 새로고침'}
           </button>
-          <span className="analysis-refresh-note">연속 계산은 15초마다 한 번만 가능해요.</span>
+          <span className="analysis-refresh-note">연속 계산은 30초마다 한 번만 가능해요.</span>
         </div>
       </div>
 
@@ -241,8 +285,8 @@ export function AnalysisPage() {
           <strong>{getGenreLabel(item.favoriteGenre)}</strong>
         </article>
         <article className="analysis-summary-card">
-          <span>선호 시기</span>
-          <strong>{item.favoriteReleasePeriod || '정보 없음'}</strong>
+          <span>총 작품 수</span>
+          <strong>{item.totalCount.toLocaleString()}편</strong>
         </article>
         <article className="analysis-summary-card">
           <span>평균 점수</span>
@@ -250,7 +294,7 @@ export function AnalysisPage() {
         </article>
         <article className="analysis-summary-card">
           <span>총 시청 시간</span>
-          <strong>{formatWatchHours(item.totalWatchMinutes)}</strong>
+          <strong>{(item.totalWatchMinutes / 60).toFixed(1)}시간</strong>
         </article>
       </div>
 
@@ -282,6 +326,10 @@ export function AnalysisPage() {
               <strong>{item.totalWatchedEpisodes.toLocaleString()}화</strong>
             </article>
             <article>
+              <span>가장 많이 본 연도</span>
+              <strong>{item.favoriteReleasePeriod || '정보 없음'}</strong>
+            </article>
+            <article>
               <span>평균 방영 연도</span>
               <strong>{averageReleaseYear !== null ? averageReleaseYear.toFixed(1) : '정보 없음'}</strong>
             </article>
@@ -290,27 +338,48 @@ export function AnalysisPage() {
 
         <section className="analysis-panel">
           <div className="analysis-panel-heading">
+            <span className="detail-label">Genre score</span>
+            <h2>장르별 평균 점수</h2>
+          </div>
+          <div className="analysis-list">
+            {genreAvgScore.length > 0 ? genreAvgScore.map(([genre, rawScore]) => {
+              const normalizedScore = toFiniteNumber(rawScore) ?? 0
+
+              return (
+                <article className="analysis-genre-score-row" key={`score-${genre}`}>
+                  <div className="analysis-genre-score-copy">
+                    <span>{getGenreLabel(genre)}</span>
+                    <div className="analysis-score-stars" aria-hidden="true">
+                      {Array.from({ length: 5 }).map((_, index) => (
+                        <div className="analysis-score-star-shell" key={`${genre}-${index}`}>
+                          <span className="analysis-score-star-base">★</span>
+                          <span
+                            className="analysis-score-star-fill"
+                            style={{ width: getStarFillPercent(normalizedScore, index) }}
+                          >
+                            ★
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <strong>{normalizedScore.toFixed(1)} / 10</strong>
+                </article>
+              )
+            }) : renderEmptyMessage('아직 장르별 평균 점수 데이터가 없어요.')}
+          </div>
+        </section>
+
+        <section className="analysis-panel">
+          <div className="analysis-panel-heading">
             <span className="detail-label">Genre</span>
             <h2>장르 분포</h2>
           </div>
-          <div className="analysis-bar-list">
-            {genreDistribution.length > 0 ? genreDistribution.map(([genre, count]) => {
-              const maxValue = getMaxValue(genreDistribution)
-              const width = maxValue > 0 ? `${(count / maxValue) * 100}%` : '0%'
-
-              return (
-                <div className="analysis-bar-item" key={`distribution-${genre}`}>
-                  <div className="analysis-bar-header">
-                    <span>{getGenreLabel(genre)}</span>
-                    <strong>{count}편</strong>
-                  </div>
-                  <div className="analysis-bar-track">
-                    <div className="analysis-bar-fill" style={{ width }} />
-                  </div>
-                </div>
-              )
-            }) : renderEmptyMessage('아직 장르 분포 데이터가 없어요.')}
-          </div>
+          {genreDistributionChartData.length > 0 ? (
+            <Suspense fallback={<div className="analysis-chart-skeleton" />}>
+              <GenreDistributionPieChart data={genreDistributionChartData} />
+            </Suspense>
+          ) : renderEmptyMessage('아직 장르 분포 데이터가 없어요.')}
         </section>
 
         <section className="analysis-panel">
@@ -318,67 +387,26 @@ export function AnalysisPage() {
             <span className="detail-label">Watch time</span>
             <h2>장르별 시청 시간</h2>
           </div>
-          <div className="analysis-bar-list">
-            {genreWatchMinutes.length > 0 ? genreWatchMinutes.map(([genre, minutes]) => {
-              const maxValue = getMaxValue(genreWatchMinutes)
-              const width = maxValue > 0 ? `${(minutes / maxValue) * 100}%` : '0%'
-
-              return (
-                <div className="analysis-bar-item" key={`minutes-${genre}`}>
-                  <div className="analysis-bar-header">
-                    <span>{getGenreLabel(genre)}</span>
-                    <strong>{formatWatchHours(minutes)}</strong>
-                  </div>
-                  <div className="analysis-bar-track">
-                    <div className="analysis-bar-fill is-soft" style={{ width }} />
-                  </div>
-                </div>
-              )
-            }) : renderEmptyMessage('아직 장르별 시청 시간 데이터가 없어요.')}
-          </div>
+          {genreWatchMinutesChartData.length > 0 ? (
+            <Suspense fallback={<div className="analysis-chart-skeleton" />}>
+              <GenreWatchMinutesPieChart data={genreWatchMinutesChartData} />
+            </Suspense>
+          ) : renderEmptyMessage('아직 장르별 시청 시간 데이터가 없어요.')}
         </section>
 
-        <section className="analysis-panel">
+        <section className="analysis-panel analysis-panel-wide">
           <div className="analysis-panel-heading">
-            <span className="detail-label">Genre score</span>
-            <h2>장르별 평균 점수</h2>
+            <span className="detail-label">Release year</span>
+            <h2>연도별 감상 작품 수</h2>
           </div>
-            <div className="analysis-list">
-              {genreAvgScore.length > 0 ? genreAvgScore.map(([genre, score]) => (
-                <article className="analysis-list-row" key={`score-${genre}`}>
-                  <span>{getGenreLabel(genre)}</span>
-                  <strong>{toFiniteNumber(score)?.toFixed(1) ?? '0.0'} / 10</strong>
-                </article>
-              )) : renderEmptyMessage('아직 장르별 평균 점수 데이터가 없어요.')}
-            </div>
+          {releaseYearChartData.length > 0 ? (
+            <Suspense fallback={<div className="analysis-chart-skeleton analysis-chart-skeleton-wide" />}>
+              <ReleaseYearBarChart data={releaseYearChartData} />
+            </Suspense>
+          ) : renderEmptyMessage('아직 연도별 감상 데이터가 없어요.')}
         </section>
 
-        <section className="analysis-panel">
-          <div className="analysis-panel-heading">
-            <span className="detail-label">Release period</span>
-            <h2>선호 시기</h2>
-          </div>
-          <div className="analysis-bar-list">
-            {releaseDistribution.length > 0 ? releaseDistribution.map(([year, count]) => {
-              const maxValue = getMaxValue(releaseDistribution)
-              const width = maxValue > 0 ? `${(count / maxValue) * 100}%` : '0%'
-
-              return (
-                <div className="analysis-bar-item" key={`release-${year}`}>
-                  <div className="analysis-bar-header">
-                    <span>{year}년대</span>
-                    <strong>{count}편</strong>
-                  </div>
-                  <div className="analysis-bar-track">
-                    <div className="analysis-bar-fill is-dark" style={{ width }} />
-                  </div>
-                </div>
-              )
-            }) : renderEmptyMessage('아직 시기 분포 데이터가 없어요.')}
-          </div>
-        </section>
-
-        <section className="analysis-panel">
+        <section className="analysis-panel analysis-panel-wide">
           <div className="analysis-panel-heading">
             <span className="detail-label">Score distribution</span>
             <h2>평점 분포</h2>

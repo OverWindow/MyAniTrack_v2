@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { isEmailVerificationRequiredError } from '../lib/auth'
 import '../styles/pages/AuthPage.css'
 
 function getWebDeviceName() {
@@ -32,6 +33,14 @@ export function LoginPage() {
       })
       navigate(redirectTo, { replace: true })
     } catch (submitError) {
+      if (isEmailVerificationRequiredError(submitError)) {
+        navigate(`/verify-email/pending?email=${encodeURIComponent(email.trim())}`, {
+          replace: true,
+          state: { message: '이메일 인증이 완료되어야 로그인할 수 있어요.' },
+        })
+        return
+      }
+
       setError(
         submitError instanceof Error ? submitError.message : '로그인에 실패했어요.',
       )
@@ -71,6 +80,10 @@ export function LoginPage() {
               required
             />
           </label>
+
+          <div className="auth-inline-links">
+            <Link to="/password-reset">비밀번호를 잊어버렸어요</Link>
+          </div>
 
           {error && <div className="feedback-card is-error">{error}</div>}
 

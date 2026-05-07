@@ -1,0 +1,15 @@
+.user-analysis-page {
+  display: grid;
+  gap: 24px;
+}
+
+.user-analysis-actions {
+  justify-items: end;
+}
+
+@media (max-width: 1180px) {
+  .user-analysis-actions {
+    width: 100%;
+    justify-items: stretch;
+  }
+}

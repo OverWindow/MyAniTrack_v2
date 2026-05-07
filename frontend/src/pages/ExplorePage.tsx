@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { CollectionButton } from '../components/CollectionButton'
+import { useAuth } from '../contexts/AuthContext'
+import {
+  addToCollection,
+  COLLECTION_CACHE_UPDATED_EVENT,
+  getCachedCollectionEntry,
+  updateCollectionEntry,
+} from '../lib/collection'
 import {
   fetchAnimeList,
   genreOptions,
@@ -9,6 +16,7 @@ import {
   searchAnime,
   sortOptions,
 } from '../lib/anime'
+import { loadExploreViewSnapshot, saveExploreViewSnapshot } from '../lib/viewState'
 import type { AnimeGenre, AnimeListItem, AnimeSort } from '../types/anime'
 import '../styles/pages/CatalogPage.css'
 import '../styles/pages/ExplorePage.css'
@@ -21,6 +29,11 @@ type ExploreState = {
   isLoadingMore: boolean
   error: string | null
   requestKey: string
+}
+
+type HoverRatingProps = {
+  animeId: number
+  maxProgress?: number | null
 }
 
 const createInitialExploreState = (requestKey: string): ExploreState => ({
@@ -41,12 +54,146 @@ function formatFivePointScore(score?: number | null) {
   return (score / 20).toFixed(1)
 }
 
+function getOverlayScore(score?: number | null) {
+  if (typeof score !== 'number' || score <= 0) {
+    return 0
+  }
+
+  return Math.min(10, Math.max(0, score))
+}
+
+function getStarFillPercent(score: number, starIndex: number) {
+  const scoreInStars = score / 2
+  const fill = Math.max(0, Math.min(1, scoreInStars - starIndex))
+  return `${fill * 100}%`
+}
+
+function HoverRating({ animeId, maxProgress }: HoverRatingProps) {
+  const { isAuthenticated, user } = useAuth()
+  const [score, setScore] = useState(0)
+  const [isAdded, setIsAdded] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setScore(0)
+      setIsAdded(false)
+      return
+    }
+
+    const syncFromCache = () => {
+      const entry = getCachedCollectionEntry(animeId)
+      setScore(getOverlayScore(entry?.score))
+      setIsAdded(Boolean(entry))
+    }
+
+    const handleCollectionUpdated = (event: Event) => {
+      const customEvent = event as CustomEvent<{ animeId?: number }>
+      const updatedAnimeId = customEvent.detail?.animeId
+
+      if (updatedAnimeId && updatedAnimeId !== animeId) {
+        return
+      }
+
+      syncFromCache()
+    }
+
+    syncFromCache()
+    window.addEventListener(COLLECTION_CACHE_UPDATED_EVENT, handleCollectionUpdated as EventListener)
+
+    return () => {
+      window.removeEventListener(COLLECTION_CACHE_UPDATED_EVENT, handleCollectionUpdated as EventListener)
+    }
+  }, [animeId, isAuthenticated, user?.id])
+
+  const handleRate = async (nextScore: number, event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault()
+    event.stopPropagation()
+
+    if (!isAuthenticated || isSubmitting) {
+      return
+    }
+
+    setIsSubmitting(true)
+
+    try {
+      if (isAdded) {
+        await updateCollectionEntry(animeId, {
+          status: 'completed',
+          score: nextScore,
+          ...(maxProgress && maxProgress > 0 ? { progress: maxProgress } : {}),
+        })
+      } else {
+        await addToCollection({
+          animeId,
+          status: 'completed',
+          score: nextScore,
+          ...(maxProgress && maxProgress > 0 ? { progress: maxProgress } : {}),
+        })
+        setIsAdded(true)
+      }
+
+      setScore(nextScore)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  if (!isAuthenticated) {
+    return null
+  }
+
+  return (
+    <div className="anime-hover-rating" aria-label="탐색 빠른 별점">
+      <div className="anime-hover-rating-stars">
+        {Array.from({ length: 5 }).map((_, index) => {
+          const leftValue = index * 2 + 1
+          const rightValue = index * 2 + 2
+
+          return (
+            <div className="anime-hover-star" key={`${animeId}-star-${index + 1}`}>
+              <span className="anime-hover-star-base" aria-hidden="true">★</span>
+              <span
+                className="anime-hover-star-fill"
+                aria-hidden="true"
+                style={{ width: getStarFillPercent(score, index) }}
+              >
+                ★
+              </span>
+              <button
+                className="anime-hover-star-hit is-left"
+                type="button"
+                aria-label={`${leftValue.toFixed(1)}점 주기`}
+                onClick={(event) => {
+                  void handleRate(leftValue, event)
+                }}
+                disabled={isSubmitting}
+              />
+              <button
+                className="anime-hover-star-hit is-right"
+                type="button"
+                aria-label={`${rightValue.toFixed(1)}점 주기`}
+                onClick={(event) => {
+                  void handleRate(rightValue, event)
+                }}
+                disabled={isSubmitting}
+              />
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 export function ExplorePage() {
-  const [sort, setSort] = useState<AnimeSort>('score')
-  const [genre, setGenre] = useState<AnimeGenre | 'all'>('all')
-  const [searchTerm, setSearchTerm] = useState('')
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
-  const [searchLanguage, setSearchLanguage] = useState<'ko' | 'en'>('ko')
+  const initialSnapshotRef = useRef(loadExploreViewSnapshot())
+  const initialSnapshot = initialSnapshotRef.current
+  const [sort, setSort] = useState<AnimeSort>(() => initialSnapshot?.sort ?? 'score')
+  const [genre, setGenre] = useState<AnimeGenre | 'all'>(() => initialSnapshot?.genre ?? 'all')
+  const [searchTerm, setSearchTerm] = useState(() => initialSnapshot?.searchTerm ?? '')
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(() => initialSnapshot?.debouncedSearchTerm ?? '')
+  const [searchLanguage, setSearchLanguage] = useState<'ko' | 'en'>(() => initialSnapshot?.searchLanguage ?? 'ko')
   const normalizedQuery = debouncedSearchTerm.trim()
   const selectedGenre = genre === 'all' ? null : genre
   const selectedGenreLabel =
@@ -54,12 +201,48 @@ export function ExplorePage() {
       ? '전체 장르'
       : genreOptions.find((option) => option.value === genre)?.label ?? genre
   const requestKey = `${sort}:${normalizedQuery}:${searchLanguage}:${genre}`
-  const [state, setState] = useState<ExploreState>(() =>
-    createInitialExploreState(requestKey),
-  )
+  const hydratedSnapshot = initialSnapshot?.requestKey === requestKey ? initialSnapshot : null
+  const [state, setState] = useState<ExploreState>(() => (
+    hydratedSnapshot
+      ? {
+          animeItems: hydratedSnapshot.animeItems,
+          nextCursor: hydratedSnapshot.nextCursor,
+          hasNext: hydratedSnapshot.hasNext,
+          isLoading: false,
+          isLoadingMore: false,
+          error: null,
+          requestKey,
+        }
+      : createInitialExploreState(requestKey)
+  ))
   const sentinelRef = useRef<HTMLDivElement | null>(null)
+  const latestSnapshotRef = useRef({
+    sort,
+    genre,
+    searchTerm,
+    debouncedSearchTerm,
+    searchLanguage,
+    animeItems: state.animeItems,
+    nextCursor: state.nextCursor,
+    hasNext: state.hasNext,
+    requestKey,
+  })
+  const shouldSkipInitialFetchRef = useRef(Boolean(hydratedSnapshot))
+  const pendingScrollRestoreRef = useRef<number | null>(hydratedSnapshot?.scrollY ?? null)
   const { animeItems, nextCursor, hasNext, isLoading, isLoadingMore, error } = state
   const isRefreshingQuery = state.requestKey !== requestKey
+
+  latestSnapshotRef.current = {
+    sort,
+    genre,
+    searchTerm,
+    debouncedSearchTerm,
+    searchLanguage,
+    animeItems,
+    nextCursor,
+    hasNext,
+    requestKey,
+  }
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -72,6 +255,45 @@ export function ExplorePage() {
   }, [searchTerm])
 
   useEffect(() => {
+    if (!isRefreshingQuery) {
+      saveExploreViewSnapshot({
+        ...latestSnapshotRef.current,
+        scrollY: window.scrollY,
+      })
+    }
+  }, [animeItems, debouncedSearchTerm, genre, hasNext, isRefreshingQuery, nextCursor, requestKey, searchLanguage, searchTerm, sort])
+
+  useEffect(() => {
+    const handleScroll = () => {
+      saveExploreViewSnapshot({
+        ...latestSnapshotRef.current,
+        scrollY: window.scrollY,
+      })
+    }
+
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
+
+  useEffect(() => {
+    if (pendingScrollRestoreRef.current === null || isLoading || isRefreshingQuery || animeItems.length === 0) {
+      return
+    }
+
+    const nextScrollY = pendingScrollRestoreRef.current
+    pendingScrollRestoreRef.current = null
+
+    window.requestAnimationFrame(() => {
+      window.scrollTo({ top: nextScrollY, behavior: 'auto' })
+    })
+  }, [animeItems.length, isLoading, isRefreshingQuery])
+
+  useEffect(() => {
+    if (shouldSkipInitialFetchRef.current) {
+      shouldSkipInitialFetchRef.current = false
+      return
+    }
+
     const controller = new AbortController()
 
     const loadFirstPage = async () => {
@@ -101,6 +323,7 @@ export function ExplorePage() {
           error: null,
           requestKey,
         })
+        pendingScrollRestoreRef.current = 0
       } catch (fetchError) {
         if (fetchError instanceof DOMException && fetchError.name === 'AbortError') {
           return
@@ -223,15 +446,6 @@ export function ExplorePage() {
   return (
     <section className="explore-page">
       <div className="explore-toolbar-shell">
-        <div className="explore-summary">
-          <span className="summary-label">애니 총</span>
-          <strong>{animeItems.length.toLocaleString()}</strong>
-          <span className="summary-label">편</span>
-          <span className="search-hint-tooltip" title="한국어로 검색이 안 될 시 영어로 검색해보세요.">
-            i
-          </span>
-        </div>
-
         <div className="explore-toolbar">
           <div className="search-group">
             <label className="search-field minimalist-search" htmlFor="anime-search">
@@ -266,6 +480,9 @@ export function ExplorePage() {
               >
                 EN
               </button>
+              <span className="search-hint-tooltip" title="한국어로 검색이 안 될 시 영어로 검색해보세요.">
+                i
+              </span>
             </div>
           </div>
 
@@ -318,8 +535,9 @@ export function ExplorePage() {
 
       {!isLoading && !isRefreshingQuery && !error && (
         <>
+          <p className="mobile-rating-hint">포스터를 꾹 누르면 별점을 빠르게 남길 수 있어요.</p>
+
           <div className="results-meta minimalist-meta">
-            <span>{animeItems.length}개의 작품 표시 중</span>
             <span>
               {normalizedQuery
                 ? `"${normalizedQuery}" 검색 결과 · ${searchLanguage === 'ko' ? '한국어' : '영어'}`
@@ -337,13 +555,13 @@ export function ExplorePage() {
           ) : (
             <div className="anime-grid">
               {animeItems.map((item) => (
-                <Link className="anime-card anime-card-link" key={item.id} to={`/anime/${item.id}`}>
+                <Link className="anime-card anime-card-link" key={item.id} to={`/anime/${item.id}`} state={{ fromPage: 'explore' }}>
                   <div className="anime-poster-wrap">
                     <div
                       className="anime-card-quick-action"
                       onClick={(event) => event.preventDefault()}
                     >
-                      <CollectionButton animeId={item.id} />
+                      <CollectionButton animeId={item.id} maxProgress={item.episodes} />
                     </div>
                     {formatFivePointScore(item.averageScore) && (
                       <div className="anime-card-rating">
@@ -356,6 +574,7 @@ export function ExplorePage() {
                       alt={getDisplayTitle(item)}
                       loading="lazy"
                     />
+                    <HoverRating animeId={item.id} maxProgress={item.episodes} />
                   </div>
                   <div className="anime-copy">
                     <h3>{getDisplayTitle(item)}</h3>

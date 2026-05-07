@@ -1,0 +1,8 @@
+.user-catalog-header {
+  display: grid;
+  gap: 10px;
+}
+
+.user-catalog-header h1 {
+  margin: 0;
+}
