@@ -647,8 +647,8 @@
 
 .floating-hub-menu {
   position: absolute;
-  right: calc(100% + 12px);
-  bottom: 0;
+  right: 0;
+  bottom: calc(100% + 12px);
   display: grid;
   gap: 10px;
   opacity: 0;

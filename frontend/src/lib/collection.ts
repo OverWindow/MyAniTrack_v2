@@ -2,6 +2,7 @@ import { authFetch, getStoredSession } from './auth'
 import type { AnimeGenre } from '../types/anime'
 import type {
   UserAnimeListEntry,
+  UserAnimeListEntryResponse,
   UserAnimeListPayload,
   UserAnimeListResponse,
   UserAnimeListSort,
@@ -199,6 +200,35 @@ export async function deleteCollectionEntry(animeId: number) {
   }
 
   removeCachedCollectionEntry(animeId)
+}
+
+export async function fetchMyCollectionEntry(animeId: number, signal?: AbortSignal) {
+  const url = new URL(`/api/me/anime-list/${animeId}`, getApiBaseUrl())
+  url.searchParams.set('titleLanguage', 'ko')
+
+  const response = await authFetch(url.toString(), { signal })
+
+  if (response.status === 404) {
+    return null
+  }
+
+  if (!response.ok) {
+    throw new Error(getErrorMessage(response.status, '내 기록을 불러오지 못했어요.'))
+  }
+
+  const data = (await response.json()) as UserAnimeListEntryResponse
+  const entry = {
+    animeId: data.item.animeId,
+    status: data.item.status,
+    score: data.item.score,
+    progress: data.item.progress,
+    startedAt: data.item.startedAt,
+    completedAt: data.item.completedAt,
+    notes: data.item.notes,
+  }
+
+  updateCachedCollectionEntry(entry)
+  return data.item
 }
 
 export async function fetchMyCollection(params: {

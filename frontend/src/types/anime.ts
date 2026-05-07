@@ -50,6 +50,22 @@ export type AnimeListItem = {
   createdAt?: string
 }
 
+export type PopularAnimeItem = {
+  id: number
+  anilistId: number
+  title: string
+  titles?: {
+    korean?: string | null
+    english?: string | null
+    native?: string | null
+    romaji?: string | null
+    userPreferred?: string | null
+  }
+  coverImageLarge: string
+  coverImageExtraLarge?: string | null
+  popularity?: number | null
+}
+
 export type AnimeListResponse = {
   success: boolean
   items: AnimeListItem[]
@@ -60,6 +76,11 @@ export type AnimeListResponse = {
     sort: AnimeSort
     titleLanguage: 'ko' | 'en' | 'ja'
   }
+}
+
+export type PopularAnimeResponse = {
+  success: boolean
+  items: PopularAnimeItem[]
 }
 
 export type KoreanTitleCandidate = {

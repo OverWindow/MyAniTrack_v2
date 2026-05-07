@@ -5,6 +5,8 @@ import type {
   AnimeListItem,
   AnimeListResponse,
   AnimeSort,
+  PopularAnimeItem,
+  PopularAnimeResponse,
 } from '../types/anime'
 import { authFetch } from './auth'
 
@@ -46,7 +48,7 @@ function getApiBaseUrl() {
   return baseUrl
 }
 
-export function getDisplayTitle(item: AnimeListItem) {
+export function getDisplayTitle(item: AnimeListItem | PopularAnimeItem) {
   return item.titles?.korean || item.titles?.english || item.title
 }
 
@@ -149,6 +151,18 @@ export async function searchAnime(params: {
     ...data,
     items: data.items.filter((item) => item.coverImageExtraLarge || item.coverImageLarge),
   }
+}
+
+export async function fetchPopularAnime(signal?: AbortSignal) {
+  const url = new URL('/api/stats/platform/popular-anime', getApiBaseUrl())
+  const response = await fetch(url.toString(), { signal })
+
+  if (!response.ok) {
+    throw new Error(`인기 애니를 불러오지 못했습니다. (${response.status})`)
+  }
+
+  const data = (await response.json()) as PopularAnimeResponse
+  return data.items.filter((item) => item.coverImageExtraLarge || item.coverImageLarge)
 }
 
 export async function fetchAnimeDetail(id: string, signal?: AbortSignal) {

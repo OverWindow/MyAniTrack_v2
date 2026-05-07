@@ -23,6 +23,7 @@ const sortOptions: Array<{ value: UserAnimeListSort; label: string }> = [
   { value: 'latest', label: '최근 수정순' },
   { value: 'added', label: '추가 최신순' },
   { value: 'score', label: '내 점수 높은 순' },
+  { value: 'scoreAsc', label: '내 점수 낮은 순' },
 ]
 
 const createInitialCollectionState = (requestKey: string): CollectionState => ({
@@ -91,6 +92,7 @@ export function CollectionPage() {
   const [sort, setSort] = useState<UserAnimeListSort>(() => initialSnapshot?.sort ?? 'latest')
   const [genre, setGenre] = useState<AnimeGenre | 'all'>(() => initialSnapshot?.genre ?? 'all')
   const [searchTerm, setSearchTerm] = useState(() => initialSnapshot?.searchTerm ?? '')
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(() => initialSnapshot?.searchTerm ?? '')
   const [reloadKey, setReloadKey] = useState(0)
   const selectedGenre = genre === 'all' ? null : genre
   const selectedGenreLabel =
@@ -137,8 +139,18 @@ export function CollectionPage() {
     requestKey,
   }
 
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm)
+    }, 550)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [searchTerm])
+
   const filteredItems = items.filter((item) =>
-    getCollectionSearchText(item).includes(searchTerm.trim().toLowerCase()),
+    getCollectionSearchText(item).includes(debouncedSearchTerm.trim().toLowerCase()),
   )
 
   useEffect(() => {
@@ -400,6 +412,7 @@ export function CollectionPage() {
 
       {!isLoading && !isRefreshingQuery && !error && (
         <>
+          <p className="mobile-rating-hint">작품 이름으로 천천히 검색하면서 정렬을 바꿔볼 수 있어요.</p>
           <div className="results-meta minimalist-meta">
             <span>{selectedGenreLabel}</span>
             <span>제목 우선순위: 한국어 → 영어</span>

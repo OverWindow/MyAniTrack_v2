@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import {
   addToCollection,
   deleteCollectionEntry,
+  fetchMyCollectionEntry,
   getCachedCollectionEntry,
   updateCollectionEntry,
 } from '../lib/collection'
@@ -51,6 +52,74 @@ export function CollectionEditor({ animeId, maxProgress }: CollectionEditorProps
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [feedback, setFeedback] = useState<string | null>(null)
   const [isAdded, setIsAdded] = useState(Boolean(cached))
+  const [isLoadingEntry, setIsLoadingEntry] = useState(false)
+
+  useEffect(() => {
+    const nextCached = getCachedCollectionEntry(animeId)
+    const nextDefaultCompletedProgress = totalProgress ?? 0
+
+    setStatus(nextCached?.status ?? 'completed')
+    setScore(getInitialScore(nextCached?.score))
+    setProgress(nextCached?.progress ?? nextDefaultCompletedProgress)
+    setStartedAt(nextCached?.startedAt ?? '')
+    setCompletedAt(nextCached?.completedAt ?? '')
+    setNotes(nextCached?.notes ?? '')
+    setIsAdded(Boolean(nextCached))
+    setFeedback(null)
+  }, [animeId, totalProgress])
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      return
+    }
+
+    const controller = new AbortController()
+
+    const loadEntry = async () => {
+      setIsLoadingEntry(true)
+
+      try {
+        const item = await fetchMyCollectionEntry(animeId, controller.signal)
+
+        if (controller.signal.aborted) {
+          return
+        }
+
+        if (!item) {
+          setStatus('completed')
+          setScore(0)
+          setProgress(defaultCompletedProgress)
+          setStartedAt('')
+          setCompletedAt('')
+          setNotes('')
+          setIsAdded(false)
+          return
+        }
+
+        setStatus(item.status)
+        setScore(getInitialScore(item.score))
+        setProgress(item.progress ?? defaultCompletedProgress)
+        setStartedAt(item.startedAt ?? '')
+        setCompletedAt(item.completedAt ?? '')
+        setNotes(item.notes ?? '')
+        setIsAdded(true)
+      } catch (error) {
+        if (controller.signal.aborted) {
+          return
+        }
+
+        setFeedback(error instanceof Error ? error.message : '내 기록을 불러오지 못했어요.')
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsLoadingEntry(false)
+        }
+      }
+    }
+
+    void loadEntry()
+
+    return () => controller.abort()
+  }, [animeId, defaultCompletedProgress, isAuthenticated])
 
   const payload = {
     status,
@@ -107,6 +176,12 @@ export function CollectionEditor({ animeId, maxProgress }: CollectionEditorProps
     try {
       await deleteCollectionEntry(animeId)
       setIsAdded(false)
+      setStatus('completed')
+      setScore(0)
+      setProgress(defaultCompletedProgress)
+      setStartedAt('')
+      setCompletedAt('')
+      setNotes('')
       setFeedback('컬렉션에서 삭제했어요.')
     } catch (submitError) {
       setFeedback(
@@ -139,8 +214,10 @@ export function CollectionEditor({ animeId, maxProgress }: CollectionEditorProps
       <span className="detail-label">My collection</span>
       <h3>{isAdded ? '내 컬렉션에서 관리 중' : '내 컬렉션에 추가'}</h3>
       <p className="collection-helper">
-        상태만 고르고 바로 추가할 수 있고, 별점이나 메모는 원할 때만 입력하면 돼요.
+        상태, 진행도, 별점, 메모를 직접 남기고 내 기록을 한눈에 확인할 수 있어요.
       </p>
+
+      {isLoadingEntry && <div className="feedback-inline">내 기록을 불러오는 중이에요.</div>}
 
       <div className="collection-form-grid">
         <label className="auth-field">
@@ -253,7 +330,7 @@ export function CollectionEditor({ animeId, maxProgress }: CollectionEditorProps
           onClick={() => {
             void handleSave()
           }}
-          disabled={isSubmitting}
+          disabled={isSubmitting || isLoadingEntry}
         >
           {isSubmitting ? '저장 중...' : isAdded ? '컬렉션 업데이트' : '컬렉션에 추가'}
         </button>
@@ -265,7 +342,7 @@ export function CollectionEditor({ animeId, maxProgress }: CollectionEditorProps
             onClick={() => {
               void handleDelete()
             }}
-            disabled={isSubmitting}
+            disabled={isSubmitting || isLoadingEntry}
           >
             컬렉션에서 삭제
           </button>

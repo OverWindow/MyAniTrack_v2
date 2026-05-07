@@ -247,7 +247,7 @@ export function ExplorePage() {
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       setDebouncedSearchTerm(searchTerm)
-    }, 300)
+    }, 550)
 
     return () => {
       window.clearTimeout(timeoutId)
@@ -480,9 +480,7 @@ export function ExplorePage() {
               >
                 EN
               </button>
-              <span className="search-hint-tooltip" title="한국어로 검색이 안 될 시 영어로 검색해보세요.">
-                i
-              </span>
+
             </div>
           </div>
 

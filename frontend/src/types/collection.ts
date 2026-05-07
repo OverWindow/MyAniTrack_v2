@@ -25,7 +25,7 @@ export type UserAnimeListEntry = {
   notes?: string | null
 }
 
-export type UserAnimeListSort = 'latest' | 'added' | 'score'
+export type UserAnimeListSort = 'latest' | 'added' | 'score' | 'scoreAsc'
 
 export type UserAnimeListItem = {
   id: number
@@ -78,4 +78,9 @@ export type UserAnimeListResponse = {
     sort: UserAnimeListSort
     titleLanguage: 'ko' | 'en' | 'ja'
   }
+}
+
+export type UserAnimeListEntryResponse = {
+  success: boolean
+  item: UserAnimeListItem
 }

@@ -136,78 +136,81 @@ function App() {
           </button>
 
           <div className={isQuickMenuOpen ? 'floating-hub-menu is-open' : 'floating-hub-menu'}>
+            <div className="floating-friends-stack">
+              {isFriendsOpen && (
+                <section id="floating-friends-panel" className="floating-friends-panel" aria-label="친구 빠른 목록">
+                  <div className="floating-friends-panel-header">
+                    <strong>친구 목록</strong>
+                    <button
+                      className="floating-friends-close"
+                      type="button"
+                      onClick={() => setIsFriendsOpen(false)}
+                      aria-label="친구 목록 닫기"
+                    >
+                      ×
+                    </button>
+                  </div>
+                  {isLoadingFriends ? (
+                    <p className="floating-friends-feedback">친구 목록을 불러오는 중...</p>
+                  ) : friendsError ? (
+                    <p className="floating-friends-feedback is-error">{friendsError}</p>
+                  ) : friends.length === 0 ? (
+                    <p className="floating-friends-feedback">아직 추가된 친구가 없어요.</p>
+                  ) : (
+                    <div className="floating-friends-list">
+                      {friends.map((friend) => {
+                        const name = getFriendPreviewName(friend.user)
+                        const initials = getFriendInitials(friend.user)
+
+                        return (
+                          <Link
+                            key={friend.id}
+                            className="floating-friend-item"
+                            to={`/users/${friend.user.id}/anime-list`}
+                            onClick={() => {
+                              setIsFriendsOpen(false)
+                              setIsQuickMenuOpen(false)
+                            }}
+                          >
+                            {friend.user.profileImageUrl ? (
+                              <img
+                                className="avatar avatar-image floating-friend-avatar"
+                                src={getProfileImageSrc(friend.user.profileImageUrl)}
+                                alt={`${name} 프로필 이미지`}
+                                onError={handleProfileImageError}
+                              />
+                            ) : (
+                              <span className="avatar floating-friend-avatar" aria-hidden="true">{initials}</span>
+                            )}
+                            <span className="floating-friend-copy">
+                              <strong>{name}</strong>
+                              <small>{formatFriendAnimeCount(friend.user.animeListCount)}</small>
+                            </span>
+                          </Link>
+                        )
+                      })}
+                    </div>
+                  )}
+                </section>
+              )}
+
+              <button
+                className="floating-cta floating-cta-wide floating-cta-secondary floating-cta-button"
+                type="button"
+                onClick={() => { void handleFriendsOverlayToggle() }}
+                aria-expanded={isFriendsOpen}
+                aria-controls="floating-friends-panel"
+              >
+                <span className="floating-cta-icon" aria-hidden="true">✦</span>
+                <span>친구 목록</span>
+              </button>
+            </div>
+
             <Link className="floating-cta floating-cta-wide" to="/collection" onClick={() => setIsQuickMenuOpen(false)}>
               <span className="floating-cta-icon" aria-hidden="true">✦</span>
               <span>컬렉션</span>
             </Link>
-            <button
-              className="floating-cta floating-cta-wide floating-cta-secondary floating-cta-button"
-              type="button"
-              onClick={() => { void handleFriendsOverlayToggle() }}
-              aria-expanded={isFriendsOpen}
-              aria-controls="floating-friends-panel"
-            >
-              <span className="floating-cta-icon" aria-hidden="true">✦</span>
-              <span>친구 목록</span>
-            </button>
           </div>
-
-          {isFriendsOpen && (
-            <section id="floating-friends-panel" className="floating-friends-panel" aria-label="친구 빠른 목록">
-              <div className="floating-friends-panel-header">
-                <strong>친구 목록</strong>
-                <button
-                  className="floating-friends-close"
-                  type="button"
-                  onClick={() => setIsFriendsOpen(false)}
-                  aria-label="친구 목록 닫기"
-                >
-                  ×
-                </button>
-              </div>
-              {isLoadingFriends ? (
-                <p className="floating-friends-feedback">친구 목록을 불러오는 중...</p>
-              ) : friendsError ? (
-                <p className="floating-friends-feedback is-error">{friendsError}</p>
-              ) : friends.length === 0 ? (
-                <p className="floating-friends-feedback">아직 추가된 친구가 없어요.</p>
-              ) : (
-                <div className="floating-friends-list">
-                  {friends.map((friend) => {
-                    const name = getFriendPreviewName(friend.user)
-                    const initials = getFriendInitials(friend.user)
-
-                    return (
-                      <Link
-                        key={friend.id}
-                        className="floating-friend-item"
-                        to={`/users/${friend.user.id}/anime-list`}
-                        onClick={() => {
-                          setIsFriendsOpen(false)
-                          setIsQuickMenuOpen(false)
-                        }}
-                      >
-                        {friend.user.profileImageUrl ? (
-                          <img
-                            className="avatar avatar-image floating-friend-avatar"
-                            src={getProfileImageSrc(friend.user.profileImageUrl)}
-                            alt={`${name} 프로필 이미지`}
-                            onError={handleProfileImageError}
-                          />
-                        ) : (
-                          <span className="avatar floating-friend-avatar" aria-hidden="true">{initials}</span>
-                        )}
-                        <span className="floating-friend-copy">
-                          <strong>{name}</strong>
-                          <small>{formatFriendAnimeCount(friend.user.animeListCount)}</small>
-                        </span>
-                      </Link>
-                    )
-                  })}
-                </div>
-              )}
-            </section>
-          )}
         </div>
       )}
     </div>

@@ -3,20 +3,6 @@
   gap: 22px;
 }
 
-.search-hint-tooltip {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: var(--point-color);
-  color: var(--text-inverse);
-  font-size: 0.72rem;
-  font-weight: 700;
-  cursor: help;
-}
-
 .search-language-switch {
   display: inline-flex;
   align-items: center;
