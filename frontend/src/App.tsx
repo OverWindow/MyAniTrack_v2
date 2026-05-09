@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, Route, Routes, useLocation } from 'react-router-dom'
+import type { Location } from 'react-router-dom'
 import { handleProfileImageError, getProfileImageSrc } from './lib/avatar'
 import { fetchFriends, formatFriendAnimeCount, getFriendInitials, getFriendPreviewName, sortFriendsByNewest } from './lib/friends'
 import type { FriendItem } from './types/friends'
@@ -29,29 +30,28 @@ import './styles/App.css'
 function App() {
   const { isAuthenticated } = useAuth()
   const location = useLocation()
-  const shouldShowFloatingCta = !['/login', '/signup'].includes(location.pathname)
+  const locationState = location.state as { backgroundLocation?: Location } | null
+  const backgroundLocation = locationState?.backgroundLocation
+  const shouldShowFloatingCta = !backgroundLocation && !['/login', '/signup'].includes(location.pathname)
   const [friends, setFriends] = useState<FriendItem[]>([])
   const [isFriendsOpen, setIsFriendsOpen] = useState(false)
-  const [isQuickMenuOpen, setIsQuickMenuOpen] = useState(false)
   const [isLoadingFriends, setIsLoadingFriends] = useState(false)
   const [friendsError, setFriendsError] = useState<string | null>(null)
   const floatingPanelRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
-    if (!isQuickMenuOpen && !isFriendsOpen) {
+    if (!isFriendsOpen) {
       return
     }
 
     const handlePointerDown = (event: MouseEvent) => {
       if (!floatingPanelRef.current?.contains(event.target as Node)) {
-        setIsQuickMenuOpen(false)
         setIsFriendsOpen(false)
       }
     }
 
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        setIsQuickMenuOpen(false)
         setIsFriendsOpen(false)
       }
     }
@@ -63,11 +63,10 @@ function App() {
       window.removeEventListener('mousedown', handlePointerDown)
       window.removeEventListener('keydown', handleEscape)
     }
-  }, [isFriendsOpen, isQuickMenuOpen])
+  }, [isFriendsOpen])
 
   const handleFriendsOverlayToggle = async () => {
     const nextOpen = !isFriendsOpen
-    setIsQuickMenuOpen(true)
     setIsFriendsOpen(nextOpen)
 
     if (!nextOpen) {
@@ -91,7 +90,7 @@ function App() {
     <div className="site-shell">
       <Header />
       <main className="landing-page">
-        <Routes>
+        <Routes location={backgroundLocation ?? location}>
           <Route path="/" element={<HomePage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
@@ -113,104 +112,82 @@ function App() {
           <Route path="/users/:userId/anime-stats" element={<UserAnalysisPage />} />
         </Routes>
       </main>
+      {backgroundLocation && (
+        <div className="route-overlay" role="dialog" aria-modal="true" aria-label="애니 상세 정보">
+          <div className="route-overlay-backdrop" />
+          <div className="route-overlay-panel">
+            <Routes>
+              <Route path="/anime/:id" element={<AnimeDetailPage isOverlay />} />
+            </Routes>
+          </div>
+        </div>
+      )}
       {shouldShowFloatingCta && isAuthenticated && (
         <div className="floating-hub" ref={floatingPanelRef}>
+          {isFriendsOpen && (
+            <section id="floating-friends-panel" className="floating-friends-panel" aria-label="친구 빠른 목록">
+              <div className="floating-friends-panel-header">
+                <strong>친구 목록</strong>
+                <button
+                  className="floating-friends-close"
+                  type="button"
+                  onClick={() => setIsFriendsOpen(false)}
+                  aria-label="친구 목록 닫기"
+                >
+                  ×
+                </button>
+              </div>
+              {isLoadingFriends ? (
+                <p className="floating-friends-feedback">친구 목록을 불러오는 중...</p>
+              ) : friendsError ? (
+                <p className="floating-friends-feedback is-error">{friendsError}</p>
+              ) : friends.length === 0 ? (
+                <p className="floating-friends-feedback">아직 추가된 친구가 없어요.</p>
+              ) : (
+                <div className="floating-friends-list">
+                  {friends.map((friend) => {
+                    const name = getFriendPreviewName(friend.user)
+                    const initials = getFriendInitials(friend.user)
+
+                    return (
+                      <Link
+                        key={friend.id}
+                        className="floating-friend-item"
+                        to={`/users/${friend.user.id}/anime-list`}
+                        onClick={() => setIsFriendsOpen(false)}
+                      >
+                        {friend.user.profileImageUrl ? (
+                          <img
+                            className="avatar avatar-image floating-friend-avatar"
+                            src={getProfileImageSrc(friend.user.profileImageUrl)}
+                            alt={`${name} 프로필 이미지`}
+                            onError={handleProfileImageError}
+                          />
+                        ) : (
+                          <span className="avatar floating-friend-avatar" aria-hidden="true">{initials}</span>
+                        )}
+                        <span className="floating-friend-copy">
+                          <strong>{name}</strong>
+                          <small>{formatFriendAnimeCount(friend.user.animeListCount)}</small>
+                        </span>
+                      </Link>
+                    )
+                  })}
+                </div>
+              )}
+            </section>
+          )}
+
           <button
             className="floating-hub-trigger"
             type="button"
-            aria-label="빠른 메뉴 열기"
-            aria-expanded={isQuickMenuOpen}
-            onClick={() => {
-              setIsQuickMenuOpen((current) => {
-                const nextOpen = !current
-
-                if (!nextOpen) {
-                  setIsFriendsOpen(false)
-                }
-
-                return nextOpen
-              })
-            }}
+            aria-label="친구 목록 열기"
+            aria-expanded={isFriendsOpen}
+            aria-controls="floating-friends-panel"
+            onClick={() => { void handleFriendsOverlayToggle() }}
           >
             <span className="floating-hub-icon" aria-hidden="true">✦</span>
           </button>
-
-          <div className={isQuickMenuOpen ? 'floating-hub-menu is-open' : 'floating-hub-menu'}>
-            <div className="floating-friends-stack">
-              {isFriendsOpen && (
-                <section id="floating-friends-panel" className="floating-friends-panel" aria-label="친구 빠른 목록">
-                  <div className="floating-friends-panel-header">
-                    <strong>친구 목록</strong>
-                    <button
-                      className="floating-friends-close"
-                      type="button"
-                      onClick={() => setIsFriendsOpen(false)}
-                      aria-label="친구 목록 닫기"
-                    >
-                      ×
-                    </button>
-                  </div>
-                  {isLoadingFriends ? (
-                    <p className="floating-friends-feedback">친구 목록을 불러오는 중...</p>
-                  ) : friendsError ? (
-                    <p className="floating-friends-feedback is-error">{friendsError}</p>
-                  ) : friends.length === 0 ? (
-                    <p className="floating-friends-feedback">아직 추가된 친구가 없어요.</p>
-                  ) : (
-                    <div className="floating-friends-list">
-                      {friends.map((friend) => {
-                        const name = getFriendPreviewName(friend.user)
-                        const initials = getFriendInitials(friend.user)
-
-                        return (
-                          <Link
-                            key={friend.id}
-                            className="floating-friend-item"
-                            to={`/users/${friend.user.id}/anime-list`}
-                            onClick={() => {
-                              setIsFriendsOpen(false)
-                              setIsQuickMenuOpen(false)
-                            }}
-                          >
-                            {friend.user.profileImageUrl ? (
-                              <img
-                                className="avatar avatar-image floating-friend-avatar"
-                                src={getProfileImageSrc(friend.user.profileImageUrl)}
-                                alt={`${name} 프로필 이미지`}
-                                onError={handleProfileImageError}
-                              />
-                            ) : (
-                              <span className="avatar floating-friend-avatar" aria-hidden="true">{initials}</span>
-                            )}
-                            <span className="floating-friend-copy">
-                              <strong>{name}</strong>
-                              <small>{formatFriendAnimeCount(friend.user.animeListCount)}</small>
-                            </span>
-                          </Link>
-                        )
-                      })}
-                    </div>
-                  )}
-                </section>
-              )}
-
-              <button
-                className="floating-cta floating-cta-wide floating-cta-secondary floating-cta-button"
-                type="button"
-                onClick={() => { void handleFriendsOverlayToggle() }}
-                aria-expanded={isFriendsOpen}
-                aria-controls="floating-friends-panel"
-              >
-                <span className="floating-cta-icon" aria-hidden="true">✦</span>
-                <span>친구 목록</span>
-              </button>
-            </div>
-
-            <Link className="floating-cta floating-cta-wide" to="/collection" onClick={() => setIsQuickMenuOpen(false)}>
-              <span className="floating-cta-icon" aria-hidden="true">✦</span>
-              <span>컬렉션</span>
-            </Link>
-          </div>
         </div>
       )}
     </div>

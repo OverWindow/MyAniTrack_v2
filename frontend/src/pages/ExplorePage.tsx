@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { CollectionButton } from '../components/CollectionButton'
 import { useAuth } from '../contexts/AuthContext'
 import {
@@ -16,7 +16,6 @@ import {
   searchAnime,
   sortOptions,
 } from '../lib/anime'
-import { loadExploreViewSnapshot, saveExploreViewSnapshot } from '../lib/viewState'
 import type { AnimeGenre, AnimeListItem, AnimeSort } from '../types/anime'
 import '../styles/pages/CatalogPage.css'
 import '../styles/pages/ExplorePage.css'
@@ -187,13 +186,12 @@ function HoverRating({ animeId, maxProgress }: HoverRatingProps) {
 }
 
 export function ExplorePage() {
-  const initialSnapshotRef = useRef(loadExploreViewSnapshot())
-  const initialSnapshot = initialSnapshotRef.current
-  const [sort, setSort] = useState<AnimeSort>(() => initialSnapshot?.sort ?? 'score')
-  const [genre, setGenre] = useState<AnimeGenre | 'all'>(() => initialSnapshot?.genre ?? 'all')
-  const [searchTerm, setSearchTerm] = useState(() => initialSnapshot?.searchTerm ?? '')
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(() => initialSnapshot?.debouncedSearchTerm ?? '')
-  const [searchLanguage, setSearchLanguage] = useState<'ko' | 'en'>(() => initialSnapshot?.searchLanguage ?? 'ko')
+  const location = useLocation()
+  const [sort, setSort] = useState<AnimeSort>('score')
+  const [genre, setGenre] = useState<AnimeGenre | 'all'>('all')
+  const [searchTerm, setSearchTerm] = useState('')
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
+  const [searchLanguage, setSearchLanguage] = useState<'ko' | 'en'>('ko')
   const normalizedQuery = debouncedSearchTerm.trim()
   const selectedGenre = genre === 'all' ? null : genre
   const selectedGenreLabel =
@@ -201,48 +199,11 @@ export function ExplorePage() {
       ? '전체 장르'
       : genreOptions.find((option) => option.value === genre)?.label ?? genre
   const requestKey = `${sort}:${normalizedQuery}:${searchLanguage}:${genre}`
-  const hydratedSnapshot = initialSnapshot?.requestKey === requestKey ? initialSnapshot : null
-  const [state, setState] = useState<ExploreState>(() => (
-    hydratedSnapshot
-      ? {
-          animeItems: hydratedSnapshot.animeItems,
-          nextCursor: hydratedSnapshot.nextCursor,
-          hasNext: hydratedSnapshot.hasNext,
-          isLoading: false,
-          isLoadingMore: false,
-          error: null,
-          requestKey,
-        }
-      : createInitialExploreState(requestKey)
-  ))
+  const [state, setState] = useState<ExploreState>(() => createInitialExploreState(requestKey))
   const sentinelRef = useRef<HTMLDivElement | null>(null)
-  const latestSnapshotRef = useRef({
-    sort,
-    genre,
-    searchTerm,
-    debouncedSearchTerm,
-    searchLanguage,
-    animeItems: state.animeItems,
-    nextCursor: state.nextCursor,
-    hasNext: state.hasNext,
-    requestKey,
-  })
-  const shouldSkipInitialFetchRef = useRef(Boolean(hydratedSnapshot))
-  const pendingScrollRestoreRef = useRef<number | null>(hydratedSnapshot?.scrollY ?? null)
+  const isLoadingMoreRef = useRef(false)
   const { animeItems, nextCursor, hasNext, isLoading, isLoadingMore, error } = state
   const isRefreshingQuery = state.requestKey !== requestKey
-
-  latestSnapshotRef.current = {
-    sort,
-    genre,
-    searchTerm,
-    debouncedSearchTerm,
-    searchLanguage,
-    animeItems,
-    nextCursor,
-    hasNext,
-    requestKey,
-  }
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -255,49 +216,12 @@ export function ExplorePage() {
   }, [searchTerm])
 
   useEffect(() => {
-    if (!isRefreshingQuery) {
-      saveExploreViewSnapshot({
-        ...latestSnapshotRef.current,
-        scrollY: window.scrollY,
-      })
-    }
-  }, [animeItems, debouncedSearchTerm, genre, hasNext, isRefreshingQuery, nextCursor, requestKey, searchLanguage, searchTerm, sort])
-
-  useEffect(() => {
-    const handleScroll = () => {
-      saveExploreViewSnapshot({
-        ...latestSnapshotRef.current,
-        scrollY: window.scrollY,
-      })
-    }
-
-    window.addEventListener('scroll', handleScroll, { passive: true })
-    return () => window.removeEventListener('scroll', handleScroll)
-  }, [])
-
-  useEffect(() => {
-    if (pendingScrollRestoreRef.current === null || isLoading || isRefreshingQuery || animeItems.length === 0) {
-      return
-    }
-
-    const nextScrollY = pendingScrollRestoreRef.current
-    pendingScrollRestoreRef.current = null
-
-    window.requestAnimationFrame(() => {
-      window.scrollTo({ top: nextScrollY, behavior: 'auto' })
-    })
-  }, [animeItems.length, isLoading, isRefreshingQuery])
-
-  useEffect(() => {
-    if (shouldSkipInitialFetchRef.current) {
-      shouldSkipInitialFetchRef.current = false
-      return
-    }
-
     const controller = new AbortController()
 
     const loadFirstPage = async () => {
       try {
+        isLoadingMoreRef.current = false
+
         const data = normalizedQuery
           ? await searchAnime({
               query: normalizedQuery,
@@ -323,7 +247,6 @@ export function ExplorePage() {
           error: null,
           requestKey,
         })
-        pendingScrollRestoreRef.current = 0
       } catch (fetchError) {
         if (fetchError instanceof DOMException && fetchError.name === 'AbortError') {
           return
@@ -367,10 +290,11 @@ export function ExplorePage() {
       (entries) => {
         const [entry] = entries
 
-        if (!entry?.isIntersecting) {
+        if (!entry?.isIntersecting || isLoadingMoreRef.current) {
           return
         }
 
+        isLoadingMoreRef.current = true
         setState((current) => ({ ...current, isLoadingMore: true }))
 
         const loadMore = async () => {
@@ -392,6 +316,10 @@ export function ExplorePage() {
                 })
 
             setState((current) => {
+              if (current.requestKey !== requestKey) {
+                return current
+              }
+
               const merged = [...current.animeItems, ...data.items]
               const seen = new Set<number>()
               const deduped = merged.filter((item) => {
@@ -412,14 +340,22 @@ export function ExplorePage() {
               }
             })
           } catch (fetchError) {
-            setState((current) => ({
-              ...current,
-              isLoadingMore: false,
-              error:
-                fetchError instanceof Error
-                  ? fetchError.message
-                  : '추가 목록을 불러오지 못했습니다.',
-            }))
+            setState((current) => {
+              if (current.requestKey !== requestKey) {
+                return current
+              }
+
+              return {
+                ...current,
+                isLoadingMore: false,
+                error:
+                  fetchError instanceof Error
+                    ? fetchError.message
+                    : '추가 목록을 불러오지 못했습니다.',
+              }
+            })
+          } finally {
+            isLoadingMoreRef.current = false
           }
         }
 
@@ -438,6 +374,7 @@ export function ExplorePage() {
     isRefreshingQuery,
     nextCursor,
     normalizedQuery,
+    requestKey,
     searchLanguage,
     selectedGenre,
     sort,
@@ -553,7 +490,12 @@ export function ExplorePage() {
           ) : (
             <div className="anime-grid">
               {animeItems.map((item) => (
-                <Link className="anime-card anime-card-link" key={item.id} to={`/anime/${item.id}`} state={{ fromPage: 'explore' }}>
+                <Link
+                  className="anime-card anime-card-link"
+                  key={item.id}
+                  to={`/anime/${item.id}`}
+                  state={{ fromPage: 'explore', backgroundLocation: location }}
+                >
                   <div className="anime-poster-wrap">
                     <div
                       className="anime-card-quick-action"

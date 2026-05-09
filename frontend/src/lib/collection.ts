@@ -217,6 +217,11 @@ export async function fetchMyCollectionEntry(animeId: number, signal?: AbortSign
   }
 
   const data = (await response.json()) as UserAnimeListEntryResponse
+
+  if (!data.item) {
+    return null
+  }
+
   const entry = {
     animeId: data.item.animeId,
     status: data.item.status,

@@ -279,7 +279,30 @@ export async function confirmPasswordReset(token: string, newPassword: string) {
   })
 
   if (!response.ok) {
-    throw createAuthError(getErrorMessage(response.status, '비밀번호 재설정에 실패했어요.'), response.status)
+    const data = await parseJsonSafe<{ success?: boolean; message?: string }>(response)
+    const serverMessage = data?.message
+
+    if (serverMessage === 'token is required') {
+      throw createAuthError('재설정 토큰이 없어 비밀번호를 변경할 수 없어요.', response.status)
+    }
+
+    if (serverMessage === 'password must be between 8 and 72 characters') {
+      throw createAuthError('비밀번호는 8자 이상 72자 이하로 입력해주세요.', response.status)
+    }
+
+    if (serverMessage === 'Invalid password reset token') {
+      throw createAuthError('재설정 링크가 올바르지 않아요. 새 메일을 다시 요청해주세요.', response.status)
+    }
+
+    if (serverMessage === 'Password reset token has already been used') {
+      throw createAuthError('이미 사용된 재설정 링크예요. 새 메일을 다시 요청해주세요.', response.status)
+    }
+
+    if (serverMessage === 'Password reset token has expired') {
+      throw createAuthError('재설정 링크가 만료됐어요. 새 메일을 다시 요청해주세요.', response.status)
+    }
+
+    throw createAuthError(serverMessage || getErrorMessage(response.status, '비밀번호 재설정에 실패했어요.'), response.status)
   }
 
   return (await response.json()) as PasswordResetConfirmResponse
@@ -430,6 +453,12 @@ export async function updateProfile(payload: UpdateProfilePayload) {
   })
 
   if (!response.ok) {
+    const data = await parseJsonSafe<{ success?: boolean; message?: string }>(response)
+
+    if (data?.message === 'Username already exists') {
+      throw createAuthError('이미 사용 중인 닉네임이에요.', response.status)
+    }
+
     throw new Error(getErrorMessage(response.status, '프로필 수정에 실패했어요.'))
   }
 

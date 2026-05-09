@@ -25,6 +25,12 @@
   color: var(--text-inverse);
 }
 
+.collection-mini-button.is-added:hover,
+.collection-mini-button.is-added:focus-visible {
+  background: #dc2626;
+  border-color: #dc2626;
+}
+
 .collection-mini-button.is-login {
   text-decoration: none;
   display: inline-flex;

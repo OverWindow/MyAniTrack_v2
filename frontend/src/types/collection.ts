@@ -82,5 +82,5 @@ export type UserAnimeListResponse = {
 
 export type UserAnimeListEntryResponse = {
   success: boolean
-  item: UserAnimeListItem
+  item: UserAnimeListItem | null
 }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useLocation, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { CollectionEditor } from '../components/CollectionEditor'
 import {
   fetchAnimeDetail,
@@ -15,6 +15,10 @@ type DetailState = {
   isLoading: boolean
   error: string | null
   requestKey: string
+}
+
+type AnimeDetailPageProps = {
+  isOverlay?: boolean
 }
 
 const createInitialDetailState = (requestKey: string): DetailState => ({
@@ -36,9 +40,10 @@ function getQuarterLabel(season?: string | null, seasonYear?: number | null) {
   return [seasonYear, seasonLabel].filter(Boolean).join(' ') || '정보 없음'
 }
 
-export function AnimeDetailPage() {
+export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
   const { id } = useParams<{ id: string }>()
   const location = useLocation()
+  const navigate = useNavigate()
   const requestKey = id ?? 'invalid'
   const [state, setState] = useState<DetailState>(() =>
     createInitialDetailState(requestKey),
@@ -48,6 +53,11 @@ export function AnimeDetailPage() {
   const fromPage = (location.state as { fromPage?: 'explore' | 'collection' } | null)?.fromPage
   const backPath = fromPage === 'collection' ? '/collection' : '/explore'
   const backLabel = fromPage === 'collection' ? '컬렉션으로 돌아가기' : '탐색으로 돌아가기'
+  const detailPageClassName = isOverlay ? 'detail-page detail-page-overlay' : 'detail-page'
+
+  const handleOverlayClose = () => {
+    navigate(-1)
+  }
 
   useEffect(() => {
     if (!id) {
@@ -90,7 +100,7 @@ export function AnimeDetailPage() {
 
   if (!id) {
     return (
-      <section className="detail-page">
+      <section className={detailPageClassName}>
         <div className="feedback-card is-error">잘못된 경로로 접근했어요.</div>
       </section>
     )
@@ -98,7 +108,12 @@ export function AnimeDetailPage() {
 
   if (isLoading || isRefreshingDetail) {
     return (
-      <section className="detail-page">
+      <section className={detailPageClassName}>
+        {isOverlay && (
+          <button className="detail-overlay-close" type="button" onClick={handleOverlayClose} aria-label="상세 닫기">
+            ×
+          </button>
+        )}
         <div className="detail-loading-card">
           <div className="detail-loading-banner" />
           <div className="detail-loading-lines">
@@ -112,7 +127,12 @@ export function AnimeDetailPage() {
 
   if (error || !item) {
     return (
-      <section className="detail-page">
+      <section className={detailPageClassName}>
+        {isOverlay && (
+          <button className="detail-overlay-close" type="button" onClick={handleOverlayClose} aria-label="상세 닫기">
+            ×
+          </button>
+        )}
         <div className="feedback-card is-error">{error ?? '작품 정보를 찾을 수 없어요.'}</div>
       </section>
     )
@@ -122,10 +142,22 @@ export function AnimeDetailPage() {
   const heroImage = item.bannerImage || getPrimaryPoster(item)
 
   return (
-    <section className="detail-page">
-      <Link className="detail-back-link" to={backPath}>
-        {backLabel}
-      </Link>
+    <section className={detailPageClassName}>
+      {isOverlay ? (
+        <button className="detail-back-link detail-back-button" type="button" onClick={handleOverlayClose}>
+          {backLabel}
+        </button>
+      ) : (
+        <Link className="detail-back-link" to={backPath}>
+          {backLabel}
+        </Link>
+      )}
+
+      {isOverlay && (
+        <button className="detail-overlay-close" type="button" onClick={handleOverlayClose} aria-label="상세 닫기">
+          ×
+        </button>
+      )}
 
       <div className="detail-hero">
         <div
@@ -176,9 +208,15 @@ export function AnimeDetailPage() {
                   원본 페이지 보기
                 </a>
               )}
-              <Link className="secondary-button" to={backPath}>
-                다른 작품 더 보기
-              </Link>
+              {isOverlay ? (
+                <button className="secondary-button" type="button" onClick={handleOverlayClose}>
+                  다른 작품 더 보기
+                </button>
+              ) : (
+                <Link className="secondary-button" to={backPath}>
+                  다른 작품 더 보기
+                </Link>
+              )}
             </div>
           </div>
         </div>

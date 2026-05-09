@@ -153,9 +153,14 @@ export async function searchAnime(params: {
   }
 }
 
-export async function fetchPopularAnime(signal?: AbortSignal) {
+export async function fetchPopularAnime(params: { limit?: number; signal?: AbortSignal } = {}) {
   const url = new URL('/api/stats/platform/popular-anime', getApiBaseUrl())
-  const response = await fetch(url.toString(), { signal })
+
+  if (params.limit !== undefined) {
+    url.searchParams.set('limit', String(params.limit))
+  }
+
+  const response = await fetch(url.toString(), { signal: params.signal })
 
   if (!response.ok) {
     throw new Error(`인기 애니를 불러오지 못했습니다. (${response.status})`)

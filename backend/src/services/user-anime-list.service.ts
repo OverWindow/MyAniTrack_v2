@@ -643,7 +643,7 @@ export async function getMyAnimeRelation(
   const row = rows[0];
 
   if (!row) {
-    throw new Error('User anime list item not found');
+    return null;
   }
 
   return {

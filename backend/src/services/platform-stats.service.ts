@@ -47,7 +47,7 @@ export async function getPlatformStats() {
   };
 }
 
-export async function getTopPopularAnime() {
+export async function getTopPopularAnime(limit = 10) {
   const [rows] = await pool.query<PopularAnimeRow[]>(
     `
     SELECT
@@ -74,8 +74,9 @@ export async function getTopPopularAnime() {
         a.title_native
       ) IS NOT NULL
     ORDER BY a.popularity DESC, a.id DESC
-    LIMIT 10
-    `
+    LIMIT ?
+    `,
+    [limit]
   );
 
   return rows.map((row) => ({

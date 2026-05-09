@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { fetchMyCollection } from '../lib/collection'
 import { genreOptions } from '../lib/anime'
-import { loadCollectionViewSnapshot, saveCollectionViewSnapshot } from '../lib/viewState'
 import type { AnimeGenre } from '../types/anime'
 import type { UserAnimeListItem, UserAnimeListSort } from '../types/collection'
 import '../styles/pages/CatalogPage.css'
@@ -86,58 +85,24 @@ function formatScore(score?: number | null) {
 }
 
 export function CollectionPage() {
+  const location = useLocation()
   const { isAuthenticated } = useAuth()
-  const initialSnapshotRef = useRef(loadCollectionViewSnapshot())
-  const initialSnapshot = initialSnapshotRef.current
-  const [sort, setSort] = useState<UserAnimeListSort>(() => initialSnapshot?.sort ?? 'latest')
-  const [genre, setGenre] = useState<AnimeGenre | 'all'>(() => initialSnapshot?.genre ?? 'all')
-  const [searchTerm, setSearchTerm] = useState(() => initialSnapshot?.searchTerm ?? '')
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(() => initialSnapshot?.searchTerm ?? '')
+  const [sort, setSort] = useState<UserAnimeListSort>('latest')
+  const [genre, setGenre] = useState<AnimeGenre | 'all'>('all')
+  const [searchTerm, setSearchTerm] = useState('')
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
   const [reloadKey, setReloadKey] = useState(0)
   const selectedGenre = genre === 'all' ? null : genre
   const selectedGenreLabel =
     genre === 'all'
       ? '전체 장르'
       : genreOptions.find((option) => option.value === genre)?.label ?? genre
-  const requestKey = `${sort}:${genre}:${reloadKey}`
-  const hydratedSnapshot = initialSnapshot?.requestKey === `${sort}:${genre}:0` ? initialSnapshot : null
-  const [state, setState] = useState<CollectionState>(() => (
-    hydratedSnapshot
-      ? {
-          items: hydratedSnapshot.items,
-          nextCursor: hydratedSnapshot.nextCursor,
-          hasNext: hydratedSnapshot.hasNext,
-          isLoading: false,
-          isLoadingMore: false,
-          error: null,
-          requestKey,
-        }
-      : createInitialCollectionState(requestKey)
-  ))
+  const requestKey = `${sort}:${genre}`
+  const [state, setState] = useState<CollectionState>(() => createInitialCollectionState(requestKey))
   const sentinelRef = useRef<HTMLDivElement | null>(null)
-  const latestSnapshotRef = useRef({
-    sort,
-    genre,
-    searchTerm,
-    items: state.items,
-    nextCursor: state.nextCursor,
-    hasNext: state.hasNext,
-    requestKey,
-  })
-  const shouldSkipInitialFetchRef = useRef(Boolean(hydratedSnapshot))
-  const pendingScrollRestoreRef = useRef<number | null>(hydratedSnapshot?.scrollY ?? null)
+  const isLoadingMoreRef = useRef(false)
   const { items, nextCursor, hasNext, isLoading, isLoadingMore, error } = state
   const isRefreshingQuery = state.requestKey !== requestKey
-
-  latestSnapshotRef.current = {
-    sort,
-    genre,
-    searchTerm,
-    items,
-    nextCursor,
-    hasNext,
-    requestKey,
-  }
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -154,46 +119,7 @@ export function CollectionPage() {
   )
 
   useEffect(() => {
-    if (!isRefreshingQuery) {
-      saveCollectionViewSnapshot({
-        ...latestSnapshotRef.current,
-        scrollY: window.scrollY,
-      })
-    }
-  }, [genre, hasNext, isRefreshingQuery, items, nextCursor, requestKey, searchTerm, sort])
-
-  useEffect(() => {
-    const handleScroll = () => {
-      saveCollectionViewSnapshot({
-        ...latestSnapshotRef.current,
-        scrollY: window.scrollY,
-      })
-    }
-
-    window.addEventListener('scroll', handleScroll, { passive: true })
-    return () => window.removeEventListener('scroll', handleScroll)
-  }, [])
-
-  useEffect(() => {
-    if (pendingScrollRestoreRef.current === null || isLoading || isRefreshingQuery || items.length === 0) {
-      return
-    }
-
-    const nextScrollY = pendingScrollRestoreRef.current
-    pendingScrollRestoreRef.current = null
-
-    window.requestAnimationFrame(() => {
-      window.scrollTo({ top: nextScrollY, behavior: 'auto' })
-    })
-  }, [isLoading, isRefreshingQuery, items.length])
-
-  useEffect(() => {
     if (!isAuthenticated) {
-      return
-    }
-
-    if (shouldSkipInitialFetchRef.current) {
-      shouldSkipInitialFetchRef.current = false
       return
     }
 
@@ -201,6 +127,16 @@ export function CollectionPage() {
 
     const loadFirstPage = async () => {
       try {
+        isLoadingMoreRef.current = false
+
+        setState((current) => ({
+          ...current,
+          isLoading: true,
+          isLoadingMore: false,
+          error: null,
+          requestKey,
+        }))
+
         const data = await fetchMyCollection({
           sort,
           genre: selectedGenre,
@@ -217,7 +153,6 @@ export function CollectionPage() {
           error: null,
           requestKey,
         })
-        pendingScrollRestoreRef.current = 0
       } catch (fetchError) {
         if (fetchError instanceof DOMException && fetchError.name === 'AbortError') {
           return
@@ -241,7 +176,7 @@ export function CollectionPage() {
     void loadFirstPage()
 
     return () => controller.abort()
-  }, [isAuthenticated, requestKey, selectedGenre, sort])
+  }, [isAuthenticated, reloadKey, requestKey, selectedGenre, sort])
 
   useEffect(() => {
     const node = sentinelRef.current
@@ -262,10 +197,11 @@ export function CollectionPage() {
       (entries) => {
         const [entry] = entries
 
-        if (!entry?.isIntersecting) {
+        if (!entry?.isIntersecting || isLoadingMoreRef.current) {
           return
         }
 
+        isLoadingMoreRef.current = true
         setState((current) => ({ ...current, isLoadingMore: true }))
 
         const loadMore = async () => {
@@ -278,6 +214,10 @@ export function CollectionPage() {
             })
 
             setState((current) => {
+              if (current.requestKey !== requestKey) {
+                return current
+              }
+
               const merged = [...current.items, ...data.items]
               const seen = new Set<number>()
               const deduped = merged.filter((item) => {
@@ -298,14 +238,22 @@ export function CollectionPage() {
               }
             })
           } catch (fetchError) {
-            setState((current) => ({
-              ...current,
-              isLoadingMore: false,
-              error:
-                fetchError instanceof Error
-                  ? fetchError.message
-                  : '추가 컬렉션을 불러오지 못했어요.',
-            }))
+            setState((current) => {
+              if (current.requestKey !== requestKey) {
+                return current
+              }
+
+              return {
+                ...current,
+                isLoadingMore: false,
+                error:
+                  fetchError instanceof Error
+                    ? fetchError.message
+                    : '추가 컬렉션을 불러오지 못했어요.',
+              }
+            })
+          } finally {
+            isLoadingMoreRef.current = false
           }
         }
 
@@ -324,6 +272,7 @@ export function CollectionPage() {
     isLoadingMore,
     isRefreshingQuery,
     nextCursor,
+    requestKey,
     selectedGenre,
     sort,
   ])
@@ -429,7 +378,7 @@ export function CollectionPage() {
                   className="collection-card"
                   key={item.id}
                   to={`/anime/${item.anime.id}`}
-                  state={{ fromPage: 'collection' }}
+                  state={{ fromPage: 'collection', backgroundLocation: location }}
                 >
                   <div className="collection-poster-wrap">
                     <img

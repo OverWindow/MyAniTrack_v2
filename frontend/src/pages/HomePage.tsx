@@ -24,14 +24,17 @@ export function HomePage() {
 
     const loadPopularAnime = async () => {
       try {
-        const popularAnime = await fetchPopularAnime(controller.signal)
+        const popularAnime = await fetchPopularAnime({
+          limit: 16,
+          signal: controller.signal,
+        })
 
         if (controller.signal.aborted) {
           return
         }
 
         setState({
-          popularAnime: popularAnime.slice(0, 10),
+          popularAnime: popularAnime.slice(0, 16),
           isLoading: false,
           error: null,
         })
@@ -78,7 +81,7 @@ export function HomePage() {
         <div className="home-anime-showcase" aria-label="인기 애니 전시">
           <div className="home-anime-showcase-wrapper">
           {state.popularAnime.length > 0 ? (
-            state.popularAnime.slice(0, 10).map((anime, index) => (
+            state.popularAnime.slice(0, 16).map((anime, index) => (
               <Link
                 className={`home-showcase-card home-showcase-card-${index + 1}`}
                 key={anime.id}

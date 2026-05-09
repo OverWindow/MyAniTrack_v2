@@ -615,6 +615,46 @@ Response example:
 }
 ```
 
+### `GET /me/anime-list/:animeId`
+내 리스트에 특정 애니가 등록되어 있는지 조회합니다.
+
+Query:
+
+- `titleLanguage`: `ko | en | ja`
+
+내 리스트에 등록되어 있으면 `item`에 기록이 들어옵니다.
+
+```json
+{
+  "success": true,
+  "item": {
+    "id": 1,
+    "userId": 1,
+    "animeId": 123,
+    "status": "watching",
+    "score": 8.5,
+    "progress": 3,
+    "startedAt": "2026-04-17",
+    "completedAt": null,
+    "notes": "재밌음",
+    "anime": {
+      "id": 123,
+      "title": "진격의 거인",
+      "coverImageLarge": "https://..."
+    }
+  }
+}
+```
+
+내 리스트에 아직 등록되어 있지 않으면 404가 아니라 아래처럼 응답합니다.
+
+```json
+{
+  "success": true,
+  "item": null
+}
+```
+
 ### `PATCH /me/anime-list/:animeId`
 내 리스트 항목 수정입니다.
 
@@ -1022,6 +1062,44 @@ Response example:
     "storedAnimeCount": 8450,
     "translatedKoreanTitleCount": 5300
   }
+}
+```
+
+### `GET /stats/platform/popular-anime`
+인기 애니 목록 조회입니다. 인증 없이 호출할 수 있습니다.
+
+Query:
+
+- `limit`: `1~50`, 기본값 `10`
+
+Example request:
+
+```http
+GET /api/stats/platform/popular-anime?limit=6
+```
+
+Response example:
+
+```json
+{
+  "success": true,
+  "limit": 6,
+  "items": [
+    {
+      "id": 123,
+      "anilistId": 456,
+      "title": "장송의 프리렌",
+      "titles": {
+        "korean": "장송의 프리렌",
+        "english": "Frieren: Beyond Journey's End",
+        "native": "葬送のフリーレン",
+        "romaji": "Sousou no Frieren",
+        "userPreferred": "Frieren: Beyond Journey's End"
+      },
+      "coverImageLarge": "https://...",
+      "popularity": 250000
+    }
+  ]
 }
 ```
 

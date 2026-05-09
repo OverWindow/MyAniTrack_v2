@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import {
   addToCollection,
   COLLECTION_CACHE_UPDATED_EVENT,
+  deleteCollectionEntry,
   getCachedCollectionEntry,
 } from '../lib/collection'
 import '../styles/components/CollectionButton.css'
@@ -51,8 +52,8 @@ export function CollectionButton({ animeId, maxProgress }: CollectionButtonProps
     }
   }, [animeId, isAuthenticated, user?.id])
 
-  const handleAdd = async () => {
-    if (isAdded || isSubmitting) {
+  const handleToggle = async () => {
+    if (isSubmitting) {
       return
     }
 
@@ -60,18 +61,26 @@ export function CollectionButton({ animeId, maxProgress }: CollectionButtonProps
     setMessage(null)
 
     try {
-      await addToCollection({
-        animeId,
-        status: 'completed',
-        ...(maxProgress && maxProgress > 0 ? { progress: maxProgress } : {}),
-      })
-      setIsAdded(true)
-      setMessage('컬렉션에 추가했어요.')
+      if (isAdded) {
+        await deleteCollectionEntry(animeId)
+        setIsAdded(false)
+        setMessage('컬렉션에서 삭제했어요.')
+      } else {
+        await addToCollection({
+          animeId,
+          status: 'completed',
+          ...(maxProgress && maxProgress > 0 ? { progress: maxProgress } : {}),
+        })
+        setIsAdded(true)
+        setMessage('컬렉션에 추가했어요.')
+      }
     } catch (submitError) {
       setMessage(
         submitError instanceof Error
           ? submitError.message
-          : '컬렉션에 추가하지 못했어요.',
+          : isAdded
+            ? '컬렉션에서 삭제하지 못했어요.'
+            : '컬렉션에 추가하지 못했어요.',
       )
     } finally {
       setIsSubmitting(false)
@@ -91,12 +100,13 @@ export function CollectionButton({ animeId, maxProgress }: CollectionButtonProps
       <button
         className={isAdded ? 'collection-mini-button is-added' : 'collection-mini-button'}
         type="button"
+        aria-label={isAdded ? '컬렉션에서 삭제' : '컬렉션에 추가'}
         onClick={() => {
-          void handleAdd()
+          void handleToggle()
         }}
         disabled={isSubmitting}
       >
-        {isSubmitting ? '추가 중...' : isAdded ? '추가됨' : '+'}
+        {isSubmitting ? (isAdded ? '삭제 중...' : '추가 중...') : isAdded ? '추가됨' : '+'}
       </button>
       {message && <span className="collection-mini-message">{message}</span>}
     </div>

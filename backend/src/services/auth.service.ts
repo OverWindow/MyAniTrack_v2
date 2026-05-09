@@ -156,7 +156,12 @@ function normalizeDeviceType(value: unknown): DeviceType {
 }
 
 function toMysqlDateTime(date: Date): string {
-  return date.toISOString().slice(0, 19).replace('T', ' ');
+  const pad = (value: number) => String(value).padStart(2, '0');
+
+  return [
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`,
+    `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`,
+  ].join(' ');
 }
 
 function hashEmailToken(token: string) {

@@ -3,12 +3,49 @@
   gap: 24px;
 }
 
+.detail-page-overlay {
+  position: relative;
+  padding: 24px;
+}
+
 .detail-back-link {
   width: fit-content;
   color: var(--point-hover);
   text-decoration: none;
   font-size: 0.92rem;
   font-weight: 700;
+}
+
+.detail-back-button {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.detail-overlay-close {
+  position: sticky;
+  top: 16px;
+  z-index: 5;
+  justify-self: end;
+  width: 42px;
+  height: 42px;
+  margin-bottom: -66px;
+  border: 1px solid rgba(120, 113, 108, 0.18);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 1.45rem;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: var(--shadow-card);
+}
+
+.detail-overlay-close:hover,
+.detail-overlay-close:focus-visible {
+  background: var(--bg-neutral);
 }
 
 .detail-hero {
@@ -243,6 +280,10 @@
 }
 
 @media (max-width: 760px) {
+  .detail-page-overlay {
+    padding: 16px 12px 24px;
+  }
+
   .detail-hero-content,
   .detail-section,
   .collection-panel,
