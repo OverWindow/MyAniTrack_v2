@@ -14,8 +14,29 @@ dotenv.config();
 
 const app = express();
 
+function getAllowedOrigins() {
+  return [
+    process.env.FRONT_DOMAIN1,
+    process.env.FRONT_DOMAIN2,
+    process.env.FRONT_DOMAIN3,
+  ].filter((origin): origin is string => Boolean(origin?.trim()));
+}
+
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
+  const isProduction = process.env.NODE_ENV === 'production';
+  const requestOrigin = req.header('Origin');
+
+  if (isProduction) {
+    const allowedOrigins = getAllowedOrigins();
+
+    if (requestOrigin && allowedOrigins.includes(requestOrigin)) {
+      res.header('Access-Control-Allow-Origin', requestOrigin);
+      res.header('Vary', 'Origin');
+    }
+  } else {
+    res.header('Access-Control-Allow-Origin', '*');
+  }
+
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
 

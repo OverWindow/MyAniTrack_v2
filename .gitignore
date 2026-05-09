@@ -72,3 +72,8 @@ docker-compose.override.yml
 # Misc
 # =========================
 *.local
+
+
+# 데이터 베이스 가리기 용
+myanitrack_v2_dump.sql
+myanitrack_v2*.sql
