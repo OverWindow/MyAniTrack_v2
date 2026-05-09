@@ -58,11 +58,13 @@ export function LoginPage() {
           내 애니 기록과 친구 비교, 취향 분석을 이어서 확인해보세요.
         </p>
 
-        <form className="auth-form" onSubmit={handleSubmit}>
+        <form className="auth-form" onSubmit={handleSubmit} autoComplete="on">
           <label className="auth-field">
             <span>이메일</span>
             <input
               type="email"
+              name="email"
+              autoComplete="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               placeholder="user@example.com"
@@ -74,6 +76,8 @@ export function LoginPage() {
             <span>비밀번호</span>
             <input
               type="password"
+              name="current-password"
+              autoComplete="current-password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               placeholder="비밀번호 입력"

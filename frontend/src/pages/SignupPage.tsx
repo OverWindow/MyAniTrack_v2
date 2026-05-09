@@ -186,11 +186,13 @@ export function SignupPage() {
             이메일 인증을 완료해야 MyAniTrack에 로그인할 수 있어요.
           </p>
 
-          <form className="auth-form" onSubmit={handleSubmit}>
+          <form className="auth-form" onSubmit={handleSubmit} autoComplete="on">
             <label className="auth-field">
               <span>이메일</span>
               <input
                 type="email"
+                name="email"
+                autoComplete="email"
                 value={form.email}
                 onChange={(event) =>
                   setForm((current) => ({ ...current, email: event.target.value }))
@@ -205,6 +207,8 @@ export function SignupPage() {
               <div className="auth-inline-field">
                 <input
                   type="text"
+                  name="username"
+                  autoComplete="username"
                   value={form.username}
                   onChange={(event) => handleUsernameChange(event.target.value)}
                   placeholder="test_user"
@@ -241,6 +245,8 @@ export function SignupPage() {
               <span>비밀번호</span>
               <input
                 type="password"
+                name="new-password"
+                autoComplete="new-password"
                 value={form.password}
                 onChange={(event) =>
                   setForm((current) => ({ ...current, password: event.target.value }))
@@ -256,6 +262,8 @@ export function SignupPage() {
               <span>비밀번호 확인</span>
               <input
                 type="password"
+                name="confirm-password"
+                autoComplete="new-password"
                 value={form.confirmPassword}
                 onChange={(event) =>
                   setForm((current) => ({ ...current, confirmPassword: event.target.value }))

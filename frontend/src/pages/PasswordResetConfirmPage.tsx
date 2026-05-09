@@ -58,11 +58,13 @@ export function PasswordResetConfirmPage() {
           메일에서 연 링크가 맞다면 새 비밀번호를 입력하고 바로 로그인할 수 있어요.
         </p>
 
-        <form className="auth-form" onSubmit={handleSubmit}>
+        <form className="auth-form" onSubmit={handleSubmit} autoComplete="on">
           <label className="auth-field">
             <span>새 비밀번호</span>
             <input
               type="password"
+              name="new-password"
+              autoComplete="new-password"
               value={newPassword}
               onChange={(event) => setNewPassword(event.target.value)}
               placeholder="최소 8자리 입력"
@@ -75,6 +77,8 @@ export function PasswordResetConfirmPage() {
             <span>새 비밀번호 확인</span>
             <input
               type="password"
+              name="confirm-password"
+              autoComplete="new-password"
               value={confirmPassword}
               onChange={(event) => setConfirmPassword(event.target.value)}
               placeholder="비밀번호를 한 번 더 입력"
