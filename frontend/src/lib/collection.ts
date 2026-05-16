@@ -64,6 +64,19 @@ function saveCollectionCache(cache: Record<number, UserAnimeListEntry>) {
   window.localStorage.setItem(getCollectionStorageKey(), JSON.stringify(cache))
 }
 
+function normalizeNullableNumber(value: number | string | null | undefined) {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null
+  }
+
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : null
+  }
+
+  return null
+}
+
 export function getCachedCollectionEntry(animeId: number) {
   return getCollectionCache()[animeId] ?? null
 }
@@ -80,6 +93,52 @@ export function removeCachedCollectionEntry(animeId: number) {
   delete cache[animeId]
   saveCollectionCache(cache)
   dispatchCollectionCacheUpdated(animeId)
+}
+
+export function syncCollectionCacheFromSearchItems(
+  items: Array<{
+    id: number
+    myCollection?: {
+      exists: boolean
+      status: string | null
+      score: number | null
+      progress: number | null
+    }
+  }>,
+) {
+  const cache = getCollectionCache()
+  let didChange = false
+
+  for (const item of items) {
+    const collection = item.myCollection
+
+    if (!collection) {
+      continue
+    }
+
+    if (!collection.exists) {
+      if (cache[item.id]) {
+        delete cache[item.id]
+        didChange = true
+      }
+
+      continue
+    }
+
+    cache[item.id] = {
+      ...cache[item.id],
+      animeId: item.id,
+      status: (collection.status as UserAnimeListEntry['status'] | null) ?? cache[item.id]?.status ?? 'planned',
+      score: normalizeNullableNumber(collection.score),
+      progress: normalizeNullableNumber(collection.progress),
+    }
+    didChange = true
+  }
+
+  if (didChange) {
+    saveCollectionCache(cache)
+    dispatchCollectionCacheUpdated()
+  }
 }
 
 function normalizePayload(payload: UserAnimeListPayload) {
@@ -225,15 +284,19 @@ export async function fetchMyCollectionEntry(animeId: number, signal?: AbortSign
   const entry = {
     animeId: data.item.animeId,
     status: data.item.status,
-    score: data.item.score,
-    progress: data.item.progress,
+    score: normalizeNullableNumber(data.item.score),
+    progress: normalizeNullableNumber(data.item.progress),
     startedAt: data.item.startedAt,
     completedAt: data.item.completedAt,
     notes: data.item.notes,
   }
 
   updateCachedCollectionEntry(entry)
-  return data.item
+  return {
+    ...data.item,
+    score: entry.score,
+    progress: entry.progress,
+  }
 }
 
 export async function fetchMyCollection(params: {
@@ -273,8 +336,8 @@ export async function fetchMyCollection(params: {
     cache[item.animeId] = {
       animeId: item.animeId,
       status: item.status,
-      score: item.score,
-      progress: item.progress,
+      score: normalizeNullableNumber(item.score),
+      progress: normalizeNullableNumber(item.progress),
       startedAt: item.startedAt,
       completedAt: item.completedAt,
       notes: item.notes,

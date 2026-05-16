@@ -38,6 +38,18 @@ export const genreOptions: Array<{ value: AnimeGenre; label: string }> = [
   { value: 'Hentai', label: '헨타이' },
 ]
 
+type AnimeSearchItemResponse = AnimeListItem & {
+  my_collection?: RawMyCollection
+  myCollection?: RawMyCollection
+}
+
+type RawMyCollection = {
+  exists?: boolean | string | number | null
+  status?: string | null
+  score?: number | string | null
+  progress?: number | string | null
+}
+
 function getApiBaseUrl() {
   const baseUrl = import.meta.env.VITE_API_BASE_URL
 
@@ -67,7 +79,7 @@ export function getSearchableTitle(item: AnimeListItem) {
 }
 
 export function getDetailMetaTitle(item: AnimeDetailItem) {
-  return item.title
+  return item.titles.korean?.find((title) => title.isPrimary)?.fullTitle || item.title
 }
 
 export function getPrimaryPoster(item: { coverImageExtraLarge?: string | null; coverImageLarge: string }) {
@@ -80,6 +92,48 @@ export function getGenreLabel(genre?: string | null) {
   }
 
   return genreOptions.find((option) => option.value === genre)?.label ?? genre
+}
+
+function normalizeBoolean(value: boolean | string | number | null | undefined) {
+  if (typeof value === 'boolean') {
+    return value
+  }
+
+  if (typeof value === 'number') {
+    return value > 0
+  }
+
+  if (typeof value === 'string') {
+    return value.toLowerCase() === 'true' || value === '1'
+  }
+
+  return false
+}
+
+function normalizeNullableNumber(value: number | string | null | undefined) {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null
+  }
+
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : null
+  }
+
+  return null
+}
+
+function normalizeMyCollection(collection: RawMyCollection | null | undefined) {
+  if (!collection) {
+    return undefined
+  }
+
+  return {
+    exists: normalizeBoolean(collection.exists),
+    status: collection.status ?? null,
+    score: normalizeNullableNumber(collection.score),
+    progress: normalizeNullableNumber(collection.progress),
+  }
 }
 
 export async function fetchAnimeList(params: {
@@ -150,6 +204,64 @@ export async function searchAnime(params: {
   return {
     ...data,
     items: data.items.filter((item) => item.coverImageExtraLarge || item.coverImageLarge),
+  }
+}
+
+export async function searchMyAnime(params: {
+  query: string
+  sort: AnimeSort
+  genre?: AnimeGenre | null
+  titleLanguage: 'ko' | 'en' | 'ja'
+  limit: number
+  cursor?: string | null
+  signal?: AbortSignal
+}) {
+  const url = new URL('/api/me/anime/search', getApiBaseUrl())
+  url.searchParams.set('query', params.query)
+  url.searchParams.set('sort', params.sort)
+  url.searchParams.set('titleLanguage', params.titleLanguage)
+  url.searchParams.set('limit', String(params.limit))
+
+  if (params.genre) {
+    url.searchParams.set('genre', params.genre)
+  }
+
+  if (params.cursor) {
+    url.searchParams.set('cursor', params.cursor)
+  }
+
+  const response = await authFetch(url.toString(), { signal: params.signal })
+
+  if (!response.ok) {
+    throw new Error(`내 컬렉션 정보가 포함된 애니 검색에 실패했습니다. (${response.status})`)
+  }
+
+  const data = (await response.json()) as AnimeListResponse & {
+    items: AnimeSearchItemResponse[]
+  }
+
+  const items = data.items as AnimeSearchItemResponse[]
+  const normalizedItems = items
+    .map((item) => ({
+      ...item,
+      myCollection: normalizeMyCollection(item.myCollection ?? item.my_collection),
+    }))
+    .filter((item) => item.coverImageExtraLarge || item.coverImageLarge)
+
+  if (import.meta.env.DEV) {
+    console.debug(
+      '[Explore] /api/me/anime/search myCollection',
+      normalizedItems.map((item) => ({
+        id: item.id,
+        title: getDisplayTitle(item),
+        myCollection: item.myCollection,
+      })),
+    )
+  }
+
+  return {
+    ...data,
+    items: normalizedItems,
   }
 }
 

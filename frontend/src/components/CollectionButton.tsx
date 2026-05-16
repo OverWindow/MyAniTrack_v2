@@ -12,23 +12,35 @@ import '../styles/components/CollectionButton.css'
 type CollectionButtonProps = {
   animeId: number
   maxProgress?: number | null
+  initialIsAdded?: boolean
+  useCacheState?: boolean
+  onAddedChange?: (isAdded: boolean) => void
 }
 
-export function CollectionButton({ animeId, maxProgress }: CollectionButtonProps) {
-  const { isAuthenticated, user } = useAuth()
+export function CollectionButton({
+  animeId,
+  maxProgress,
+  initialIsAdded = false,
+  useCacheState = true,
+  onAddedChange,
+}: CollectionButtonProps) {
+  const { isAuthenticated } = useAuth()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
-  const [isAdded, setIsAdded] = useState(false)
+  const [localIsAdded, setLocalIsAdded] = useState<boolean | null>(null)
+  const cacheIsAdded = isAuthenticated && useCacheState
+    ? Boolean(getCachedCollectionEntry(animeId)) || initialIsAdded
+    : false
+  const isAdded = localIsAdded ?? (useCacheState ? cacheIsAdded : initialIsAdded)
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      setIsAdded(false)
-      setMessage(null)
+    if (!isAuthenticated || !useCacheState) {
       return
     }
 
     const syncCachedState = () => {
-      setIsAdded(Boolean(getCachedCollectionEntry(animeId)))
+      const cachedEntry = getCachedCollectionEntry(animeId)
+      setLocalIsAdded(Boolean(cachedEntry))
     }
 
     const handleCollectionUpdated = (event: Event) => {
@@ -43,14 +55,12 @@ export function CollectionButton({ animeId, maxProgress }: CollectionButtonProps
       setMessage(null)
     }
 
-    syncCachedState()
-    setMessage(null)
     window.addEventListener(COLLECTION_CACHE_UPDATED_EVENT, handleCollectionUpdated as EventListener)
 
     return () => {
       window.removeEventListener(COLLECTION_CACHE_UPDATED_EVENT, handleCollectionUpdated as EventListener)
     }
-  }, [animeId, isAuthenticated, user?.id])
+  }, [animeId, isAuthenticated, useCacheState])
 
   const handleToggle = async () => {
     if (isSubmitting) {
@@ -63,7 +73,8 @@ export function CollectionButton({ animeId, maxProgress }: CollectionButtonProps
     try {
       if (isAdded) {
         await deleteCollectionEntry(animeId)
-        setIsAdded(false)
+        setLocalIsAdded(false)
+        onAddedChange?.(false)
         setMessage('컬렉션에서 삭제했어요.')
       } else {
         await addToCollection({
@@ -71,7 +82,8 @@ export function CollectionButton({ animeId, maxProgress }: CollectionButtonProps
           status: 'completed',
           ...(maxProgress && maxProgress > 0 ? { progress: maxProgress } : {}),
         })
-        setIsAdded(true)
+        setLocalIsAdded(true)
+        onAddedChange?.(true)
         setMessage('컬렉션에 추가했어요.')
       }
     } catch (submitError) {

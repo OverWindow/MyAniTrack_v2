@@ -24,12 +24,18 @@ type CollectionEditorProps = {
   maxProgress?: number | null
 }
 
-function getInitialScore(score?: number | null) {
-  if (typeof score !== 'number' || score <= 0) {
+function getInitialScore(score?: number | string | null) {
+  const numericScore = typeof score === 'number'
+    ? score
+    : typeof score === 'string'
+      ? Number(score)
+      : NaN
+
+  if (!Number.isFinite(numericScore) || numericScore <= 0) {
     return 0
   }
 
-  return Math.min(10, Math.max(0, score))
+  return Math.min(10, Math.max(0, numericScore))
 }
 
 function getStarFillPercent(score: number, starIndex: number) {
@@ -53,20 +59,6 @@ export function CollectionEditor({ animeId, maxProgress }: CollectionEditorProps
   const [feedback, setFeedback] = useState<string | null>(null)
   const [isAdded, setIsAdded] = useState(Boolean(cached))
   const [isLoadingEntry, setIsLoadingEntry] = useState(false)
-
-  useEffect(() => {
-    const nextCached = getCachedCollectionEntry(animeId)
-    const nextDefaultCompletedProgress = totalProgress ?? 0
-
-    setStatus(nextCached?.status ?? 'completed')
-    setScore(getInitialScore(nextCached?.score))
-    setProgress(nextCached?.progress ?? nextDefaultCompletedProgress)
-    setStartedAt(nextCached?.startedAt ?? '')
-    setCompletedAt(nextCached?.completedAt ?? '')
-    setNotes(nextCached?.notes ?? '')
-    setIsAdded(Boolean(nextCached))
-    setFeedback(null)
-  }, [animeId, totalProgress])
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -138,8 +130,50 @@ export function CollectionEditor({ animeId, maxProgress }: CollectionEditorProps
     }
   }
 
-  const handleScoreSelect = (nextScore: number) => {
-    setScore(nextScore)
+  const handleScoreSelect = async (nextScore: number, event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault()
+    event.stopPropagation()
+
+    if (isSubmitting || isLoadingEntry) {
+      return
+    }
+
+    setIsSubmitting(true)
+    setFeedback(null)
+
+    try {
+      const nextStatus = isAdded ? status : 'completed'
+      const nextProgress = totalProgress ?? progress
+
+      if (isAdded) {
+        await updateCollectionEntry(animeId, {
+          status: nextStatus,
+          score: nextScore,
+          ...(nextProgress > 0 || nextStatus === 'completed' ? { progress: nextProgress } : {}),
+        })
+      } else {
+        await addToCollection({
+          animeId,
+          status: nextStatus,
+          score: nextScore,
+          ...(nextProgress > 0 || nextStatus === 'completed' ? { progress: nextProgress } : {}),
+        })
+        setIsAdded(true)
+      }
+
+      setStatus(nextStatus)
+      setScore(nextScore)
+      setProgress(nextProgress)
+      setFeedback(`${nextScore.toFixed(1)}점으로 저장했어요.`)
+    } catch (submitError) {
+      setFeedback(
+        submitError instanceof Error
+          ? submitError.message
+          : '별점을 저장하지 못했어요.',
+      )
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const handleSave = async () => {
@@ -219,6 +253,47 @@ export function CollectionEditor({ animeId, maxProgress }: CollectionEditorProps
 
       {isLoadingEntry && <div className="feedback-inline">내 기록을 불러오는 중이에요.</div>}
 
+      <div className="detail-rating-control" aria-label="내 별점 수정">
+        <span className="detail-rating-label">내 별점</span>
+        <div className="detail-rating-stars" role="radiogroup" aria-label="별점 선택">
+          {Array.from({ length: 5 }).map((_, index) => {
+            const leftValue = index * 2 + 1
+            const rightValue = index * 2 + 2
+
+            return (
+              <div className="detail-rating-star" key={`${animeId}-detail-star-${index + 1}`}>
+                <span className="detail-rating-star-base" aria-hidden="true">★</span>
+                <span
+                  className="detail-rating-star-fill"
+                  aria-hidden="true"
+                  style={{ width: getStarFillPercent(score, index) }}
+                >
+                  ★
+                </span>
+                <button
+                  className="detail-rating-star-hit is-left"
+                  type="button"
+                  aria-label={`${leftValue.toFixed(1)}점 주기`}
+                  onClick={(event) => {
+                    void handleScoreSelect(leftValue, event)
+                  }}
+                  disabled={isSubmitting || isLoadingEntry}
+                />
+                <button
+                  className="detail-rating-star-hit is-right"
+                  type="button"
+                  aria-label={`${rightValue.toFixed(1)}점 주기`}
+                  onClick={(event) => {
+                    void handleScoreSelect(rightValue, event)
+                  }}
+                  disabled={isSubmitting || isLoadingEntry}
+                />
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
       <div className="collection-form-grid">
         <label className="auth-field">
           <span>상태</span>
@@ -233,49 +308,6 @@ export function CollectionEditor({ animeId, maxProgress }: CollectionEditorProps
             ))}
           </select>
         </label>
-
-        <div className="auth-field collection-score-field">
-          <span>별점</span>
-          <div className="star-rating-card">
-            <div className="star-rating-display" role="radiogroup" aria-label="별점 선택">
-              <div className="star-rating-stars">
-                {Array.from({ length: 5 }).map((_, index) => {
-                  const leftValue = index * 2 + 1.5
-                  const rightValue = index * 2 + 2
-
-                  return (
-                    <div className="star-button-shell" key={index}>
-                      <span className="star-button-base" aria-hidden="true">★</span>
-                      <span
-                        className="star-button-fill"
-                        aria-hidden="true"
-                        style={{ width: getStarFillPercent(score, index) }}
-                      >
-                        ★
-                      </span>
-                      <button
-                        className="star-button-hit is-left"
-                        type="button"
-                        aria-label={`${leftValue.toFixed(1)}점 선택`}
-                        onClick={() => handleScoreSelect(leftValue)}
-                      />
-                      <button
-                        className="star-button-hit is-right"
-                        type="button"
-                        aria-label={`${rightValue.toFixed(1)}점 선택`}
-                        onClick={() => handleScoreSelect(rightValue)}
-                      />
-                    </div>
-                  )
-                })}
-              </div>
-              <strong className="star-score-value">{score > 0 ? score.toFixed(1) : '--'}</strong>
-            </div>
-            <p className="star-rating-help">
-              {score > 0 ? `${score.toFixed(1)}점을 선택했어요.` : '별 왼쪽/오른쪽을 눌러 점수를 선택해 주세요'}
-            </p>
-          </div>
-        </div>
 
         <label className="auth-field collection-slider-field">
           <span>진행도</span>

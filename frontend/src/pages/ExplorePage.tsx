@@ -4,8 +4,7 @@ import { CollectionButton } from '../components/CollectionButton'
 import { useAuth } from '../contexts/AuthContext'
 import {
   addToCollection,
-  COLLECTION_CACHE_UPDATED_EVENT,
-  getCachedCollectionEntry,
+  syncCollectionCacheFromSearchItems,
   updateCollectionEntry,
 } from '../lib/collection'
 import {
@@ -14,6 +13,7 @@ import {
   getDisplayTitle,
   getPrimaryPoster,
   searchAnime,
+  searchMyAnime,
   sortOptions,
 } from '../lib/anime'
 import type { AnimeGenre, AnimeListItem, AnimeSort } from '../types/anime'
@@ -33,6 +33,8 @@ type ExploreState = {
 type HoverRatingProps = {
   animeId: number
   maxProgress?: number | null
+  collection?: AnimeListItem['myCollection']
+  onCollectionChange: (collection: NonNullable<AnimeListItem['myCollection']>) => void
 }
 
 const createInitialExploreState = (requestKey: string): ExploreState => ({
@@ -67,43 +69,34 @@ function getStarFillPercent(score: number, starIndex: number) {
   return `${fill * 100}%`
 }
 
-function HoverRating({ animeId, maxProgress }: HoverRatingProps) {
-  const { isAuthenticated, user } = useAuth()
-  const [score, setScore] = useState(0)
-  const [isAdded, setIsAdded] = useState(false)
+// function getUserRatingLabel(score: number) {
+//   if (score <= 0) {
+//     return '내 평점 없음'
+//   }
+
+//   return `내 평점 ${score.toFixed(1)} / 10`
+// }
+
+function logExploreCollectionOnHover(item: AnimeListItem, collection: AnimeListItem['myCollection']) {
+  if (!import.meta.env.DEV) {
+    return
+  }
+
+  console.debug('[Explore] hover myCollection', {
+    animeId: item.id,
+    title: getDisplayTitle(item),
+    rawItemCollection: item.myCollection,
+    renderedCollection: collection,
+    scoreType: typeof collection?.score,
+    existsType: typeof collection?.exists,
+  })
+}
+
+function HoverRating({ animeId, maxProgress, collection, onCollectionChange }: HoverRatingProps) {
+  const { isAuthenticated } = useAuth()
   const [isSubmitting, setIsSubmitting] = useState(false)
-
-  useEffect(() => {
-    if (!isAuthenticated) {
-      setScore(0)
-      setIsAdded(false)
-      return
-    }
-
-    const syncFromCache = () => {
-      const entry = getCachedCollectionEntry(animeId)
-      setScore(getOverlayScore(entry?.score))
-      setIsAdded(Boolean(entry))
-    }
-
-    const handleCollectionUpdated = (event: Event) => {
-      const customEvent = event as CustomEvent<{ animeId?: number }>
-      const updatedAnimeId = customEvent.detail?.animeId
-
-      if (updatedAnimeId && updatedAnimeId !== animeId) {
-        return
-      }
-
-      syncFromCache()
-    }
-
-    syncFromCache()
-    window.addEventListener(COLLECTION_CACHE_UPDATED_EVENT, handleCollectionUpdated as EventListener)
-
-    return () => {
-      window.removeEventListener(COLLECTION_CACHE_UPDATED_EVENT, handleCollectionUpdated as EventListener)
-    }
-  }, [animeId, isAuthenticated, user?.id])
+  const score = getOverlayScore(collection?.score)
+  const isAdded = Boolean(collection?.exists)
 
   const handleRate = async (nextScore: number, event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault()
@@ -129,10 +122,14 @@ function HoverRating({ animeId, maxProgress }: HoverRatingProps) {
           score: nextScore,
           ...(maxProgress && maxProgress > 0 ? { progress: maxProgress } : {}),
         })
-        setIsAdded(true)
       }
 
-      setScore(nextScore)
+      onCollectionChange({
+        exists: true,
+        status: 'completed',
+        score: nextScore,
+        progress: maxProgress && maxProgress > 0 ? maxProgress : collection?.progress ?? null,
+      })
     } finally {
       setIsSubmitting(false)
     }
@@ -143,7 +140,8 @@ function HoverRating({ animeId, maxProgress }: HoverRatingProps) {
   }
 
   return (
-    <div className="anime-hover-rating" aria-label="탐색 빠른 별점">
+    <div className={isAdded ? 'anime-hover-rating is-added' : 'anime-hover-rating'} aria-label="탐색 빠른 별점">
+      {/* {isAdded && <strong className="anime-hover-rating-label">{getUserRatingLabel(score)}</strong>} */}
       <div className="anime-hover-rating-stars">
         {Array.from({ length: 5 }).map((_, index) => {
           const leftValue = index * 2 + 1
@@ -185,8 +183,74 @@ function HoverRating({ animeId, maxProgress }: HoverRatingProps) {
   )
 }
 
+type ExploreAnimeCardProps = {
+  item: AnimeListItem
+  location: ReturnType<typeof useLocation>
+}
+
+function ExploreAnimeCard({ item, location }: ExploreAnimeCardProps) {
+  const [localCollection, setLocalCollection] = useState<AnimeListItem['myCollection']>(undefined)
+  const collection = localCollection ?? item.myCollection
+
+  return (
+    <Link
+      className="anime-card anime-card-link"
+      key={item.id}
+      to={`/anime/${item.id}`}
+      state={{ fromPage: 'explore', backgroundLocation: location }}
+    >
+      <div
+        className="anime-poster-wrap"
+        onMouseEnter={() => logExploreCollectionOnHover(item, collection)}
+        onFocus={() => logExploreCollectionOnHover(item, collection)}
+      >
+        <div
+          className="anime-card-quick-action"
+          onClick={(event) => event.preventDefault()}
+        >
+          <CollectionButton
+            animeId={item.id}
+            maxProgress={item.episodes}
+            initialIsAdded={collection?.exists}
+            useCacheState={false}
+            onAddedChange={(exists) => {
+              setLocalCollection((current) => ({
+                exists,
+                status: exists ? current?.status ?? item.myCollection?.status ?? 'completed' : null,
+                score: exists ? current?.score ?? item.myCollection?.score ?? null : null,
+                progress: exists ? current?.progress ?? item.myCollection?.progress ?? null : null,
+              }))
+            }}
+          />
+        </div>
+        {formatFivePointScore(item.averageScore) && (
+          <div className="anime-card-rating">
+            {formatFivePointScore(item.averageScore)} / 5
+          </div>
+        )}
+        <img
+          className="anime-poster"
+          src={getPrimaryPoster(item)}
+          alt={getDisplayTitle(item)}
+          loading="lazy"
+        />
+        <HoverRating
+          animeId={item.id}
+          maxProgress={item.episodes}
+          collection={collection}
+          onCollectionChange={setLocalCollection}
+        />
+      </div>
+      <div className="anime-copy">
+        <h3>{getDisplayTitle(item)}</h3>
+      </div>
+    </Link>
+  )
+}
+
 export function ExplorePage() {
   const location = useLocation()
+  const { isAuthenticated } = useAuth()
   const [sort, setSort] = useState<AnimeSort>('score')
   const [genre, setGenre] = useState<AnimeGenre | 'all'>('all')
   const [searchTerm, setSearchTerm] = useState('')
@@ -198,7 +262,7 @@ export function ExplorePage() {
     genre === 'all'
       ? '전체 장르'
       : genreOptions.find((option) => option.value === genre)?.label ?? genre
-  const requestKey = `${sort}:${normalizedQuery}:${searchLanguage}:${genre}`
+  const requestKey = `${sort}:${normalizedQuery}:${searchLanguage}:${genre}:${isAuthenticated ? 'auth' : 'guest'}`
   const [state, setState] = useState<ExploreState>(() => createInitialExploreState(requestKey))
   const sentinelRef = useRef<HTMLDivElement | null>(null)
   const isLoadingMoreRef = useRef(false)
@@ -222,8 +286,8 @@ export function ExplorePage() {
       try {
         isLoadingMoreRef.current = false
 
-        const data = normalizedQuery
-          ? await searchAnime({
+        const data = isAuthenticated
+          ? await searchMyAnime({
               query: normalizedQuery,
               sort,
               genre: selectedGenre,
@@ -231,12 +295,25 @@ export function ExplorePage() {
               limit: 24,
               signal: controller.signal,
             })
+          : normalizedQuery
+            ? await searchAnime({
+                query: normalizedQuery,
+                sort,
+                genre: selectedGenre,
+                titleLanguage: searchLanguage,
+                limit: 24,
+                signal: controller.signal,
+              })
           : await fetchAnimeList({
               sort,
               genre: selectedGenre,
               limit: 24,
               signal: controller.signal,
             })
+
+        if (isAuthenticated) {
+          syncCollectionCacheFromSearchItems(data.items)
+        }
 
         setState({
           animeItems: data.items,
@@ -270,7 +347,7 @@ export function ExplorePage() {
     void loadFirstPage()
 
     return () => controller.abort()
-  }, [normalizedQuery, requestKey, searchLanguage, selectedGenre, sort])
+  }, [isAuthenticated, normalizedQuery, requestKey, searchLanguage, selectedGenre, sort])
 
   useEffect(() => {
     const node = sentinelRef.current
@@ -299,8 +376,8 @@ export function ExplorePage() {
 
         const loadMore = async () => {
           try {
-            const data = normalizedQuery
-              ? await searchAnime({
+            const data = isAuthenticated
+              ? await searchMyAnime({
                   query: normalizedQuery,
                   sort,
                   genre: selectedGenre,
@@ -308,12 +385,25 @@ export function ExplorePage() {
                   limit: 24,
                   cursor: nextCursor,
                 })
+              : normalizedQuery
+                ? await searchAnime({
+                    query: normalizedQuery,
+                    sort,
+                    genre: selectedGenre,
+                    titleLanguage: searchLanguage,
+                    limit: 24,
+                    cursor: nextCursor,
+                  })
               : await fetchAnimeList({
                   sort,
                   genre: selectedGenre,
                   limit: 24,
                   cursor: nextCursor,
                 })
+
+            if (isAuthenticated) {
+              syncCollectionCacheFromSearchItems(data.items)
+            }
 
             setState((current) => {
               if (current.requestKey !== requestKey) {
@@ -372,6 +462,7 @@ export function ExplorePage() {
     isLoading,
     isLoadingMore,
     isRefreshingQuery,
+    isAuthenticated,
     nextCursor,
     normalizedQuery,
     requestKey,
@@ -490,36 +581,11 @@ export function ExplorePage() {
           ) : (
             <div className="anime-grid">
               {animeItems.map((item) => (
-                <Link
-                  className="anime-card anime-card-link"
+                <ExploreAnimeCard
                   key={item.id}
-                  to={`/anime/${item.id}`}
-                  state={{ fromPage: 'explore', backgroundLocation: location }}
-                >
-                  <div className="anime-poster-wrap">
-                    <div
-                      className="anime-card-quick-action"
-                      onClick={(event) => event.preventDefault()}
-                    >
-                      <CollectionButton animeId={item.id} maxProgress={item.episodes} />
-                    </div>
-                    {formatFivePointScore(item.averageScore) && (
-                      <div className="anime-card-rating">
-                        {formatFivePointScore(item.averageScore)} / 5
-                      </div>
-                    )}
-                    <img
-                      className="anime-poster"
-                      src={getPrimaryPoster(item)}
-                      alt={getDisplayTitle(item)}
-                      loading="lazy"
-                    />
-                    <HoverRating animeId={item.id} maxProgress={item.episodes} />
-                  </div>
-                  <div className="anime-copy">
-                    <h3>{getDisplayTitle(item)}</h3>
-                  </div>
-                </Link>
+                  item={item}
+                  location={location}
+                />
               ))}
             </div>
           )}

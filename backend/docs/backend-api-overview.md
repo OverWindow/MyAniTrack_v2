@@ -18,6 +18,7 @@
 - `/me/profile`
 - `/me/agreements`
 - `/me/anime-list`
+- `/me/anime/search`
 - `/me/anime-stats`
 - `/me/anime-stats/recalculate`
 - `/me/recommendations`
@@ -139,6 +140,79 @@ Response example:
       "seasonYear": 2023,
       "averageScore": 91,
       "isAdult": false
+    }
+  ],
+  "pageInfo": {
+    "hasNext": false,
+    "nextCursor": null,
+    "limit": 20,
+    "sort": "score",
+    "titleLanguage": "ko"
+  }
+}
+```
+
+### `GET /me/anime/search`
+내 컬렉션 정보가 포함된 애니 목록/검색입니다. 로그인 필요입니다.
+
+기본 조건과 페이지네이션은 `GET /anime` / `GET /anime/search`와 동일하며, 각 결과에 `myCollection`이 추가됩니다. `query`가 있으면 검색으로 동작하고, 없으면 일반 애니 목록으로 동작합니다.
+
+Query:
+
+- `query`: 선택값
+- `sort`: `latest | score | season`
+- `titleLanguage`: `ko | en | ja`
+- `genre`: 선택값
+- `limit`: `1~50`
+- `cursor`: 이전 응답의 `pageInfo.nextCursor`
+
+Example request:
+
+```http
+GET /api/me/anime/search?query=프리렌&sort=score&titleLanguage=ko&limit=20
+```
+
+검색어 없이 목록으로 호출할 수도 있습니다.
+
+```http
+GET /api/me/anime/search?sort=score&titleLanguage=ko&limit=24
+```
+
+Response example:
+
+```json
+{
+  "success": true,
+  "items": [
+    {
+      "id": 123,
+      "anilistId": 456,
+      "title": "장송의 프리렌",
+      "coverImageLarge": "https://...",
+      "seasonYear": 2023,
+      "averageScore": 91,
+      "isAdult": false,
+      "myCollection": {
+        "exists": true,
+        "status": "completed",
+        "score": 9.5,
+        "progress": 28
+      }
+    },
+    {
+      "id": 124,
+      "anilistId": 457,
+      "title": "프리렌 스페셜",
+      "coverImageLarge": "https://...",
+      "seasonYear": 2024,
+      "averageScore": 82,
+      "isAdult": false,
+      "myCollection": {
+        "exists": false,
+        "status": null,
+        "score": null,
+        "progress": null
+      }
     }
   ],
   "pageInfo": {
@@ -1197,6 +1271,43 @@ Response example:
     "processedBatches": 1,
     "totalSaved": 100,
     "remaining": true
+  }
+}
+```
+
+### `PATCH /admin/anime/:animeId/korean-title`
+관리자가 특정 애니의 대표 한국어 제목을 직접 수정합니다.
+
+관리자가 수정한 제목은 자동 변경 방지를 위해 `isLocked: true`, `source: "MANUAL"`로 저장됩니다. 기존 대표 한국어 제목은 대표 상태가 해제되고, 새 제목이 대표 제목이 됩니다.
+
+Body:
+
+```json
+{
+  "title": "장송의 프리렌",
+  "subtitle": ""
+}
+```
+
+Response example:
+
+```json
+{
+  "success": true,
+  "message": "Anime Korean title updated and locked",
+  "item": {
+    "id": 10,
+    "animeId": 123,
+    "title": "장송의 프리렌",
+    "subtitle": null,
+    "fullTitle": "장송의 프리렌",
+    "isPrimary": true,
+    "isLocked": true,
+    "lockedAt": "2026-05-16 10:00:00",
+    "lockedBy": 1,
+    "source": "MANUAL",
+    "createdAt": "2026-05-16 10:00:00",
+    "updatedAt": "2026-05-16 10:00:00"
   }
 }
 ```

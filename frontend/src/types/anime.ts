@@ -48,6 +48,12 @@ export type AnimeListItem = {
   siteUrl?: string | null
   isAdult?: boolean
   createdAt?: string
+  myCollection?: {
+    exists: boolean
+    status: string | null
+    score: number | null
+    progress: number | null
+  }
 }
 
 export type PopularAnimeItem = {

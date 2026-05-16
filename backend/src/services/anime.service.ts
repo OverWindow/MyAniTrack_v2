@@ -112,6 +112,13 @@ interface AnimeDetailRow extends RowDataPacket {
   updatedAt: string;
 }
 
+interface UserAnimeRelationRow extends RowDataPacket {
+  animeId: number;
+  status: string;
+  score: number | null;
+  progress: number;
+}
+
 interface KoreanTitleRow extends RowDataPacket {
   title: string;
   subtitle: string | null;
@@ -428,6 +435,58 @@ export async function getAnimeList(params: AnimeListParams) {
       sort: params.sort,
       titleLanguage: params.titleLanguage,
     },
+  };
+}
+
+export async function getAnimeListWithUserCollection(userId: number, params: AnimeListParams) {
+  const result = await getAnimeList(params);
+  const animeIds = result.items.map((item) => item.id);
+
+  if (animeIds.length === 0) {
+    return {
+      ...result,
+      items: result.items.map((item) => ({
+        ...item,
+        myCollection: {
+          exists: false,
+          status: null,
+          score: null,
+          progress: null,
+        },
+      })),
+    };
+  }
+
+  const [rows] = await pool.query<UserAnimeRelationRow[]>(
+    `
+    SELECT
+      anime_id AS animeId,
+      status,
+      score,
+      progress
+    FROM user_anime_lists
+    WHERE user_id = ?
+      AND anime_id IN (?)
+    `,
+    [userId, animeIds]
+  );
+  const relationMap = new Map(rows.map((row) => [row.animeId, row]));
+
+  return {
+    ...result,
+    items: result.items.map((item) => {
+      const relation = relationMap.get(item.id);
+
+      return {
+        ...item,
+        myCollection: {
+          exists: Boolean(relation),
+          status: relation?.status ?? null,
+          score: relation?.score ?? null,
+          progress: relation?.progress ?? null,
+        },
+      };
+    }),
   };
 }
 

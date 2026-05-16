@@ -94,8 +94,10 @@
   position: absolute;
   inset: auto 0 0;
   z-index: 2;
-  display: flex;
+  display: grid;
   justify-content: center;
+  justify-items: center;
+  gap: 8px;
   padding: 16px 14px 14px;
   background: linear-gradient(180deg, rgba(17, 24, 39, 0) 0%, rgba(17, 24, 39, 0.72) 38%, rgba(17, 24, 39, 0.82) 100%);
   opacity: 0;
@@ -105,10 +107,28 @@
     transform var(--duration-normal) ease;
 }
 
+.anime-hover-rating.is-added {
+  padding-top: 24px;
+  background: linear-gradient(180deg, rgba(17, 24, 39, 0) 0%, rgba(17, 24, 39, 0.74) 30%, rgba(17, 24, 39, 0.9) 100%);
+}
+
 .anime-card:hover .anime-hover-rating,
 .anime-card:focus-within .anime-hover-rating {
   opacity: 1;
   transform: translateY(0);
+}
+
+.anime-hover-rating-label {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 251, 235, 0.96);
+  border: 1px solid rgba(251, 191, 36, 0.38);
+  color: var(--text-on-point-soft);
+  font-size: 0.76rem;
+  font-weight: 800;
 }
 
 .anime-hover-rating-stars {

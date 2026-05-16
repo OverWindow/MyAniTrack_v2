@@ -1,14 +1,42 @@
 import { Request, Response } from 'express';
 import { syncAnimePage, syncAllAnime, syncAnimeInChunks, syncSeasonAnime } from '../../sync/anime.sync.service';
 import { translateAnimeKoreanTitlesInBatches } from '../../translations/anime.korean-title.service';
+import { updateAnimeKoreanTitleByAdmin } from '../services/admin-korean-title.service';
 
 function sendError(res: Response, error: unknown) {
-  console.error(error);
+  const message = error instanceof Error ? error.message : 'Unknown error';
+  const statusCode = getErrorStatus(message);
 
-  return res.status(500).json({
+  if (statusCode === 500) {
+    console.error(error);
+  }
+
+  return res.status(statusCode).json({
     success: false,
-    message: error instanceof Error ? error.message : 'Unknown error',
+    message,
   });
+}
+
+function getErrorStatus(message: string) {
+  if (message.includes('must be') || message.includes('required')) {
+    return 400;
+  }
+
+  if (message === 'Anime not found' || message === 'Korean title not found') {
+    return 404;
+  }
+
+  return 500;
+}
+
+function parsePositiveInteger(value: unknown, fieldName: string) {
+  const parsedValue = Number(value);
+
+  if (!Number.isInteger(parsedValue) || parsedValue <= 0) {
+    throw new Error(`${fieldName} must be a positive integer`);
+  }
+
+  return parsedValue;
 }
 
 export async function syncAnimePageController(req: Request, res: Response) {
@@ -109,6 +137,33 @@ export async function translateAnimeKoreanTitlesController(req: Request, res: Re
       success: true,
       message: 'Anime Korean title translation completed',
       result,
+    });
+  } catch (error) {
+    return sendError(res, error);
+  }
+}
+
+export async function updateAnimeKoreanTitleController(req: Request, res: Response) {
+  try {
+    const authUser = req.authUser;
+
+    if (!authUser) {
+      return res.status(401).json({
+        success: false,
+        message: 'Unauthorized',
+      });
+    }
+
+    const animeId = parsePositiveInteger(req.params.animeId, 'animeId');
+    const item = await updateAnimeKoreanTitleByAdmin(authUser.userId, animeId, {
+      title: req.body.title,
+      subtitle: req.body.subtitle,
+    });
+
+    return res.json({
+      success: true,
+      message: 'Anime Korean title updated and locked',
+      item,
     });
   } catch (error) {
     return sendError(res, error);

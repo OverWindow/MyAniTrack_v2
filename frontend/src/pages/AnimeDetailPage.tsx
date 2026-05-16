@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { CollectionEditor } from '../components/CollectionEditor'
+import { useAuth } from '../contexts/AuthContext'
+import { updateAnimeKoreanTitle } from '../lib/admin'
 import {
   fetchAnimeDetail,
   getDetailMetaTitle,
@@ -40,16 +42,113 @@ function getQuarterLabel(season?: string | null, seasonYear?: number | null) {
   return [seasonYear, seasonLabel].filter(Boolean).join(' ') || '정보 없음'
 }
 
+type AdminTitleEditorProps = {
+  item: AnimeDetailItem
+  onTitleUpdated: (updatedTitle: {
+    title: string
+    subtitle: string | null
+    fullTitle: string
+  }) => void
+}
+
+function AdminTitleEditor({ item, onTitleUpdated }: AdminTitleEditorProps) {
+  const primaryKoreanTitle = item.titles.korean?.find((title) => title.isPrimary) ?? item.titles.korean?.[0]
+  const [adminTitle, setAdminTitle] = useState(primaryKoreanTitle?.title ?? '')
+  const [adminSubtitle, setAdminSubtitle] = useState(primaryKoreanTitle?.subtitle ?? '')
+  const [isSavingAdminTitle, setIsSavingAdminTitle] = useState(false)
+  const [adminTitleFeedback, setAdminTitleFeedback] = useState<string | null>(null)
+  const [adminTitleError, setAdminTitleError] = useState<string | null>(null)
+
+  const handleAdminTitleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+
+    if (isSavingAdminTitle) {
+      return
+    }
+
+    const nextTitle = adminTitle.trim()
+    const nextSubtitle = adminSubtitle.trim()
+
+    if (!nextTitle) {
+      setAdminTitleError('한국어 제목을 입력해주세요.')
+      return
+    }
+
+    setIsSavingAdminTitle(true)
+    setAdminTitleFeedback(null)
+    setAdminTitleError(null)
+
+    try {
+      const response = await updateAnimeKoreanTitle(item.id, {
+        title: nextTitle,
+        subtitle: nextSubtitle,
+      })
+      const updatedTitle = response.item
+
+      onTitleUpdated({
+        title: updatedTitle.title,
+        subtitle: updatedTitle.subtitle,
+        fullTitle: updatedTitle.fullTitle,
+      })
+      setAdminTitle(updatedTitle.title)
+      setAdminSubtitle(updatedTitle.subtitle ?? '')
+      setAdminTitleFeedback('한국어 제목을 저장하고 잠금 처리했어요.')
+    } catch (saveError) {
+      setAdminTitleError(saveError instanceof Error ? saveError.message : '한국어 제목 수정에 실패했어요.')
+    } finally {
+      setIsSavingAdminTitle(false)
+    }
+  }
+
+  return (
+    <section className="detail-section admin-title-editor">
+      <span className="detail-label">Admin title lock</span>
+      <h2>한국어 제목 수정</h2>
+      <form className="admin-title-form" onSubmit={handleAdminTitleSubmit}>
+        <label className="auth-field">
+          <span>대표 한국어 제목</span>
+          <input
+            type="text"
+            value={adminTitle}
+            onChange={(event) => setAdminTitle(event.target.value)}
+            placeholder="장송의 프리렌"
+            required
+          />
+        </label>
+
+        <label className="auth-field">
+          <span>부제목</span>
+          <input
+            type="text"
+            value={adminSubtitle}
+            onChange={(event) => setAdminSubtitle(event.target.value)}
+            placeholder="비워두면 없음"
+          />
+        </label>
+
+        {adminTitleFeedback && <div className="feedback-card admin-title-feedback">{adminTitleFeedback}</div>}
+        {adminTitleError && <div className="feedback-card is-error admin-title-feedback">{adminTitleError}</div>}
+
+        <button className="primary-button auth-submit" type="submit" disabled={isSavingAdminTitle}>
+          {isSavingAdminTitle ? '저장 중...' : '제목 저장 및 잠금'}
+        </button>
+      </form>
+    </section>
+  )
+}
+
 export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
   const { id } = useParams<{ id: string }>()
   const location = useLocation()
   const navigate = useNavigate()
+  const { user } = useAuth()
   const requestKey = id ?? 'invalid'
   const [state, setState] = useState<DetailState>(() =>
     createInitialDetailState(requestKey),
   )
   const { item, isLoading, error } = state
   const isRefreshingDetail = state.requestKey !== requestKey
+  const isAdmin = Boolean(user?.isAdmin || user?.role === 'ADMIN')
   const fromPage = (location.state as { fromPage?: 'explore' | 'collection' } | null)?.fromPage
   const backPath = fromPage === 'collection' ? '/collection' : '/explore'
   const backLabel = fromPage === 'collection' ? '컬렉션으로 돌아가기' : '탐색으로 돌아가기'
@@ -97,6 +196,46 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
 
     return () => controller.abort()
   }, [id, requestKey])
+
+  const handleAdminTitleUpdated = (updatedTitle: {
+    title: string
+    subtitle: string | null
+    fullTitle: string
+  }) => {
+    setState((current) => {
+      if (!current.item) {
+        return current
+      }
+
+      const existingKoreanTitles = current.item.titles.korean ?? []
+      const nextKoreanTitles = [
+        {
+          title: updatedTitle.title,
+          subtitle: updatedTitle.subtitle,
+          fullTitle: updatedTitle.fullTitle,
+          isPrimary: true,
+        },
+        ...existingKoreanTitles
+          .filter((title) => title.fullTitle !== updatedTitle.fullTitle)
+          .map((title) => ({
+            ...title,
+            isPrimary: false,
+          })),
+      ]
+
+      return {
+        ...current,
+        item: {
+          ...current.item,
+          title: updatedTitle.fullTitle,
+          titles: {
+            ...current.item.titles,
+            korean: nextKoreanTitles,
+          },
+        },
+      }
+    })
+  }
 
   if (!id) {
     return (
@@ -226,7 +365,7 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
         <article className="detail-section detail-description">
           <span className="detail-label">Genres</span>
           <h2>장르</h2>
-          {!!item.genres?.length ? (
+          {item.genres?.length ? (
             <div className="chip-list detail-chip-list-spacious">
               {item.genres.map((genre) => (
                 <span className="info-chip" key={genre}>
@@ -240,7 +379,11 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
         </article>
 
         <aside className="detail-sidebar">
-          <CollectionEditor animeId={item.id} maxProgress={item.episodes} />
+          {isAdmin && (
+            <AdminTitleEditor key={item.id} item={item} onTitleUpdated={handleAdminTitleUpdated} />
+          )}
+
+          <CollectionEditor key={item.id} animeId={item.id} maxProgress={item.episodes} />
 
           <section className="detail-section">
             <span className="detail-label">Overview</span>

@@ -190,6 +190,26 @@
   gap: 18px;
 }
 
+.admin-title-editor {
+  display: grid;
+  gap: 14px;
+  border-color: rgba(245, 158, 11, 0.28);
+  background: linear-gradient(180deg, var(--bg-card) 0%, rgba(255, 251, 235, 0.86) 100%);
+}
+
+.admin-title-editor h2 {
+  margin: 0;
+}
+
+.admin-title-form {
+  display: grid;
+  gap: 14px;
+}
+
+.admin-title-feedback {
+  padding: 14px 16px;
+}
+
 .collection-panel {
   padding: 30px;
 }

@@ -32,6 +32,32 @@ export type AdminTranslateKoreanTitlesPayload = {
   maxBatches: number
 }
 
+export type AdminUpdateKoreanTitlePayload = {
+  title: string
+  subtitle?: string
+}
+
+export type AdminKoreanTitleItem = {
+  id: number
+  animeId: number
+  title: string
+  subtitle: string | null
+  fullTitle: string
+  isPrimary: boolean
+  isLocked: boolean
+  lockedAt: string | null
+  lockedBy: number | null
+  source: string
+  createdAt: string
+  updatedAt: string
+}
+
+export type AdminUpdateKoreanTitleResponse = {
+  success: boolean
+  message: string
+  item: AdminKoreanTitleItem
+}
+
 export type AdminActionResponse = {
   success: boolean
   message: string

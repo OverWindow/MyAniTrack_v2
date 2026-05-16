@@ -6,6 +6,8 @@ import type {
   AdminSyncPagePayload,
   AdminSyncSeasonPayload,
   AdminTranslateKoreanTitlesPayload,
+  AdminUpdateKoreanTitlePayload,
+  AdminUpdateKoreanTitleResponse,
   PlatformStats,
 } from '../types/admin'
 
@@ -34,6 +36,10 @@ function getAdminErrorMessage(status: number, fallback: string) {
 
   if (status === 403) {
     return '관리자 권한이 있는 계정만 사용할 수 있어요.'
+  }
+
+  if (status === 404) {
+    return '해당 애니를 찾을 수 없어요.'
   }
 
   if (status >= 500) {
@@ -92,4 +98,20 @@ export function syncAnimeSeason(payload: AdminSyncSeasonPayload) {
 
 export function translateKoreanTitles(payload: AdminTranslateKoreanTitlesPayload) {
   return postAdminAction('/admin/anime/korean-titles/translate', payload, '한국어 제목 번역 배치 실행에 실패했어요.')
+}
+
+export async function updateAnimeKoreanTitle(animeId: number, payload: AdminUpdateKoreanTitlePayload) {
+  const response = await authFetch(createAdminUrl(`/admin/anime/${animeId}/korean-title`), {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  })
+
+  if (!response.ok) {
+    throw new Error(getAdminErrorMessage(response.status, '한국어 제목 수정에 실패했어요.'))
+  }
+
+  return (await response.json()) as AdminUpdateKoreanTitleResponse
 }

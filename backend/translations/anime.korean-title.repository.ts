@@ -12,6 +12,10 @@ export interface KoreanTitleRecord {
   isPrimary?: boolean;
 }
 
+interface LockedAnimeTitleRow {
+  animeId: number;
+}
+
 export async function findAnimeWithoutKoreanTitles(limit = 100): Promise<AnimeTitleTranslationSource[]> {
   const [rows] = await pool.query(
     `
@@ -49,11 +53,29 @@ export async function saveKoreanTitles(records: KoreanTitleRecord[]): Promise<nu
     return 0;
   }
 
-  const values = records.map((record) => [
+  const animeIds = Array.from(new Set(records.map((record) => record.animeId)));
+  const [lockedRows] = await pool.query(
+    `
+    SELECT DISTINCT anime_id AS animeId
+    FROM anime_korean_titles
+    WHERE is_locked = TRUE
+      AND anime_id IN (?)
+    `,
+    [animeIds]
+  );
+  const lockedAnimeIds = new Set((lockedRows as LockedAnimeTitleRow[]).map((row) => row.animeId));
+  const unlockedRecords = records.filter((record) => !lockedAnimeIds.has(record.animeId));
+
+  if (unlockedRecords.length === 0) {
+    return 0;
+  }
+
+  const values = unlockedRecords.map((record) => [
     record.animeId,
     record.title.trim(),
     (record.subtitle ?? '').trim(),
     record.isPrimary ?? true,
+    'AUTO',
   ]);
 
   await pool.query(
@@ -62,17 +84,19 @@ export async function saveKoreanTitles(records: KoreanTitleRecord[]): Promise<nu
       anime_id,
       title,
       subtitle,
-      is_primary
+      is_primary,
+      source
     )
     VALUES ?
     ON DUPLICATE KEY UPDATE
-      title = VALUES(title),
-      subtitle = VALUES(subtitle),
-      is_primary = VALUES(is_primary),
-      updated_at = CURRENT_TIMESTAMP
+      title = IF(is_locked, title, VALUES(title)),
+      subtitle = IF(is_locked, subtitle, VALUES(subtitle)),
+      is_primary = IF(is_locked, is_primary, VALUES(is_primary)),
+      source = IF(is_locked, source, VALUES(source)),
+      updated_at = IF(is_locked, updated_at, CURRENT_TIMESTAMP)
     `,
     [values]
   );
 
-  return records.length;
+  return unlockedRecords.length;
 }

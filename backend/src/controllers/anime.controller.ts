@@ -5,6 +5,7 @@ import {
   AnimeTitleLanguage,
   getAnimeDetailById,
   getAnimeList,
+  getAnimeListWithUserCollection,
 } from '../services/anime.service';
 
 const SORT_OPTIONS: AnimeSortOption[] = ['latest', 'score', 'season'];
@@ -69,6 +70,11 @@ function parseSearchQuery(value: unknown): string {
   }
 
   return query;
+}
+
+function parseOptionalSearchQuery(value: unknown): string | undefined {
+  const query = typeof value === 'string' ? value.trim() : '';
+  return query || undefined;
 }
 
 function parseGenre(value: unknown): AnimeGenre | undefined {
@@ -161,6 +167,42 @@ export async function searchAnime(req: Request, res: Response) {
     });
   } catch (error) {
     return sendError(res, error, ['Cursor query', 'Cursor genre', 'query is required']);
+  }
+}
+
+export async function searchAnimeWithMyCollection(req: Request, res: Response) {
+  try {
+    const authUser = req.authUser;
+
+    if (!authUser) {
+      return res.status(401).json({
+        success: false,
+        message: 'Unauthorized',
+      });
+    }
+
+    const sort = parseSort(req.query.sort);
+    const titleLanguage = parseTitleLanguage(req.query.titleLanguage);
+    const genre = parseGenre(req.query.genre);
+    const limit = parseLimit(req.query.limit);
+    const query = parseOptionalSearchQuery(req.query.query);
+    const cursor = typeof req.query.cursor === 'string' ? req.query.cursor : undefined;
+
+    const result = await getAnimeListWithUserCollection(authUser.userId, {
+      sort,
+      titleLanguage,
+      query,
+      genre,
+      limit,
+      cursor,
+    });
+
+    return res.json({
+      success: true,
+      ...result,
+    });
+  } catch (error) {
+    return sendError(res, error, ['Cursor query', 'Cursor genre']);
   }
 }
 
