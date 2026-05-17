@@ -16,7 +16,7 @@ export type AuthUser = {
 
 export type AuthTokens = {
   accessToken: string
-  refreshToken: string
+  refreshToken?: string
   accessTokenExpiresIn: number
   tokenType: string
 }
@@ -95,7 +95,7 @@ export type UserAgreements = {
   privacyVersion: string | null
 }
 
-export type StoredSession = AuthTokens & {
+export type StoredSession = {
   user: AuthUser | null
-  accessTokenExpiresAt: number
+  accessTokenExpiresAt?: number
 }

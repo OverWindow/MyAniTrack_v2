@@ -152,3 +152,7 @@ export function hashRefreshToken(token: string): string {
 export function getAccessTokenExpiresInSeconds() {
   return ACCESS_TOKEN_EXPIRES_IN_SECONDS;
 }
+
+export function getRefreshTokenExpiresInSeconds() {
+  return REFRESH_TOKEN_EXPIRES_IN_SECONDS;
+}

@@ -7,13 +7,14 @@
 ### `myanitrack.auth.session`
 
 저장 내용:
-- 로그인/토큰 세션 정보
-- `accessToken`, `refreshToken`, `accessTokenExpiresIn`, `accessTokenExpiresAt`
-- 현재 사용자 정보 `user`
+- 로그인 사용자 정보 `user`
+- access token 만료 기준 시각 `accessTokenExpiresAt`
+- refresh token은 저장하지 않습니다. 백엔드가 내려주는 HttpOnly Cookie에만 보관됩니다.
+- access token은 localStorage에 저장하지 않고 프론트 런타임 메모리에만 보관합니다.
 
 저장/수정 시점:
 - 로그인 성공 시 저장합니다.
-- 토큰 refresh 성공 시 새 토큰으로 갱신합니다.
+- 토큰 refresh 성공 시 access token은 메모리에 올리고, localStorage에는 사용자 정보와 만료 기준만 갱신합니다.
 - `/api/auth/me`로 사용자 정보를 다시 가져오면 저장된 `user`를 갱신합니다.
 - 프로필 수정 등으로 사용자 정보가 바뀌면 저장된 `user`를 갱신합니다.
 

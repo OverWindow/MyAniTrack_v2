@@ -5,8 +5,17 @@
 - Base URL: `http://<host>:<port>/api`
 - Health check: `GET /health`
 - 인증 헤더: `Authorization: Bearer <accessToken>`
+- refresh token: `HttpOnly` cookie `refreshToken`
+- refresh/logout 호출 시 프론트는 `credentials: "include"` 필요
 - 성공 응답 기본 형식: `{ "success": true, ... }`
 - 실패 응답 기본 형식: `{ "success": false, "message": "..." }`
+
+인증 쿠키/CORS 설정:
+
+- 개발 기본 허용 origin: `http://localhost:5173`
+- 운영 허용 origin: `FRONT_DOMAIN1`, `FRONT_DOMAIN2`, `FRONT_DOMAIN3`
+- 운영에서 프론트/백엔드가 cross-site이면 `AUTH_REFRESH_COOKIE_SAME_SITE=none` 설정 필요
+- `SameSite=None` 또는 `NODE_ENV=production`에서는 refresh cookie에 `Secure`가 적용됨
 
 ## Common Rules
 
@@ -399,12 +408,17 @@ Body:
 
 Response example:
 
+`refreshToken`은 `HttpOnly` cookie로 설정됩니다.
+
+```http
+Set-Cookie: refreshToken=...; HttpOnly; SameSite=Lax; Path=/api/auth; Max-Age=2592000
+```
+
 ```json
 {
   "success": true,
   "message": "Login successful",
   "accessToken": "...",
-  "refreshToken": "...",
   "accessTokenExpiresIn": 900,
   "tokenType": "Bearer",
   "user": {
@@ -422,22 +436,17 @@ Response example:
 ### `POST /auth/refresh`
 access token 재발급입니다.
 
-Body:
-
-```json
-{
-  "refreshToken": "..."
-}
-```
+`refreshToken`은 request body가 아니라 `HttpOnly` cookie에서 읽습니다. 프론트는 `credentials: "include"`로 호출해야 합니다.
 
 Response example:
+
+refresh token rotation으로 새 `refreshToken` cookie가 다시 설정됩니다.
 
 ```json
 {
   "success": true,
   "message": "Token refreshed successfully",
   "accessToken": "...",
-  "refreshToken": "...",
   "accessTokenExpiresIn": 900,
   "tokenType": "Bearer",
   "user": {
@@ -498,17 +507,13 @@ Response example:
 ```
 
 ### `POST /auth/logout`
-현재 refresh token 로그아웃입니다.
-
-Body:
-
-```json
-{
-  "refreshToken": "..."
-}
-```
+현재 refresh token 로그아웃입니다. `refreshToken`은 `HttpOnly` cookie에서 읽고, 응답에서 cookie를 만료합니다.
 
 Response example:
+
+```http
+Set-Cookie: refreshToken=; HttpOnly; SameSite=Lax; Path=/api/auth; Max-Age=0
+```
 
 ```json
 {
@@ -543,6 +548,8 @@ Response example:
 
 ### `POST /auth/logout-all`
 모든 기기 로그아웃입니다.
+
+응답에서 현재 브라우저의 `refreshToken` cookie도 만료합니다.
 
 Response example:
 

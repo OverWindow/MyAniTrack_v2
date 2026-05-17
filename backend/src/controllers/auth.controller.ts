@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { getRefreshTokenExpiresInSeconds } from '../lib/auth';
 import {
   checkUsernameAvailability,
   getMyProfile,
@@ -14,6 +15,10 @@ import {
 } from '../services/auth.service';
 
 function getErrorStatus(message: string) {
+  if (message === 'refreshToken is required') {
+    return 401;
+  }
+
   if (
     message.includes('required') ||
     message.includes('must be') ||
@@ -53,13 +58,87 @@ function getErrorStatus(message: string) {
   return 500;
 }
 
+function getRequestBody(req: Request): Record<string, unknown> {
+  return req.body && typeof req.body === 'object' ? req.body : {};
+}
+
 function getClientMetadata(req: Request) {
+  const body = getRequestBody(req);
+
   return {
-    deviceType: typeof req.body.deviceType === 'string' ? req.body.deviceType : null,
-    deviceName: typeof req.body.deviceName === 'string' ? req.body.deviceName : null,
+    deviceType: typeof body.deviceType === 'string' ? body.deviceType : null,
+    deviceName: typeof body.deviceName === 'string' ? body.deviceName : null,
     userAgent: req.get('user-agent') ?? null,
     ipAddress: req.ip ?? null,
   };
+}
+
+function getRefreshCookieSameSite(): 'lax' | 'strict' | 'none' {
+  const value = String(process.env.AUTH_REFRESH_COOKIE_SAME_SITE || 'lax').toLowerCase();
+
+  if (value === 'strict' || value === 'none') {
+    return value;
+  }
+
+  return 'lax';
+}
+
+function getRefreshCookieOptions() {
+  const sameSite = getRefreshCookieSameSite();
+
+  return {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production' || sameSite === 'none',
+    sameSite,
+    path: '/api/auth',
+  } as const;
+}
+
+function setRefreshTokenCookie(res: Response, refreshToken: string) {
+  res.cookie('refreshToken', refreshToken, {
+    ...getRefreshCookieOptions(),
+    maxAge: getRefreshTokenExpiresInSeconds() * 1000,
+  });
+}
+
+function clearRefreshTokenCookie(res: Response) {
+  res.clearCookie('refreshToken', getRefreshCookieOptions());
+}
+
+function getCookieValue(req: Request, name: string) {
+  const cookieHeader = req.header('Cookie');
+
+  if (!cookieHeader) {
+    return '';
+  }
+
+  for (const part of cookieHeader.split(';')) {
+    const [rawKey, ...rawValueParts] = part.trim().split('=');
+
+    if (rawKey === name) {
+      return decodeURIComponent(rawValueParts.join('='));
+    }
+  }
+
+  return '';
+}
+
+function getRefreshTokenFromRequest(req: Request) {
+  const body = getRequestBody(req);
+
+  return getCookieValue(req, 'refreshToken')
+    || (typeof body.refreshToken === 'string' ? body.refreshToken : '');
+}
+
+function sendAuthResponse(res: Response, result: Awaited<ReturnType<typeof login>>, message: string) {
+  const { refreshToken, ...body } = result;
+  setRefreshTokenCookie(res, refreshToken);
+
+  return res.json({
+    success: true,
+    message,
+    ...body,
+  });
 }
 
 function sendError(res: Response, error: unknown) {
@@ -152,11 +231,7 @@ export async function loginUser(req: Request, res: Response) {
       ...getClientMetadata(req),
     });
 
-    return res.json({
-      success: true,
-      message: 'Login successful',
-      ...result,
-    });
+    return sendAuthResponse(res, result, 'Login successful');
   } catch (error) {
     return sendError(res, error);
   }
@@ -165,15 +240,11 @@ export async function loginUser(req: Request, res: Response) {
 export async function refreshUserSession(req: Request, res: Response) {
   try {
     const result = await refreshSession({
-      refreshToken: typeof req.body.refreshToken === 'string' ? req.body.refreshToken : '',
+      refreshToken: getRefreshTokenFromRequest(req),
       ...getClientMetadata(req),
     });
 
-    return res.json({
-      success: true,
-      message: 'Token refreshed successfully',
-      ...result,
-    });
+    return sendAuthResponse(res, result, 'Token refreshed successfully');
   } catch (error) {
     return sendError(res, error);
   }
@@ -216,7 +287,8 @@ export async function confirmPasswordReset(req: Request, res: Response) {
 
 export async function logoutUser(req: Request, res: Response) {
   try {
-    await logout(typeof req.body.refreshToken === 'string' ? req.body.refreshToken : '');
+    await logout(getRefreshTokenFromRequest(req));
+    clearRefreshTokenCookie(res);
 
     return res.json({
       success: true,
@@ -261,6 +333,7 @@ export async function logoutEverywhere(req: Request, res: Response) {
     }
 
     await logoutAll(authUser.userId);
+    clearRefreshTokenCookie(res);
 
     return res.json({
       success: true,

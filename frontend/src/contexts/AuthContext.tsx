@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import {
   createContext,
   useContext,
@@ -66,19 +67,15 @@ function replaceStoredSessionUser(nextUser: AuthUser | null) {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const initialSession = getStoredSession()
   const [user, setUser] = useState<AuthUser | null>(() => initialSession?.user ?? null)
-  const [isBootstrapping, setIsBootstrapping] = useState(() => Boolean(initialSession))
+  const [isBootstrapping, setIsBootstrapping] = useState(true)
 
   useEffect(() => {
     const session = getStoredSession()
 
-    if (!session?.accessToken) {
-      setIsBootstrapping(false)
-      return
-    }
-
     const loadMe = async () => {
       try {
-        const me = await fetchMe(session.accessToken)
+        await refreshStoredSession()
+        const me = await fetchMe()
         setUser(me)
         replaceStoredSessionUser(me)
       } catch (error) {
@@ -86,7 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           clearStoredSession()
           setUser(null)
         } else {
-          setUser((current) => current ?? session.user ?? null)
+          setUser((current) => current ?? session?.user ?? null)
         }
       } finally {
         setIsBootstrapping(false)
@@ -103,10 +100,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const session = getStoredSession()
 
-    if (!session?.refreshToken) {
-      return
-    }
-
     const timeoutId = window.setTimeout(() => {
       const refreshInBackground = async () => {
         try {
@@ -121,7 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       void refreshInBackground()
-    }, getSessionRefreshDelay(session))
+    }, getSessionRefreshDelay(session ?? { user }))
 
     return () => {
       window.clearTimeout(timeoutId)
@@ -152,61 +145,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return signup(payload)
       },
       async logout() {
-        const session = getStoredSession()
-
-        if (session?.refreshToken) {
-          try {
-            await logoutCurrentDevice(session.refreshToken)
-          } finally {
-            clearStoredSession()
-            setUser(null)
-          }
-
-          return
+        try {
+          await logoutCurrentDevice()
+        } finally {
+          clearStoredSession()
+          setUser(null)
         }
-
-        clearStoredSession()
-        setUser(null)
       },
       async logoutEverywhere() {
-        const session = getStoredSession()
-
-        if (session?.accessToken) {
-          try {
-            await logoutAllDevices(session.accessToken)
-          } finally {
-            clearStoredSession()
-            setUser(null)
-          }
-
-          return
+        try {
+          await logoutAllDevices()
+        } finally {
+          clearStoredSession()
+          setUser(null)
         }
-
-        clearStoredSession()
-        setUser(null)
       },
       async refreshMe() {
-        const session = getStoredSession()
-
-        if (!session?.accessToken) {
-          setUser(null)
-          return
-        }
-
-        const me = await fetchMe(session.accessToken)
+        await refreshStoredSession()
+        const me = await fetchMe()
         setUser(me)
         replaceStoredSessionUser(me)
       },
       async updateMyProfile(payload) {
-        const session = getStoredSession()
-
-        if (!session?.accessToken) {
+        if (!user) {
           throw new Error('로그인 후에 프로필을 수정할 수 있어요.')
         }
 
         const updatedUser = await updateProfile(payload)
         setUser(updatedUser)
-        saveStoredSession({ ...session, user: updatedUser })
+        saveStoredSession({ ...(getStoredSession() ?? {}), user: updatedUser })
       },
     }),
     [isBootstrapping, user],

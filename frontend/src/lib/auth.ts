@@ -20,6 +20,8 @@ const PENDING_AGREEMENTS_KEY = 'myanitrack.pending.agreements'
 const ACCESS_TOKEN_REFRESH_BUFFER_MS = 60_000
 
 let refreshPromise: Promise<AuthTokens> | null = null
+let memoryAccessToken: string | null = null
+let memoryAccessTokenExpiresAt: number | null = null
 
 type PendingAgreementsState = {
   email: string
@@ -53,22 +55,36 @@ function getAccessTokenExpiresAt(accessTokenExpiresIn: number) {
   return Date.now() + Math.max(accessTokenExpiresIn, 1) * 1000
 }
 
-function normalizeStoredSession(session: Omit<StoredSession, 'accessTokenExpiresAt'> & { accessTokenExpiresAt?: number }) {
+function normalizeStoredSession(session: StoredSession) {
   return {
-    ...session,
+    user: session.user ?? null,
     accessTokenExpiresAt:
       typeof session.accessTokenExpiresAt === 'number' && Number.isFinite(session.accessTokenExpiresAt)
         ? session.accessTokenExpiresAt
-        : getAccessTokenExpiresAt(session.accessTokenExpiresIn),
+        : undefined,
   } satisfies StoredSession
 }
 
 export function createStoredSession(tokens: AuthTokens, user: AuthUser | null) {
+  setMemoryTokens(tokens)
   return {
-    ...tokens,
     user,
     accessTokenExpiresAt: getAccessTokenExpiresAt(tokens.accessTokenExpiresIn),
   } satisfies StoredSession
+}
+
+function setMemoryTokens(tokens: AuthTokens) {
+  memoryAccessToken = tokens.accessToken
+  memoryAccessTokenExpiresAt = getAccessTokenExpiresAt(tokens.accessTokenExpiresIn)
+}
+
+function clearMemoryTokens() {
+  memoryAccessToken = null
+  memoryAccessTokenExpiresAt = null
+}
+
+function getMemoryAccessToken() {
+  return memoryAccessToken
 }
 
 export function getStoredSession(): StoredSession | null {
@@ -91,6 +107,7 @@ export function saveStoredSession(session: StoredSession) {
 }
 
 export function clearStoredSession() {
+  clearMemoryTokens()
   window.localStorage.removeItem(SESSION_STORAGE_KEY)
 }
 
@@ -188,6 +205,7 @@ async function parseJsonSafe<T>(response: Response) {
 export async function signup(payload: SignupPayload) {
   const response = await fetch(createUrl('/api/auth/signup'), {
     method: 'POST',
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
     },
@@ -204,6 +222,7 @@ export async function signup(payload: SignupPayload) {
 export async function login(payload: LoginPayload) {
   const response = await fetch(createUrl('/api/auth/login'), {
     method: 'POST',
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
     },
@@ -224,6 +243,7 @@ export async function login(payload: LoginPayload) {
 export async function resendVerificationEmail(email: string) {
   const response = await fetch(createUrl('/api/auth/verify-email/resend'), {
     method: 'POST',
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
     },
@@ -240,6 +260,7 @@ export async function resendVerificationEmail(email: string) {
 export async function confirmEmailVerification(token: string) {
   const response = await fetch(createUrl('/api/auth/verify-email/confirm'), {
     method: 'POST',
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
     },
@@ -256,6 +277,7 @@ export async function confirmEmailVerification(token: string) {
 export async function requestPasswordReset(email: string) {
   const response = await fetch(createUrl('/api/auth/password-reset/request'), {
     method: 'POST',
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
     },
@@ -272,6 +294,7 @@ export async function requestPasswordReset(email: string) {
 export async function confirmPasswordReset(token: string, newPassword: string) {
   const response = await fetch(createUrl('/api/auth/password-reset/confirm'), {
     method: 'POST',
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
     },
@@ -330,20 +353,23 @@ export async function checkUsernameAvailability(username: string) {
   }
 }
 
-export async function refreshAuth(refreshToken: string) {
+export async function refreshAuth() {
   const response = await fetch(createUrl('/api/auth/refresh'), {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ refreshToken }),
+    credentials: 'include',
   })
 
   if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('세션이 만료되었어요. 다시 로그인해주세요.')
+    }
+
     throw new Error(getErrorMessage(response.status, '토큰 갱신에 실패했어요.'))
   }
 
-  return (await response.json()) as AuthTokens
+  const tokens = (await response.json()) as AuthTokens
+  setMemoryTokens(tokens)
+  return tokens
 }
 
 export async function fetchMe(accessToken?: string) {
@@ -405,13 +431,10 @@ export async function updateMyAgreements(payload: UpdateAgreementsPayload) {
   return data.item
 }
 
-export async function logoutCurrentDevice(refreshToken: string) {
+export async function logoutCurrentDevice() {
   const response = await fetch(createUrl('/api/auth/logout'), {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ refreshToken }),
+    credentials: 'include',
   })
 
   if (!response.ok) {
@@ -419,12 +442,18 @@ export async function logoutCurrentDevice(refreshToken: string) {
   }
 }
 
-export async function logoutAllDevices(accessToken: string) {
+export async function logoutAllDevices() {
+  const headers = new Headers()
+  const accessToken = getMemoryAccessToken()
+
+  if (accessToken) {
+    headers.set('Authorization', `Bearer ${accessToken}`)
+  }
+
   const response = await fetch(createUrl('/api/auth/logout-all'), {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
+    credentials: 'include',
+    headers,
   })
 
   if (!response.ok) {
@@ -474,14 +503,10 @@ export async function updateProfile(payload: UpdateProfilePayload) {
 async function ensureFreshTokens() {
   const session = getStoredSession()
 
-  if (!session?.refreshToken) {
-    throw new Error('세션이 만료되었어요. 다시 로그인해주세요.')
-  }
-
   if (!refreshPromise) {
-    refreshPromise = refreshAuth(session.refreshToken)
+    refreshPromise = refreshAuth()
       .then((tokens) => {
-        const nextSession = createStoredSession(tokens, session.user)
+        const nextSession = createStoredSession(tokens, session?.user ?? null)
         saveStoredSession(nextSession)
         return tokens
       })
@@ -494,35 +519,39 @@ async function ensureFreshTokens() {
 }
 
 export async function refreshStoredSession() {
-  await ensureFreshTokens()
+  const tokens = await ensureFreshTokens()
   const nextSession = getStoredSession()
 
   if (!nextSession) {
-    throw new Error('세션이 만료되었어요. 다시 로그인해주세요.')
+    const restoredSession = createStoredSession(tokens, null)
+    saveStoredSession(restoredSession)
+    return restoredSession
   }
 
   return nextSession
 }
 
 export function getSessionRefreshDelay(session: StoredSession) {
-  const remainingMs = session.accessTokenExpiresAt - Date.now() - ACCESS_TOKEN_REFRESH_BUFFER_MS
+  const expiresAt = memoryAccessTokenExpiresAt ?? session.accessTokenExpiresAt ?? Date.now() + 15_000
+  const remainingMs = expiresAt - Date.now() - ACCESS_TOKEN_REFRESH_BUFFER_MS
   return Math.max(remainingMs, 15_000)
 }
 
 export async function authFetch(input: string, init: RequestInit = {}) {
-  const session = getStoredSession()
   const headers = new Headers(init.headers)
+  const accessToken = getMemoryAccessToken()
 
-  if (session?.accessToken) {
-    headers.set('Authorization', `Bearer ${session.accessToken}`)
+  if (accessToken && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${accessToken}`)
   }
 
   let response = await fetch(input, {
     ...init,
+    credentials: 'include',
     headers,
   })
 
-  if (response.status !== 401 || !session?.refreshToken) {
+  if (response.status !== 401) {
     return response
   }
 
@@ -533,6 +562,7 @@ export async function authFetch(input: string, init: RequestInit = {}) {
 
     response = await fetch(input, {
       ...init,
+      credentials: 'include',
       headers: retryHeaders,
     })
   } catch {

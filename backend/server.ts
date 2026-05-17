@@ -15,32 +15,56 @@ dotenv.config();
 const app = express();
 
 function getAllowedOrigins() {
+  const developmentOrigins = process.env.NODE_ENV === 'production'
+    ? []
+    : ['http://localhost:5173'];
+
   return [
+    ...developmentOrigins,
     process.env.FRONT_DOMAIN1,
     process.env.FRONT_DOMAIN2,
     process.env.FRONT_DOMAIN3,
   ].filter((origin): origin is string => Boolean(origin?.trim()));
 }
 
-app.use((req, res, next) => {
-  const isProduction = process.env.NODE_ENV === 'production';
-  const requestOrigin = req.header('Origin');
+function getRequestOrigin(req: express.Request) {
+  const origin = req.header('Origin');
 
-  if (isProduction) {
-    const allowedOrigins = getAllowedOrigins();
-
-    if (requestOrigin && allowedOrigins.includes(requestOrigin)) {
-      res.header('Access-Control-Allow-Origin', requestOrigin);
-      res.header('Vary', 'Origin');
-    }
-  } else {
-    res.header('Access-Control-Allow-Origin', '*');
+  if (origin) {
+    return origin;
   }
 
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  const referer = req.header('Referer');
+
+  if (!referer) {
+    return null;
+  }
+
+  try {
+    return new URL(referer).origin;
+  } catch {
+    return null;
+  }
+}
+
+app.use((req, res, next) => {
+  const requestOrigin = req.header('Origin');
+  const allowedOrigins = getAllowedOrigins();
+
+  if (requestOrigin && allowedOrigins.includes(requestOrigin)) {
+    res.header('Access-Control-Allow-Origin', requestOrigin);
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Vary', 'Origin');
+  }
+
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-CSRF-Token');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
 
   if (req.method === 'OPTIONS') {
+    if (requestOrigin && !allowedOrigins.includes(requestOrigin)) {
+      return res.sendStatus(403);
+    }
+
     return res.sendStatus(204);
   }
 
@@ -48,6 +72,29 @@ app.use((req, res, next) => {
 });
 
 app.use(express.json());
+
+app.use((req, res, next) => {
+  const unsafeMethods = ['POST', 'PUT', 'PATCH', 'DELETE'];
+
+  if (!unsafeMethods.includes(req.method)) {
+    return next();
+  }
+
+  const requestOrigin = getRequestOrigin(req);
+
+  if (!requestOrigin) {
+    return next();
+  }
+
+  if (!getAllowedOrigins().includes(requestOrigin)) {
+    return res.status(403).json({
+      success: false,
+      message: 'Origin not allowed',
+    });
+  }
+
+  return next();
+});
 
 app.get('/health', (_req, res) => {
   res.json({ ok: true });
