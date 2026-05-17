@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { fetchMyCollection, getCachedCollectionPage, saveCollectionPageCache } from '../lib/collection'
@@ -86,7 +86,7 @@ function formatScore(score?: number | null) {
 
 export function CollectionPage() {
   const location = useLocation()
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, isBootstrapping } = useAuth()
   const [sort, setSort] = useState<UserAnimeListSort>('latest')
   const [genre, setGenre] = useState<AnimeGenre | 'all'>('all')
   const [searchTerm, setSearchTerm] = useState('')
@@ -119,8 +119,67 @@ export function CollectionPage() {
     getCollectionSearchText(item).includes(debouncedSearchTerm.trim().toLowerCase()),
   )
 
+  const fetchFullCollection = useCallback(async (signal?: AbortSignal) => {
+    const firstPage = await fetchMyCollection({
+      sort,
+      genre: selectedGenre,
+      limit: 50,
+      signal,
+    })
+    const allItems = [...firstPage.items]
+    let cursor = firstPage.pageInfo.nextCursor
+    const seenCursors = new Set<string>()
+
+    while (firstPage.pageInfo.hasNext && cursor && !seenCursors.has(cursor)) {
+      seenCursors.add(cursor)
+
+      const nextPage = await fetchMyCollection({
+        sort,
+        genre: selectedGenre,
+        limit: 50,
+        cursor,
+        signal,
+      })
+
+      const seenItems = new Set(allItems.map((item) => item.id))
+      for (const item of nextPage.items) {
+        if (!seenItems.has(item.id)) {
+          allItems.push(item)
+          seenItems.add(item.id)
+        }
+      }
+
+      cursor = nextPage.pageInfo.nextCursor
+
+      if (!nextPage.pageInfo.hasNext) {
+        break
+      }
+    }
+
+    const fullData = {
+      ...firstPage,
+      items: allItems,
+      pageInfo: {
+        ...firstPage.pageInfo,
+        hasNext: false,
+        nextCursor: null,
+        limit: allItems.length,
+      },
+    }
+
+    saveCollectionPageCache(
+      {
+        sort,
+        genre: selectedGenre,
+      },
+      fullData,
+    )
+
+    return fullData
+  }, [selectedGenre, sort])
+
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (isBootstrapping || !isAuthenticated) {
       return
     }
 
@@ -160,17 +219,12 @@ export function CollectionPage() {
         }))
         consumedReloadKeyRef.current = reloadKey
 
-        const data = await fetchMyCollection({
-          sort,
-          genre: selectedGenre,
-          limit: 24,
-          signal: controller.signal,
-        })
+        const data = await fetchFullCollection(controller.signal)
 
         setState({
           items: data.items,
-          nextCursor: data.pageInfo.nextCursor,
-          hasNext: data.pageInfo.hasNext,
+          nextCursor: null,
+          hasNext: false,
           isLoading: false,
           isLoadingMore: false,
           error: null,
@@ -199,7 +253,7 @@ export function CollectionPage() {
     void loadFirstPage()
 
     return () => controller.abort()
-  }, [isAuthenticated, reloadKey, requestKey, selectedGenre, sort])
+  }, [fetchFullCollection, isAuthenticated, isBootstrapping, reloadKey, requestKey, selectedGenre, sort])
 
   useEffect(() => {
     const node = sentinelRef.current
@@ -316,6 +370,22 @@ export function CollectionPage() {
     selectedGenre,
     sort,
   ])
+
+  if (isBootstrapping) {
+    return (
+      <section className="collection-page">
+        <div className="collection-grid">
+          {Array.from({ length: 8 }).map((_, index) => (
+            <article className="collection-card skeleton-card" key={`collection-bootstrap-${index}`}>
+              <div className="skeleton-poster" />
+              <div className="skeleton-line short" />
+              <div className="skeleton-line long" />
+            </article>
+          ))}
+        </div>
+      </section>
+    )
+  }
 
   if (!isAuthenticated) {
     return (
