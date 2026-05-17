@@ -113,6 +113,54 @@ export function HomePage() {
       </section>
 
       {state.error && <div className="feedback-card is-error">{state.error}</div>}
+
+      <section className="home-flow-section" aria-labelledby="home-flow-title">
+        <div className="home-flow-heading">
+          <span className="section-kicker">How it works</span>
+          <h2 id="home-flow-title">MyAniTrack 사용 방법</h2>
+        </div>
+
+        <div className="home-flow-card-grid">
+          <Link className="home-flow-card home-flow-card-explore" to="/explore">
+            <span className="home-flow-number">1</span>
+            <div className="home-flow-card-copy">
+              <h3>탐색</h3>
+              <p>마음에 드는 애니를 찾아 내 리스트에 추가하고, 바로 별점과 진행도를 남겨요.</p>
+            </div>
+            <div className="home-flow-visual home-flow-visual-explore" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </div>
+          </Link>
+
+          <Link className="home-flow-card home-flow-card-analysis" to="/analysis">
+            <span className="home-flow-number">2</span>
+            <div className="home-flow-card-copy">
+              <h3>분석</h3>
+              <p>추가한 애니를 기준으로 취향, 장르, 평점 분포를 한눈에 확인해요.</p>
+            </div>
+            <div className="home-flow-visual home-flow-visual-analysis" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </div>
+          </Link>
+
+          <Link className="home-flow-card home-flow-card-friends" to="/friends">
+            <span className="home-flow-number">3</span>
+            <div className="home-flow-card-copy">
+              <h3>친구</h3>
+              <p>친구를 만들고 서로의 컬렉션과 분석을 보면서 새로운 작품을 발견해요.</p>
+            </div>
+            <div className="home-flow-visual home-flow-visual-friends" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </div>
+          </Link>
+        </div>
+      </section>
     </div>
   )
 }

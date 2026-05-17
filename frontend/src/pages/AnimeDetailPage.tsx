@@ -103,7 +103,7 @@ function AdminTitleEditor({ item, onTitleUpdated }: AdminTitleEditorProps) {
   return (
     <section className="detail-section admin-title-editor">
       <span className="detail-label">Admin title lock</span>
-      <h2>한국어 제목 수정</h2>
+      {/* <h2>한국어 제목 수정</h2> */}
       <form className="admin-title-form" onSubmit={handleAdminTitleSubmit}>
         <label className="auth-field">
           <span>대표 한국어 제목</span>
@@ -362,28 +362,22 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
       </div>
 
       <div className="detail-layout">
-        <article className="detail-section detail-description">
-          <span className="detail-label">Genres</span>
-          <h2>장르</h2>
-          {item.genres?.length ? (
-            <div className="chip-list detail-chip-list-spacious">
-              {item.genres.map((genre) => (
-                <span className="info-chip" key={genre}>
-                  {getGenreLabel(genre)}
-                </span>
-              ))}
-            </div>
-          ) : (
-            <p className="detail-description-text">아직 등록된 장르 정보가 없어요.</p>
-          )}
-        </article>
-
-        <aside className="detail-sidebar">
-          {isAdmin && (
-            <AdminTitleEditor key={item.id} item={item} onTitleUpdated={handleAdminTitleUpdated} />
-          )}
-
-          <CollectionEditor key={item.id} animeId={item.id} maxProgress={item.episodes} />
+        <div className="detail-left-column">
+          <article className="detail-section detail-description">
+            <span className="detail-label">Genres</span>
+            <h2>장르</h2>
+            {item.genres?.length ? (
+              <div className="chip-list detail-chip-list-spacious">
+                {item.genres.map((genre) => (
+                  <span className="info-chip" key={genre}>
+                    {getGenreLabel(genre)}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="detail-description-text">아직 등록된 장르 정보가 없어요.</p>
+            )}
+          </article>
 
           <section className="detail-section">
             <span className="detail-label">Overview</span>
@@ -414,6 +408,14 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
               </div>
             </div>
           </section>
+        </div>
+
+        <aside className="detail-sidebar">
+          {isAdmin && (
+            <AdminTitleEditor key={item.id} item={item} onTitleUpdated={handleAdminTitleUpdated} />
+          )}
+
+          <CollectionEditor key={item.id} animeId={item.id} maxProgress={item.episodes} />
 
           {koreanTitles.length > 0 && (
             <section className="detail-section">

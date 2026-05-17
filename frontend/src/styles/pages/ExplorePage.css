@@ -10,7 +10,7 @@
   padding: 4px;
   border-radius: var(--radius-pill);
   background: var(--point-softest);
-  border: 1px solid var(--point-border);
+  /* border: 1px solid var(--point-border); */
 }
 
 .search-language-button {

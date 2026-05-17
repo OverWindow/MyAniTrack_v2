@@ -160,6 +160,205 @@
   color: var(--text-secondary);
 }
 
+.home-flow-section {
+  display: grid;
+  gap: 24px;
+  padding: clamp(18px, 3vw, 32px) 0 0;
+  color: var(--text-primary);
+}
+
+.home-flow-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.home-flow-heading h2 {
+  margin: 0;
+  font-size: clamp(2.1rem, 4vw, 4rem);
+  line-height: 1;
+  color: var(--text-primary);
+}
+
+.home-flow-card-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.home-flow-card {
+  position: relative;
+  min-height: 320px;
+  overflow: hidden;
+  border-radius: 26px;
+  padding: 84px 28px 28px;
+  color: var(--text-inverse);
+  text-decoration: none;
+  isolation: isolate;
+  transition:
+    transform var(--duration-normal) var(--ease-out),
+    box-shadow var(--duration-normal) var(--ease-out);
+}
+
+.home-flow-card:hover,
+.home-flow-card:focus-visible {
+  transform: translateY(-4px);
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.3);
+  outline: none;
+}
+
+.home-flow-card::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0;
+  height: 52%;
+  z-index: -1;
+  background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.2));
+}
+
+.home-flow-card-explore {
+  background: linear-gradient(135deg, #7f3f06 0%, #b07c28 100%);
+}
+
+.home-flow-card-analysis {
+  background: linear-gradient(135deg, #315d04 0%, #8aa813 100%);
+}
+
+.home-flow-card-friends {
+  background: linear-gradient(135deg, #05545a 0%, #2fbba1 100%);
+}
+
+.home-flow-number {
+  position: absolute;
+  top: -24px;
+  left: 24px;
+  color: #ffc43b;
+  font-size: clamp(5rem, 9vw, 7rem);
+  font-weight: 900;
+  line-height: 1;
+  text-shadow: 0 10px 18px rgba(0, 0, 0, 0.28);
+}
+
+.home-flow-card-analysis .home-flow-number {
+  color: #b8f042;
+}
+
+.home-flow-card-friends .home-flow-number {
+  color: #59f0ef;
+}
+
+.home-flow-card-copy {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 10px;
+  max-width: 28ch;
+}
+
+.home-flow-card-copy h3 {
+  margin: 0;
+  color: var(--text-inverse);
+  font-size: clamp(1.45rem, 2vw, 1.9rem);
+  line-height: 1.1;
+}
+
+.home-flow-card-copy p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 0.98rem;
+  font-weight: 700;
+  line-height: 1.55;
+}
+
+.home-flow-visual {
+  position: absolute;
+  right: 26px;
+  bottom: 22px;
+  width: min(42%, 180px);
+  aspect-ratio: 1;
+  opacity: 0.95;
+}
+
+.home-flow-visual span {
+  position: absolute;
+  display: block;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.22);
+}
+
+.home-flow-visual-explore span:nth-child(1) {
+  inset: 18% 34% 18% 0;
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.home-flow-visual-explore span:nth-child(2) {
+  inset: 0 6% 28% 38%;
+  background: rgba(255, 238, 185, 0.46);
+}
+
+.home-flow-visual-explore span:nth-child(3) {
+  right: 4%;
+  bottom: 6%;
+  width: 46%;
+  height: 34%;
+  background: #ffc43b;
+}
+
+.home-flow-visual-analysis span:nth-child(1) {
+  left: 8%;
+  right: 8%;
+  bottom: 10%;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.34);
+  box-shadow: none;
+}
+
+.home-flow-visual-analysis span:nth-child(2) {
+  left: 18%;
+  bottom: 12%;
+  width: 18%;
+  height: 46%;
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.home-flow-visual-analysis span:nth-child(3) {
+  right: 20%;
+  bottom: 12%;
+  width: 18%;
+  height: 70%;
+  background: #cffb4f;
+}
+
+.home-flow-visual-friends span {
+  border-radius: 50%;
+}
+
+.home-flow-visual-friends span:nth-child(1) {
+  left: 4%;
+  top: 32%;
+  width: 44%;
+  height: 44%;
+  background: rgba(255, 255, 255, 0.34);
+}
+
+.home-flow-visual-friends span:nth-child(2) {
+  right: 4%;
+  top: 12%;
+  width: 48%;
+  height: 48%;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.home-flow-visual-friends span:nth-child(3) {
+  right: 18%;
+  bottom: 8%;
+  width: 38%;
+  height: 38%;
+  background: #ffd24a;
+}
+
 @media (max-width: 1180px) {
   .home-gallery-hero {
     grid-template-columns: 1fr;
@@ -181,6 +380,14 @@
 
   .home-anime-showcase-wrapper {
     min-height: min(590px, calc(100svh - 360px));
+  }
+
+  .home-flow-card-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .home-flow-card {
+    min-height: 260px;
   }
 }
 
@@ -257,5 +464,24 @@
 
   .home-platform-card {
     padding: 22px;
+  }
+
+  .home-flow-section {
+    padding: 24px 16px;
+    border-radius: 22px;
+  }
+
+  .home-flow-heading {
+    display: grid;
+  }
+
+  .home-flow-card {
+    min-height: 280px;
+    padding: 78px 22px 22px;
+  }
+
+  .home-flow-visual {
+    width: 44%;
+    right: 18px;
   }
 }

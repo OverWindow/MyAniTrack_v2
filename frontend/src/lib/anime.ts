@@ -13,6 +13,7 @@ import { authFetch } from './auth'
 export const sortOptions: Array<{ value: AnimeSort; label: string }> = [
   { value: 'latest', label: '최신 등록순' },
   { value: 'score', label: '평점 높은 순' },
+  { value: 'popularity', label: '인기 높은 순' },
   { value: 'season', label: '시즌 순' },
 ]
 

@@ -69,7 +69,7 @@ Response example:
 
 Query:
 
-- `sort`: `latest | score | season`
+- `sort`: `latest | score | season | popularity`
 - `titleLanguage`: `ko | en | ja`
 - `genre`: 선택값
 - `limit`: `1~50`
@@ -120,7 +120,7 @@ Response example:
 Query:
 
 - `query`: 필수
-- `sort`: `latest | score | season`
+- `sort`: `latest | score | season | popularity`
 - `titleLanguage`: `ko | en | ja`
 - `genre`: 선택값
 - `limit`: `1~50`
@@ -160,7 +160,7 @@ Response example:
 Query:
 
 - `query`: 선택값
-- `sort`: `latest | score | season`
+- `sort`: `latest | score | season | popularity`
 - `titleLanguage`: `ko | en | ja`
 - `genre`: 선택값
 - `limit`: `1~50`

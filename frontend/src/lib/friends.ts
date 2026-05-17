@@ -1,4 +1,4 @@
-import { authFetch } from './auth'
+import { authFetch, getStoredSession } from './auth'
 import type {
   FriendItem,
   FriendRequestAction,
@@ -9,6 +9,23 @@ import type {
   SendFriendRequestResponse,
   UpdateFriendRequestResponse,
 } from '../types/friends'
+
+const FRIENDS_SESSION_STORAGE_KEY_PREFIX = 'myanitrack.friends.session-cache'
+
+export type FriendsSessionCache = {
+  incoming: FriendRequestItem[]
+  outgoing: FriendRequestItem[]
+  friends: FriendItem[]
+}
+
+function getFriendsSessionStorageKey() {
+  const session = getStoredSession()
+  const userId = session?.user?.id
+
+  return userId
+    ? `${FRIENDS_SESSION_STORAGE_KEY_PREFIX}:${String(userId)}`
+    : `${FRIENDS_SESSION_STORAGE_KEY_PREFIX}:guest`
+}
 
 function getApiBaseUrl() {
   const baseUrl = import.meta.env.VITE_API_BASE_URL
@@ -46,6 +63,25 @@ function getErrorMessage(status: number, fallback: string) {
   }
 
   return fallback
+}
+
+export function getCachedFriendsSession() {
+  const raw = window.sessionStorage.getItem(getFriendsSessionStorageKey())
+
+  if (!raw) {
+    return null
+  }
+
+  try {
+    return JSON.parse(raw) as FriendsSessionCache
+  } catch {
+    window.sessionStorage.removeItem(getFriendsSessionStorageKey())
+    return null
+  }
+}
+
+export function saveFriendsSessionCache(data: FriendsSessionCache) {
+  window.sessionStorage.setItem(getFriendsSessionStorageKey(), JSON.stringify(data))
 }
 
 export async function sendFriendRequest(payload: FriendRequestPayload) {

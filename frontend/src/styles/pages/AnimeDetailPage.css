@@ -161,6 +161,11 @@
   align-items: start;
 }
 
+.detail-left-column {
+  display: grid;
+  gap: 18px;
+}
+
 .detail-section {
   padding: 24px;
   border-radius: 20px;

@@ -79,6 +79,63 @@
   padding: 16px 18px;
 }
 
+button.friends-summary-card {
+  border: 1px solid rgba(120, 113, 108, 0.16);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  transition:
+    transform var(--duration-normal) var(--ease-out),
+    border-color var(--duration-normal) var(--ease-out),
+    background var(--duration-normal) var(--ease-out);
+}
+
+.friends-summary-card.is-toggle {
+  position: relative;
+  padding-right: 46px;
+}
+
+.friends-summary-card.is-toggle:hover,
+.friends-summary-card.is-toggle:focus-visible {
+  transform: translateY(-1px);
+  border-color: var(--point-border);
+  outline: none;
+}
+
+.friends-summary-card.is-toggle::after {
+  content: '';
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--bg-neutral);
+  color: var(--text-secondary);
+  transform: translateY(-50%);
+  transition:
+    transform var(--duration-normal) var(--ease-out),
+    background var(--duration-normal) var(--ease-out),
+    color var(--duration-normal) var(--ease-out);
+  background-image:
+    linear-gradient(45deg, transparent 42%, currentColor 42%, currentColor 58%, transparent 58%),
+    linear-gradient(135deg, transparent 42%, currentColor 42%, currentColor 58%, transparent 58%);
+  background-position: 8px 11px, 13px 11px;
+  background-repeat: no-repeat;
+  background-size: 7px 7px;
+}
+
+.friends-summary-card.is-active {
+  border-color: var(--point-border);
+  background: var(--point-softest);
+}
+
+.friends-summary-card.is-active::after {
+  color: var(--point-hover);
+  background-color: var(--point-soft);
+  transform: translateY(-50%) rotate(180deg);
+}
+
 .friends-summary-card strong {
   font-size: 1.3rem;
   line-height: 1.1;
@@ -93,9 +150,28 @@
   gap: 0;
 }
 
+.request-accordion {
+  overflow: hidden;
+  animation: requestPanelDrop 240ms var(--ease-out) both;
+}
+
 .friends-list-panel {
   display: grid;
   gap: 16px;
+}
+
+@keyframes requestPanelDrop {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+    clip-path: inset(0 0 100% 0 round 20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    clip-path: inset(0 0 0 0 round 20px);
+  }
 }
 
 .friends-card-list {

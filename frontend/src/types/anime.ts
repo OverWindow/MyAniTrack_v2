@@ -1,4 +1,4 @@
-export type AnimeSort = 'latest' | 'score' | 'season'
+export type AnimeSort = 'latest' | 'score' | 'season' | 'popularity'
 
 export type AnimeGenre =
   | 'Action'

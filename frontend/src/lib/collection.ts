@@ -9,6 +9,7 @@ import type {
 } from '../types/collection'
 
 const COLLECTION_STORAGE_KEY_PREFIX = 'myanitrack.collection.cache'
+const COLLECTION_PAGE_STORAGE_KEY_PREFIX = 'myanitrack.collection.page-cache'
 export const COLLECTION_CACHE_UPDATED_EVENT = 'myanitrack:collection-cache-updated'
 
 function getApiBaseUrl() {
@@ -32,6 +33,19 @@ function getCollectionStorageKey() {
   return userId
     ? `${COLLECTION_STORAGE_KEY_PREFIX}:${String(userId)}`
     : `${COLLECTION_STORAGE_KEY_PREFIX}:guest`
+}
+
+function getCollectionPageStorageKey(params: {
+  sort: UserAnimeListSort
+  genre?: AnimeGenre | null
+}) {
+  const session = getStoredSession()
+  const userId = session?.user?.id
+  const genreKey = params.genre ?? 'all'
+
+  return userId
+    ? `${COLLECTION_PAGE_STORAGE_KEY_PREFIX}:${String(userId)}:${params.sort}:${genreKey}`
+    : `${COLLECTION_PAGE_STORAGE_KEY_PREFIX}:guest:${params.sort}:${genreKey}`
 }
 
 function dispatchCollectionCacheUpdated(animeId?: number) {
@@ -79,6 +93,34 @@ function normalizeNullableNumber(value: number | string | null | undefined) {
 
 export function getCachedCollectionEntry(animeId: number) {
   return getCollectionCache()[animeId] ?? null
+}
+
+export function getCachedCollectionPage(params: {
+  sort: UserAnimeListSort
+  genre?: AnimeGenre | null
+}) {
+  const raw = window.localStorage.getItem(getCollectionPageStorageKey(params))
+
+  if (!raw) {
+    return null
+  }
+
+  try {
+    return JSON.parse(raw) as UserAnimeListResponse
+  } catch {
+    window.localStorage.removeItem(getCollectionPageStorageKey(params))
+    return null
+  }
+}
+
+export function saveCollectionPageCache(
+  params: {
+    sort: UserAnimeListSort
+    genre?: AnimeGenre | null
+  },
+  data: UserAnimeListResponse,
+) {
+  window.localStorage.setItem(getCollectionPageStorageKey(params), JSON.stringify(data))
 }
 
 function updateCachedCollectionEntry(entry: UserAnimeListEntry) {
@@ -345,6 +387,16 @@ export async function fetchMyCollection(params: {
   }
 
   saveCollectionCache(cache)
+  saveCollectionPageCache(
+    {
+      sort: params.sort,
+      genre: params.genre,
+    },
+    {
+      ...data,
+      items: filteredItems,
+    },
+  )
   dispatchCollectionCacheUpdated()
 
   return {

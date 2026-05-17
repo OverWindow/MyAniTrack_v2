@@ -8,7 +8,7 @@ import {
   getAnimeListWithUserCollection,
 } from '../services/anime.service';
 
-const SORT_OPTIONS: AnimeSortOption[] = ['latest', 'score', 'season'];
+const SORT_OPTIONS: AnimeSortOption[] = ['latest', 'score', 'season', 'popularity'];
 const TITLE_LANGUAGE_OPTIONS: AnimeTitleLanguage[] = ['ko', 'en', 'ja'];
 const GENRE_OPTIONS: AnimeGenre[] = [
   'Action',
@@ -36,7 +36,7 @@ function parseSort(value: unknown): AnimeSortOption {
   const sort = typeof value === 'string' ? value : 'latest';
 
   if (!SORT_OPTIONS.includes(sort as AnimeSortOption)) {
-    throw new Error('sort must be one of latest, score, season');
+    throw new Error('sort must be one of latest, score, season, popularity');
   }
 
   return sort as AnimeSortOption;

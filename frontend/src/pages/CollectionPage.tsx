@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { fetchMyCollection } from '../lib/collection'
+import { fetchMyCollection, getCachedCollectionPage, saveCollectionPageCache } from '../lib/collection'
 import { genreOptions } from '../lib/anime'
 import type { AnimeGenre } from '../types/anime'
 import type { UserAnimeListItem, UserAnimeListSort } from '../types/collection'
@@ -101,6 +101,7 @@ export function CollectionPage() {
   const [state, setState] = useState<CollectionState>(() => createInitialCollectionState(requestKey))
   const sentinelRef = useRef<HTMLDivElement | null>(null)
   const isLoadingMoreRef = useRef(false)
+  const consumedReloadKeyRef = useRef(0)
   const { items, nextCursor, hasNext, isLoading, isLoadingMore, error } = state
   const isRefreshingQuery = state.requestKey !== requestKey
 
@@ -128,6 +129,27 @@ export function CollectionPage() {
     const loadFirstPage = async () => {
       try {
         isLoadingMoreRef.current = false
+        const shouldFetchFromApi = reloadKey !== consumedReloadKeyRef.current
+
+        if (!shouldFetchFromApi) {
+          const cachedPage = getCachedCollectionPage({
+            sort,
+            genre: selectedGenre,
+          })
+
+          if (cachedPage) {
+            setState({
+              items: cachedPage.items,
+              nextCursor: null,
+              hasNext: false,
+              isLoading: false,
+              isLoadingMore: false,
+              error: null,
+              requestKey,
+            })
+            return
+          }
+        }
 
         setState((current) => ({
           ...current,
@@ -136,6 +158,7 @@ export function CollectionPage() {
           error: null,
           requestKey,
         }))
+        consumedReloadKeyRef.current = reloadKey
 
         const data = await fetchMyCollection({
           sort,
@@ -228,14 +251,31 @@ export function CollectionPage() {
                 seen.add(item.id)
                 return true
               })
-
-              return {
+              const nextState = {
                 ...current,
                 items: deduped,
                 nextCursor: data.pageInfo.nextCursor,
                 hasNext: data.pageInfo.hasNext,
                 isLoadingMore: false,
               }
+
+              saveCollectionPageCache(
+                {
+                  sort,
+                  genre: selectedGenre,
+                },
+                {
+                  success: data.success,
+                  items: deduped,
+                  pageInfo: {
+                    ...data.pageInfo,
+                    nextCursor: data.pageInfo.nextCursor,
+                    hasNext: data.pageInfo.hasNext,
+                  },
+                },
+              )
+
+              return nextState
             })
           } catch (fetchError) {
             setState((current) => {

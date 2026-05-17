@@ -1,7 +1,7 @@
 import { pool } from '../../config/db';
 import { RowDataPacket } from 'mysql2/promise';
 
-export type AnimeSortOption = 'latest' | 'score' | 'season';
+export type AnimeSortOption = 'latest' | 'score' | 'season' | 'popularity';
 export type AnimeTitleLanguage = 'ko' | 'en' | 'ja';
 export type AnimeGenre =
   | 'Action'
@@ -42,6 +42,7 @@ interface AnimeListCursorPayload {
   score?: number | null;
   seasonYear?: number | null;
   seasonRank?: number | null;
+  popularity?: number | null;
   id: number;
 }
 
@@ -190,6 +191,10 @@ function buildListOrderClause(sort: AnimeSortOption): string {
     return `${SCORE_SORT_SQL} DESC, a.id DESC`;
   }
 
+  if (sort === 'popularity') {
+    return 'COALESCE(a.popularity, -1) DESC, a.id DESC';
+  }
+
   if (sort === 'season') {
     return `${SEASON_YEAR_SORT_SQL} DESC, ${SEASON_RANK_SQL} DESC, a.id DESC`;
   }
@@ -212,6 +217,16 @@ function buildCursorWhereClause(sort: AnimeSortOption, cursor: AnimeListCursorPa
       AND (
         ${SCORE_SORT_SQL} < ?
         OR (${SCORE_SORT_SQL} = ? AND a.id < ?)
+      )
+    `;
+  }
+
+  if (sort === 'popularity') {
+    params.push(cursor.popularity ?? -1, cursor.popularity ?? -1, cursor.id);
+    return `
+      AND (
+        COALESCE(a.popularity, -1) < ?
+        OR (COALESCE(a.popularity, -1) = ? AND a.id < ?)
       )
     `;
   }
@@ -395,6 +410,7 @@ export async function getAnimeList(params: AnimeListParams) {
         score: lastItem.scoreSortValue,
         seasonYear: lastItem.seasonYear,
         seasonRank: lastItem.seasonRankValue,
+        popularity: lastItem.popularity,
         id: lastItem.id,
       })
     : null;

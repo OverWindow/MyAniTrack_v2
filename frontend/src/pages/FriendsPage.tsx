@@ -1,12 +1,14 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import {
   fetchFriendRequests,
   fetchFriends,
   formatFriendAnimeCount,
+  getCachedFriendsSession,
   getFriendPreviewName,
   removeFriend,
+  saveFriendsSessionCache,
   sendFriendRequest,
   sortFriendsByNewest,
   updateFriendRequest,
@@ -49,18 +51,53 @@ function FriendAvatar({ user }: { user: FriendRequestItem['user'] | FriendItem['
 
 export function FriendsPage() {
   const { isAuthenticated } = useAuth()
-  const [state, setState] = useState<FriendsState>({
-    incoming: [],
-    outgoing: [],
-    friends: [],
-    isLoading: true,
-    error: null,
+  const [state, setState] = useState<FriendsState>(() => {
+    const cachedData = getCachedFriendsSession()
+
+    if (cachedData) {
+      return {
+        incoming: cachedData.incoming,
+        outgoing: cachedData.outgoing,
+        friends: sortFriendsByNewest(cachedData.friends),
+        isLoading: false,
+        error: null,
+      }
+    }
+
+    return {
+      incoming: [],
+      outgoing: [],
+      friends: [],
+      isLoading: true,
+      error: null,
+    }
   })
   const [username, setUsername] = useState('')
   const [isSendingRequest, setIsSendingRequest] = useState(false)
   const [feedback, setFeedback] = useState<string | null>(null)
   const [activeRequestId, setActiveRequestId] = useState<number | null>(null)
   const [activeFriendId, setActiveFriendId] = useState<number | null>(null)
+  const [isIncomingOpen, setIsIncomingOpen] = useState(false)
+  const [isOutgoingOpen, setIsOutgoingOpen] = useState(false)
+
+  const loadFriendsDataFromApi = useCallback(async (signal?: AbortSignal) => {
+    const [requests, friends] = await Promise.all([
+      fetchFriendRequests(signal),
+      fetchFriends(signal),
+    ])
+    const nextData = {
+      incoming: requests.incoming,
+      outgoing: requests.outgoing,
+      friends: sortFriendsByNewest(friends),
+    }
+
+    saveFriendsSessionCache(nextData)
+    setState({
+      ...nextData,
+      isLoading: false,
+      error: null,
+    })
+  }, [])
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -68,21 +105,15 @@ export function FriendsPage() {
     }
 
     const controller = new AbortController()
+    const cachedData = getCachedFriendsSession()
+
+    if (cachedData) {
+      return () => controller.abort()
+    }
 
     const loadFriendsData = async () => {
       try {
-        const [requests, friends] = await Promise.all([
-          fetchFriendRequests(controller.signal),
-          fetchFriends(controller.signal),
-        ])
-
-        setState({
-          incoming: requests.incoming,
-          outgoing: requests.outgoing,
-          friends: sortFriendsByNewest(friends),
-          isLoading: false,
-          error: null,
-        })
+        await loadFriendsDataFromApi(controller.signal)
       } catch (loadError) {
         if (loadError instanceof DOMException && loadError.name === 'AbortError') {
           return
@@ -104,7 +135,7 @@ export function FriendsPage() {
     void loadFriendsData()
 
     return () => controller.abort()
-  }, [isAuthenticated])
+  }, [isAuthenticated, loadFriendsDataFromApi])
 
   const totalPendingCount = state.incoming.length + state.outgoing.length
   const summaryCards = useMemo(
@@ -130,12 +161,9 @@ export function FriendsPage() {
 
     try {
       const result = await sendFriendRequest({ username: normalizedUsername })
-      setState((current) => ({
-        ...current,
-        outgoing: [result.item, ...current.outgoing],
-      }))
       setUsername('')
       setFeedback(result.message || '친구 요청을 보냈어요.')
+      await loadFriendsDataFromApi()
     } catch (requestError) {
       setFeedback(
         requestError instanceof Error
@@ -152,23 +180,7 @@ export function FriendsPage() {
     setFeedback(null)
 
     try {
-      const updatedItem = await updateFriendRequest(requestId, action)
-
-      setState((current) => {
-        const nextIncoming = current.incoming.filter((item) => item.id !== requestId)
-        const nextOutgoing = current.outgoing.filter((item) => item.id !== requestId)
-        const shouldAddFriend = action === 'accept'
-          && !current.friends.some((friend) => friend.user.id === updatedItem.user.id)
-
-        return {
-          ...current,
-          incoming: nextIncoming,
-          outgoing: nextOutgoing,
-          friends: shouldAddFriend
-            ? [{ id: updatedItem.id, createdAt: new Date().toISOString(), user: updatedItem.user }, ...current.friends]
-            : current.friends,
-        }
-      })
+      await updateFriendRequest(requestId, action)
 
       if (action === 'accept') {
         setFeedback('친구 요청을 수락했어요.')
@@ -177,6 +189,7 @@ export function FriendsPage() {
       } else {
         setFeedback('보낸 친구 요청을 취소했어요.')
       }
+      await loadFriendsDataFromApi()
     } catch (actionError) {
       setFeedback(
         actionError instanceof Error
@@ -194,11 +207,8 @@ export function FriendsPage() {
 
     try {
       await removeFriend(friendUserId)
-      setState((current) => ({
-        ...current,
-        friends: current.friends.filter((friend) => friend.user.id !== friendUserId),
-      }))
       setFeedback('친구를 목록에서 삭제했어요.')
+      await loadFriendsDataFromApi()
     } catch (removeError) {
       setFeedback(
         removeError instanceof Error
@@ -298,70 +308,102 @@ export function FriendsPage() {
           </section>
 
           <div className="friends-summary-grid compact-summary-grid">
-            {summaryCards.map((card) => (
-              <article className="friends-summary-card" key={card.label}>
-                <span>{card.label}</span>
-                <strong>{card.value.toLocaleString()}</strong>
-              </article>
-            ))}
+            {summaryCards.map((card) => {
+              const isIncomingCard = card.label === '받은 요청'
+              const isOutgoingCard = card.label === '보낸 요청'
+              const isRequestCard = isIncomingCard || isOutgoingCard
+              const isActive = (isIncomingCard && isIncomingOpen) || (isOutgoingCard && isOutgoingOpen)
+
+              if (isRequestCard) {
+                return (
+                  <button
+                    className={isActive ? 'friends-summary-card is-toggle is-active' : 'friends-summary-card is-toggle'}
+                    key={card.label}
+                    type="button"
+                    aria-expanded={isActive}
+                    onClick={() => {
+                      if (isIncomingCard) {
+                        setIsIncomingOpen((current) => !current)
+                      } else {
+                        setIsOutgoingOpen((current) => !current)
+                      }
+                    }}
+                  >
+                    <span>{card.label}</span>
+                    <strong>{card.value.toLocaleString()}</strong>
+                  </button>
+                )
+              }
+
+              return (
+                <article className="friends-summary-card" key={card.label}>
+                  <span>{card.label}</span>
+                  <strong>{card.value.toLocaleString()}</strong>
+                </article>
+              )
+            })}
           </div>
 
-          <section className="friends-panel friends-panel-compact">
-            <div className="friends-panel-heading">
-              <span className="detail-label">Incoming</span>
-              <h2>받은 요청</h2>
-            </div>
+          {isIncomingOpen && (
+            <section className="friends-panel friends-panel-compact request-accordion is-open">
+              <div className="friends-panel-heading">
+                <span className="detail-label">Incoming</span>
+                <h2>받은 요청</h2>
+              </div>
 
-            <div className="friends-card-list compact-list">
-              {state.incoming.length === 0 ? (
-                <div className="friends-empty-state">아직 받은 친구 요청이 없어요.</div>
-              ) : (
-                state.incoming.map((request) => (
-                  <article className="friend-card friend-card-compact" key={`incoming-${request.id}`}>
-                    <Link className="friend-card-main friend-card-link" to={`/users/${request.user.id}/profile`}>
-                      <FriendAvatar user={request.user} />
-                      <div className="friend-card-copy compact-copy">
-                        <strong>{getFriendPreviewName(request.user)}</strong>
-                        <span>{formatFriendAnimeCount(request.user.animeListCount)}</span>
+              <div className="friends-card-list compact-list">
+                {state.incoming.length === 0 ? (
+                  <div className="friends-empty-state">아직 받은 친구 요청이 없어요.</div>
+                ) : (
+                  state.incoming.map((request) => (
+                    <article className="friend-card friend-card-compact" key={`incoming-${request.id}`}>
+                      <Link className="friend-card-main friend-card-link" to={`/users/${request.user.id}/profile`}>
+                        <FriendAvatar user={request.user} />
+                        <div className="friend-card-copy compact-copy">
+                          <strong>{getFriendPreviewName(request.user)}</strong>
+                          <span>{formatFriendAnimeCount(request.user.animeListCount)}</span>
+                        </div>
+                      </Link>
+                      <div className="friend-card-actions compact-actions">
+                        <button className="primary-button small-button" type="button" onClick={() => { void handleRequestAction(request.id, 'accept') }} disabled={activeRequestId === request.id}>수락</button>
+                        <button className="secondary-button small-button" type="button" onClick={() => { void handleRequestAction(request.id, 'reject') }} disabled={activeRequestId === request.id}>거절</button>
                       </div>
-                    </Link>
-                    <div className="friend-card-actions compact-actions">
-                      <button className="primary-button small-button" type="button" onClick={() => { void handleRequestAction(request.id, 'accept') }} disabled={activeRequestId === request.id}>수락</button>
-                      <button className="secondary-button small-button" type="button" onClick={() => { void handleRequestAction(request.id, 'reject') }} disabled={activeRequestId === request.id}>거절</button>
-                    </div>
-                  </article>
-                ))
-              )}
-            </div>
-          </section>
+                    </article>
+                  ))
+                )}
+              </div>
+            </section>
+          )}
 
-          <section className="friends-panel friends-panel-compact">
-            <div className="friends-panel-heading">
-              <span className="detail-label">Outgoing</span>
-              <h2>보낸 요청</h2>
-            </div>
+          {isOutgoingOpen && (
+            <section className="friends-panel friends-panel-compact request-accordion is-open">
+              <div className="friends-panel-heading">
+                <span className="detail-label">Outgoing</span>
+                <h2>보낸 요청</h2>
+              </div>
 
-            <div className="friends-card-list compact-list">
-              {state.outgoing.length === 0 ? (
-                <div className="friends-empty-state">아직 보낸 친구 요청이 없어요.</div>
-              ) : (
-                state.outgoing.map((request) => (
-                  <article className="friend-card friend-card-compact" key={`outgoing-${request.id}`}>
-                    <Link className="friend-card-main friend-card-link" to={`/users/${request.user.id}/profile`}>
-                      <FriendAvatar user={request.user} />
-                      <div className="friend-card-copy compact-copy">
-                        <strong>{getFriendPreviewName(request.user)}</strong>
-                        <span>{formatFriendAnimeCount(request.user.animeListCount)}</span>
+              <div className="friends-card-list compact-list">
+                {state.outgoing.length === 0 ? (
+                  <div className="friends-empty-state">아직 보낸 친구 요청이 없어요.</div>
+                ) : (
+                  state.outgoing.map((request) => (
+                    <article className="friend-card friend-card-compact" key={`outgoing-${request.id}`}>
+                      <Link className="friend-card-main friend-card-link" to={`/users/${request.user.id}/profile`}>
+                        <FriendAvatar user={request.user} />
+                        <div className="friend-card-copy compact-copy">
+                          <strong>{getFriendPreviewName(request.user)}</strong>
+                          <span>{formatFriendAnimeCount(request.user.animeListCount)}</span>
+                        </div>
+                      </Link>
+                      <div className="friend-card-actions compact-actions">
+                        <button className="secondary-button small-button" type="button" onClick={() => { void handleRequestAction(request.id, 'cancel') }} disabled={activeRequestId === request.id}>취소</button>
                       </div>
-                    </Link>
-                    <div className="friend-card-actions compact-actions">
-                      <button className="secondary-button small-button" type="button" onClick={() => { void handleRequestAction(request.id, 'cancel') }} disabled={activeRequestId === request.id}>취소</button>
-                    </div>
-                  </article>
-                ))
-              )}
-            </div>
-          </section>
+                    </article>
+                  ))
+                )}
+              </div>
+            </section>
+          )}
         </div>
       </div>
     </section>
