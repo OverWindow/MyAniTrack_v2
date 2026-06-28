@@ -1,6 +1,7 @@
 .collection-page {
   display: grid;
   gap: 22px;
+  margin-top: -10px;
 }
 
 .collection-grid {

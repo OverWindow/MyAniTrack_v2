@@ -30,23 +30,86 @@ type ScoreDistributionChartDatum = {
 }
 
 const CHART_COLORS = ['#f59e0b', '#fb7185', '#fbbf24', '#fdba74', '#f97316', '#f43f5e', '#fca5a5', '#fed7aa']
+const RADIAN = Math.PI / 180
 
-export function GenreDistributionPieChart({
+type PieLabelProps = {
+  cx?: number | string
+  cy?: number | string
+  midAngle?: number
+  outerRadius?: number | string
+  payload?: PieDatum
+}
+
+function toNumber(value: number | string | undefined, fallback: number) {
+  const numericValue = typeof value === 'number' ? value : Number(value)
+
+  return Number.isFinite(numericValue) ? numericValue : fallback
+}
+
+function renderPieLabel(formatValue: (value: number) => string) {
+  return ({ cx, cy, midAngle, outerRadius, payload }: PieLabelProps) => {
+    if (!payload || midAngle === undefined) {
+      return null
+    }
+
+    const centerX = toNumber(cx, 0)
+    const centerY = toNumber(cy, 0)
+    const radius = toNumber(outerRadius, 98) + 22
+    const x = centerX + radius * Math.cos(-midAngle * RADIAN)
+    const y = centerY + radius * Math.sin(-midAngle * RADIAN)
+    const textAnchor = x >= centerX ? 'start' : 'end'
+
+    return (
+      <text className="analysis-pie-slice-label" x={x} y={y} textAnchor={textAnchor} dominantBaseline="central">
+        <tspan x={x} dy="-0.35em">{payload.label}</tspan>
+        <tspan x={x} dy="1.25em">{formatValue(payload.value)}</tspan>
+      </text>
+    )
+  }
+}
+
+function AnalysisGenrePieChart({
   data,
   selectedKey,
   onSelectGenre,
+  formatTooltipValue,
+  formatLabelValue,
 }: {
   data: PieDatum[]
   selectedKey?: string | null
   onSelectGenre?: (genre: string) => void
+  formatTooltipValue: (value: number) => string
+  formatLabelValue: (value: number) => string
 }) {
   return (
     <div className="analysis-pie-shell">
-      <ResponsiveContainer width="100%" height={280}>
-        <PieChart>
-          <Pie data={data} dataKey="value" nameKey="label" innerRadius={66} outerRadius={98} paddingAngle={2}>
+      <ResponsiveContainer width="100%" height={300}>
+        <PieChart margin={{ top: 12, right: 74, bottom: 12, left: 74 }}>
+          <Pie
+            data={data}
+            dataKey="value"
+            nameKey="label"
+            innerRadius={62}
+            outerRadius={88}
+            paddingAngle={2}
+            label={renderPieLabel(formatLabelValue)}
+            labelLine={false}
+            cursor={onSelectGenre ? 'pointer' : 'default'}
+            onClick={(entry) => {
+              const payload = (entry as { payload?: PieDatum }).payload ?? (entry as unknown as PieDatum)
+
+              if (payload.key) {
+                onSelectGenre?.(payload.key)
+              }
+            }}
+          >
             {data.map((entry, index) => (
-              <Cell key={`${entry.label}-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+              <Cell
+                key={`${entry.label}-${index}`}
+                fill={CHART_COLORS[index % CHART_COLORS.length]}
+                stroke={selectedKey === entry.key ? '#292524' : '#fff7ed'}
+                strokeWidth={selectedKey === entry.key ? 3 : 1}
+              />
             ))}
           </Pie>
           <Tooltip
@@ -60,32 +123,34 @@ export function GenreDistributionPieChart({
               return (
                 <div className="analysis-chart-tooltip">
                   <strong>{entry.label}</strong>
-                  <span>{entry.value.toLocaleString()}편 감상</span>
+                  <span>{formatTooltipValue(entry.value)}</span>
                 </div>
               )
             }}
           />
         </PieChart>
       </ResponsiveContainer>
-      <div className="analysis-pie-legend">
-        {data.map((entry, index) => (
-          <button
-            className={
-              selectedKey === entry.key
-                ? 'analysis-pie-legend-row analysis-pie-legend-button is-active'
-                : 'analysis-pie-legend-row analysis-pie-legend-button'
-            }
-            key={entry.key}
-            type="button"
-            onClick={() => onSelectGenre?.(entry.key)}
-          >
-            <span className="analysis-pie-swatch" style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }} />
-            <span>{entry.label}</span>
-            <strong>{entry.value}편</strong>
-          </button>
-        ))}
-      </div>
     </div>
+  )
+}
+
+export function GenreDistributionPieChart({
+  data,
+  selectedKey,
+  onSelectGenre,
+}: {
+  data: PieDatum[]
+  selectedKey?: string | null
+  onSelectGenre?: (genre: string) => void
+}) {
+  return (
+    <AnalysisGenrePieChart
+      data={data}
+      selectedKey={selectedKey}
+      onSelectGenre={onSelectGenre}
+      formatTooltipValue={(value) => `${value.toLocaleString()}편 감상`}
+      formatLabelValue={(value) => `${value.toLocaleString()}편`}
+    />
   )
 }
 
@@ -99,51 +164,13 @@ export function GenreWatchMinutesPieChart({
   onSelectGenre?: (genre: string) => void
 }) {
   return (
-    <div className="analysis-pie-shell">
-      <ResponsiveContainer width="100%" height={280}>
-        <PieChart>
-          <Pie data={data} dataKey="value" nameKey="label" innerRadius={66} outerRadius={98} paddingAngle={2}>
-            {data.map((entry, index) => (
-              <Cell key={`${entry.label}-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-            ))}
-          </Pie>
-          <Tooltip
-            content={({ active, payload }) => {
-              if (!active || !payload || payload.length === 0) {
-                return null
-              }
-
-              const entry = payload[0]?.payload as PieDatum
-
-              return (
-                <div className="analysis-chart-tooltip">
-                  <strong>{entry.label}</strong>
-                  <span>{formatWatchHours(entry.value)}</span>
-                </div>
-              )
-            }}
-          />
-        </PieChart>
-      </ResponsiveContainer>
-      <div className="analysis-pie-legend">
-        {data.map((entry, index) => (
-          <button
-            className={
-              selectedKey === entry.key
-                ? 'analysis-pie-legend-row analysis-pie-legend-button is-active'
-                : 'analysis-pie-legend-row analysis-pie-legend-button'
-            }
-            key={entry.key}
-            type="button"
-            onClick={() => onSelectGenre?.(entry.key)}
-          >
-            <span className="analysis-pie-swatch" style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }} />
-            <span>{entry.label}</span>
-            <strong>{formatWatchHours(entry.value)}</strong>
-          </button>
-        ))}
-      </div>
-    </div>
+    <AnalysisGenrePieChart
+      data={data}
+      selectedKey={selectedKey}
+      onSelectGenre={onSelectGenre}
+      formatTooltipValue={formatWatchHours}
+      formatLabelValue={formatWatchHours}
+    />
   )
 }
 

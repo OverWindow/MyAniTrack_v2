@@ -16,6 +16,7 @@ export function ProfileEditPage() {
   const { isAuthenticated, user, updateMyProfile } = useAuth()
   const navigate = useNavigate()
   const [username, setUsername] = useState(user?.username ?? '')
+  const [bio, setBio] = useState(user?.bio ?? '')
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [removeProfileImage, setRemoveProfileImage] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -40,8 +41,11 @@ export function ProfileEditPage() {
   }, [removeProfileImage, selectedFile, user?.profileImageUrl])
 
   const normalizedUsername = username.trim()
+  const normalizedBio = bio.trim()
   const currentUsername = user?.username ?? ''
+  const currentBio = (user?.bio ?? '').trim()
   const isUsernameChanged = normalizedUsername !== currentUsername
+  const isBioChanged = normalizedBio !== currentBio
   const isUsernameVerified = useMemo(
     () =>
       !isUsernameChanged ||
@@ -49,8 +53,9 @@ export function ProfileEditPage() {
     [isUsernameChanged, normalizedUsername, usernameCheck.checkedUsername, usernameCheck.isAvailable],
   )
   const displayName = normalizedUsername || user?.username || 'MyAniTrack User'
+  const displayBio = normalizedBio || '좋아하는 장르와 감상 스타일을 소개해보세요.'
   const hasChanges =
-    isUsernameChanged || Boolean(selectedFile) || removeProfileImage
+    isUsernameChanged || isBioChanged || Boolean(selectedFile) || removeProfileImage
 
   useEffect(() => {
     return () => {
@@ -140,6 +145,7 @@ export function ProfileEditPage() {
     try {
       await updateMyProfile({
         username: normalizedUsername || undefined,
+        bio: isBioChanged ? normalizedBio : undefined,
         profileImage: removeProfileImage ? null : selectedFile,
         removeProfileImage,
       })
@@ -160,7 +166,7 @@ export function ProfileEditPage() {
         <span className="section-kicker">Edit profile</span>
         <h1 className="auth-title">프로필 수정</h1>
         <p className="auth-description">
-          사용자명과 프로필 이미지를 바꾸면 즉시 헤더와 프로필 페이지에 반영돼요.
+          사용자명, bio, 프로필 이미지를 바꾸면 즉시 헤더와 프로필 페이지에 반영돼요.
         </p>
 
         <form className="auth-form" onSubmit={handleSubmit}>
@@ -174,7 +180,7 @@ export function ProfileEditPage() {
 
             <div className="profile-edit-preview-copy">
               <strong>{displayName}</strong>
-              <span>{user.bio || '현재 bio는 읽기 전용이에요. 추후 수정 API가 연결되면 함께 열어둘게요.'}</span>
+              <span>{displayBio}</span>
             </div>
           </div>
 
@@ -213,6 +219,17 @@ export function ProfileEditPage() {
               <p className="auth-field-hint">저장 전에 닉네임 중복 확인을 완료해주세요.</p>
             )}
           </div>
+
+          <label className="auth-field" htmlFor="profile-bio">
+            <span>bio</span>
+            <textarea
+              id="profile-bio"
+              value={bio}
+              onChange={(event) => setBio(event.target.value)}
+              placeholder="좋아하는 장르나 감상 스타일을 적어보세요."
+              maxLength={160}
+            />
+          </label>
 
           <label className="auth-field">
             <span>프로필 이미지</span>

@@ -468,6 +468,10 @@ export async function updateProfile(payload: UpdateProfilePayload) {
     formData.append('username', payload.username)
   }
 
+  if (payload.bio !== undefined) {
+    formData.append('bio', payload.bio ?? '')
+  }
+
   if (payload.profileImage) {
     formData.append('profileImage', payload.profileImage)
   }

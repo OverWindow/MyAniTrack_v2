@@ -87,26 +87,36 @@
 .analysis-summary-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+  gap: 0;
 }
 
 .analysis-summary-card {
-  display: grid;
-  gap: 6px;
   min-width: 0;
-  padding: 16px;
+  padding: 8px;
   border: 1px solid rgba(120, 113, 108, 0.14);
-  border-radius: 10px;
+  border-radius: 12px;
   background: var(--bg-card);
   box-shadow: var(--shadow-soft);
 }
 
-.analysis-summary-card span {
+.analysis-summary-item {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 16px;
+  border-right: 1px solid rgba(120, 113, 108, 0.12);
+}
+
+.analysis-summary-item:last-child {
+  border-right: 0;
+}
+
+.analysis-summary-item span {
   color: var(--text-secondary);
   font-size: 0.82rem;
 }
 
-.analysis-summary-card strong {
+.analysis-summary-item strong {
   color: var(--point-hover);
   font-size: clamp(1.25rem, 2vw, 1.8rem);
   line-height: 1.05;
@@ -382,10 +392,28 @@
   margin-top: 10px;
 }
 
+.analysis-detail-scroll-target {
+  grid-column: 1 / -1;
+  scroll-margin-top: 112px;
+}
+
 .analysis-pie-shell {
   display: grid;
   gap: 10px;
   margin-top: 8px;
+}
+
+.analysis-pie-slice-label {
+  fill: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.analysis-pie-slice-label tspan + tspan {
+  fill: var(--text-primary);
+  font-size: 0.68rem;
+  font-weight: 800;
 }
 
 .analysis-pie-legend {
@@ -564,6 +592,19 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .analysis-summary-item {
+    border-right: 0;
+    border-bottom: 1px solid rgba(120, 113, 108, 0.12);
+  }
+
+  .analysis-summary-item:nth-child(odd) {
+    border-right: 1px solid rgba(120, 113, 108, 0.12);
+  }
+
+  .analysis-summary-item:nth-last-child(-n + 2) {
+    border-bottom: 0;
+  }
+
   .analysis-facts-grid {
     grid-template-columns: 1fr;
   }
@@ -605,7 +646,34 @@
     flex-direction: column;
   }
 
+  .analysis-pie-slice-label {
+    font-size: 0.64rem;
+  }
+
+  .analysis-pie-slice-label tspan + tspan {
+    font-size: 0.6rem;
+  }
+
   .analysis-year-chart-shell {
     height: 280px;
+  }
+}
+
+@media (max-width: 520px) {
+  .analysis-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .analysis-summary-item,
+  .analysis-summary-item:nth-child(odd) {
+    border-right: 0;
+  }
+
+  .analysis-summary-item:nth-last-child(-n + 2) {
+    border-bottom: 1px solid rgba(120, 113, 108, 0.12);
+  }
+
+  .analysis-summary-item:last-child {
+    border-bottom: 0;
   }
 }

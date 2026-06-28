@@ -93,10 +93,6 @@ export function CollectionPage() {
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
   const [reloadKey, setReloadKey] = useState(0)
   const selectedGenre = genre === 'all' ? null : genre
-  const selectedGenreLabel =
-    genre === 'all'
-      ? '전체 장르'
-      : genreOptions.find((option) => option.value === genre)?.label ?? genre
   const requestKey = `${sort}:${genre}`
   const [state, setState] = useState<CollectionState>(() => createInitialCollectionState(requestKey))
   const sentinelRef = useRef<HTMLDivElement | null>(null)
@@ -471,12 +467,6 @@ export function CollectionPage() {
 
       {!isLoading && !isRefreshingQuery && !error && (
         <>
-          <p className="mobile-rating-hint">작품 이름으로 천천히 검색하면서 정렬을 바꿔볼 수 있어요.</p>
-          <div className="results-meta minimalist-meta">
-            <span>{selectedGenreLabel}</span>
-            <span>제목 우선순위: 한국어 → 영어</span>
-          </div>
-
           {filteredItems.length === 0 ? (
             <div className="feedback-card">
               아직 컬렉션에 담긴 작품이 없거나, 검색 결과가 없어요.

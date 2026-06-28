@@ -2,10 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, Route, Routes, useLocation } from 'react-router-dom'
 import type { Location } from 'react-router-dom'
 import { handleProfileImageError, getProfileImageSrc } from './lib/avatar'
-import { fetchFriends, formatFriendAnimeCount, getFriendInitials, getFriendPreviewName, sortFriendsByNewest } from './lib/friends'
-import type { FriendItem } from './types/friends'
+import { formatFriendAnimeCount, getFriendInitials, getFriendPreviewName } from './lib/friends'
 import { Header } from './components/Header'
 import { useAuth } from './contexts/AuthContext'
+import { useFriends } from './contexts/FriendsContext'
 import { AdminPage } from './pages/AdminPage'
 import { AnimeDetailPage } from './pages/AnimeDetailPage'
 import { AnalysisPage } from './pages/AnalysisPage'
@@ -29,14 +29,17 @@ import './styles/App.css'
 
 function App() {
   const { isAuthenticated } = useAuth()
+  const {
+    friends,
+    isLoading: isLoadingFriends,
+    error: friendsError,
+    refreshFriends,
+  } = useFriends()
   const location = useLocation()
   const locationState = location.state as { backgroundLocation?: Location } | null
   const backgroundLocation = locationState?.backgroundLocation
   const shouldShowFloatingCta = !backgroundLocation && !['/login', '/signup'].includes(location.pathname)
-  const [friends, setFriends] = useState<FriendItem[]>([])
   const [isFriendsOpen, setIsFriendsOpen] = useState(false)
-  const [isLoadingFriends, setIsLoadingFriends] = useState(false)
-  const [friendsError, setFriendsError] = useState<string | null>(null)
   const floatingPanelRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -73,17 +76,7 @@ function App() {
       return
     }
 
-    setIsLoadingFriends(true)
-    setFriendsError(null)
-
-    try {
-      const items = await fetchFriends()
-      setFriends(sortFriendsByNewest(items))
-    } catch (error) {
-      setFriendsError(error instanceof Error ? error.message : '친구 목록을 불러오지 못했어요.')
-    } finally {
-      setIsLoadingFriends(false)
-    }
+    await refreshFriends({ silent: true })
   }
 
   return (

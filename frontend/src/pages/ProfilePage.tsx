@@ -1,33 +1,71 @@
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { BadgeSection } from '../components/BadgeSection'
 import { useAuth } from '../contexts/AuthContext'
 import { getProfileImageSrc, handleProfileImageError } from '../lib/avatar'
+import { fetchMyBadges } from '../lib/badges'
+import type { UserBadge } from '../types/badges'
 import '../styles/pages/ProfilePage.css'
 
-const mockBadges = [
-  '첫 완주 배지',
-  '리뷰 작성 배지',
-  '친구 추천 배지',
-  '장르 탐험가 배지',
-]
-
-const quickLinks = [
-  {
-    title: '내 컬렉션',
-    description: '기록한 작품과 점수를 바로 확인해보세요.',
-    to: '/collection',
-    style: 'primary',
-  },
-  {
-    title: '내 분석',
-    description: '컬렉션 기반 취향 흐름과 평점 분포를 확인해보세요.',
-    to: '/analysis',
-    style: 'secondary',
-  },
-]
+type ProfileBadgesState = {
+  items: UserBadge[]
+  newlyEarned: UserBadge[]
+  earnedCount: number
+  totalCount: number
+  isLoading: boolean
+  error: string | null
+}
 
 export function ProfilePage() {
   const { isAuthenticated, user } = useAuth()
   const navigate = useNavigate()
+  const [badgesState, setBadgesState] = useState<ProfileBadgesState>({
+    items: [],
+    newlyEarned: [],
+    earnedCount: 0,
+    totalCount: 0,
+    isLoading: true,
+    error: null,
+  })
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      return
+    }
+
+    const controller = new AbortController()
+
+    const loadBadges = async () => {
+      try {
+        const badges = await fetchMyBadges(controller.signal)
+        setBadgesState({
+          items: badges.items,
+          newlyEarned: badges.newlyEarned,
+          earnedCount: badges.earnedCount,
+          totalCount: badges.totalCount,
+          isLoading: false,
+          error: null,
+        })
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          return
+        }
+
+        setBadgesState({
+          items: [],
+          newlyEarned: [],
+          earnedCount: 0,
+          totalCount: 0,
+          isLoading: false,
+          error: error instanceof Error ? error.message : '내 배지를 불러오지 못했어요.',
+        })
+      }
+    }
+
+    void loadBadges()
+
+    return () => controller.abort()
+  }, [isAuthenticated])
 
   if (!isAuthenticated || !user) {
     return (
@@ -80,40 +118,14 @@ export function ProfilePage() {
         </div>
       </div>
 
-      <section className="profile-quick-section">
-        <div className="profile-quick-grid">
-          {quickLinks.map((item) => (
-            <Link
-              key={item.to}
-              className={item.style === 'primary' ? 'profile-quick-card is-primary' : 'profile-quick-card'}
-              to={item.to}
-            >
-              <strong>{item.title}</strong>
-              <p>{item.description}</p>
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      <section className="profile-badge-section">
-        <div className="profile-section-heading">
-          <div>
-            <span className="detail-label">Badges</span>
-            <h2>수집할 뱃지</h2>
-          </div>
-          <span className="profile-coming-soon">Coming soon</span>
-        </div>
-
-        <div className="badge-grid">
-          {mockBadges.map((badge) => (
-            <article className="badge-card" key={badge}>
-              <span className="badge-dot" aria-hidden="true" />
-              <strong>{badge}</strong>
-              <p>활동에 따라 해금될 예정인 자리예요.</p>
-            </article>
-          ))}
-        </div>
-      </section>
+      <BadgeSection
+        badges={badgesState.items.filter((badge) => badge.earned)}
+        isLoading={badgesState.isLoading}
+        error={badgesState.error}
+        newlyEarned={badgesState.newlyEarned}
+        emptyMessage="아직 획득한 배지가 없어요."
+        showProgress
+      />
     </section>
   )
 }

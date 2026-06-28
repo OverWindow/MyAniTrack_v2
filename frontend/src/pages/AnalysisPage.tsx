@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { getProfileImageSrc, handleProfileImageError } from '../lib/avatar'
@@ -314,6 +314,18 @@ export function AnalysisPage() {
     isLoading: false,
     error: null,
   })
+  const genreDetailRef = useRef<HTMLDivElement | null>(null)
+  const yearDetailRef = useRef<HTMLDivElement | null>(null)
+  const scoreDetailRef = useRef<HTMLDivElement | null>(null)
+
+  const scrollToDetailCard = (target: RefObject<HTMLDivElement | null>) => {
+    window.setTimeout(() => {
+      target.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      })
+    }, 80)
+  }
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -413,6 +425,7 @@ export function AnalysisPage() {
         isLoading: false,
         error: '이 항목은 단일 연도가 아니라 기간이라서 작품 목록을 불러올 수 없어요.',
       })
+      scrollToDetailCard(yearDetailRef)
       return
     }
 
@@ -422,6 +435,7 @@ export function AnalysisPage() {
       isLoading: true,
       error: null,
     })
+    scrollToDetailCard(yearDetailRef)
 
     try {
       const response = await fetchMyCollection({
@@ -456,6 +470,7 @@ export function AnalysisPage() {
       isLoading: true,
       error: null,
     })
+    scrollToDetailCard(genreDetailRef)
 
     try {
       const response = await fetchMyCollection({
@@ -493,6 +508,7 @@ export function AnalysisPage() {
         isLoading: false,
         error: '선택한 평점 형식이 올바르지 않아요.',
       })
+      scrollToDetailCard(scoreDetailRef)
       return
     }
 
@@ -502,6 +518,7 @@ export function AnalysisPage() {
       isLoading: true,
       error: null,
     })
+    scrollToDetailCard(scoreDetailRef)
 
     try {
       const response = await fetchMyCollection({
@@ -609,18 +626,12 @@ export function AnalysisPage() {
       <div className="analysis-hero-card">
         <div className="analysis-hero-copy">
           <div className="analysis-profile-heading">
-            {user?.profileImageUrl ? (
-              <img
-                className="analysis-profile-avatar analysis-profile-avatar-image"
-                src={getProfileImageSrc(user.profileImageUrl)}
-                alt={displayName}
-                onError={handleProfileImageError}
-              />
-            ) : (
-              <div className="analysis-profile-avatar" aria-hidden="true">
-                {displayName.charAt(0).toUpperCase()}
-              </div>
-            )}
+            <img
+              className="analysis-profile-avatar analysis-profile-avatar-image"
+              src={getProfileImageSrc(user?.profileImageUrl)}
+              alt={displayName}
+              onError={handleProfileImageError}
+            />
             <div>
               <span className="section-kicker">Anime analysis</span>
               <h1>{displayName}</h1>
@@ -656,24 +667,26 @@ export function AnalysisPage() {
 
       {state.error && <div className="feedback-card is-error">{state.error}</div>}
 
-      <div className="analysis-summary-grid">
-        <article className="analysis-summary-card">
-          <span>선호 장르</span>
-          <strong>{getGenreLabel(item.favoriteGenre)}</strong>
-        </article>
-        <article className="analysis-summary-card">
-          <span>총 작품 수</span>
-          <strong>{item.totalCount.toLocaleString()}편</strong>
-        </article>
-        <article className="analysis-summary-card">
-          <span>평균 점수</span>
-          <strong>{averageScore !== null ? `${averageScore.toFixed(1)} / 10` : '미집계'}</strong>
-        </article>
-        <article className="analysis-summary-card">
-          <span>총 시청 시간</span>
-          <strong>{(item.totalWatchMinutes / 60).toFixed(1)}시간</strong>
-        </article>
-      </div>
+      <section className="analysis-summary-card">
+        <div className="analysis-summary-grid">
+          <article className="analysis-summary-item">
+            <span>선호 장르</span>
+            <strong>{getGenreLabel(item.favoriteGenre)}</strong>
+          </article>
+          <article className="analysis-summary-item">
+            <span>총 작품 수</span>
+            <strong>{item.totalCount.toLocaleString()}편</strong>
+          </article>
+          <article className="analysis-summary-item">
+            <span>평균 점수</span>
+            <strong>{averageScore !== null ? `${averageScore.toFixed(1)} / 10` : '미집계'}</strong>
+          </article>
+          <article className="analysis-summary-item">
+            <span>총 시청 시간</span>
+            <strong>{(item.totalWatchMinutes / 60).toFixed(1)}시간</strong>
+          </article>
+        </div>
+      </section>
 
       <div className="analysis-panel-grid">
         <section className="analysis-panel analysis-overview-panel">
@@ -812,7 +825,9 @@ export function AnalysisPage() {
                 ) : renderEmptyMessage('아직 장르별 시청 시간 데이터가 없어요.')}
               </section>
 
-              <AnalysisGenreAnimeList {...genreAnimeState} />
+              <div className="analysis-detail-scroll-target" ref={genreDetailRef}>
+                <AnalysisGenreAnimeList {...genreAnimeState} />
+              </div>
             </div>
           )}
 
@@ -836,7 +851,9 @@ export function AnalysisPage() {
                 ) : renderEmptyMessage('아직 연도별 감상 데이터가 없어요.')}
               </section>
 
-              <AnalysisYearAnimeList {...yearAnimeState} />
+              <div className="analysis-detail-scroll-target" ref={yearDetailRef}>
+                <AnalysisYearAnimeList {...yearAnimeState} />
+              </div>
             </div>
           )}
 
@@ -860,7 +877,9 @@ export function AnalysisPage() {
                 ) : renderEmptyMessage('아직 평점 분포 데이터가 없어요.')}
               </section>
 
-              <AnalysisScoreAnimeList {...scoreAnimeState} />
+              <div className="analysis-detail-scroll-target" ref={scoreDetailRef}>
+                <AnalysisScoreAnimeList {...scoreAnimeState} />
+              </div>
             </div>
           )}
         </div>

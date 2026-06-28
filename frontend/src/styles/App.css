@@ -497,6 +497,10 @@
   color: var(--text-inverse);
 }
 
+.detail-label {
+  display: none !important;
+}
+
 .primary-button,
 .secondary-button {
   display: inline-flex;

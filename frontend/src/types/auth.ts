@@ -76,6 +76,7 @@ export type SignupPayload = {
 
 export type UpdateProfilePayload = {
   username?: string
+  bio?: string | null
   profileImage?: File | null
   removeProfileImage?: boolean
 }

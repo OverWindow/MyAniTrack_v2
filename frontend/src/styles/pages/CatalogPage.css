@@ -74,6 +74,11 @@
   font: inherit;
 }
 
+.sort-field select {
+  border-color: transparent;
+  background: rgba(255, 251, 235, 0.72);
+}
+
 .search-field input:focus,
 .sort-field select:focus {
   border-color: var(--point-color);
@@ -81,25 +86,12 @@
   outline: none;
 }
 
+.sort-field select:focus {
+  border-color: transparent;
+}
+
 .minimalist-search {
   width: 100%;
-}
-
-.results-meta {
-  display: flex;
-  justify-content: center;
-  gap: 12px;
-  padding: 0 4px;
-  color: var(--text-secondary);
-  font-size: 0.92rem;
-}
-
-.mobile-rating-hint {
-  display: none;
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: 0.84rem;
-  text-align: center;
 }
 
 .refresh-button {
@@ -145,13 +137,8 @@
     flex-wrap: wrap;
   }
 
-  .results-meta,
   .explore-summary {
     display: none;
-  }
-
-  .mobile-rating-hint {
-    display: block;
   }
 
   .catalog-control-group {

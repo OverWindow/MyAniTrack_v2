@@ -169,9 +169,6 @@ export function Header() {
                 <NavLink className="auth-link" to="/login">
                   로그인
                 </NavLink>
-                <NavLink className="auth-link auth-link-primary" to="/signup">
-                  회원가입
-                </NavLink>
                 {isBootstrapping && <span className="auth-booting">불러오는 중...</span>}
               </div>
             )}

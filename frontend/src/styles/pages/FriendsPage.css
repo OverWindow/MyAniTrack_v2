@@ -3,6 +3,43 @@
   gap: 20px;
 }
 
+.friends-toast {
+  position: fixed;
+  left: 50%;
+  bottom: max(24px, env(safe-area-inset-bottom));
+  z-index: 50;
+  width: min(calc(100vw - 32px), 420px);
+  padding: 14px 18px;
+  border: 1px solid rgba(120, 113, 108, 0.16);
+  border-radius: 10px;
+  background: var(--bg-card);
+  box-shadow: 0 18px 48px rgba(41, 37, 36, 0.18);
+  color: var(--text-primary);
+  font-size: 0.94rem;
+  line-height: 1.45;
+  text-align: center;
+  transform: translateX(-50%);
+  animation: friendsToastLifecycle 3420ms var(--ease-out) both;
+}
+
+@keyframes friendsToastLifecycle {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 16px);
+  }
+
+  7%,
+  94% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, 16px);
+  }
+}
+
 .friends-layout {
   display: grid;
   grid-template-columns: minmax(320px, 0.95fr) minmax(0, 1.05fr);
@@ -275,6 +312,107 @@ button.friends-summary-card {
   justify-content: flex-end;
 }
 
+.friend-action-menu-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.friend-kebab-button {
+  width: 38px;
+  height: 38px;
+  display: inline-grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 251, 235, 0.78);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background var(--duration-normal) var(--ease-out),
+    color var(--duration-normal) var(--ease-out),
+    transform var(--duration-normal) var(--ease-out);
+}
+
+.friend-kebab-button:hover,
+.friend-kebab-button:focus-visible {
+  background: var(--point-soft);
+  color: var(--point-hover);
+  outline: none;
+}
+
+.friend-kebab-button:active {
+  transform: scale(0.96);
+}
+
+.friend-action-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 20;
+  min-width: 136px;
+  padding: 6px;
+  display: grid;
+  gap: 2px;
+  border: 1px solid rgba(120, 113, 108, 0.14);
+  border-radius: 10px;
+  background: var(--bg-card);
+  box-shadow: 0 18px 44px rgba(41, 37, 36, 0.16);
+  animation: friendActionMenuIn 160ms var(--ease-out) both;
+}
+
+.friend-action-menu-item {
+  min-height: 36px;
+  padding: 0 11px;
+  display: flex;
+  align-items: center;
+  border-radius: 7px;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.9rem;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.friend-action-menu-item:hover,
+.friend-action-menu-item:focus-visible {
+  background: var(--point-softest);
+  color: var(--point-hover);
+  outline: none;
+}
+
+.friend-action-menu-button:disabled {
+  cursor: progress;
+  opacity: 0.62;
+}
+
+.friend-action-menu-item.is-danger {
+  color: #991b1b;
+}
+
+.friend-action-menu-item.is-danger:hover,
+.friend-action-menu-item.is-danger:focus-visible {
+  background: var(--error-soft);
+  color: #7f1d1d;
+}
+
+@keyframes friendActionMenuIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 .compact-actions {
   flex-wrap: nowrap;
 }
@@ -323,6 +461,10 @@ button.friends-summary-card {
   .friend-card-compact {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .friend-action-menu-wrap {
+    align-self: flex-end;
   }
 
   .friend-card-actions,

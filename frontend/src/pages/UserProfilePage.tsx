@@ -1,22 +1,34 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { BadgeSection } from '../components/BadgeSection'
 import { getProfileImageSrc, handleProfileImageError } from '../lib/avatar'
+import { fetchPublicUserBadges } from '../lib/badges'
 import { fetchPublicUserProfile } from '../lib/users'
+import type { UserBadge } from '../types/badges'
 import type { PublicUserProfile } from '../types/users'
+import '../styles/pages/ProfilePage.css'
 import '../styles/pages/UserProfilePage.css'
 
 type UserProfileState = {
   user: PublicUserProfile | null
+  badges: UserBadge[]
+  earnedCount: number
+  totalCount: number
   isLoading: boolean
   error: string | null
+  badgesError: string | null
 }
 
 export function UserProfilePage() {
   const { userId } = useParams<{ userId: string }>()
   const [state, setState] = useState<UserProfileState>({
     user: null,
+    badges: [],
+    earnedCount: 0,
+    totalCount: 0,
     isLoading: true,
     error: null,
+    badgesError: null,
   })
 
   useEffect(() => {
@@ -29,7 +41,22 @@ export function UserProfilePage() {
     const loadProfile = async () => {
       try {
         const user = await fetchPublicUserProfile(userId, controller.signal)
-        setState({ user, isLoading: false, error: null })
+        const badgesResult = await fetchPublicUserBadges(userId, controller.signal)
+          .then((badges) => ({ badges, error: null }))
+          .catch((badgesError: unknown) => ({
+            badges: { items: [], earnedCount: 0, totalCount: 0 },
+            error: badgesError instanceof Error ? badgesError.message : '사용자 배지를 불러오지 못했어요.',
+          }))
+
+        setState({
+          user,
+          badges: badgesResult.badges.items,
+          earnedCount: badgesResult.badges.earnedCount,
+          totalCount: badgesResult.badges.totalCount,
+          isLoading: false,
+          error: null,
+          badgesError: badgesResult.error,
+        })
       } catch (loadError) {
         if (loadError instanceof DOMException && loadError.name === 'AbortError') {
           return
@@ -37,8 +64,12 @@ export function UserProfilePage() {
 
         setState({
           user: null,
+          badges: [],
+          earnedCount: 0,
+          totalCount: 0,
           isLoading: false,
           error: loadError instanceof Error ? loadError.message : '사용자 프로필을 불러오지 못했어요.',
+          badgesError: null,
         })
       }
     }
@@ -111,6 +142,12 @@ export function UserProfilePage() {
           </Link>
         </div>
       </div>
+
+      <BadgeSection
+        badges={state.badges}
+        error={state.badgesError}
+        emptyMessage="아직 획득한 공개 배지가 없어요."
+      />
     </section>
   )
 }

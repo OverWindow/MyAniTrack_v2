@@ -47,12 +47,12 @@ const createInitialExploreState = (requestKey: string): ExploreState => ({
   requestKey,
 })
 
-function formatFivePointScore(score?: number | null) {
+function formatTenPointScore(score?: number | null) {
   if (typeof score !== 'number') {
     return null
   }
 
-  return (score / 20).toFixed(1)
+  return (score / 10).toFixed(1)
 }
 
 function getOverlayScore(score?: number | null) {
@@ -223,9 +223,9 @@ function ExploreAnimeCard({ item, location }: ExploreAnimeCardProps) {
             }}
           />
         </div>
-        {formatFivePointScore(item.averageScore) && (
+        {formatTenPointScore(item.averageScore) && (
           <div className="anime-card-rating">
-            {formatFivePointScore(item.averageScore)} / 5
+            {formatTenPointScore(item.averageScore)}
           </div>
         )}
         <img
@@ -258,10 +258,6 @@ export function ExplorePage() {
   const [searchLanguage, setSearchLanguage] = useState<'ko' | 'en'>('ko')
   const normalizedQuery = debouncedSearchTerm.trim()
   const selectedGenre = genre === 'all' ? null : genre
-  const selectedGenreLabel =
-    genre === 'all'
-      ? '전체 장르'
-      : genreOptions.find((option) => option.value === genre)?.label ?? genre
   const requestKey = `${sort}:${normalizedQuery}:${searchLanguage}:${genre}:${isAuthenticated ? 'auth' : 'guest'}`
   const [state, setState] = useState<ExploreState>(() => createInitialExploreState(requestKey))
   const sentinelRef = useRef<HTMLDivElement | null>(null)
@@ -561,17 +557,6 @@ export function ExplorePage() {
 
       {!isLoading && !isRefreshingQuery && !error && (
         <>
-          <p className="mobile-rating-hint">포스터를 꾹 누르면 별점을 빠르게 남길 수 있어요.</p>
-
-          <div className="results-meta minimalist-meta">
-            <span>
-              {normalizedQuery
-                ? `"${normalizedQuery}" 검색 결과 · ${searchLanguage === 'ko' ? '한국어' : '영어'}`
-                : '전체 작품 목록'}
-            </span>
-            <span>{selectedGenreLabel}</span>
-          </div>
-
           {animeItems.length === 0 ? (
             <div className="feedback-card">
               {normalizedQuery

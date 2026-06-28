@@ -2,6 +2,8 @@
 
 현재 `server.ts` 기준으로 연결된 백엔드 API 전체 요약입니다.
 
+관리자 전용 API만 따로 볼 때는 `docs/admin-api-summary.md`를 참고하세요.
+
 - Base URL: `http://<host>:<port>/api`
 - Health check: `GET /health`
 - 인증 헤더: `Authorization: Bearer <accessToken>`
@@ -27,9 +29,13 @@
 - `/me/profile`
 - `/me/agreements`
 - `/me/anime-list`
+- `/me/anime-list/smart-rating/candidates`
+- `/me/anime-list/smart-rating/estimate`
 - `/me/anime/search`
 - `/me/anime-stats`
 - `/me/anime-stats/recalculate`
+- `/me/badges`
+- `/me/badges/recalculate`
 - `/me/recommendations`
 - `/friends`
 - `/friends/requests`
@@ -1195,6 +1201,150 @@ Response example:
     "favoriteGenre": "Drama",
     "updatedAt": "2026-05-06 13:01:00"
   }
+}
+```
+
+### `GET /me/badges`
+내 배지 목록 조회입니다. 호출 시 현재 애니 통계를 기준으로 배지 획득 여부를 자동 계산합니다.
+
+기본 제공 배지:
+
+- `ANIME_TOTAL_100`: 시청 완료 애니 100편
+- `ANIME_TOTAL_200`: 시청 완료 애니 200편
+- `ANIME_TOTAL_300`: 시청 완료 애니 300편
+
+기본 배지 이미지는 Supabase Storage의 `myanitrack_v2/badges` 폴더 파일을 사용합니다.
+
+Response example:
+
+```json
+{
+  "success": true,
+  "items": [
+    {
+      "id": 1,
+      "code": "ANIME_TOTAL_100",
+      "name": "100편 시청",
+      "description": "애니를 100개 이상 보았을 때 획득합니다.",
+      "imageUrl": "https://.../storage/v1/object/public/myanitrack_v2/badges/watch-badge100.png",
+      "category": "WATCH",
+      "conditionType": "COMPLETED_COUNT",
+      "conditionValue": "100",
+      "rarity": "COMMON",
+      "hidden": false,
+      "earned": true,
+      "earnedAt": "2026-06-28 12:00:00",
+      "progressSnapshot": {
+        "conditionType": "COMPLETED_COUNT",
+        "conditionValue": "100",
+        "currentValue": 120,
+        "targetValue": 100
+      },
+      "progress": {
+        "current": 120,
+        "target": 100,
+        "percent": 100,
+        "isComplete": true
+      }
+    },
+    {
+      "id": 2,
+      "code": "ANIME_TOTAL_200",
+      "name": "200편 시청",
+      "description": "애니를 200개 이상 보았을 때 획득합니다.",
+      "imageUrl": "https://.../storage/v1/object/public/myanitrack_v2/badges/watch-badge200.png",
+      "category": "WATCH",
+      "conditionType": "COMPLETED_COUNT",
+      "conditionValue": "200",
+      "rarity": "RARE",
+      "hidden": false,
+      "earned": false,
+      "earnedAt": null,
+      "progressSnapshot": null,
+      "progress": {
+        "current": 120,
+        "target": 200,
+        "percent": 60,
+        "isComplete": false
+      }
+    }
+  ],
+  "newlyEarned": [],
+  "earnedCount": 1,
+  "totalCount": 3
+}
+```
+
+### `POST /me/badges/recalculate`
+내 배지를 강제 재계산합니다. 보통은 `GET /me/badges`가 자동 계산하므로 프론트에서 필수로 호출할 필요는 없습니다.
+
+Response example:
+
+```json
+{
+  "success": true,
+  "message": "User badges recalculated",
+  "newlyEarned": [
+    {
+      "code": "ANIME_TOTAL_100",
+      "name": "100편 시청",
+      "earned": true,
+      "progress": {
+        "current": 100,
+        "target": 100,
+        "percent": 100,
+        "isComplete": true
+      }
+    }
+  ],
+  "items": [],
+  "earnedCount": 1,
+  "totalCount": 3
+}
+```
+
+### `GET /users/:userId/badges`
+다른 유저의 공개 획득 배지 목록 조회입니다. 획득하지 않은 배지와 `hidden = true` 배지는 노출하지 않습니다.
+
+Response example:
+
+```json
+{
+  "success": true,
+  "user": {
+    "id": 12,
+    "username": "mika",
+    "profileImageUrl": "https://...",
+    "bio": "anime lover",
+    "animeListCount": 120
+  },
+  "items": [
+    {
+      "id": 1,
+      "code": "ANIME_TOTAL_100",
+      "name": "100편 시청",
+      "description": "애니를 100개 이상 보았을 때 획득합니다.",
+      "imageUrl": "https://.../storage/v1/object/public/myanitrack_v2/badges/watch-badge100.png",
+      "category": "WATCH",
+      "conditionType": "COMPLETED_COUNT",
+      "conditionValue": "100",
+      "rarity": "COMMON",
+      "hidden": false,
+      "earned": true,
+      "earnedAt": "2026-06-28 12:00:00",
+      "progressSnapshot": {
+        "currentValue": 120,
+        "targetValue": 100
+      },
+      "progress": {
+        "current": 120,
+        "target": 100,
+        "percent": 100,
+        "isComplete": true
+      }
+    }
+  ],
+  "earnedCount": 1
 }
 ```
 
