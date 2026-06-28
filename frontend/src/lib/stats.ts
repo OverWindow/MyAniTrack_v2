@@ -1,6 +1,6 @@
 import { authFetch } from './auth'
 import { genreOptions } from './anime'
-import type { AnimeStatsResponse } from '../types/stats'
+import type { AnimeStatsResponse, TopGenreAnimeItem } from '../types/stats'
 
 function getApiBaseUrl() {
   const baseUrl = import.meta.env.VITE_API_BASE_URL
@@ -67,6 +67,50 @@ function normalizeNumericMap(value: unknown) {
   return normalized
 }
 
+function normalizeTopGenreAnimeItems(value: unknown) {
+  let source: unknown = value
+
+  if (typeof source === 'string') {
+    try {
+      source = JSON.parse(source)
+    } catch {
+      return [] as TopGenreAnimeItem[]
+    }
+  }
+
+  if (!Array.isArray(source)) {
+    return [] as TopGenreAnimeItem[]
+  }
+
+  return source.flatMap((entry): TopGenreAnimeItem[] => {
+    if (!entry || typeof entry !== 'object') {
+      return []
+    }
+
+    const rawEntry = entry as Record<string, unknown>
+    const animeId = toFiniteNumber(rawEntry.animeId)
+    const title = typeof rawEntry.title === 'string' ? rawEntry.title.trim() : ''
+    const genre = typeof rawEntry.genre === 'string' ? rawEntry.genre : ''
+
+    if (animeId === null || !title) {
+      return []
+    }
+
+    return [
+      {
+        animeId,
+        title,
+        coverImageLarge:
+          typeof rawEntry.coverImageLarge === 'string' && rawEntry.coverImageLarge.trim()
+            ? rawEntry.coverImageLarge
+            : null,
+        score: toFiniteNumber(rawEntry.score),
+        genre,
+      },
+    ]
+  })
+}
+
 function normalizeStatsItem(payload: unknown) {
   const item = extractStatsItem(payload)
 
@@ -85,6 +129,8 @@ function normalizeStatsItem(payload: unknown) {
     releaseYearDistribution: normalizeNumericMap(item.releaseYearDistribution),
     avgReleaseYear: toFiniteNumber(item.avgReleaseYear),
     scoreDistribution: normalizeNumericMap(item.scoreDistribution),
+    topWatchedGenreTopAnime: normalizeTopGenreAnimeItems(item.topWatchedGenreTopAnime),
+    topRatedGenreTopAnime: normalizeTopGenreAnimeItems(item.topRatedGenreTopAnime),
   }
 }
 

@@ -6,6 +6,9 @@ import type {
   UserAnimeListPayload,
   UserAnimeListResponse,
   UserAnimeListSort,
+  SmartRatingCandidatesResponse,
+  SmartRatingEstimateResponse,
+  SmartRatingRelation,
 } from '../types/collection'
 
 const COLLECTION_STORAGE_KEY_PREFIX = 'myanitrack.collection.cache'
@@ -38,14 +41,18 @@ function getCollectionStorageKey() {
 function getCollectionPageStorageKey(params: {
   sort: UserAnimeListSort
   genre?: AnimeGenre | null
+  year?: number | string | null
+  score?: number | string | null
 }) {
   const session = getStoredSession()
   const userId = session?.user?.id
   const genreKey = params.genre ?? 'all'
+  const yearKey = params.year ?? 'all'
+  const scoreKey = params.score ?? 'all'
 
   return userId
-    ? `${COLLECTION_PAGE_STORAGE_KEY_PREFIX}:${String(userId)}:${params.sort}:${genreKey}`
-    : `${COLLECTION_PAGE_STORAGE_KEY_PREFIX}:guest:${params.sort}:${genreKey}`
+    ? `${COLLECTION_PAGE_STORAGE_KEY_PREFIX}:${String(userId)}:${params.sort}:${genreKey}:${yearKey}:${scoreKey}`
+    : `${COLLECTION_PAGE_STORAGE_KEY_PREFIX}:guest:${params.sort}:${genreKey}:${yearKey}:${scoreKey}`
 }
 
 function dispatchCollectionCacheUpdated(animeId?: number) {
@@ -98,6 +105,8 @@ export function getCachedCollectionEntry(animeId: number) {
 export function getCachedCollectionPage(params: {
   sort: UserAnimeListSort
   genre?: AnimeGenre | null
+  year?: number | string | null
+  score?: number | string | null
 }) {
   const raw = window.localStorage.getItem(getCollectionPageStorageKey(params))
 
@@ -117,6 +126,8 @@ export function saveCollectionPageCache(
   params: {
     sort: UserAnimeListSort
     genre?: AnimeGenre | null
+    year?: number | string | null
+    score?: number | string | null
   },
   data: UserAnimeListResponse,
 ) {
@@ -345,6 +356,8 @@ export async function fetchMyCollection(params: {
   sort: UserAnimeListSort
   limit: number
   genre?: AnimeGenre | null
+  year?: number | string | null
+  score?: number | string | null
   cursor?: string | null
   signal?: AbortSignal
 }) {
@@ -355,6 +368,14 @@ export async function fetchMyCollection(params: {
 
   if (params.genre) {
     url.searchParams.set('genre', params.genre)
+  }
+
+  if (params.year) {
+    url.searchParams.set('year', String(params.year))
+  }
+
+  if (params.score) {
+    url.searchParams.set('score', String(params.score))
   }
 
   if (params.cursor) {
@@ -391,6 +412,8 @@ export async function fetchMyCollection(params: {
     {
       sort: params.sort,
       genre: params.genre,
+      year: params.year,
+      score: params.score,
     },
     {
       ...data,
@@ -403,4 +426,45 @@ export async function fetchMyCollection(params: {
     ...data,
     items: filteredItems,
   }
+}
+
+export async function fetchSmartRatingCandidates(params: {
+  targetAnimeId: number
+  limit?: number
+  signal?: AbortSignal
+}) {
+  const url = new URL('/api/me/anime-list/smart-rating/candidates', getApiBaseUrl())
+  url.searchParams.set('targetAnimeId', String(params.targetAnimeId))
+  url.searchParams.set('titleLanguage', 'ko')
+  url.searchParams.set('limit', String(params.limit ?? 5))
+
+  const response = await authFetch(url.toString(), { signal: params.signal })
+
+  if (!response.ok) {
+    throw new Error(getErrorMessage(response.status, '스마트 평점 후보를 불러오지 못했어요.'))
+  }
+
+  return (await response.json()) as SmartRatingCandidatesResponse
+}
+
+export async function estimateSmartRating(params: {
+  targetAnimeId: number
+  comparisons: Array<{
+    animeId: number
+    relation: SmartRatingRelation
+  }>
+}) {
+  const response = await authFetch(createUrl('/api/me/anime-list/smart-rating/estimate'), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(params),
+  })
+
+  if (!response.ok) {
+    throw new Error(getErrorMessage(response.status, '스마트 평점을 계산하지 못했어요.'))
+  }
+
+  return (await response.json()) as SmartRatingEstimateResponse
 }

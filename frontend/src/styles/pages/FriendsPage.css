@@ -12,14 +12,15 @@
 
 .friends-left-column,
 .friends-request-panel,
+.friends-summary-cluster,
 .friends-summary-card,
 .friends-panel,
 .friend-card,
 .friends-empty-state {
   border: 1px solid rgba(120, 113, 108, 0.16);
-  border-radius: 20px;
+  border-radius: 12px;
   background: var(--bg-card);
-  box-shadow: var(--shadow-card);
+  box-shadow: none;
 }
 
 .friends-right-column {
@@ -66,21 +67,33 @@
 .friends-summary-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+  gap: 0;
 }
 
 .compact-summary-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.friends-summary-cluster {
+  padding: 8px;
+}
+
 .friends-summary-card {
   display: grid;
   gap: 6px;
-  padding: 16px 18px;
+  padding: 14px 16px;
+  border: 0;
+  border-right: 1px solid rgba(120, 113, 108, 0.12);
+  border-radius: 8px;
+  background: transparent;
+}
+
+.friends-summary-card:last-child {
+  border-right: 0;
 }
 
 button.friends-summary-card {
-  border: 1px solid rgba(120, 113, 108, 0.16);
+  border: 0;
   text-align: left;
   font: inherit;
   cursor: pointer;
@@ -98,7 +111,7 @@ button.friends-summary-card {
 .friends-summary-card.is-toggle:hover,
 .friends-summary-card.is-toggle:focus-visible {
   transform: translateY(-1px);
-  border-color: var(--point-border);
+  background: var(--point-softest);
   outline: none;
 }
 
@@ -109,7 +122,7 @@ button.friends-summary-card {
   top: 50%;
   width: 24px;
   height: 24px;
-  border-radius: 50%;
+  border-radius: 8px;
   background: var(--bg-neutral);
   color: var(--text-secondary);
   transform: translateY(-50%);
@@ -126,7 +139,6 @@ button.friends-summary-card {
 }
 
 .friends-summary-card.is-active {
-  border-color: var(--point-border);
   background: var(--point-softest);
 }
 
@@ -164,13 +176,13 @@ button.friends-summary-card {
   from {
     opacity: 0;
     transform: translateY(-10px);
-    clip-path: inset(0 0 100% 0 round 20px);
+    clip-path: inset(0 0 100% 0 round 12px);
   }
 
   to {
     opacity: 1;
     transform: translateY(0);
-    clip-path: inset(0 0 0 0 round 20px);
+    clip-path: inset(0 0 0 0 round 12px);
   }
 }
 
@@ -190,6 +202,8 @@ button.friends-summary-card {
   align-items: center;
   gap: 14px;
   padding: 16px;
+  border: 0;
+  background: rgba(250, 247, 241, 0.58);
 }
 
 .friend-card-compact {
@@ -217,7 +231,7 @@ button.friends-summary-card {
   width: 48px;
   height: 48px;
   flex-shrink: 0;
-  border-radius: 14px;
+  border-radius: 10px;
   display: grid;
   place-items: center;
   background: var(--point-softest);
@@ -299,6 +313,10 @@ button.friends-summary-card {
   .friends-summary-grid,
   .compact-summary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .friends-summary-card:nth-child(2n) {
+    border-right: 0;
   }
 
   .friend-card,

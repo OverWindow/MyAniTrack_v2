@@ -8,8 +8,10 @@ import {
   updateUserAnimeListItem,
   validateUserAnimeListGenre,
   validateUserAnimeListLimit,
+  validateUserAnimeListScoreFilter,
   validateUserAnimeListSort,
   validateUserAnimeListTitleLanguage,
+  validateUserAnimeListYear,
 } from '../services/user-anime-list.service';
 
 function parsePositiveInteger(value: unknown, fieldName: string) {
@@ -29,7 +31,9 @@ function getErrorStatus(message: string) {
     message === 'At least one field is required to update' ||
     message === 'Invalid cursor' ||
     message.includes('Cursor sort') ||
-    message.includes('Cursor genre')
+    message.includes('Cursor genre') ||
+    message.includes('Cursor year') ||
+    message.includes('Cursor score filter')
   ) {
     return 400;
   }
@@ -119,6 +123,8 @@ export async function getMyAnimeList(req: Request, res: Response) {
       typeof req.query.titleLanguage === 'string' ? req.query.titleLanguage : 'ko'
     );
     const genre = validateUserAnimeListGenre(req.query.genre);
+    const year = validateUserAnimeListYear(req.query.year);
+    const score = validateUserAnimeListScoreFilter(req.query.score);
     const limit = validateUserAnimeListLimit(req.query.limit);
     const cursor = typeof req.query.cursor === 'string' ? req.query.cursor : undefined;
 
@@ -127,6 +133,8 @@ export async function getMyAnimeList(req: Request, res: Response) {
       sort,
       titleLanguage,
       genre,
+      year,
+      score,
       limit,
       cursor,
     });
@@ -149,6 +157,8 @@ export async function getUserAnimeListController(req: Request, res: Response) {
       typeof req.query.titleLanguage === 'string' ? req.query.titleLanguage : 'ko'
     );
     const genre = validateUserAnimeListGenre(req.query.genre);
+    const year = validateUserAnimeListYear(req.query.year);
+    const score = validateUserAnimeListScoreFilter(req.query.score);
     const limit = validateUserAnimeListLimit(req.query.limit);
     const cursor = typeof req.query.cursor === 'string' ? req.query.cursor : undefined;
 
@@ -157,6 +167,8 @@ export async function getUserAnimeListController(req: Request, res: Response) {
       sort,
       titleLanguage,
       genre,
+      year,
+      score,
       limit,
       cursor,
     });

@@ -63,7 +63,9 @@ interface UserAnimeListListRow extends RowDataPacket {
 interface UserAnimeListCursorPayload {
   sort: UserAnimeListSortOption;
   genre?: AnimeGenre | null;
-  score?: number | null;
+  year?: number | null;
+  scoreFilter?: number | null;
+  sortScore?: number | null;
   createdAt?: string;
   updatedAt?: string;
   animeId: number;
@@ -74,6 +76,8 @@ export interface GetUserAnimeListParams {
   sort: UserAnimeListSortOption;
   titleLanguage: UserAnimeListTitleLanguage;
   genre?: AnimeGenre;
+  year?: number;
+  score?: number;
   limit: number;
   cursor?: string;
 }
@@ -162,6 +166,34 @@ export function validateUserAnimeListGenre(value: unknown): AnimeGenre | undefin
   }
 
   return value as AnimeGenre;
+}
+
+export function validateUserAnimeListYear(value: unknown): number | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const year = Number(value);
+
+  if (!Number.isInteger(year) || year < 1900 || year > 2100) {
+    throw new Error('year must be an integer between 1900 and 2100');
+  }
+
+  return year;
+}
+
+export function validateUserAnimeListScoreFilter(value: unknown): number | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const score = Number(value);
+
+  if (!Number.isInteger(score) || score < 1 || score > 10) {
+    throw new Error('score must be an integer between 1 and 10');
+  }
+
+  return score;
 }
 
 function validateStatus(status: unknown): ListStatus {
@@ -399,7 +431,7 @@ function buildCursorWhereClause(
   }
 
   if (sort === 'score') {
-    params.push(cursor.score ?? -1, cursor.score ?? -1, cursor.animeId);
+    params.push(cursor.sortScore ?? -1, cursor.sortScore ?? -1, cursor.animeId);
     return `
       AND (
         COALESCE(ual.score, -1) < ?
@@ -435,6 +467,28 @@ function buildCursorWhereClause(
   `;
 }
 
+function buildScoreWhereClause(
+  score: number | undefined,
+  cursor: UserAnimeListCursorPayload | null,
+  params: Array<string | number | null>
+) {
+  if (cursor && (cursor.scoreFilter ?? null) !== (score ?? null)) {
+    throw new Error('Cursor score filter does not match requested score');
+  }
+
+  if (score === undefined) {
+    return '';
+  }
+
+  if (score === 10) {
+    params.push(10);
+    return 'AND ual.score = ?';
+  }
+
+  params.push(score, score + 1);
+  return 'AND ual.score >= ? AND ual.score < ?';
+}
+
 function buildGenreWhereClause(
   genre: AnimeGenre | undefined,
   cursor: UserAnimeListCursorPayload | null,
@@ -459,10 +513,29 @@ function buildGenreWhereClause(
   `;
 }
 
+function buildYearWhereClause(
+  year: number | undefined,
+  cursor: UserAnimeListCursorPayload | null,
+  params: Array<string | number | null>
+) {
+  if (cursor && (cursor.year ?? null) !== (year ?? null)) {
+    throw new Error('Cursor year does not match requested year');
+  }
+
+  if (year === undefined) {
+    return '';
+  }
+
+  params.push(year);
+  return 'AND a.season_year = ?';
+}
+
 export async function getUserAnimeList(params: GetUserAnimeListParams) {
   const decodedCursor = decodeCursor(params.cursor);
   const queryParams: Array<string | number | null> = [params.userId];
   const genreWhereClause = buildGenreWhereClause(params.genre, decodedCursor, queryParams);
+  const yearWhereClause = buildYearWhereClause(params.year, decodedCursor, queryParams);
+  const scoreWhereClause = buildScoreWhereClause(params.score, decodedCursor, queryParams);
   const cursorWhereClause = buildCursorWhereClause(params.sort, decodedCursor, queryParams);
   const orderByClause = buildOrderClause(params.sort);
 
@@ -512,6 +585,8 @@ export async function getUserAnimeList(params: GetUserAnimeListParams) {
       AND akt.is_primary = TRUE
     WHERE ual.user_id = ?
       ${genreWhereClause}
+      ${yearWhereClause}
+      ${scoreWhereClause}
       ${cursorWhereClause}
     ORDER BY ${orderByClause}
     LIMIT ?
@@ -527,7 +602,9 @@ export async function getUserAnimeList(params: GetUserAnimeListParams) {
     ? encodeCursor({
         sort: params.sort,
         genre: params.genre ?? null,
-        score: lastItem.sortScoreValue,
+        year: params.year ?? null,
+        scoreFilter: params.score ?? null,
+        sortScore: lastItem.sortScoreValue,
         createdAt: lastItem.createdAt,
         updatedAt: lastItem.updatedAt,
         animeId: lastItem.animeId,
@@ -581,6 +658,9 @@ export async function getUserAnimeList(params: GetUserAnimeListParams) {
       limit: params.limit,
       sort: params.sort,
       titleLanguage: params.titleLanguage,
+      genre: params.genre ?? null,
+      year: params.year ?? null,
+      score: params.score ?? null,
     },
   };
 }

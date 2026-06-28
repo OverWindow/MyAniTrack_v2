@@ -84,3 +84,42 @@ export type UserAnimeListEntryResponse = {
   success: boolean
   item: UserAnimeListItem | null
 }
+
+export type SmartRatingRelation = 'better' | 'similar' | 'worse'
+
+export type SmartRatingCandidate = {
+  animeId: number
+  score: number
+  anime: {
+    id: number
+    anilistId: number
+    title: string
+    coverImageLarge: string | null
+    coverImageExtraLarge?: string | null
+  }
+}
+
+export type SmartRatingCandidatesResponse = {
+  success: boolean
+  targetAnimeId: number
+  items: SmartRatingCandidate[]
+}
+
+export type SmartRatingEstimateComparison = {
+  animeId: number
+  relation: SmartRatingRelation
+  score: number
+}
+
+export type SmartRatingEstimateResponse = {
+  success: boolean
+  targetAnimeId: number
+  estimatedScore: number
+  confidence: 'low' | 'medium' | 'high' | string
+  range: {
+    min: number
+    max: number
+  }
+  comparisons: SmartRatingEstimateComparison[]
+  reason: string
+}

@@ -77,6 +77,10 @@
   background: var(--bg-card);
 }
 
+.profile-quick-section {
+  padding: 18px;
+}
+
 .profile-badge-section {
   background: var(--point-softest);
   border-color: rgba(251, 191, 36, 0.28);

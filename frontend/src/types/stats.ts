@@ -1,3 +1,11 @@
+export type TopGenreAnimeItem = {
+  animeId: number
+  title: string
+  coverImageLarge: string | null
+  score: number | null
+  genre: string
+}
+
 export type AnimeStatsItem = {
   userId: number
   totalCount: number
@@ -15,6 +23,8 @@ export type AnimeStatsItem = {
   releaseYearDistribution: Record<string, number>
   avgReleaseYear: number | null
   scoreDistribution: Record<string, number>
+  topWatchedGenreTopAnime: TopGenreAnimeItem[]
+  topRatedGenreTopAnime: TopGenreAnimeItem[]
   preferenceSummary: string | null
   recommendationContext: string | null
   updatedAt: string | null

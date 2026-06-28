@@ -152,6 +152,8 @@ export async function fetchPublicUserCollection(params: {
   sort: UserAnimeListSort
   limit: number
   genre?: AnimeGenre | null
+  year?: number | string | null
+  score?: number | string | null
   cursor?: string | null
   signal?: AbortSignal
 }) {
@@ -162,6 +164,14 @@ export async function fetchPublicUserCollection(params: {
 
   if (params.genre) {
     url.searchParams.set('genre', params.genre)
+  }
+
+  if (params.year) {
+    url.searchParams.set('year', String(params.year))
+  }
+
+  if (params.score) {
+    url.searchParams.set('score', String(params.score))
   }
 
   if (params.cursor) {

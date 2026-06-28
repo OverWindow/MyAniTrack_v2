@@ -415,7 +415,16 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
             <AdminTitleEditor key={item.id} item={item} onTitleUpdated={handleAdminTitleUpdated} />
           )}
 
-          <CollectionEditor key={item.id} animeId={item.id} maxProgress={item.episodes} />
+          <CollectionEditor
+            key={item.id}
+            animeId={item.id}
+            maxProgress={item.episodes}
+            targetAnime={{
+              title: item.title,
+              coverImageLarge: item.coverImageLarge,
+              coverImageExtraLarge: item.coverImageExtraLarge,
+            }}
+          />
 
           {koreanTitles.length > 0 && (
             <section className="detail-section">

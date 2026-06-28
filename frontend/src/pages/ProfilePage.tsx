@@ -18,9 +18,9 @@ const quickLinks = [
     style: 'primary',
   },
   {
-    title: '친구 목록',
-    description: '연결된 친구와 요청 상태를 한 번에 관리할 수 있어요.',
-    to: '/friends',
+    title: '내 분석',
+    description: '컬렉션 기반 취향 흐름과 평점 분포를 확인해보세요.',
+    to: '/analysis',
     style: 'secondary',
   },
 ]
@@ -81,13 +81,6 @@ export function ProfilePage() {
       </div>
 
       <section className="profile-quick-section">
-        <div className="profile-section-heading">
-          <div>
-            <span className="detail-label">Quick access</span>
-            <h2>내 리스트 바로가기</h2>
-          </div>
-        </div>
-
         <div className="profile-quick-grid">
           {quickLinks.map((item) => (
             <Link

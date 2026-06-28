@@ -656,11 +656,19 @@ Response example:
 
 Query:
 
-- `sort`: `latest | added | score`
+- `sort`: `latest | added | score | scoreAsc`
 - `titleLanguage`: `ko | en | ja`
 - `genre`: 선택값
+- `year`: 선택값, 애니 방영 연도(`seasonYear`) 필터. 예: `2023`
+- `score`: 선택값, 내 평점 점수대 필터 `1~10`. 예: `8`은 `8 <= score < 9`, `10`은 `score = 10`
 - `limit`: `1~50`
 - `cursor`: 이전 응답의 `pageInfo.nextCursor`
+
+Example:
+
+```http
+GET /api/me/anime-list?year=2023&score=8&sort=score&titleLanguage=ko&limit=20
+```
 
 Response example:
 
@@ -691,8 +699,167 @@ Response example:
     "nextCursor": "eyJ...",
     "limit": 20,
     "sort": "latest",
-    "titleLanguage": "ko"
+    "titleLanguage": "ko",
+    "genre": null,
+    "year": null,
+    "score": null
   }
+}
+```
+
+### `GET /me/anime-list/smart-rating/candidates`
+스마트 평점 모달에서 비교할 기존 평가 작품 후보를 가져옵니다.
+
+내 컬렉션에서 `score`가 있는 작품만 사용하며, `targetAnimeId`는 제외합니다. 후보는 매 요청마다 랜덤이고, 가능한 한 서로 다른 평점의 작품을 최대 5개까지 반환합니다.
+
+Query:
+
+- `targetAnimeId`: 필수, 새로 평점을 매기려는 애니 ID
+- `titleLanguage`: `ko | en | ja`, 기본값 `ko`
+- `limit`: `1~5`, 기본값 `5`
+
+Example:
+
+```http
+GET /api/me/anime-list/smart-rating/candidates?targetAnimeId=123&titleLanguage=ko&limit=5
+```
+
+Response example:
+
+```json
+{
+  "success": true,
+  "targetAnimeId": 123,
+  "items": [
+    {
+      "animeId": 10,
+      "score": 10,
+      "anime": {
+        "id": 10,
+        "anilistId": 154587,
+        "title": "장송의 프리렌",
+        "titles": {
+          "korean": "장송의 프리렌",
+          "english": "Frieren: Beyond Journey's End",
+          "native": "葬送のフリーレン",
+          "romaji": "Sousou no Frieren",
+          "userPreferred": "Sousou no Frieren"
+        },
+        "coverImageLarge": "https://...",
+        "coverImageExtraLarge": "https://..."
+      }
+    },
+    {
+      "animeId": 20,
+      "score": 8,
+      "anime": {
+        "id": 20,
+        "anilistId": 16498,
+        "title": "진격의 거인",
+        "titles": {
+          "korean": "진격의 거인",
+          "english": "Attack on Titan",
+          "native": "進撃の巨人",
+          "romaji": "Shingeki no Kyojin",
+          "userPreferred": "Shingeki no Kyojin"
+        },
+        "coverImageLarge": "https://...",
+        "coverImageExtraLarge": "https://..."
+      }
+    }
+  ]
+}
+```
+
+Error examples:
+
+- `400`: 평가된 작품이 하나도 없거나 요청 값이 잘못된 경우
+- `404`: `targetAnimeId` 애니가 없는 경우
+
+### `POST /me/anime-list/smart-rating/estimate`
+스마트 평점 모달에서 사용자의 비교 결과를 받아 추천 평점을 계산합니다.
+
+프론트는 후보마다 새 작품이 기존 작품보다 어떤지 선택하게 하면 됩니다.
+
+- `better`: 새 작품이 기존 작품보다 더 재밌음
+- `similar`: 새 작품이 기존 작품과 비슷함
+- `worse`: 새 작품이 기존 작품보다 별로임
+
+Body:
+
+```json
+{
+  "targetAnimeId": 123,
+  "comparisons": [
+    {
+      "animeId": 10,
+      "relation": "worse"
+    },
+    {
+      "animeId": 20,
+      "relation": "better"
+    },
+    {
+      "animeId": 30,
+      "relation": "similar"
+    }
+  ]
+}
+```
+
+Response example:
+
+```json
+{
+  "success": true,
+  "targetAnimeId": 123,
+  "estimatedScore": 9,
+  "confidence": "medium",
+  "range": {
+    "min": 8,
+    "max": 10
+  },
+  "comparisons": [
+    {
+      "animeId": 10,
+      "relation": "worse",
+      "score": 10
+    },
+    {
+      "animeId": 20,
+      "relation": "better",
+      "score": 8
+    }
+  ],
+  "reason": "8점 작품보다는 좋고 10점 작품보다는 낮게 평가되어 9점으로 추정했습니다."
+}
+```
+
+계산된 점수는 저장하지 않습니다. 모달 마지막 단계에서 사용자가 적용을 누르면 기존 컬렉션 API로 저장하면 됩니다.
+
+이미 컬렉션에 있는 애니:
+
+```http
+PATCH /api/me/anime-list/:animeId
+```
+
+```json
+{
+  "score": 8.5
+}
+```
+
+컬렉션에 없는 애니:
+
+```http
+POST /api/me/anime-list
+```
+
+```json
+{
+  "animeId": 123,
+  "status": "completed",
+  "score": 8.5
 }
 ```
 
@@ -835,6 +1002,22 @@ Response example:
 ### `GET /users/:userId/anime-list`
 다른 유저 애니 리스트 조회입니다.
 
+Query:
+
+- `sort`: `latest | added | score | scoreAsc`
+- `titleLanguage`: `ko | en | ja`
+- `genre`: 선택값
+- `year`: 선택값, 애니 방영 연도(`seasonYear`) 필터. 예: `2023`
+- `score`: 선택값, 사용자 평점 점수대 필터 `1~10`. 예: `8`은 `8 <= score < 9`, `10`은 `score = 10`
+- `limit`: `1~50`
+- `cursor`: 이전 응답의 `pageInfo.nextCursor`
+
+Example:
+
+```http
+GET /api/users/12/anime-list?year=2023&score=8&sort=score&titleLanguage=ko&limit=20
+```
+
 Response example:
 
 ```json
@@ -865,13 +1048,18 @@ Response example:
     "nextCursor": null,
     "limit": 20,
     "sort": "score",
-    "titleLanguage": "ko"
+    "titleLanguage": "ko",
+    "genre": null,
+    "year": null,
+    "score": null
   }
 }
 ```
 
 ### `GET /users/:userId/anime-stats`
 다른 유저 애니 통계 조회입니다.
+
+`item` 구조는 `GET /me/anime-stats`의 `item`과 동일합니다. 타 사용자 API는 공개 프로필 정보인 `user`만 추가로 포함합니다.
 
 Response example:
 
@@ -890,10 +1078,55 @@ Response example:
     "totalCount": 42,
     "completedCount": 20,
     "watchingCount": 8,
+    "droppedCount": 3,
+    "totalWatchedEpisodes": 560,
+    "totalWatchMinutes": 13440,
     "avgScore": 8.4,
     "favoriteGenre": "Drama",
     "favoriteReleasePeriod": "2020s",
-    "preferenceSummary": "This user has 42 anime records and prefers Drama."
+    "genreDistribution": {
+      "Drama": 12,
+      "Action": 9
+    },
+    "genreWatchMinutes": {
+      "Drama": 2400,
+      "Action": 1800
+    },
+    "genreAvgScore": {
+      "Drama": 8.8,
+      "Action": 7.9
+    },
+    "releaseYearDistribution": {
+      "2020s": 18,
+      "2010s": 12
+    },
+    "avgReleaseYear": 2019.4,
+    "scoreDistribution": {
+      "10": 3,
+      "9": 8,
+      "8": 12
+    },
+    "topWatchedGenreTopAnime": [
+      {
+        "animeId": 101,
+        "title": "장송의 프리렌",
+        "coverImageLarge": "https://...",
+        "score": 9.5,
+        "genre": "Drama"
+      }
+    ],
+    "topRatedGenreTopAnime": [
+      {
+        "animeId": 205,
+        "title": "바이올렛 에버가든",
+        "coverImageLarge": "https://...",
+        "score": 10,
+        "genre": "Drama"
+      }
+    ],
+    "preferenceSummary": "This user has 42 anime records and prefers Drama.",
+    "recommendationContext": "Top genres => Drama:12, Action:9 | Preferred release years => 2020s:18, 2010s:12 | Average score => 8.4 | Watch minutes => 13440",
+    "updatedAt": "2026-05-06 13:00:00"
   }
 }
 ```

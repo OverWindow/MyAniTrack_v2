@@ -204,12 +204,30 @@ export function FriendsPage() {
   const handleRemoveFriend = async (friendUserId: number) => {
     setActiveFriendId(friendUserId)
     setFeedback(null)
+    const previousState = state
+    const nextData = {
+      incoming: state.incoming,
+      outgoing: state.outgoing,
+      friends: state.friends.filter((friend) => friend.user.id !== friendUserId),
+    }
+
+    saveFriendsSessionCache(nextData)
+    setState({
+      ...nextData,
+      isLoading: false,
+      error: null,
+    })
 
     try {
       await removeFriend(friendUserId)
       setFeedback('친구를 목록에서 삭제했어요.')
-      await loadFriendsDataFromApi()
     } catch (removeError) {
+      saveFriendsSessionCache({
+        incoming: previousState.incoming,
+        outgoing: previousState.outgoing,
+        friends: previousState.friends,
+      })
+      setState(previousState)
       setFeedback(
         removeError instanceof Error
           ? removeError.message
@@ -307,42 +325,44 @@ export function FriendsPage() {
             </div>
           </section>
 
-          <div className="friends-summary-grid compact-summary-grid">
-            {summaryCards.map((card) => {
-              const isIncomingCard = card.label === '받은 요청'
-              const isOutgoingCard = card.label === '보낸 요청'
-              const isRequestCard = isIncomingCard || isOutgoingCard
-              const isActive = (isIncomingCard && isIncomingOpen) || (isOutgoingCard && isOutgoingOpen)
+          <section className="friends-summary-cluster">
+            <div className="friends-summary-grid compact-summary-grid">
+              {summaryCards.map((card) => {
+                const isIncomingCard = card.label === '받은 요청'
+                const isOutgoingCard = card.label === '보낸 요청'
+                const isRequestCard = isIncomingCard || isOutgoingCard
+                const isActive = (isIncomingCard && isIncomingOpen) || (isOutgoingCard && isOutgoingOpen)
 
-              if (isRequestCard) {
+                if (isRequestCard) {
+                  return (
+                    <button
+                      className={isActive ? 'friends-summary-card is-toggle is-active' : 'friends-summary-card is-toggle'}
+                      key={card.label}
+                      type="button"
+                      aria-expanded={isActive}
+                      onClick={() => {
+                        if (isIncomingCard) {
+                          setIsIncomingOpen((current) => !current)
+                        } else {
+                          setIsOutgoingOpen((current) => !current)
+                        }
+                      }}
+                    >
+                      <span>{card.label}</span>
+                      <strong>{card.value.toLocaleString()}</strong>
+                    </button>
+                  )
+                }
+
                 return (
-                  <button
-                    className={isActive ? 'friends-summary-card is-toggle is-active' : 'friends-summary-card is-toggle'}
-                    key={card.label}
-                    type="button"
-                    aria-expanded={isActive}
-                    onClick={() => {
-                      if (isIncomingCard) {
-                        setIsIncomingOpen((current) => !current)
-                      } else {
-                        setIsOutgoingOpen((current) => !current)
-                      }
-                    }}
-                  >
+                  <article className="friends-summary-card" key={card.label}>
                     <span>{card.label}</span>
                     <strong>{card.value.toLocaleString()}</strong>
-                  </button>
+                  </article>
                 )
-              }
-
-              return (
-                <article className="friends-summary-card" key={card.label}>
-                  <span>{card.label}</span>
-                  <strong>{card.value.toLocaleString()}</strong>
-                </article>
-              )
-            })}
-          </div>
+              })}
+            </div>
+          </section>
 
           {isIncomingOpen && (
             <section className="friends-panel friends-panel-compact request-accordion is-open">

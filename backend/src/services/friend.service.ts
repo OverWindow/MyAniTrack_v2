@@ -1,5 +1,6 @@
 import { ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import { pool } from '../../config/db';
+import { normalizeProfileImageUrl } from '../lib/supabase-storage';
 
 interface FriendUserRow extends RowDataPacket {
   id: number;
@@ -53,7 +54,7 @@ function mapUser(row: Pick<FriendUserRow, 'id' | 'username' | 'profileImageUrl' 
   return {
     id: row.id,
     username: row.username,
-    profileImageUrl: row.profileImageUrl,
+    profileImageUrl: normalizeProfileImageUrl(row.profileImageUrl),
     bio: row.bio,
     animeListCount: row.animeListCount,
   };
@@ -63,7 +64,7 @@ function mapRequestUser(row: FriendRequestListRow) {
   return {
     id: row.userId,
     username: row.username,
-    profileImageUrl: row.profileImageUrl,
+    profileImageUrl: normalizeProfileImageUrl(row.profileImageUrl),
     bio: row.bio,
     animeListCount: row.animeListCount,
   };
@@ -191,6 +192,30 @@ async function areFriends(userId: number, friendUserId: number) {
   );
 
   return rows.length > 0;
+}
+
+async function backfillAcceptedFriendships(userId: number) {
+  await pool.execute<ResultSetHeader>(
+    `
+    INSERT IGNORE INTO friendships (user_id, friend_user_id)
+    SELECT fr.requester_id, fr.receiver_id
+    FROM friend_requests fr
+    WHERE fr.status = 'accepted'
+      AND (fr.requester_id = ? OR fr.receiver_id = ?)
+    `,
+    [userId, userId]
+  );
+
+  await pool.execute<ResultSetHeader>(
+    `
+    INSERT IGNORE INTO friendships (user_id, friend_user_id)
+    SELECT fr.receiver_id, fr.requester_id
+    FROM friend_requests fr
+    WHERE fr.status = 'accepted'
+      AND (fr.requester_id = ? OR fr.receiver_id = ?)
+    `,
+    [userId, userId]
+  );
 }
 
 export async function sendFriendRequest(userId: number, input: SendFriendRequestInput) {
@@ -410,9 +435,8 @@ export async function respondToFriendRequest(
     if (action === 'accept') {
       await connection.execute<ResultSetHeader>(
         `
-        INSERT INTO friendships (user_id, friend_user_id)
+        INSERT IGNORE INTO friendships (user_id, friend_user_id)
         VALUES (?, ?), (?, ?)
-        ON DUPLICATE KEY UPDATE created_at = created_at
         `,
         [request.requesterId, request.receiverId, request.receiverId, request.requesterId]
       );
@@ -439,6 +463,8 @@ export async function respondToFriendRequest(
 }
 
 export async function getFriends(userId: number) {
+  await backfillAcceptedFriendships(userId);
+
   const [rows] = await pool.query<FriendListRow[]>(
     `
     SELECT
@@ -468,7 +494,7 @@ export async function getFriends(userId: number) {
     user: {
       id: row.userId,
       username: row.username,
-      profileImageUrl: row.profileImageUrl,
+      profileImageUrl: normalizeProfileImageUrl(row.profileImageUrl),
       bio: row.bio,
       animeListCount: row.animeListCount,
     },

@@ -10,6 +10,7 @@ import {
   verifyPassword,
 } from '../lib/auth';
 import { sendPasswordResetEmail, sendVerifyEmail } from '../lib/mail';
+import { normalizeProfileImageUrl } from '../lib/supabase-storage';
 
 type UserRole = 'USER' | 'ADMIN';
 type EmailTokenPurpose = 'SIGNUP_VERIFY' | 'PASSWORD_RESET';
@@ -288,7 +289,7 @@ function mapUserProfile(user: UserRow) {
     isAdmin: user.role === 'ADMIN',
     emailVerified: Boolean(user.emailVerified),
     emailVerifiedAt: user.emailVerifiedAt,
-    profileImageUrl: user.profileImageUrl,
+    profileImageUrl: normalizeProfileImageUrl(user.profileImageUrl),
     bio: user.bio,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
@@ -428,7 +429,7 @@ export async function signUp(params: SignUpParams) {
   const email = validateEmail(params.email);
   const username = validateUsername(params.username);
   const password = validatePassword(params.password);
-  const profileImageUrl = normalizeOptionalText(params.profileImageUrl, 500);
+  const profileImageUrl = normalizeProfileImageUrl(normalizeOptionalText(params.profileImageUrl, 500));
   const bio = normalizeOptionalText(params.bio, 500);
 
   const passwordHash = await hashPassword(password);
