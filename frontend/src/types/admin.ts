@@ -32,6 +32,27 @@ export type AdminTranslateKoreanTitlesPayload = {
   maxBatches: number
 }
 
+export type AdminCastLanguage = 'JAPANESE' | 'ENGLISH' | 'KOREAN'
+
+export type AdminCastSyncAnimePayload = {
+  animeId: number
+  language: AdminCastLanguage
+  perPage: number
+}
+
+export type AdminCastSyncBatchPayload = {
+  limit: number
+  language: AdminCastLanguage
+  perPage: number
+  onlyMissing: boolean
+  retryFailed: boolean
+  delayMs: number
+}
+
+export type AdminCastSyncStatusPayload = {
+  animeId: number
+}
+
 export type AdminUpdateKoreanTitlePayload = {
   title: string
   subtitle?: string
@@ -68,4 +89,9 @@ export type PlatformStats = {
   registeredUserCount: number
   storedAnimeCount: number
   translatedKoreanTitleCount: number
+  translationProgressRate: number
+  castSyncedAnimeCount: number
+  castSyncProgressRate: number
+  characterCount: number
+  voiceActorCount: number
 }

@@ -4,12 +4,13 @@ import { CollectionEditor } from '../components/CollectionEditor'
 import { useAuth } from '../contexts/AuthContext'
 import { updateAnimeKoreanTitle } from '../lib/admin'
 import {
+  fetchAnimeCast,
   fetchAnimeDetail,
   getDetailMetaTitle,
   getGenreLabel,
   getPrimaryPoster,
 } from '../lib/anime'
-import type { AnimeDetailItem } from '../types/anime'
+import type { AnimeCastCharacter, AnimeDetailItem } from '../types/anime'
 import '../styles/pages/AnimeDetailPage.css'
 
 type DetailState = {
@@ -21,6 +22,12 @@ type DetailState = {
 
 type AnimeDetailPageProps = {
   isOverlay?: boolean
+}
+
+type CastState = {
+  items: AnimeCastCharacter[]
+  isLoading: boolean
+  error: string | null
 }
 
 const createInitialDetailState = (requestKey: string): DetailState => ({
@@ -40,6 +47,10 @@ function getQuarterLabel(season?: string | null, seasonYear?: number | null) {
 
   const seasonLabel = season ? labelMap[season] ?? season : null
   return [seasonYear, seasonLabel].filter(Boolean).join(' ') || '정보 없음'
+}
+
+function getCastDisplayName(name: { full?: string | null; native?: string | null; userPreferred?: string | null }) {
+  return name.userPreferred || name.full || name.native || '이름 정보 없음'
 }
 
 type AdminTitleEditorProps = {
@@ -146,12 +157,16 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
   const [state, setState] = useState<DetailState>(() =>
     createInitialDetailState(requestKey),
   )
+  const [castState, setCastState] = useState<CastState>({
+    items: [],
+    isLoading: false,
+    error: null,
+  })
   const { item, isLoading, error } = state
   const isRefreshingDetail = state.requestKey !== requestKey
   const isAdmin = Boolean(user?.isAdmin || user?.role === 'ADMIN')
   const fromPage = (location.state as { fromPage?: 'explore' | 'collection' } | null)?.fromPage
   const backPath = fromPage === 'collection' ? '/collection' : '/explore'
-  const backLabel = fromPage === 'collection' ? '컬렉션으로 돌아가기' : '탐색으로 돌아가기'
   const detailPageClassName = isOverlay ? 'detail-page detail-page-overlay' : 'detail-page'
 
   const handleOverlayClose = () => {
@@ -196,6 +211,65 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
 
     return () => controller.abort()
   }, [id, requestKey])
+
+  useEffect(() => {
+    if (!item?.id) {
+      const resetTimer = window.setTimeout(() => {
+        setCastState({
+          items: [],
+          isLoading: false,
+          error: null,
+        })
+      })
+      return () => window.clearTimeout(resetTimer)
+    }
+
+    const controller = new AbortController()
+    const animeId = item.id
+
+    const loadingTimer = window.setTimeout(() => {
+      setCastState({
+        items: [],
+        isLoading: true,
+        error: null,
+      })
+    })
+
+    const loadCast = async () => {
+      try {
+        const items = await fetchAnimeCast({
+          animeId,
+          role: 'MAIN',
+          limit: 20,
+          voiceLanguage: 'Japanese',
+          signal: controller.signal,
+        })
+
+        setCastState({
+          items,
+          isLoading: false,
+          error: null,
+        })
+      } catch (castError) {
+        if (castError instanceof DOMException && castError.name === 'AbortError') {
+          return
+        }
+
+        setCastState({
+          items: [],
+          isLoading: false,
+          error: castError instanceof Error ? castError.message : '캐릭터/성우 정보를 불러오지 못했어요.',
+        })
+      }
+    }
+
+    void loadCast()
+
+    return () => {
+      window.clearTimeout(loadingTimer)
+      controller.abort()
+    }
+  }, [item?.id])
 
   const handleAdminTitleUpdated = (updatedTitle: {
     title: string
@@ -282,16 +356,6 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
 
   return (
     <section className={detailPageClassName}>
-      {isOverlay ? (
-        <button className="detail-back-link detail-back-button" type="button" onClick={handleOverlayClose}>
-          {backLabel}
-        </button>
-      ) : (
-        <Link className="detail-back-link" to={backPath}>
-          {backLabel}
-        </Link>
-      )}
-
       {isOverlay && (
         <button className="detail-overlay-close" type="button" onClick={handleOverlayClose} aria-label="상세 닫기">
           ×
@@ -363,48 +427,50 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
 
       <div className="detail-layout">
         <div className="detail-left-column">
-          <article className="detail-section detail-description">
-            <span className="detail-label">Genres</span>
-            <h2>장르</h2>
-            {item.genres?.length ? (
-              <div className="chip-list detail-chip-list-spacious">
-                {item.genres.map((genre) => (
-                  <span className="info-chip" key={genre}>
-                    {getGenreLabel(genre)}
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <p className="detail-description-text">아직 등록된 장르 정보가 없어요.</p>
-            )}
-          </article>
+          <section className="detail-section detail-overview-card">
+            <div className="detail-info-block detail-description">
+              <span className="detail-label">Genres</span>
+              <h2>장르</h2>
+              {item.genres?.length ? (
+                <div className="chip-list detail-chip-list-spacious">
+                  {item.genres.map((genre) => (
+                    <span className="info-chip" key={genre}>
+                      {getGenreLabel(genre)}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="detail-description-text">아직 등록된 장르 정보가 없어요.</p>
+              )}
+            </div>
 
-          <section className="detail-section">
-            <span className="detail-label">Overview</span>
-            <div className="detail-facts">
-              <div>
-                <span>상태</span>
-                <strong>{item.status ?? '정보 없음'}</strong>
-              </div>
-              <div>
-                <span>원작</span>
-                <strong>{item.source ?? '정보 없음'}</strong>
-              </div>
-              <div>
-                <span>국가</span>
-                <strong>{item.countryOfOrigin ?? '정보 없음'}</strong>
-              </div>
-              <div>
-                <span>인기</span>
-                <strong>{item.popularity?.toLocaleString() ?? '정보 없음'}</strong>
-              </div>
-              <div>
-                <span>즐겨찾기</span>
-                <strong>{item.favourites?.toLocaleString() ?? '정보 없음'}</strong>
-              </div>
-              <div>
-                <span>성인 작품</span>
-                <strong>{item.isAdult ? '예' : '아니오'}</strong>
+            <div className="detail-info-block">
+              <span className="detail-label">Overview</span>
+              <div className="detail-facts">
+                <div>
+                  <span>상태</span>
+                  <strong>{item.status ?? '정보 없음'}</strong>
+                </div>
+                <div>
+                  <span>원작</span>
+                  <strong>{item.source ?? '정보 없음'}</strong>
+                </div>
+                <div>
+                  <span>국가</span>
+                  <strong>{item.countryOfOrigin ?? '정보 없음'}</strong>
+                </div>
+                <div>
+                  <span>인기</span>
+                  <strong>{item.popularity?.toLocaleString() ?? '정보 없음'}</strong>
+                </div>
+                <div>
+                  <span>즐겨찾기</span>
+                  <strong>{item.favourites?.toLocaleString() ?? '정보 없음'}</strong>
+                </div>
+                <div>
+                  <span>성인 작품</span>
+                  <strong>{item.isAdult ? '예' : '아니오'}</strong>
+                </div>
               </div>
             </div>
           </section>
@@ -453,6 +519,66 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
           )}
         </aside>
       </div>
+
+      {(castState.isLoading || (!castState.error && castState.items.length > 0)) && (
+        <section className="detail-section detail-cast-section">
+          <div className="detail-cast-heading">
+            <div>
+              <span className="detail-label">Main cast</span>
+              <h2>주요 캐릭터와 성우</h2>
+            </div>
+          </div>
+
+          {castState.isLoading ? (
+            <div className="detail-cast-grid">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <article className="detail-cast-card skeleton-card" key={`cast-skeleton-${index}`}>
+                  <div className="skeleton-line short" />
+                  <div className="skeleton-line long" />
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className="detail-cast-grid">
+              {castState.items.map((character) => {
+                const voiceActor = character.voiceActors[0]
+
+                return (
+                  <article className="detail-cast-card" key={character.id}>
+                    <div className="detail-cast-person">
+                      <img
+                        src={character.image.large || character.image.medium || ''}
+                        alt={getCastDisplayName(character.name)}
+                        loading="lazy"
+                      />
+                      <div>
+                        <span>Character</span>
+                        <strong>{getCastDisplayName(character.name)}</strong>
+                        {character.name.native && <small>{character.name.native}</small>}
+                      </div>
+                    </div>
+
+                    {voiceActor && (
+                      <div className="detail-cast-person">
+                        <img
+                          src={voiceActor.image.large || voiceActor.image.medium || ''}
+                          alt={getCastDisplayName(voiceActor.name)}
+                          loading="lazy"
+                        />
+                        <div>
+                          <span>Voice actor</span>
+                          <strong>{getCastDisplayName(voiceActor.name)}</strong>
+                          {voiceActor.name.native && <small>{voiceActor.name.native}</small>}
+                        </div>
+                      </div>
+                    )}
+                  </article>
+                )
+              })}
+            </div>
+          )}
+        </section>
+      )}
     </section>
   )
 }

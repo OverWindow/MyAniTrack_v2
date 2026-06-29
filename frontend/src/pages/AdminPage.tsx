@@ -2,8 +2,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import {
+  fetchAnimeCastSyncStatus,
   fetchPlatformStats,
   syncAllAnimePages,
+  syncAnimeCast,
+  syncAnimeCastBatch,
   syncAnimeChunked,
   syncAnimePage,
   syncAnimeSeason,
@@ -11,6 +14,10 @@ import {
 } from '../lib/admin'
 import type {
   AdminActionResponse,
+  AdminCastLanguage,
+  AdminCastSyncAnimePayload,
+  AdminCastSyncBatchPayload,
+  AdminCastSyncStatusPayload,
   AdminSeason,
   AdminSyncAllPayload,
   AdminSyncChunkedPayload,
@@ -27,7 +34,7 @@ type AdminActionCardProps<TPayload> = {
   fields: Array<{
     key: keyof TPayload
     label: string
-    type?: 'number' | 'text' | 'select'
+    type?: 'number' | 'text' | 'select' | 'checkbox'
     options?: string[]
   }>
   values: TPayload
@@ -43,14 +50,12 @@ type AdminActionKey =
   | 'sync-chunked'
   | 'sync-season'
   | 'translate-korean'
-
-const mockQueues = [
-  { title: '최근 동기화 작업', body: '2026-05-05 14:20 기준 SPRING 2025 시즌 동기화가 마지막으로 실행됐습니다.' },
-  { title: '주의 필요 항목', body: '번역 배치가 증가할 수 있으니 배치 크기와 maxBatches를 보수적으로 조정하는 것을 권장합니다.' },
-  { title: '확장 포인트', body: '향후 유저 관리, 신고 처리, 큐 모니터링, 로그 뷰어 카드가 이 영역에 추가될 수 있습니다.' },
-]
+  | 'cast-sync-anime'
+  | 'cast-sync-batch'
+  | 'cast-sync-status'
 
 const seasonOptions: AdminSeason[] = ['WINTER', 'SPRING', 'SUMMER', 'FALL']
+const castLanguageOptions: AdminCastLanguage[] = ['JAPANESE', 'ENGLISH', 'KOREAN']
 const RESPONSE_PREVIEW_LENGTH = 360
 
 function formatNumber(value: number) {
@@ -82,7 +87,7 @@ function AdminResponsePreview({ response }: { response: AdminActionResponse }) {
   )
 }
 
-function AdminActionCard<TPayload extends Record<string, string | number>>({
+function AdminActionCard<TPayload extends Record<string, string | number | boolean>>({
   title,
   description,
   fields,
@@ -107,9 +112,18 @@ function AdminActionCard<TPayload extends Record<string, string | number>>({
           return (
             <label className="auth-field" key={String(field.key)}>
               <span>{field.label}</span>
-              {field.type === 'select' ? (
+              {field.type === 'checkbox' ? (
+                <label className="admin-checkbox-field">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(rawValue)}
+                    onChange={(event) => onChange(field.key, event.target.checked as TPayload[keyof TPayload])}
+                  />
+                  <span>{Boolean(rawValue) ? '활성화' : '비활성화'}</span>
+                </label>
+              ) : field.type === 'select' ? (
                 <select
-                  value={value}
+                  value={String(value)}
                   onChange={(event) => onChange(field.key, event.target.value as TPayload[keyof TPayload])}
                 >
                   {field.options?.map((option) => (
@@ -121,7 +135,7 @@ function AdminActionCard<TPayload extends Record<string, string | number>>({
               ) : (
                 <input
                   type={field.type ?? 'number'}
-                  value={value}
+                  value={String(value)}
                   onChange={(event) => {
                     const nextValue = field.type === 'number' || !field.type
                       ? Number(event.target.value)
@@ -176,6 +190,22 @@ export function AdminPage() {
     batchSize: 100,
     maxBatches: 1,
   })
+  const [castAnimeValues, setCastAnimeValues] = useState<AdminCastSyncAnimePayload>({
+    animeId: 1,
+    language: 'JAPANESE',
+    perPage: 25,
+  })
+  const [castBatchValues, setCastBatchValues] = useState<AdminCastSyncBatchPayload>({
+    limit: 10,
+    language: 'JAPANESE',
+    perPage: 25,
+    onlyMissing: true,
+    retryFailed: true,
+    delayMs: 2500,
+  })
+  const [castStatusValues, setCastStatusValues] = useState<AdminCastSyncStatusPayload>({
+    animeId: 1,
+  })
 
   const [selectedAction, setSelectedAction] = useState<AdminActionKey>('sync-page')
   const [activeAction, setActiveAction] = useState<string | null>(null)
@@ -195,12 +225,19 @@ export function AdminPage() {
         { label: '등록 유저', value: '-', hint: '플랫폼 통계 불러오기 전' },
         { label: '저장된 애니', value: '-', hint: '플랫폼 통계 불러오기 전' },
         { label: '번역 진행률', value: '-', hint: '플랫폼 통계 불러오기 전' },
+        { label: '캐스트 동기화율', value: '-', hint: '플랫폼 통계 불러오기 전' },
+        { label: '캐릭터 / 성우', value: '-', hint: '플랫폼 통계 불러오기 전' },
       ]
     }
 
-    const translationRate = platformStats.storedAnimeCount > 0
-      ? (platformStats.translatedKoreanTitleCount / platformStats.storedAnimeCount) * 100
-      : 0
+    const translationRate = platformStats.translationProgressRate
+      ?? (platformStats.storedAnimeCount > 0
+        ? (platformStats.translatedKoreanTitleCount / platformStats.storedAnimeCount) * 100
+        : 0)
+    const castSyncRate = platformStats.castSyncProgressRate
+      ?? (platformStats.storedAnimeCount > 0
+        ? (platformStats.castSyncedAnimeCount / platformStats.storedAnimeCount) * 100
+        : 0)
 
     return [
       {
@@ -217,6 +254,16 @@ export function AdminPage() {
         label: '번역 진행률',
         value: formatPercent(translationRate),
         hint: `${formatNumber(platformStats.translatedKoreanTitleCount)} / ${formatNumber(platformStats.storedAnimeCount)}`,
+      },
+      {
+        label: '캐스트 동기화율',
+        value: formatPercent(castSyncRate),
+        hint: `${formatNumber(platformStats.castSyncedAnimeCount)} / ${formatNumber(platformStats.storedAnimeCount)}`,
+      },
+      {
+        label: '캐릭터 / 성우',
+        value: `${formatNumber(platformStats.characterCount)} / ${formatNumber(platformStats.voiceActorCount)}`,
+        hint: 'AniList 캐릭터 및 성우 저장 수',
       },
     ]
   }, [platformStats])
@@ -398,6 +445,73 @@ export function AdminPage() {
         />
       ),
     },
+    {
+      key: 'cast-sync-anime' as const,
+      group: '캐릭터/성우',
+      label: '단건 동기화',
+      description: '내부 anime.id 하나의 캐릭터/성우를 동기화합니다.',
+      content: (
+        <AdminActionCard
+          title="애니 캐릭터/성우 단건 동기화"
+          description="내부 DB의 anime.id 기준으로 AniList 캐릭터/성우를 가져와 characters, voice_actors 및 연결 테이블을 최신 결과로 재구성합니다."
+          fields={[
+            { key: 'animeId', label: '내부 anime.id', type: 'number' },
+            { key: 'language', label: '성우 언어', type: 'select', options: castLanguageOptions },
+            { key: 'perPage', label: 'AniList 페이지당 수', type: 'number' },
+          ]}
+          values={castAnimeValues}
+          isRunning={activeAction === 'cast-sync-anime'}
+          onChange={(key, value) => setCastAnimeValues((current) => ({ ...current, [key]: value }))}
+          onSubmit={() => { void runAction('cast-sync-anime', () => syncAnimeCast(castAnimeValues)) }}
+          response={responseMap['cast-sync-anime'] ?? null}
+        />
+      ),
+    },
+    {
+      key: 'cast-sync-batch' as const,
+      group: '캐릭터/성우',
+      label: '배치 동기화',
+      description: '여러 애니의 캐릭터/성우를 순차 동기화합니다.',
+      content: (
+        <AdminActionCard
+          title="애니 캐릭터/성우 배치 동기화"
+          description="여러 애니를 순차 처리합니다. 장시간 요청일 수 있으므로 실행 중에는 버튼 중복 클릭을 막습니다."
+          fields={[
+            { key: 'limit', label: '처리 개수', type: 'number' },
+            { key: 'language', label: '성우 언어', type: 'select', options: castLanguageOptions },
+            { key: 'perPage', label: 'AniList 페이지당 수', type: 'number' },
+            { key: 'onlyMissing', label: '미수집만 처리', type: 'checkbox' },
+            { key: 'retryFailed', label: '실패 항목 재시도', type: 'checkbox' },
+            { key: 'delayMs', label: '요청 간 지연(ms)', type: 'number' },
+          ]}
+          values={castBatchValues}
+          isRunning={activeAction === 'cast-sync-batch'}
+          onChange={(key, value) => setCastBatchValues((current) => ({ ...current, [key]: value }))}
+          onSubmit={() => { void runAction('cast-sync-batch', () => syncAnimeCastBatch(castBatchValues)) }}
+          response={responseMap['cast-sync-batch'] ?? null}
+        />
+      ),
+    },
+    {
+      key: 'cast-sync-status' as const,
+      group: '캐릭터/성우',
+      label: '동기화 상태 조회',
+      description: '특정 애니의 cast sync 상태를 조회합니다.',
+      content: (
+        <AdminActionCard
+          title="캐릭터/성우 동기화 상태 조회"
+          description="anime_cast_sync_state에 기록된 해당 애니의 syncing/success/failed 상태와 상세 응답을 확인합니다."
+          fields={[
+            { key: 'animeId', label: '내부 anime.id', type: 'number' },
+          ]}
+          values={castStatusValues}
+          isRunning={activeAction === 'cast-sync-status'}
+          onChange={(key, value) => setCastStatusValues((current) => ({ ...current, [key]: value }))}
+          onSubmit={() => { void runAction('cast-sync-status', () => fetchAnimeCastSyncStatus(castStatusValues)) }}
+          response={responseMap['cast-sync-status'] ?? null}
+        />
+      ),
+    },
   ]
 
   const selectedItem = actionItems.find((item) => item.key === selectedAction) ?? actionItems[0]
@@ -444,24 +558,15 @@ export function AdminPage() {
           </button>
         </div>
 
-        <div className="admin-summary-grid compact-three">
+        <article className="admin-summary-card admin-summary-combined-card">
           {summaryCards.map((card) => (
-            <article className="admin-summary-card" key={card.label}>
+            <div className="admin-summary-item" key={card.label}>
               <span>{card.label}</span>
               <strong>{card.value}</strong>
               <p>{card.hint}</p>
-            </article>
+            </div>
           ))}
-        </div>
-      </div>
-
-      <div className="admin-overview-grid">
-        {mockQueues.map((item) => (
-          <article className="admin-overview-card" key={item.title}>
-            <strong>{item.title}</strong>
-            <p>{item.body}</p>
-          </article>
-        ))}
+        </article>
       </div>
 
       <div className="admin-workspace">

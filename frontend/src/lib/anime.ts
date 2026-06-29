@@ -1,6 +1,9 @@
 import type {
   AnimeDetailItem,
   AnimeDetailResponse,
+  AnimeCastResponse,
+  AnimeCastRole,
+  AnimeCastVoiceLanguage,
   AnimeGenre,
   AnimeListItem,
   AnimeListResponse,
@@ -303,4 +306,33 @@ export async function fetchAnimeDetail(id: string, signal?: AbortSignal) {
 
   const data = (await response.json()) as AnimeDetailResponse
   return data.item
+}
+
+export async function fetchAnimeCast(params: {
+  animeId: number | string
+  role?: AnimeCastRole
+  limit?: number
+  voiceLanguage?: AnimeCastVoiceLanguage
+  signal?: AbortSignal
+}) {
+  const url = new URL(`/api/anime/${params.animeId}/cast`, getApiBaseUrl())
+  url.searchParams.set('role', params.role ?? 'MAIN')
+  url.searchParams.set('limit', String(params.limit ?? 20))
+
+  if (params.voiceLanguage) {
+    url.searchParams.set('voiceLanguage', params.voiceLanguage)
+  }
+
+  const response = await authFetch(url.toString(), { signal: params.signal })
+
+  if (response.status === 404) {
+    throw new Error('해당 애니를 찾을 수 없어요.')
+  }
+
+  if (!response.ok) {
+    throw new Error(`캐릭터/성우 정보를 불러오지 못했습니다. (${response.status})`)
+  }
+
+  const data = (await response.json()) as AnimeCastResponse
+  return data.items ?? []
 }

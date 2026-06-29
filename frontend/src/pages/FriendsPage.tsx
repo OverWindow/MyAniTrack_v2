@@ -336,11 +336,6 @@ export function FriendsPage() {
 
           {isIncomingOpen && (
             <section className="friends-panel friends-panel-compact request-accordion is-open">
-              <div className="friends-panel-heading">
-                <span className="detail-label">Incoming</span>
-                <h2>받은 요청</h2>
-              </div>
-
               <div className="friends-card-list compact-list">
                 {incoming.length === 0 ? (
                   <div className="friends-empty-state">아직 받은 친구 요청이 없어요.</div>
@@ -367,11 +362,6 @@ export function FriendsPage() {
 
           {isOutgoingOpen && (
             <section className="friends-panel friends-panel-compact request-accordion is-open">
-              <div className="friends-panel-heading">
-                <span className="detail-label">Outgoing</span>
-                <h2>보낸 요청</h2>
-              </div>
-
               <div className="friends-card-list compact-list">
                 {outgoing.length === 0 ? (
                   <div className="friends-empty-state">아직 보낸 친구 요청이 없어요.</div>

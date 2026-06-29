@@ -1,4 +1,8 @@
-import { ANILIST_ANIME_PAGE_QUERY, ANILIST_SEASON_ANIME_PAGE_QUERY } from './anilist.queries';
+import {
+  ANILIST_ANIME_CAST_QUERY,
+  ANILIST_ANIME_PAGE_QUERY,
+  ANILIST_SEASON_ANIME_PAGE_QUERY,
+} from './anilist.queries';
 
 const ANILIST_URL = 'https://graphql.anilist.co';
 
@@ -53,6 +57,67 @@ interface AniListPageResponse {
       };
       media?: AniListAnime[];
     };
+  };
+  errors?: Array<{ message: string }>;
+}
+
+export interface AniListCharacter {
+  id: number;
+  name?: {
+    full?: string | null;
+    native?: string | null;
+    userPreferred?: string | null;
+  } | null;
+  image?: {
+    large?: string | null;
+    medium?: string | null;
+  } | null;
+  gender?: string | null;
+  age?: string | null;
+  description?: string | null;
+  siteUrl?: string | null;
+  updatedAt?: number | null;
+}
+
+export interface AniListVoiceActor {
+  id: number;
+  name?: {
+    full?: string | null;
+    native?: string | null;
+    userPreferred?: string | null;
+  } | null;
+  languageV2?: string | null;
+  image?: {
+    large?: string | null;
+    medium?: string | null;
+  } | null;
+  description?: string | null;
+  siteUrl?: string | null;
+  updatedAt?: number | null;
+}
+
+export interface AniListCharacterEdge {
+  role?: string | null;
+  name?: string | null;
+  node?: AniListCharacter | null;
+  voiceActors?: AniListVoiceActor[] | null;
+}
+
+interface AniListAnimeCastResponse {
+  data?: {
+    Media?: {
+      id: number;
+      updatedAt?: number | null;
+      characters?: {
+        pageInfo?: {
+          currentPage: number;
+          hasNextPage: boolean;
+          lastPage: number;
+          perPage: number;
+        };
+        edges?: AniListCharacterEdge[];
+      } | null;
+    } | null;
   };
   errors?: Array<{ message: string }>;
 }
@@ -141,5 +206,57 @@ export async function fetchSeasonAnimePage(
     hasNextPage: pageData.pageInfo.hasNextPage,
     currentPage: pageData.pageInfo.currentPage,
     lastPage: pageData.pageInfo.lastPage,
+  };
+}
+
+export async function fetchAnimeCastPage(
+  anilistId: number,
+  page: number,
+  perPage: number,
+  language: 'JAPANESE' | 'ENGLISH' | 'KOREAN' = 'JAPANESE'
+): Promise<{
+  anilistId: number;
+  sourceUpdatedAt: number | null;
+  edges: AniListCharacterEdge[];
+  hasNextPage: boolean;
+  currentPage: number;
+  lastPage: number;
+}> {
+  const response = await fetch(ANILIST_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
+    body: JSON.stringify({
+      query: ANILIST_ANIME_CAST_QUERY,
+      variables: { anilistId, page, perPage, language },
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`AniList cast request failed: ${response.status} ${response.statusText}`);
+  }
+
+  const json = (await response.json()) as AniListAnimeCastResponse;
+
+  if (json.errors?.length) {
+    throw new Error(`AniList GraphQL error: ${json.errors.map(e => e.message).join(', ')}`);
+  }
+
+  const media = json.data?.Media;
+  const characters = media?.characters;
+
+  if (!media || !characters?.pageInfo) {
+    throw new Error('Invalid AniList cast response: missing media characters');
+  }
+
+  return {
+    anilistId: media.id,
+    sourceUpdatedAt: media.updatedAt ?? null,
+    edges: characters.edges ?? [],
+    hasNextPage: characters.pageInfo.hasNextPage,
+    currentPage: characters.pageInfo.currentPage,
+    lastPage: characters.pageInfo.lastPage,
   };
 }

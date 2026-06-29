@@ -98,6 +98,7 @@ type SmartRatingModalProps = {
 function SmartRatingModal({ animeId, targetAnime, onClose, onApplyScore }: SmartRatingModalProps) {
   const [candidates, setCandidates] = useState<SmartRatingCandidate[]>([])
   const [comparisons, setComparisons] = useState<Record<number, SmartRatingRelation>>({})
+  const [activeCandidateIndex, setActiveCandidateIndex] = useState(0)
   const [estimate, setEstimate] = useState<SmartRatingEstimateResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isEstimating, setIsEstimating] = useState(false)
@@ -123,6 +124,9 @@ function SmartRatingModal({ animeId, targetAnime, onClose, onApplyScore }: Smart
         }
 
         setCandidates(response.items)
+        setComparisons({})
+        setActiveCandidateIndex(0)
+        setEstimate(null)
       } catch (candidateError) {
         if (controller.signal.aborted) {
           return
@@ -146,6 +150,7 @@ function SmartRatingModal({ animeId, targetAnime, onClose, onApplyScore }: Smart
       ...current,
       [candidateAnimeId]: relation,
     }))
+    setActiveCandidateIndex((current) => Math.min(current + 1, Math.max(0, candidates.length - 1)))
     setEstimate(null)
   }
 
@@ -156,6 +161,7 @@ function SmartRatingModal({ animeId, targetAnime, onClose, onApplyScore }: Smart
   })
 
   const canEstimate = selectedComparisons.length > 0 && !isEstimating
+  const activeCandidate = candidates[activeCandidateIndex]
 
   const handleEstimate = async () => {
     if (!canEstimate) {
@@ -213,54 +219,57 @@ function SmartRatingModal({ animeId, targetAnime, onClose, onApplyScore }: Smart
         {isLoading && <div className="feedback-inline">비교 후보를 불러오는 중이에요.</div>}
         {error && <div className="feedback-card is-error">{error}</div>}
 
-        {!isLoading && candidates.length > 0 && (
+        {!isLoading && activeCandidate && (
           <div className="smart-rating-candidate-list">
-            {candidates.map((candidate) => (
-              <article className="smart-rating-comparison" key={candidate.animeId}>
-                <div className="smart-rating-target-card">
-                  {targetAnime?.coverImageExtraLarge || targetAnime?.coverImageLarge ? (
-                    <img
-                      src={targetAnime.coverImageExtraLarge || targetAnime.coverImageLarge}
-                      alt={targetAnime.title}
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div className="smart-rating-candidate-cover" aria-hidden="true" />
-                  )}
-                  <div className="smart-rating-candidate-copy">
-                    <span>새로 평가할 작품</span>
-                    <strong>{targetAnime?.title ?? '현재 작품'}</strong>
-                  </div>
+            <article className="smart-rating-comparison" key={activeCandidate.animeId}>
+              <div className="smart-rating-target-card">
+                {targetAnime?.coverImageExtraLarge || targetAnime?.coverImageLarge ? (
+                  <img
+                    src={targetAnime.coverImageExtraLarge || targetAnime.coverImageLarge}
+                    alt={targetAnime.title}
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className="smart-rating-candidate-cover" aria-hidden="true" />
+                )}
+                <div className="smart-rating-candidate-copy">
+                  <span>새로 평가할 작품</span>
+                  <strong>{targetAnime?.title ?? '현재 작품'}</strong>
                 </div>
-                <div className="smart-rating-candidate">
-                  {candidate.anime.coverImageExtraLarge || candidate.anime.coverImageLarge ? (
-                    <img
-                      src={candidate.anime.coverImageExtraLarge || candidate.anime.coverImageLarge || ''}
-                      alt={candidate.anime.title}
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div className="smart-rating-candidate-cover" aria-hidden="true" />
-                  )}
-                  <div className="smart-rating-candidate-copy">
-                    <span>비교 대상 · 내 평점 {candidate.score.toFixed(1)}점</span>
-                    <strong>{candidate.anime.title}</strong>
-                  </div>
-                  <div className="smart-rating-choice-group" aria-label={`${candidate.anime.title} 비교`}>
-                    {(['better', 'similar', 'worse'] as SmartRatingRelation[]).map((relation) => (
-                      <button
-                        className={comparisons[candidate.animeId] === relation ? 'smart-rating-choice is-active' : 'smart-rating-choice'}
-                        key={`${candidate.animeId}-${relation}`}
-                        type="button"
-                        onClick={() => handleRelationSelect(candidate.animeId, relation)}
-                      >
-                        {getRelationLabel(relation)}
-                      </button>
-                    ))}
-                  </div>
+              </div>
+              <div className="smart-rating-candidate">
+                {activeCandidate.anime.coverImageExtraLarge || activeCandidate.anime.coverImageLarge ? (
+                  <img
+                    src={activeCandidate.anime.coverImageExtraLarge || activeCandidate.anime.coverImageLarge || ''}
+                    alt={activeCandidate.anime.title}
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className="smart-rating-candidate-cover" aria-hidden="true" />
+                )}
+                <div className="smart-rating-candidate-copy">
+                  <span>비교 대상 · 내 평점 {activeCandidate.score.toFixed(1)}점</span>
+                  <strong>{activeCandidate.anime.title}</strong>
                 </div>
-              </article>
-            ))}
+              </div>
+              <div className="smart-rating-choice-panel">
+                <span>
+                  {activeCandidateIndex + 1} / {candidates.length}
+                </span>
+                <div className="smart-rating-choice-group" aria-label={`${activeCandidate.anime.title} 비교`}>
+                  {(['better', 'similar', 'worse'] as SmartRatingRelation[]).map((relation) => (
+                    <button
+                      className={comparisons[activeCandidate.animeId] === relation ? 'smart-rating-choice is-active' : 'smart-rating-choice'}
+                      key={`${activeCandidate.animeId}-${relation}`}
+                      type="button"
+                      onClick={() => handleRelationSelect(activeCandidate.animeId, relation)}
+                    >
+                      {getRelationLabel(relation)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </article>
           </div>
         )}
 

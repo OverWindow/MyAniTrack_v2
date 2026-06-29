@@ -51,7 +51,7 @@
 .detail-hero {
   position: relative;
   overflow: hidden;
-  border-radius: 24px;
+  border-radius: 2px;
   border: 1px solid rgba(68, 64, 60, 0.18);
   min-height: 480px;
   background: var(--dark-cocoa);
@@ -80,7 +80,7 @@
 
 .detail-cover-card {
   width: min(100%, 300px);
-  border-radius: 20px;
+  border-radius: 2px;
   overflow: hidden;
   box-shadow: 0 24px 60px rgba(28, 25, 23, 0.26);
 }
@@ -125,7 +125,7 @@
 
 .detail-meta-grid div {
   padding: 16px;
-  border-radius: var(--radius-card);
+  border-radius: 2px;
   background: rgba(255, 255, 255, 0.08);
 }
 
@@ -168,15 +168,24 @@
 
 .detail-section {
   padding: 24px;
-  border-radius: 20px;
+  border-radius: 2px;
   border: 1px solid rgba(120, 113, 108, 0.16);
   background: var(--bg-card);
   box-shadow: var(--shadow-card);
 }
 
+.detail-overview-card {
+  display: grid;
+  gap: 20px;
+}
+
+.detail-info-block + .detail-info-block {
+  padding-top: 20px;
+  border-top: 1px solid rgba(120, 113, 108, 0.12);
+}
+
 .detail-description {
   align-self: start;
-  padding: 20px 22px;
 }
 
 .detail-description h2 {
@@ -193,6 +202,85 @@
 .detail-sidebar {
   display: grid;
   gap: 18px;
+}
+
+.detail-cast-section {
+  display: grid;
+  gap: 18px;
+}
+
+.detail-cast-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.detail-cast-heading h2 {
+  margin: 8px 0 0;
+}
+
+.detail-cast-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.detail-cast-card {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid rgba(120, 113, 108, 0.14);
+  border-radius: 2px;
+  background: rgba(250, 247, 241, 0.62);
+}
+
+.detail-cast-person {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.detail-cast-person img {
+  width: 72px;
+  height: 92px;
+  border-radius: 2px;
+  object-fit: cover;
+  background: var(--bg-neutral);
+  box-shadow: var(--shadow-soft);
+}
+
+.detail-cast-person div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.detail-cast-person span {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.detail-cast-person strong,
+.detail-cast-person small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.detail-cast-person strong {
+  color: var(--text-primary);
+  line-height: 1.25;
+}
+
+.detail-cast-person small {
+  color: var(--text-secondary);
+  white-space: nowrap;
 }
 
 .admin-title-editor {
@@ -227,7 +315,7 @@
 
 .detail-facts div {
   padding: 14px 16px;
-  border-radius: var(--radius-card);
+  border-radius: 2px;
   background: var(--bg-neutral);
 }
 
@@ -254,12 +342,16 @@
   gap: 8px;
 }
 
+.detail-chip-list-spacious .info-chip {
+  border-radius: var(--radius-pill);
+}
+
 .info-chip {
   display: inline-flex;
   align-items: center;
   min-height: 34px;
   padding: 0 12px;
-  border-radius: var(--radius-pill);
+  border-radius: 2px;
   background: var(--point-soft);
   border: 1px solid var(--point-border);
   color: var(--text-on-point-soft);
@@ -271,7 +363,7 @@
   display: grid;
   gap: 18px;
   padding: 24px;
-  border-radius: 24px;
+  border-radius: 2px;
   border: 1px solid rgba(120, 113, 108, 0.16);
   background: var(--bg-card);
   box-shadow: var(--shadow-card);
@@ -279,7 +371,7 @@
 
 .detail-loading-banner {
   height: 360px;
-  border-radius: 20px;
+  border-radius: 2px;
 }
 
 .detail-loading-lines {
@@ -290,7 +382,8 @@
 @media (max-width: 1180px) {
   .detail-hero-content,
   .detail-layout,
-  .detail-meta-grid {
+  .detail-meta-grid,
+  .detail-cast-grid {
     grid-template-columns: 1fr;
   }
 
@@ -298,8 +391,7 @@
     max-width: none;
   }
 
-  .collection-panel,
-  .detail-description {
+  .collection-panel {
     padding: 24px;
   }
 }
@@ -311,12 +403,20 @@
 
   .detail-hero-content,
   .detail-section,
-  .collection-panel,
-  .detail-description {
+  .collection-panel {
     padding: 22px;
   }
 
   .detail-actions {
+    flex-direction: column;
+  }
+
+  .detail-cast-heading,
+  .detail-cast-card {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-cast-heading {
     flex-direction: column;
   }
 }

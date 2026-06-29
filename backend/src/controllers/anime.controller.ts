@@ -1,8 +1,10 @@
 import { Request, Response } from 'express';
 import {
+  AnimeCharacterRole,
   AnimeGenre,
   AnimeSortOption,
   AnimeTitleLanguage,
+  getAnimeCastByRole,
   getAnimeDetailById,
   getAnimeList,
   getAnimeListWithUserCollection,
@@ -10,6 +12,7 @@ import {
 
 const SORT_OPTIONS: AnimeSortOption[] = ['latest', 'score', 'season', 'popularity'];
 const TITLE_LANGUAGE_OPTIONS: AnimeTitleLanguage[] = ['ko', 'en', 'ja'];
+const CHARACTER_ROLE_OPTIONS: AnimeCharacterRole[] = ['MAIN', 'SUPPORT', 'BACKGROUND'];
 const GENRE_OPTIONS: AnimeGenre[] = [
   'Action',
   'Adventure',
@@ -99,9 +102,47 @@ function parseAnimeId(value: string): number {
   return id;
 }
 
+function parseCharacterRole(value: unknown): AnimeCharacterRole {
+  const role = typeof value === 'string' ? value.toUpperCase() : 'MAIN';
+
+  if (role === 'SUPPORTING') {
+    return 'SUPPORT';
+  }
+
+  if (!CHARACTER_ROLE_OPTIONS.includes(role as AnimeCharacterRole)) {
+    throw new Error('role must be one of MAIN, SUPPORT, BACKGROUND');
+  }
+
+  return role as AnimeCharacterRole;
+}
+
+function parseCastLimit(value: unknown): number {
+  const limit = Number(value ?? 50);
+
+  if (!Number.isInteger(limit) || limit <= 0 || limit > 100) {
+    throw new Error('limit must be an integer between 1 and 100');
+  }
+
+  return limit;
+}
+
+function parseVoiceLanguage(value: unknown): string | undefined {
+  if (value === undefined || value === null || value === '') {
+    return undefined;
+  }
+
+  if (typeof value !== 'string') {
+    throw new Error('voiceLanguage must be a string');
+  }
+
+  return value.trim() || undefined;
+}
+
 function sendError(res: Response, error: unknown, extraBadRequestChecks: string[] = []) {
   const message = error instanceof Error ? error.message : 'Unknown error';
-  const statusCode = message.includes('must be')
+  const statusCode = message === 'Anime not found'
+    ? 404
+    : message.includes('must be')
     || message === 'Invalid cursor'
     || message.includes('Cursor sort')
     || extraBadRequestChecks.some((pattern) => message.includes(pattern) || message === pattern)
@@ -236,5 +277,29 @@ export async function getAnimeById(req: Request, res: Response) {
       success: false,
       message,
     });
+  }
+}
+
+export async function getAnimeCast(req: Request, res: Response) {
+  try {
+    const animeIdParam = typeof req.params.id === 'string' ? req.params.id : '';
+    const animeId = parseAnimeId(animeIdParam);
+    const role = parseCharacterRole(req.query.role);
+    const limit = parseCastLimit(req.query.limit);
+    const voiceLanguage = parseVoiceLanguage(req.query.voiceLanguage);
+
+    const result = await getAnimeCastByRole({
+      animeId,
+      role,
+      limit,
+      voiceLanguage,
+    });
+
+    return res.json({
+      success: true,
+      ...result,
+    });
+  } catch (error) {
+    return sendError(res, error, ['voiceLanguage must be']);
   }
 }

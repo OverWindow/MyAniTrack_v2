@@ -1,5 +1,10 @@
 import { Request, Response } from 'express';
 import { syncAnimePage, syncAllAnime, syncAnimeInChunks, syncSeasonAnime } from '../../sync/anime.sync.service';
+import {
+  getAnimeCastSyncState,
+  syncAnimeCastBatch,
+  syncAnimeCastByAnimeId,
+} from '../../sync/anime-cast.sync.service';
 import { translateAnimeKoreanTitlesInBatches } from '../../translations/anime.korean-title.service';
 import { updateAnimeKoreanTitleByAdmin } from '../services/admin-korean-title.service';
 
@@ -163,6 +168,59 @@ export async function updateAnimeKoreanTitleController(req: Request, res: Respon
     return res.json({
       success: true,
       message: 'Anime Korean title updated and locked',
+      item,
+    });
+  } catch (error) {
+    return sendError(res, error);
+  }
+}
+
+export async function syncAnimeCastController(req: Request, res: Response) {
+  try {
+    const animeId = parsePositiveInteger(req.params.animeId, 'animeId');
+    const result = await syncAnimeCastByAnimeId(animeId, {
+      perPage: req.body.perPage,
+      language: req.body.language,
+    });
+
+    return res.json({
+      success: true,
+      message: 'Anime cast synced successfully',
+      result,
+    });
+  } catch (error) {
+    return sendError(res, error);
+  }
+}
+
+export async function syncAnimeCastBatchController(req: Request, res: Response) {
+  try {
+    const result = await syncAnimeCastBatch({
+      limit: req.body.limit,
+      perPage: req.body.perPage,
+      language: req.body.language,
+      onlyMissing: req.body.onlyMissing,
+      retryFailed: req.body.retryFailed,
+      delayMs: req.body.delayMs,
+    });
+
+    return res.json({
+      success: true,
+      message: 'Anime cast batch sync completed',
+      result,
+    });
+  } catch (error) {
+    return sendError(res, error);
+  }
+}
+
+export async function getAnimeCastSyncStateController(req: Request, res: Response) {
+  try {
+    const animeId = parsePositiveInteger(req.params.animeId, 'animeId');
+    const item = await getAnimeCastSyncState(animeId);
+
+    return res.json({
+      success: true,
       item,
     });
   } catch (error) {

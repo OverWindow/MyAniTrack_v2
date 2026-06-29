@@ -69,7 +69,7 @@
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   gap: 18px;
-  align-items: end;
+  align-items: center;
   padding: 20px 22px;
 }
 
@@ -81,6 +81,11 @@
 .friends-request-copy h2,
 .friends-panel-heading h2 {
   margin: 0;
+}
+
+.friends-request-copy h2 {
+  font-size: 1.05rem;
+  line-height: 1.25;
 }
 
 .friends-request-form {
@@ -227,6 +232,10 @@ button.friends-summary-card {
   display: grid;
   gap: 12px;
   margin-top: 16px;
+}
+
+.request-accordion .friends-card-list {
+  margin-top: 0;
 }
 
 .compact-list {

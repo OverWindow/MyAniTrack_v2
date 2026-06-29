@@ -141,3 +141,55 @@ export type AnimeDetailResponse = {
   success: boolean
   item: AnimeDetailItem
 }
+
+export type AnimeCastRole = 'MAIN' | 'SUPPORT' | 'SUPPORTING' | 'BACKGROUND'
+
+export type AnimeCastVoiceLanguage = 'Japanese' | 'Korean' | 'English'
+
+export type AnimeCastPersonName = {
+  full?: string | null
+  native?: string | null
+  userPreferred?: string | null
+}
+
+export type AnimeCastImage = {
+  large?: string | null
+  medium?: string | null
+}
+
+export type AnimeCastVoiceActor = {
+  id: number
+  anilistId: number
+  languageV2?: string | null
+  sortOrder?: number | null
+  name: AnimeCastPersonName
+  image: AnimeCastImage
+  description?: string | null
+  siteUrl?: string | null
+}
+
+export type AnimeCastCharacter = {
+  id: number
+  anilistId: number
+  role: string
+  requestedRole?: string | null
+  edgeName?: string | null
+  sortOrder?: number | null
+  name: AnimeCastPersonName
+  image: AnimeCastImage
+  gender?: string | null
+  age?: string | null
+  description?: string | null
+  siteUrl?: string | null
+  voiceActors: AnimeCastVoiceActor[]
+}
+
+export type AnimeCastResponse = {
+  success: boolean
+  animeId: number
+  role: AnimeCastRole
+  storedRole: string
+  voiceLanguage?: AnimeCastVoiceLanguage | null
+  requiresImages: boolean
+  items: AnimeCastCharacter[]
+}

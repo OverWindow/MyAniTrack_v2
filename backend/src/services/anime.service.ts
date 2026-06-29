@@ -3,6 +3,7 @@ import { RowDataPacket } from 'mysql2/promise';
 
 export type AnimeSortOption = 'latest' | 'score' | 'season' | 'popularity';
 export type AnimeTitleLanguage = 'ko' | 'en' | 'ja';
+export type AnimeCharacterRole = 'MAIN' | 'SUPPORT' | 'BACKGROUND';
 export type AnimeGenre =
   | 'Action'
   | 'Adventure'
@@ -141,6 +142,38 @@ interface SynonymRow extends RowDataPacket {
   synonym: string;
 }
 
+interface IdRow extends RowDataPacket {
+  id: number;
+}
+
+interface AnimeCastRow extends RowDataPacket {
+  characterId: number;
+  characterAnilistId: number;
+  characterNameFull: string | null;
+  characterNameNative: string | null;
+  characterNameUserPreferred: string | null;
+  characterImageLarge: string | null;
+  characterImageMedium: string | null;
+  characterGender: string | null;
+  characterAge: string | null;
+  characterDescription: string | null;
+  characterSiteUrl: string | null;
+  role: string | null;
+  edgeName: string | null;
+  characterSortOrder: number | null;
+  voiceActorId: number;
+  voiceActorAnilistId: number;
+  voiceActorNameFull: string | null;
+  voiceActorNameNative: string | null;
+  voiceActorNameUserPreferred: string | null;
+  voiceActorLanguageV2: string | null;
+  voiceActorImageLarge: string | null;
+  voiceActorImageMedium: string | null;
+  voiceActorDescription: string | null;
+  voiceActorSiteUrl: string | null;
+  voiceActorSortOrder: number | null;
+}
+
 function decodeCursor(cursor?: string): AnimeListCursorPayload | null {
   if (!cursor) {
     return null;
@@ -184,6 +217,14 @@ function pickDisplayTitle(row: AnimeListRow | AnimeDetailRow, titleLanguage: Ani
     ?? row.titleUserPreferred
     ?? row.titleEnglish
     ?? koreanTitle;
+}
+
+function toStoredCharacterRole(role: AnimeCharacterRole) {
+  if (role === 'SUPPORT') {
+    return 'SUPPORTING';
+  }
+
+  return role;
 }
 
 function buildListOrderClause(sort: AnimeSortOption): string {
@@ -643,5 +684,191 @@ export async function getAnimeDetailById(id: number, titleLanguage: AnimeTitleLa
       isSpoiler: normalizeBoolean(row.isSpoiler),
     })),
     synonyms: synonymRows[0].map((row) => row.synonym),
+  };
+}
+
+export async function getAnimeCastByRole(params: {
+  animeId: number;
+  role: AnimeCharacterRole;
+  limit: number;
+  voiceLanguage?: string;
+}) {
+  const { animeId, role, limit, voiceLanguage } = params;
+
+  if (!Number.isInteger(animeId) || animeId <= 0) {
+    throw new Error('anime id must be a positive integer');
+  }
+
+  const [animeRows] = await pool.query<IdRow[]>(
+    `
+    SELECT id
+    FROM anime
+    WHERE id = ?
+    LIMIT 1
+    `,
+    [animeId]
+  );
+
+  if (!animeRows[0]) {
+    throw new Error('Anime not found');
+  }
+
+  const storedRole = toStoredCharacterRole(role);
+  const queryParams: Array<string | number> = [];
+  const voiceLanguageWhere = voiceLanguage
+    ? 'AND acva.language_v2 = ?'
+    : '';
+
+  if (voiceLanguage) {
+    queryParams.push(voiceLanguage);
+  }
+
+  queryParams.push(animeId, storedRole, limit);
+
+  const [rows] = await pool.query<AnimeCastRow[]>(
+    `
+    SELECT
+      c.id AS characterId,
+      c.anilist_id AS characterAnilistId,
+      c.name_full AS characterNameFull,
+      c.name_native AS characterNameNative,
+      c.name_user_preferred AS characterNameUserPreferred,
+      c.image_large AS characterImageLarge,
+      c.image_medium AS characterImageMedium,
+      c.gender AS characterGender,
+      c.age AS characterAge,
+      c.description AS characterDescription,
+      c.site_url AS characterSiteUrl,
+      ac.role,
+      ac.edge_name AS edgeName,
+      ac.sort_order AS characterSortOrder,
+      va.id AS voiceActorId,
+      va.anilist_id AS voiceActorAnilistId,
+      va.name_full AS voiceActorNameFull,
+      va.name_native AS voiceActorNameNative,
+      va.name_user_preferred AS voiceActorNameUserPreferred,
+      va.language_v2 AS voiceActorLanguageV2,
+      va.image_large AS voiceActorImageLarge,
+      va.image_medium AS voiceActorImageMedium,
+      va.description AS voiceActorDescription,
+      va.site_url AS voiceActorSiteUrl,
+      acva.sort_order AS voiceActorSortOrder
+    FROM anime_characters ac
+    INNER JOIN characters c
+      ON c.id = ac.character_id
+    INNER JOIN anime_character_voice_actors acva
+      ON acva.anime_id = ac.anime_id
+      AND acva.character_id = ac.character_id
+      ${voiceLanguageWhere}
+    INNER JOIN voice_actors va
+      ON va.id = acva.voice_actor_id
+    WHERE ac.anime_id = ?
+      AND ac.role = ?
+      AND COALESCE(c.image_large, c.image_medium) IS NOT NULL
+      AND COALESCE(va.image_large, va.image_medium) IS NOT NULL
+    ORDER BY
+      COALESCE(ac.sort_order, 999999) ASC,
+      c.id ASC,
+      COALESCE(acva.sort_order, 999999) ASC,
+      va.id ASC
+    LIMIT ?
+    `,
+    queryParams
+  );
+
+  const characterMap = new Map<number, {
+    id: number;
+    anilistId: number;
+    role: string | null;
+    requestedRole: AnimeCharacterRole;
+    edgeName: string | null;
+    sortOrder: number | null;
+    name: {
+      full: string | null;
+      native: string | null;
+      userPreferred: string | null;
+    };
+    image: {
+      large: string | null;
+      medium: string | null;
+    };
+    gender: string | null;
+    age: string | null;
+    description: string | null;
+    siteUrl: string | null;
+    voiceActors: Array<{
+      id: number;
+      anilistId: number;
+      languageV2: string | null;
+      sortOrder: number | null;
+      name: {
+        full: string | null;
+        native: string | null;
+        userPreferred: string | null;
+      };
+      image: {
+        large: string | null;
+        medium: string | null;
+      };
+      description: string | null;
+      siteUrl: string | null;
+    }>;
+  }>();
+
+  for (const row of rows) {
+    const existingCharacter = characterMap.get(row.characterId);
+    const character = existingCharacter ?? {
+      id: row.characterId,
+      anilistId: row.characterAnilistId,
+      role: row.role,
+      requestedRole: role,
+      edgeName: row.edgeName,
+      sortOrder: row.characterSortOrder,
+      name: {
+        full: row.characterNameFull,
+        native: row.characterNameNative,
+        userPreferred: row.characterNameUserPreferred,
+      },
+      image: {
+        large: row.characterImageLarge,
+        medium: row.characterImageMedium,
+      },
+      gender: row.characterGender,
+      age: row.characterAge,
+      description: row.characterDescription,
+      siteUrl: row.characterSiteUrl,
+      voiceActors: [],
+    };
+
+    character.voiceActors.push({
+      id: row.voiceActorId,
+      anilistId: row.voiceActorAnilistId,
+      languageV2: row.voiceActorLanguageV2,
+      sortOrder: row.voiceActorSortOrder,
+      name: {
+        full: row.voiceActorNameFull,
+        native: row.voiceActorNameNative,
+        userPreferred: row.voiceActorNameUserPreferred,
+      },
+      image: {
+        large: row.voiceActorImageLarge,
+        medium: row.voiceActorImageMedium,
+      },
+      description: row.voiceActorDescription,
+      siteUrl: row.voiceActorSiteUrl,
+    });
+
+    if (!existingCharacter) {
+      characterMap.set(row.characterId, character);
+    }
+  }
+
+  return {
+    animeId,
+    role,
+    storedRole,
+    voiceLanguage: voiceLanguage ?? null,
+    requiresImages: true,
+    items: Array.from(characterMap.values()),
   };
 }

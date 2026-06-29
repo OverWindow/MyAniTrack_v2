@@ -420,10 +420,23 @@
 }
 
 .smart-rating-choice-group {
-  grid-column: 1 / -1;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
+}
+
+.smart-rating-choice-panel {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 10px;
+  padding: 4px 2px 0;
+}
+
+.smart-rating-choice-panel > span {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-align: center;
 }
 
 .smart-rating-choice {

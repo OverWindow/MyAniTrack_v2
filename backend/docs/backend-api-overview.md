@@ -284,6 +284,84 @@ Response example:
 }
 ```
 
+### `GET /anime/:id/cast`
+특정 애니의 캐릭터와 해당 캐릭터의 성우 정보를 role 기준으로 조회합니다.
+
+이 API는 캐릭터 이미지와 성우 이미지가 모두 있는 데이터만 반환합니다. 캐릭터/성우 데이터는 먼저 관리자 캐스트 동기화 API로 수집되어 있어야 합니다.
+
+Query:
+
+- `role`: `MAIN | SUPPORT | BACKGROUND`, 기본값 `MAIN`
+- `limit`: `1~100`, 기본값 `50`
+- `voiceLanguage`: 선택값. 예: `Japanese`, `Korean`, `English`. 저장된 `anime_character_voice_actors.language_v2`와 정확히 일치하는 성우만 조회합니다.
+
+참고:
+
+- AniList 원본 role `SUPPORTING`은 프론트 요청에서는 `SUPPORT`로 사용합니다.
+- `role=SUPPORTING`을 보내도 서버가 `SUPPORT`로 처리합니다.
+- `id`는 AniList id가 아니라 내부 `anime.id`입니다.
+
+Example request:
+
+```http
+GET /api/anime/123/cast?role=MAIN&limit=20
+```
+
+Response example:
+
+```json
+{
+  "success": true,
+  "animeId": 123,
+  "role": "MAIN",
+  "storedRole": "MAIN",
+  "voiceLanguage": null,
+  "requiresImages": true,
+  "items": [
+    {
+      "id": 10,
+      "anilistId": 1001,
+      "role": "MAIN",
+      "requestedRole": "MAIN",
+      "edgeName": null,
+      "sortOrder": 1,
+      "name": {
+        "full": "Frieren",
+        "native": "フリーレン",
+        "userPreferred": "Frieren"
+      },
+      "image": {
+        "large": "https://...",
+        "medium": "https://..."
+      },
+      "gender": "Female",
+      "age": null,
+      "description": "...",
+      "siteUrl": "https://anilist.co/character/...",
+      "voiceActors": [
+        {
+          "id": 20,
+          "anilistId": 2001,
+          "languageV2": "Japanese",
+          "sortOrder": 1,
+          "name": {
+            "full": "Atsumi Tanezaki",
+            "native": "種﨑敦美",
+            "userPreferred": "Atsumi Tanezaki"
+          },
+          "image": {
+            "large": "https://...",
+            "medium": "https://..."
+          },
+          "description": "...",
+          "siteUrl": "https://anilist.co/staff/..."
+        }
+      ]
+    }
+  ]
+}
+```
+
 ## Auth
 
 ### `GET /auth/check-username`
@@ -1524,7 +1602,12 @@ Response example:
   "item": {
     "registeredUserCount": 120,
     "storedAnimeCount": 8450,
-    "translatedKoreanTitleCount": 5300
+    "translatedKoreanTitleCount": 5300,
+    "translationProgressRate": 62.72,
+    "castSyncedAnimeCount": 2100,
+    "castSyncProgressRate": 24.85,
+    "characterCount": 18340,
+    "voiceActorCount": 4120
   }
 }
 ```
@@ -1642,6 +1725,73 @@ Response example:
     "totalAnime": 120,
     "nextPage": null,
     "finished": true
+  }
+}
+```
+
+### `POST /admin/anime/:animeId/sync/cast`
+특정 애니의 캐릭터/성우 정보를 AniList에서 동기화합니다.
+
+`animeId`는 내부 `anime.id`입니다.
+
+Body:
+
+```json
+{
+  "language": "JAPANESE",
+  "perPage": 25
+}
+```
+
+Response example:
+
+```json
+{
+  "success": true,
+  "message": "Anime cast synced successfully",
+  "result": {
+    "animeId": 123,
+    "anilistId": 21858,
+    "language": "JAPANESE",
+    "processedPages": 2,
+    "characterEdgeCount": 41,
+    "characterCount": 41,
+    "voiceActorCount": 38,
+    "characterVoiceActorLinkCount": 38
+  }
+}
+```
+
+### `POST /admin/anime/sync/cast/batch`
+동기화 기록이 없거나 실패한 애니의 캐릭터/성우 정보를 순차 동기화합니다.
+
+Body:
+
+```json
+{
+  "limit": 10,
+  "language": "JAPANESE",
+  "perPage": 25,
+  "onlyMissing": true,
+  "retryFailed": true,
+  "delayMs": 2500
+}
+```
+
+### `GET /admin/anime/:animeId/sync/cast`
+특정 애니의 캐릭터/성우 동기화 상태를 조회합니다.
+
+Response example:
+
+```json
+{
+  "success": true,
+  "item": {
+    "animeId": 123,
+    "lastSyncedAt": "2026-06-28 10:10:00",
+    "sourceUpdatedAt": "2026-06-28 10:00:00",
+    "status": "success",
+    "errorMessage": null
   }
 }
 ```

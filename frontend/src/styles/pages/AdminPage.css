@@ -9,8 +9,7 @@
 .admin-action-card,
 .admin-response-card,
 .admin-sidebar,
-.admin-workspace-panel,
-.admin-summary-section {
+.admin-workspace-panel {
   border: 1px solid rgba(120, 113, 108, 0.16);
   border-radius: 20px;
   background: var(--bg-card);
@@ -49,7 +48,6 @@
   font-size: 0.92rem;
 }
 
-.admin-summary-section,
 .admin-summary-card,
 .admin-overview-card,
 .admin-sidebar,
@@ -57,6 +55,11 @@
   padding: 22px;
   display: grid;
   gap: 10px;
+}
+
+.admin-summary-section {
+  display: grid;
+  gap: 16px;
 }
 
 .admin-summary-header {
@@ -74,8 +77,26 @@
 
 .admin-summary-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 16px;
+}
+
+.admin-summary-combined-card {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.admin-summary-item {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 22px;
+}
+
+.admin-summary-item + .admin-summary-item {
+  border-left: 1px solid rgba(120, 113, 108, 0.14);
 }
 
 .admin-summary-card span,
@@ -180,6 +201,30 @@
   gap: 14px;
 }
 
+.admin-checkbox-field {
+  min-height: 52px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  border: 1px solid #d6d3d1;
+  border-radius: var(--radius-input);
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+
+.admin-checkbox-field input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--point-color);
+}
+
+.admin-checkbox-field span {
+  color: var(--text-primary);
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
 .admin-action-footer {
   display: grid;
   gap: 14px;
@@ -226,7 +271,6 @@
 
 @media (max-width: 760px) {
   .admin-hero-card,
-  .admin-summary-section,
   .admin-summary-card,
   .admin-overview-card,
   .admin-sidebar,
@@ -237,5 +281,15 @@
 
   .admin-summary-header {
     flex-direction: column;
+  }
+
+  .admin-summary-combined-card {
+    grid-template-columns: 1fr;
+    padding: 0;
+  }
+
+  .admin-summary-item + .admin-summary-item {
+    border-top: 1px solid rgba(120, 113, 108, 0.14);
+    border-left: 0;
   }
 }

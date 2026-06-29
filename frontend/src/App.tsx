@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, Route, Routes, useLocation } from 'react-router-dom'
 import type { Location } from 'react-router-dom'
 import { handleProfileImageError, getProfileImageSrc } from './lib/avatar'
-import { formatFriendAnimeCount, getFriendInitials, getFriendPreviewName } from './lib/friends'
+import { formatFriendAnimeCount, getFriendPreviewName } from './lib/friends'
 import { Header } from './components/Header'
 import { useAuth } from './contexts/AuthContext'
 import { useFriends } from './contexts/FriendsContext'
@@ -140,7 +140,6 @@ function App() {
                 <div className="floating-friends-list">
                   {friends.map((friend) => {
                     const name = getFriendPreviewName(friend.user)
-                    const initials = getFriendInitials(friend.user)
 
                     return (
                       <Link
@@ -149,16 +148,12 @@ function App() {
                         to={`/users/${friend.user.id}/anime-list`}
                         onClick={() => setIsFriendsOpen(false)}
                       >
-                        {friend.user.profileImageUrl ? (
-                          <img
-                            className="avatar avatar-image floating-friend-avatar"
-                            src={getProfileImageSrc(friend.user.profileImageUrl)}
-                            alt={`${name} 프로필 이미지`}
-                            onError={handleProfileImageError}
-                          />
-                        ) : (
-                          <span className="avatar floating-friend-avatar" aria-hidden="true">{initials}</span>
-                        )}
+                        <img
+                          className="avatar avatar-image floating-friend-avatar"
+                          src={getProfileImageSrc(friend.user.profileImageUrl)}
+                          alt={`${name} 프로필 이미지`}
+                          onError={handleProfileImageError}
+                        />
                         <span className="floating-friend-copy">
                           <strong>{name}</strong>
                           <small>{formatFriendAnimeCount(friend.user.animeListCount)}</small>

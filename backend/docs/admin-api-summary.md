@@ -8,6 +8,31 @@
 - 성공 응답 기본 형식: `{ "success": true, ... }`
 - 실패 응답 기본 형식: `{ "success": false, "message": "..." }`
 
+## Platform Stats
+
+### `GET /api/stats/platform`
+관리자 페이지 상단 플랫폼 현황에서 사용하는 통계 API입니다.
+
+현재 라우트는 공개 API지만, 프론트에서는 관리자 페이지에서만 주요 운영 지표로 사용합니다.
+
+Response 예시:
+
+```json
+{
+  "success": true,
+  "item": {
+    "registeredUserCount": 120,
+    "storedAnimeCount": 8450,
+    "translatedKoreanTitleCount": 5300,
+    "translationProgressRate": 62.72,
+    "castSyncedAnimeCount": 2100,
+    "castSyncProgressRate": 24.85,
+    "characterCount": 18340,
+    "voiceActorCount": 4120
+  }
+}
+```
+
 ## Anime Sync
 
 ### `POST /admin/anime/sync/page`
@@ -74,6 +99,91 @@ Body 예시:
   "season": "SPRING",
   "seasonYear": 2026,
   "perPage": 50
+}
+```
+
+### `POST /admin/anime/:animeId/sync/cast`
+특정 애니의 캐릭터/성우 정보를 AniList에서 가져와 동기화합니다.
+
+`animeId`는 AniList id가 아니라 내부 `anime.id`입니다.
+
+Body 예시:
+
+```json
+{
+  "language": "JAPANESE",
+  "perPage": 25
+}
+```
+
+동작:
+
+- `characters`는 `anilist_id` 기준으로 upsert합니다.
+- `voice_actors`는 `anilist_id` 기준으로 upsert합니다.
+- 해당 애니의 `anime_characters`, `anime_character_voice_actors` 연결은 최신 AniList 결과 기준으로 재구성합니다.
+- `anime_cast_sync_state`에 `syncing`, `success`, `failed` 상태와 실패 메시지를 저장합니다.
+
+Response 예시:
+
+```json
+{
+  "success": true,
+  "message": "Anime cast synced successfully",
+  "result": {
+    "animeId": 123,
+    "anilistId": 21858,
+    "language": "JAPANESE",
+    "perPage": 25,
+    "processedPages": 2,
+    "sourceUpdatedAt": "2026-06-28 10:00:00",
+    "characterEdgeCount": 41,
+    "characterCount": 41,
+    "voiceActorCount": 38,
+    "characterVoiceActorLinkCount": 38
+  }
+}
+```
+
+### `POST /admin/anime/sync/cast/batch`
+여러 애니의 캐릭터/성우 정보를 순차 동기화합니다.
+
+Body 예시:
+
+```json
+{
+  "limit": 10,
+  "language": "JAPANESE",
+  "perPage": 25,
+  "onlyMissing": true,
+  "retryFailed": true,
+  "delayMs": 2500
+}
+```
+
+옵션:
+
+- `limit`: 1~100, 기본 10
+- `language`: `JAPANESE`, `ENGLISH`, `KOREAN`, 기본 `JAPANESE`
+- `perPage`: 1~50, 기본 25
+- `onlyMissing`: 기본 `true`; 동기화 기록이 없거나 pending/failed인 애니만 처리
+- `retryFailed`: 기본 `true`; failed 상태를 다시 시도
+- `delayMs`: 애니별 요청 간 대기 시간, 기본 2500ms
+
+### `GET /admin/anime/:animeId/sync/cast`
+특정 애니의 캐릭터/성우 동기화 상태를 조회합니다.
+
+Response 예시:
+
+```json
+{
+  "success": true,
+  "item": {
+    "animeId": 123,
+    "lastSyncedAt": "2026-06-28 10:10:00",
+    "sourceUpdatedAt": "2026-06-28 10:00:00",
+    "status": "success",
+    "errorMessage": null
+  }
 }
 ```
 

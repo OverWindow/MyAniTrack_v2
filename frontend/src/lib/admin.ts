@@ -1,6 +1,9 @@
 import { authFetch } from './auth'
 import type {
   AdminActionResponse,
+  AdminCastSyncAnimePayload,
+  AdminCastSyncBatchPayload,
+  AdminCastSyncStatusPayload,
   AdminSyncAllPayload,
   AdminSyncChunkedPayload,
   AdminSyncPagePayload,
@@ -98,6 +101,31 @@ export function syncAnimeSeason(payload: AdminSyncSeasonPayload) {
 
 export function translateKoreanTitles(payload: AdminTranslateKoreanTitlesPayload) {
   return postAdminAction('/admin/anime/korean-titles/translate', payload, '한국어 제목 번역 배치 실행에 실패했어요.')
+}
+
+export function syncAnimeCast(payload: AdminCastSyncAnimePayload) {
+  const { animeId, ...body } = payload
+  return postAdminAction(`/admin/anime/${animeId}/sync/cast`, body, '캐릭터/성우 단건 동기화에 실패했어요.')
+}
+
+export function syncAnimeCastBatch(payload: AdminCastSyncBatchPayload) {
+  return postAdminAction('/admin/anime/sync/cast/batch', payload, '캐릭터/성우 배치 동기화에 실패했어요.')
+}
+
+export async function fetchAnimeCastSyncStatus(payload: AdminCastSyncStatusPayload) {
+  const response = await authFetch(createAdminUrl(`/admin/anime/${payload.animeId}/sync/cast`))
+
+  if (!response.ok) {
+    throw new Error(getAdminErrorMessage(response.status, '캐릭터/성우 동기화 상태 조회에 실패했어요.'))
+  }
+
+  const data = await response.json()
+
+  return {
+    success: Boolean(data?.success ?? true),
+    message: typeof data?.message === 'string' ? data.message : '캐릭터/성우 동기화 상태를 조회했어요.',
+    result: data,
+  } as AdminActionResponse
 }
 
 export async function updateAnimeKoreanTitle(animeId: number, payload: AdminUpdateKoreanTitlePayload) {

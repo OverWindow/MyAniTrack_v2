@@ -5,6 +5,9 @@ interface PlatformStatsRow extends RowDataPacket {
   registeredUserCount: number;
   storedAnimeCount: number;
   translatedKoreanTitleCount: number;
+  castSyncedAnimeCount: number;
+  characterCount: number;
+  voiceActorCount: number;
 }
 
 interface PopularAnimeRow extends RowDataPacket {
@@ -34,16 +37,35 @@ export async function getPlatformStats() {
     SELECT
       (SELECT COUNT(*) FROM users) AS registeredUserCount,
       (SELECT COUNT(*) FROM anime) AS storedAnimeCount,
-      (SELECT COUNT(*) FROM anime_korean_titles) AS translatedKoreanTitleCount
+      (SELECT COUNT(*) FROM anime_korean_titles) AS translatedKoreanTitleCount,
+      (
+        SELECT COUNT(*)
+        FROM anime_cast_sync_state
+        WHERE status = 'success'
+      ) AS castSyncedAnimeCount,
+      (SELECT COUNT(*) FROM characters) AS characterCount,
+      (SELECT COUNT(*) FROM voice_actors) AS voiceActorCount
     `
   );
 
   const stats = rows[0];
+  const storedAnimeCount = stats?.storedAnimeCount ?? 0;
+  const translatedKoreanTitleCount = stats?.translatedKoreanTitleCount ?? 0;
+  const castSyncedAnimeCount = stats?.castSyncedAnimeCount ?? 0;
 
   return {
     registeredUserCount: stats?.registeredUserCount ?? 0,
-    storedAnimeCount: stats?.storedAnimeCount ?? 0,
-    translatedKoreanTitleCount: stats?.translatedKoreanTitleCount ?? 0,
+    storedAnimeCount,
+    translatedKoreanTitleCount,
+    translationProgressRate: storedAnimeCount > 0
+      ? Number(((translatedKoreanTitleCount / storedAnimeCount) * 100).toFixed(2))
+      : 0,
+    castSyncedAnimeCount,
+    castSyncProgressRate: storedAnimeCount > 0
+      ? Number(((castSyncedAnimeCount / storedAnimeCount) * 100).toFixed(2))
+      : 0,
+    characterCount: stats?.characterCount ?? 0,
+    voiceActorCount: stats?.voiceActorCount ?? 0,
   };
 }
 
