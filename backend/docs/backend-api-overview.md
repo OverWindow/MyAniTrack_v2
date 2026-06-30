@@ -1215,6 +1215,189 @@ Response example:
 }
 ```
 
+## Voice Actor Analysis
+
+유저 컬렉션과 캐릭터/성우 동기화 데이터를 기반으로 성우 취향을 분석합니다.
+
+분석 결과는 `user_voice_actor_stats` 스냅샷 테이블에 저장됩니다. 유저의 애니 컬렉션이 추가/수정/삭제되면 dirty 처리되고, 다음 랭킹 조회 시 자동 재계산됩니다.
+
+### `GET /me/voice-actors/ranking`
+내가 많이 본 성우 또는 평점 기준으로 좋아하는 성우 랭킹을 조회합니다.
+
+인증 필요.
+
+Query:
+
+- `sort`: `count | score`, 기본값 `count`
+- `limit`: `1~50`, 기본값 `20`
+- `cursor`: 다음 페이지 cursor
+- `minAnimeCount`: 최소 출연 작품 수, 기본값 `1`
+- `minRatedAnimeCount`: `sort=score`에서 최소 평점 작품 수, 기본값 `1`
+
+Example requests:
+
+```http
+GET /api/me/voice-actors/ranking?sort=count&limit=20
+GET /api/me/voice-actors/ranking?sort=score&minRatedAnimeCount=3&limit=20
+```
+
+Response example:
+
+```json
+{
+  "success": true,
+  "userId": 1,
+  "items": [
+    {
+      "voiceActor": {
+        "id": 12,
+        "anilistId": 95001,
+        "name": {
+          "full": "Kana Hanazawa",
+          "native": "花澤香菜",
+          "userPreferred": "Kana Hanazawa"
+        },
+        "image": {
+          "large": "https://...",
+          "medium": "https://..."
+        },
+        "languageV2": "Japanese"
+      },
+      "animeCount": 34,
+      "characterCount": 41,
+      "ratedAnimeCount": 29,
+      "scoreSum": 247,
+      "averageScore": 8.52,
+      "statsVersion": 3,
+      "lastCalculatedAt": "2026-06-30 10:00:00"
+    }
+  ],
+  "pageInfo": {
+    "limit": 20,
+    "sort": "score",
+    "minAnimeCount": 1,
+    "minRatedAnimeCount": 3,
+    "hasNext": true,
+    "nextCursor": "..."
+  },
+  "analysis": {
+    "dirty": false,
+    "version": 3,
+    "calculatedAt": "2026-06-30 10:00:00"
+  }
+}
+```
+
+### `GET /users/:userId/voice-actors/ranking`
+타 사용자의 성우 랭킹을 조회합니다.
+
+Query와 응답 구조는 `/me/voice-actors/ranking`과 같습니다.
+
+### `GET /me/voice-actors/:voiceActorId/anime`
+특정 성우가 내 컬렉션의 어떤 애니에서 어떤 캐릭터를 맡았는지 cursor 기반으로 조회합니다.
+
+인증 필요.
+
+Query:
+
+- `limit`: `1~50`, 기본값 `20`
+- `cursor`: 다음 페이지 cursor
+- `titleLanguage`: `ko | en | ja`, 기본값 `ko`
+
+Example request:
+
+```http
+GET /api/me/voice-actors/12/anime?titleLanguage=ko&limit=20
+```
+
+Response example:
+
+```json
+{
+  "success": true,
+  "userId": 1,
+  "voiceActor": {
+    "id": 12,
+    "anilistId": 95001,
+    "name": {
+      "full": "Kana Hanazawa",
+      "native": "花澤香菜",
+      "userPreferred": "Kana Hanazawa"
+    },
+    "image": {
+      "large": "https://...",
+      "medium": "https://..."
+    },
+    "languageV2": "Japanese",
+    "description": "...",
+    "siteUrl": "https://anilist.co/staff/..."
+  },
+  "items": [
+    {
+      "anime": {
+        "id": 123,
+        "anilistId": 456,
+        "title": "장송의 프리렌",
+        "titles": {
+          "korean": "장송의 프리렌",
+          "english": "Frieren: Beyond Journey's End",
+          "native": "葬送のフリーレン",
+          "romaji": "Sousou no Frieren",
+          "userPreferred": "Frieren: Beyond Journey's End"
+        },
+        "coverImageLarge": "https://...",
+        "coverImageExtraLarge": "https://...",
+        "bannerImage": "https://...",
+        "seasonYear": 2023,
+        "format": "TV",
+        "status": "FINISHED",
+        "averageScore": 88
+      },
+      "userList": {
+        "status": "completed",
+        "score": 9,
+        "progress": 28,
+        "updatedAt": "2026-06-30 10:00:00"
+      },
+      "characters": [
+        {
+          "id": 77,
+          "anilistId": 1001,
+          "role": "MAIN",
+          "sortOrder": 1,
+          "name": {
+            "full": "Frieren",
+            "native": "フリーレン",
+            "userPreferred": "Frieren"
+          },
+          "image": {
+            "large": "https://...",
+            "medium": "https://..."
+          }
+        }
+      ]
+    }
+  ],
+  "pageInfo": {
+    "limit": 20,
+    "titleLanguage": "ko",
+    "hasNext": true,
+    "nextCursor": "..."
+  }
+}
+```
+
+### `GET /users/:userId/voice-actors/:voiceActorId/anime`
+타 사용자 컬렉션 기준으로 특정 성우가 나온 애니/캐릭터 목록을 조회합니다.
+
+Query와 응답 구조는 `/me/voice-actors/:voiceActorId/anime`과 같습니다.
+
+Frontend usage:
+
+1. 분석 페이지 진입 시 `sort=count`, `sort=score` 랭킹을 각각 호출합니다.
+2. 성우 카드를 클릭했을 때만 `/voice-actors/:voiceActorId/anime`을 호출합니다.
+3. 상세 목록은 `pageInfo.nextCursor`로 더보기 처리합니다.
+
 ## Recommendation / Stats
 
 ### `GET /me/anime-stats`
@@ -1775,6 +1958,45 @@ Body:
   "onlyMissing": true,
   "retryFailed": true,
   "delayMs": 2500
+}
+```
+
+### `POST /admin/anime/sync/cast/chunked`
+캐릭터/성우 배치를 여러 청크로 순차 처리합니다. 100개를 초과하는 동기화 작업은 이 API를 사용합니다.
+
+Body:
+
+```json
+{
+  "totalLimit": 500,
+  "chunkSize": 100,
+  "maxChunks": 5,
+  "chunkDelayMs": 10000,
+  "language": "JAPANESE",
+  "perPage": 25,
+  "onlyMissing": true,
+  "retryFailed": true,
+  "delayMs": 2500
+}
+```
+
+Response example:
+
+```json
+{
+  "success": true,
+  "message": "Anime cast chunked sync completed",
+  "result": {
+    "totalLimit": 500,
+    "chunkSize": 100,
+    "maxChunks": 5,
+    "processedChunks": 5,
+    "selectedAnimeCount": 500,
+    "processedAnimeCount": 497,
+    "failedAnimeCount": 3,
+    "finished": false,
+    "nextChunkAvailable": false
+  }
 }
 ```
 

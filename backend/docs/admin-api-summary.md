@@ -169,6 +169,56 @@ Body 예시:
 - `retryFailed`: 기본 `true`; failed 상태를 다시 시도
 - `delayMs`: 애니별 요청 간 대기 시간, 기본 2500ms
 
+### `POST /admin/anime/sync/cast/chunked`
+캐릭터/성우 배치를 여러 청크로 순차 처리합니다.
+
+기존 `cast/batch`는 한 번에 최대 100개까지만 처리합니다. 이 API는 내부적으로 `cast/batch`를 여러 번 호출해 100개 초과 작업을 안전하게 나눠 처리합니다.
+
+Body 예시:
+
+```json
+{
+  "totalLimit": 500,
+  "chunkSize": 100,
+  "maxChunks": 5,
+  "chunkDelayMs": 10000,
+  "language": "JAPANESE",
+  "perPage": 25,
+  "onlyMissing": true,
+  "retryFailed": true,
+  "delayMs": 2500
+}
+```
+
+옵션:
+
+- `totalLimit`: 전체 처리 목표 개수, 1~5000, 생략 가능
+- `chunkSize`: 청크당 처리 개수, 1~100, 기본 100
+- `maxChunks`: 최대 청크 수, 1~100, 생략 가능
+- `chunkDelayMs`: 청크 사이 대기 시간, 기본 10000ms
+- `delayMs`: 청크 내부에서 애니별 대기 시간, 기본 2500ms
+- `language`, `perPage`, `onlyMissing`, `retryFailed`: `cast/batch`와 동일
+
+Response 예시:
+
+```json
+{
+  "success": true,
+  "message": "Anime cast chunked sync completed",
+  "result": {
+    "totalLimit": 500,
+    "chunkSize": 100,
+    "maxChunks": 5,
+    "processedChunks": 5,
+    "selectedAnimeCount": 500,
+    "processedAnimeCount": 497,
+    "failedAnimeCount": 3,
+    "finished": false,
+    "nextChunkAvailable": false
+  }
+}
+```
+
 ### `GET /admin/anime/:animeId/sync/cast`
 특정 애니의 캐릭터/성우 동기화 상태를 조회합니다.
 

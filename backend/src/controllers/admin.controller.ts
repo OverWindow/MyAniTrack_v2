@@ -4,6 +4,7 @@ import {
   getAnimeCastSyncState,
   syncAnimeCastBatch,
   syncAnimeCastByAnimeId,
+  syncAnimeCastInChunks,
 } from '../../sync/anime-cast.sync.service';
 import { translateAnimeKoreanTitlesInBatches } from '../../translations/anime.korean-title.service';
 import { updateAnimeKoreanTitleByAdmin } from '../services/admin-korean-title.service';
@@ -207,6 +208,30 @@ export async function syncAnimeCastBatchController(req: Request, res: Response) 
     return res.json({
       success: true,
       message: 'Anime cast batch sync completed',
+      result,
+    });
+  } catch (error) {
+    return sendError(res, error);
+  }
+}
+
+export async function syncAnimeCastInChunksController(req: Request, res: Response) {
+  try {
+    const result = await syncAnimeCastInChunks({
+      totalLimit: req.body.totalLimit,
+      chunkSize: req.body.chunkSize,
+      maxChunks: req.body.maxChunks,
+      chunkDelayMs: req.body.chunkDelayMs,
+      perPage: req.body.perPage,
+      language: req.body.language,
+      onlyMissing: req.body.onlyMissing,
+      retryFailed: req.body.retryFailed,
+      delayMs: req.body.delayMs,
+    });
+
+    return res.json({
+      success: true,
+      message: 'Anime cast chunked sync completed',
       result,
     });
   } catch (error) {

@@ -49,6 +49,18 @@ export type AdminCastSyncBatchPayload = {
   delayMs: number
 }
 
+export type AdminCastSyncChunkedPayload = {
+  totalLimit: number
+  chunkSize: number
+  maxChunks: number
+  chunkDelayMs: number
+  language: AdminCastLanguage
+  perPage: number
+  onlyMissing: boolean
+  retryFailed: boolean
+  delayMs: number
+}
+
 export type AdminCastSyncStatusPayload = {
   animeId: number
 }

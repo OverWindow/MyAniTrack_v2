@@ -2,6 +2,7 @@ import { ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import { pool } from '../../config/db';
 import { AnimeGenre } from './anime.service';
 import { recalculateUserAnimeStats } from './recommendation.service';
+import { markUserVoiceActorStatsDirty } from './user-voice-actor-stats.service';
 
 const LIST_STATUS_OPTIONS = ['planned', 'watching', 'completed', 'paused', 'dropped'] as const;
 const USER_ANIME_LIST_SORT_OPTIONS = ['latest', 'added', 'score', 'scoreAsc'] as const;
@@ -814,6 +815,7 @@ export async function addAnimeToUserList(userId: number, animeId: number, input:
   }
 
   await recalculateUserAnimeStats(userId);
+  await markUserVoiceActorStatsDirty(userId);
 
   return mapUserAnimeListItem(item);
 }
@@ -879,6 +881,7 @@ export async function updateUserAnimeListItem(userId: number, animeId: number, i
   }
 
   await recalculateUserAnimeStats(userId);
+  await markUserVoiceActorStatsDirty(userId);
 
   return mapUserAnimeListItem(item);
 }
@@ -899,6 +902,7 @@ export async function removeAnimeFromUserList(userId: number, animeId: number) {
   }
 
   await recalculateUserAnimeStats(userId);
+  await markUserVoiceActorStatsDirty(userId);
 }
 
 

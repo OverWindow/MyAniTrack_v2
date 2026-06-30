@@ -3,6 +3,7 @@ import type {
   AdminActionResponse,
   AdminCastSyncAnimePayload,
   AdminCastSyncBatchPayload,
+  AdminCastSyncChunkedPayload,
   AdminCastSyncStatusPayload,
   AdminSyncAllPayload,
   AdminSyncChunkedPayload,
@@ -110,6 +111,10 @@ export function syncAnimeCast(payload: AdminCastSyncAnimePayload) {
 
 export function syncAnimeCastBatch(payload: AdminCastSyncBatchPayload) {
   return postAdminAction('/admin/anime/sync/cast/batch', payload, '캐릭터/성우 배치 동기화에 실패했어요.')
+}
+
+export function syncAnimeCastChunked(payload: AdminCastSyncChunkedPayload) {
+  return postAdminAction('/admin/anime/sync/cast/chunked', payload, '캐릭터/성우 청크 동기화에 실패했어요.')
 }
 
 export async function fetchAnimeCastSyncStatus(payload: AdminCastSyncStatusPayload) {

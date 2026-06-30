@@ -9,6 +9,7 @@ import recommendationRoutes from './src/routes/recommendation.routes';
 import userAgreementRoutes from './src/routes/user-agreement.routes';
 import userAnimeListRoutes from './src/routes/user-anime-list.routes';
 import userProfileRoutes from './src/routes/user-profile.routes';
+import userVoiceActorStatsRoutes from './src/routes/user-voice-actor-stats.routes';
 
 dotenv.config();
 
@@ -109,6 +110,7 @@ app.use('/api', recommendationRoutes);
 app.use('/api', userAgreementRoutes);
 app.use('/api', userAnimeListRoutes);
 app.use('/api', userProfileRoutes);
+app.use('/api', userVoiceActorStatsRoutes);
 
 const PORT = Number(process.env.PORT || 4000);
 

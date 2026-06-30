@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { VoiceActorRankingSection } from '../components/VoiceActorRankingSection'
 import { getProfileImageSrc, handleProfileImageError } from '../lib/avatar'
 import { formatUpdatedAt, formatWatchHours, getGenreLabel } from '../lib/stats'
 import { fetchPublicUserAnimeStats, fetchPublicUserCollection } from '../lib/users'
@@ -631,6 +632,8 @@ export function UserAnalysisPage() {
           )}
         </div>
       </div>
+
+      <VoiceActorRankingSection userId={userId} ownerLabel={user.username} />
     </section>
   )
 }

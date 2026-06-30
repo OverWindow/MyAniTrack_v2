@@ -533,6 +533,100 @@ export async function syncAnimeCastBatch(options: {
   };
 }
 
+export async function syncAnimeCastInChunks(options: {
+  totalLimit?: unknown;
+  chunkSize?: unknown;
+  maxChunks?: unknown;
+  chunkDelayMs?: unknown;
+  perPage?: unknown;
+  language?: unknown;
+  onlyMissing?: unknown;
+  retryFailed?: unknown;
+  delayMs?: unknown;
+} = {}) {
+  const totalLimit = options.totalLimit === undefined ? undefined : Number(options.totalLimit);
+  const chunkSize = Number(options.chunkSize ?? 100);
+  const maxChunks = options.maxChunks === undefined ? undefined : Number(options.maxChunks);
+  const chunkDelayMs = Number(options.chunkDelayMs ?? 10000);
+
+  if (totalLimit !== undefined && (!Number.isInteger(totalLimit) || totalLimit < 1 || totalLimit > 5000)) {
+    throw new Error('totalLimit must be an integer between 1 and 5000');
+  }
+
+  if (!Number.isInteger(chunkSize) || chunkSize < 1 || chunkSize > 100) {
+    throw new Error('chunkSize must be an integer between 1 and 100');
+  }
+
+  if (maxChunks !== undefined && (!Number.isInteger(maxChunks) || maxChunks < 1 || maxChunks > 100)) {
+    throw new Error('maxChunks must be an integer between 1 and 100');
+  }
+
+  if (!Number.isInteger(chunkDelayMs) || chunkDelayMs < 0) {
+    throw new Error('chunkDelayMs must be a non-negative integer');
+  }
+
+  const chunkResults: Array<Awaited<ReturnType<typeof syncAnimeCastBatch>>> = [];
+  const failed: Array<{ animeId: number; anilistId: number; message: string }> = [];
+  let processedAnimeCount = 0;
+  let selectedAnimeCount = 0;
+  let failedAnimeCount = 0;
+  let finished = false;
+
+  while (!finished) {
+    if (maxChunks !== undefined && chunkResults.length >= maxChunks) {
+      break;
+    }
+
+    const remainingLimit = totalLimit === undefined
+      ? chunkSize
+      : totalLimit - selectedAnimeCount;
+
+    if (remainingLimit <= 0) {
+      break;
+    }
+
+    const currentChunkLimit = Math.min(chunkSize, remainingLimit);
+    const chunkResult = await syncAnimeCastBatch({
+      limit: currentChunkLimit,
+      perPage: options.perPage,
+      language: options.language,
+      onlyMissing: options.onlyMissing,
+      retryFailed: options.retryFailed,
+      delayMs: options.delayMs,
+    });
+
+    chunkResults.push(chunkResult);
+    selectedAnimeCount += chunkResult.selectedAnimeCount;
+    processedAnimeCount += chunkResult.processedAnimeCount;
+    failedAnimeCount += chunkResult.failedAnimeCount;
+    failed.push(...chunkResult.failed);
+
+    finished = chunkResult.selectedAnimeCount < currentChunkLimit
+      || chunkResult.selectedAnimeCount === 0;
+
+    if (!finished && chunkDelayMs > 0) {
+      await sleep(chunkDelayMs);
+    }
+  }
+
+  return {
+    totalLimit: totalLimit ?? null,
+    chunkSize,
+    maxChunks: maxChunks ?? null,
+    chunkDelayMs,
+    processedChunks: chunkResults.length,
+    selectedAnimeCount,
+    processedAnimeCount,
+    failedAnimeCount,
+    finished,
+    nextChunkAvailable: !finished && (totalLimit === undefined || selectedAnimeCount < totalLimit),
+    language: chunkResults[0]?.language ?? normalizeCastLanguage(options.language),
+    perPage: chunkResults[0]?.perPage ?? normalizePerPage(options.perPage),
+    chunks: chunkResults,
+    failed,
+  };
+}
+
 export async function getAnimeCastSyncState(animeId: number) {
   if (!Number.isInteger(animeId) || animeId <= 0) {
     throw new Error('animeId must be a positive integer');

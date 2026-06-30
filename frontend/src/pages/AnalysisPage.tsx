@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { Link } from 'react-router-dom'
+import { VoiceActorRankingSection } from '../components/VoiceActorRankingSection'
 import { useAuth } from '../contexts/AuthContext'
 import { getProfileImageSrc, handleProfileImageError } from '../lib/avatar'
 import { fetchMyCollection } from '../lib/collection'
@@ -884,6 +885,8 @@ export function AnalysisPage() {
           )}
         </div>
       </div>
+
+      <VoiceActorRankingSection ownerLabel="내" />
     </section>
   )
 }

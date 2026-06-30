@@ -1,6 +1,12 @@
 import { authFetch } from './auth'
 import { genreOptions } from './anime'
-import type { AnimeStatsResponse, TopGenreAnimeItem } from '../types/stats'
+import type {
+  AnimeStatsResponse,
+  TopGenreAnimeItem,
+  VoiceActorAnimeResponse,
+  VoiceActorRankingResponse,
+  VoiceActorRankingSort,
+} from '../types/stats'
 
 function getApiBaseUrl() {
   const baseUrl = import.meta.env.VITE_API_BASE_URL
@@ -174,6 +180,89 @@ export async function recalculateMyAnimeStats() {
   const payload = await response.json()
   console.log('[MyAniTrack] POST /api/me/anime-stats/recalculate response', payload)
   return normalizeStatsItem(payload)
+}
+
+type VoiceActorRankingParams = {
+  userId?: string
+  sort: VoiceActorRankingSort
+  limit?: number
+  minRatedAnimeCount?: number
+  signal?: AbortSignal
+}
+
+type VoiceActorAnimeParams = {
+  userId?: string
+  voiceActorId: number
+  titleLanguage?: 'ko' | 'en' | 'romaji'
+  limit?: number
+  cursor?: string | null
+  signal?: AbortSignal
+}
+
+function createVoiceActorRankingUrl(params: VoiceActorRankingParams) {
+  const path = params.userId
+    ? `/api/users/${params.userId}/voice-actors/ranking`
+    : '/api/me/voice-actors/ranking'
+  const url = new URL(path, getApiBaseUrl())
+
+  url.searchParams.set('sort', params.sort)
+  url.searchParams.set('limit', String(params.limit ?? 20))
+
+  if (params.minRatedAnimeCount !== undefined) {
+    url.searchParams.set('minRatedAnimeCount', String(params.minRatedAnimeCount))
+  }
+
+  return url
+}
+
+function createVoiceActorAnimeUrl(params: VoiceActorAnimeParams) {
+  const path = params.userId
+    ? `/api/users/${params.userId}/voice-actors/${params.voiceActorId}/anime`
+    : `/api/me/voice-actors/${params.voiceActorId}/anime`
+  const url = new URL(path, getApiBaseUrl())
+
+  url.searchParams.set('titleLanguage', params.titleLanguage ?? 'ko')
+  url.searchParams.set('limit', String(params.limit ?? 20))
+
+  if (params.cursor) {
+    url.searchParams.set('cursor', params.cursor)
+  }
+
+  return url
+}
+
+export async function fetchVoiceActorRanking(params: VoiceActorRankingParams) {
+  const response = await authFetch(createVoiceActorRankingUrl(params).toString(), {
+    signal: params.signal,
+  })
+
+  if (response.status === 401) {
+    throw new Error('로그인이 필요해요.')
+  }
+
+  if (!response.ok) {
+    throw new Error(`성우 랭킹을 불러오지 못했습니다. (${response.status})`)
+  }
+
+  const payload = (await response.json()) as VoiceActorRankingResponse
+
+  return payload.items ?? []
+}
+
+export async function fetchVoiceActorAnime(params: VoiceActorAnimeParams) {
+  const response = await authFetch(createVoiceActorAnimeUrl(params).toString(), {
+    signal: params.signal,
+  })
+
+  if (response.status === 401) {
+    throw new Error('로그인이 필요해요.')
+  }
+
+  if (!response.ok) {
+    throw new Error(`성우 상세 작품을 불러오지 못했습니다. (${response.status})`)
+  }
+
+  return (await response.json()) as VoiceActorAnimeResponse
 }
 
 export function getGenreLabel(genre?: string | null) {

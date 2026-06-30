@@ -7,6 +7,7 @@ import {
   syncAllAnimePages,
   syncAnimeCast,
   syncAnimeCastBatch,
+  syncAnimeCastChunked,
   syncAnimeChunked,
   syncAnimePage,
   syncAnimeSeason,
@@ -17,6 +18,7 @@ import type {
   AdminCastLanguage,
   AdminCastSyncAnimePayload,
   AdminCastSyncBatchPayload,
+  AdminCastSyncChunkedPayload,
   AdminCastSyncStatusPayload,
   AdminSeason,
   AdminSyncAllPayload,
@@ -50,8 +52,12 @@ type AdminActionKey =
   | 'sync-chunked'
   | 'sync-season'
   | 'translate-korean'
+  | 'cast-sync'
+
+type AdminCastActionKey =
   | 'cast-sync-anime'
   | 'cast-sync-batch'
+  | 'cast-sync-chunked'
   | 'cast-sync-status'
 
 const seasonOptions: AdminSeason[] = ['WINTER', 'SPRING', 'SUMMER', 'FALL']
@@ -203,11 +209,23 @@ export function AdminPage() {
     retryFailed: true,
     delayMs: 2500,
   })
+  const [castChunkedValues, setCastChunkedValues] = useState<AdminCastSyncChunkedPayload>({
+    totalLimit: 500,
+    chunkSize: 100,
+    maxChunks: 5,
+    chunkDelayMs: 10000,
+    language: 'JAPANESE',
+    perPage: 25,
+    onlyMissing: true,
+    retryFailed: true,
+    delayMs: 2500,
+  })
   const [castStatusValues, setCastStatusValues] = useState<AdminCastSyncStatusPayload>({
     animeId: 1,
   })
 
   const [selectedAction, setSelectedAction] = useState<AdminActionKey>('sync-page')
+  const [selectedCastAction, setSelectedCastAction] = useState<AdminCastActionKey>('cast-sync-anime')
   const [activeAction, setActiveAction] = useState<string | null>(null)
   const [responseMap, setResponseMap] = useState<Record<string, AdminActionResponse | null>>({})
   const [platformStats, setPlatformStats] = useState<PlatformStats | null>(null)
@@ -332,6 +350,101 @@ export function AdminPage() {
     }
   }
 
+  const castActionItems = [
+    {
+      key: 'cast-sync-anime' as const,
+      label: '단건',
+      description: '내부 anime.id 하나만 즉시 동기화합니다.',
+      content: (
+        <AdminActionCard
+          title="애니 캐릭터/성우 단건 동기화"
+          description="내부 DB의 anime.id 기준으로 AniList 캐릭터/성우를 가져와 characters, voice_actors 및 연결 테이블을 최신 결과로 재구성합니다."
+          fields={[
+            { key: 'animeId', label: '내부 anime.id', type: 'number' },
+            { key: 'language', label: '성우 언어', type: 'select', options: castLanguageOptions },
+            { key: 'perPage', label: 'AniList 페이지당 수', type: 'number' },
+          ]}
+          values={castAnimeValues}
+          isRunning={activeAction === 'cast-sync-anime'}
+          onChange={(key, value) => setCastAnimeValues((current) => ({ ...current, [key]: value }))}
+          onSubmit={() => { void runAction('cast-sync-anime', () => syncAnimeCast(castAnimeValues)) }}
+          response={responseMap['cast-sync-anime'] ?? null}
+        />
+      ),
+    },
+    {
+      key: 'cast-sync-batch' as const,
+      label: '배치',
+      description: '여러 애니를 한 요청에서 순차 동기화합니다.',
+      content: (
+        <AdminActionCard
+          title="애니 캐릭터/성우 배치 동기화"
+          description="여러 애니를 순차 처리합니다. 장시간 요청일 수 있으므로 실행 중에는 버튼 중복 클릭을 막습니다."
+          fields={[
+            { key: 'limit', label: '처리 개수', type: 'number' },
+            { key: 'language', label: '성우 언어', type: 'select', options: castLanguageOptions },
+            { key: 'perPage', label: 'AniList 페이지당 수', type: 'number' },
+            { key: 'onlyMissing', label: '미수집만 처리', type: 'checkbox' },
+            { key: 'retryFailed', label: '실패 항목 재시도', type: 'checkbox' },
+            { key: 'delayMs', label: '요청 간 지연(ms)', type: 'number' },
+          ]}
+          values={castBatchValues}
+          isRunning={activeAction === 'cast-sync-batch'}
+          onChange={(key, value) => setCastBatchValues((current) => ({ ...current, [key]: value }))}
+          onSubmit={() => { void runAction('cast-sync-batch', () => syncAnimeCastBatch(castBatchValues)) }}
+          response={responseMap['cast-sync-batch'] ?? null}
+        />
+      ),
+    },
+    {
+      key: 'cast-sync-chunked' as const,
+      label: '청크',
+      description: '대량 수집을 청크 단위로 나눠 안정적으로 실행합니다.',
+      content: (
+        <AdminActionCard
+          title="캐릭터/성우 청크 단위 동기화"
+          description="전체 처리 목표를 여러 chunk로 나누고, chunk 사이와 애니별 처리 사이에 대기 시간을 둡니다. 대량 캐스트 수집에 적합해요."
+          fields={[
+            { key: 'totalLimit', label: '전체 목표 개수', type: 'number' },
+            { key: 'chunkSize', label: '청크당 처리 개수', type: 'number' },
+            { key: 'maxChunks', label: '최대 청크 수', type: 'number' },
+            { key: 'chunkDelayMs', label: '청크 사이 지연(ms)', type: 'number' },
+            { key: 'language', label: '성우 언어', type: 'select', options: castLanguageOptions },
+            { key: 'perPage', label: 'AniList 페이지당 수', type: 'number' },
+            { key: 'onlyMissing', label: '미동기화/실패만 처리', type: 'checkbox' },
+            { key: 'retryFailed', label: '실패 항목 재시도', type: 'checkbox' },
+            { key: 'delayMs', label: '애니별 지연(ms)', type: 'number' },
+          ]}
+          values={castChunkedValues}
+          isRunning={activeAction === 'cast-sync-chunked'}
+          onChange={(key, value) => setCastChunkedValues((current) => ({ ...current, [key]: value }))}
+          onSubmit={() => { void runAction('cast-sync-chunked', () => syncAnimeCastChunked(castChunkedValues)) }}
+          response={responseMap['cast-sync-chunked'] ?? null}
+        />
+      ),
+    },
+    {
+      key: 'cast-sync-status' as const,
+      label: '상태 조회',
+      description: '특정 애니의 동기화 상태를 확인합니다.',
+      content: (
+        <AdminActionCard
+          title="캐릭터/성우 동기화 상태 조회"
+          description="anime_cast_sync_state에 기록된 해당 애니의 syncing/success/failed 상태와 상세 응답을 확인합니다."
+          fields={[
+            { key: 'animeId', label: '내부 anime.id', type: 'number' },
+          ]}
+          values={castStatusValues}
+          isRunning={activeAction === 'cast-sync-status'}
+          onChange={(key, value) => setCastStatusValues((current) => ({ ...current, [key]: value }))}
+          onSubmit={() => { void runAction('cast-sync-status', () => fetchAnimeCastSyncStatus(castStatusValues)) }}
+          response={responseMap['cast-sync-status'] ?? null}
+        />
+      ),
+    },
+  ]
+  const selectedCastItem = castActionItems.find((item) => item.key === selectedCastAction) ?? castActionItems[0]
+
   const actionItems = [
     {
       key: 'sync-page' as const,
@@ -446,70 +559,30 @@ export function AdminPage() {
       ),
     },
     {
-      key: 'cast-sync-anime' as const,
+      key: 'cast-sync' as const,
       group: '캐릭터/성우',
-      label: '단건 동기화',
-      description: '내부 anime.id 하나의 캐릭터/성우를 동기화합니다.',
+      label: '캐릭터/성우 동기화',
+      description: '단건, 배치, 청크, 상태 조회를 한 곳에서 실행합니다.',
       content: (
-        <AdminActionCard
-          title="애니 캐릭터/성우 단건 동기화"
-          description="내부 DB의 anime.id 기준으로 AniList 캐릭터/성우를 가져와 characters, voice_actors 및 연결 테이블을 최신 결과로 재구성합니다."
-          fields={[
-            { key: 'animeId', label: '내부 anime.id', type: 'number' },
-            { key: 'language', label: '성우 언어', type: 'select', options: castLanguageOptions },
-            { key: 'perPage', label: 'AniList 페이지당 수', type: 'number' },
-          ]}
-          values={castAnimeValues}
-          isRunning={activeAction === 'cast-sync-anime'}
-          onChange={(key, value) => setCastAnimeValues((current) => ({ ...current, [key]: value }))}
-          onSubmit={() => { void runAction('cast-sync-anime', () => syncAnimeCast(castAnimeValues)) }}
-          response={responseMap['cast-sync-anime'] ?? null}
-        />
-      ),
-    },
-    {
-      key: 'cast-sync-batch' as const,
-      group: '캐릭터/성우',
-      label: '배치 동기화',
-      description: '여러 애니의 캐릭터/성우를 순차 동기화합니다.',
-      content: (
-        <AdminActionCard
-          title="애니 캐릭터/성우 배치 동기화"
-          description="여러 애니를 순차 처리합니다. 장시간 요청일 수 있으므로 실행 중에는 버튼 중복 클릭을 막습니다."
-          fields={[
-            { key: 'limit', label: '처리 개수', type: 'number' },
-            { key: 'language', label: '성우 언어', type: 'select', options: castLanguageOptions },
-            { key: 'perPage', label: 'AniList 페이지당 수', type: 'number' },
-            { key: 'onlyMissing', label: '미수집만 처리', type: 'checkbox' },
-            { key: 'retryFailed', label: '실패 항목 재시도', type: 'checkbox' },
-            { key: 'delayMs', label: '요청 간 지연(ms)', type: 'number' },
-          ]}
-          values={castBatchValues}
-          isRunning={activeAction === 'cast-sync-batch'}
-          onChange={(key, value) => setCastBatchValues((current) => ({ ...current, [key]: value }))}
-          onSubmit={() => { void runAction('cast-sync-batch', () => syncAnimeCastBatch(castBatchValues)) }}
-          response={responseMap['cast-sync-batch'] ?? null}
-        />
-      ),
-    },
-    {
-      key: 'cast-sync-status' as const,
-      group: '캐릭터/성우',
-      label: '동기화 상태 조회',
-      description: '특정 애니의 cast sync 상태를 조회합니다.',
-      content: (
-        <AdminActionCard
-          title="캐릭터/성우 동기화 상태 조회"
-          description="anime_cast_sync_state에 기록된 해당 애니의 syncing/success/failed 상태와 상세 응답을 확인합니다."
-          fields={[
-            { key: 'animeId', label: '내부 anime.id', type: 'number' },
-          ]}
-          values={castStatusValues}
-          isRunning={activeAction === 'cast-sync-status'}
-          onChange={(key, value) => setCastStatusValues((current) => ({ ...current, [key]: value }))}
-          onSubmit={() => { void runAction('cast-sync-status', () => fetchAnimeCastSyncStatus(castStatusValues)) }}
-          response={responseMap['cast-sync-status'] ?? null}
-        />
+        <div className="admin-cast-tool">
+          <div className="admin-cast-mode-list" role="tablist" aria-label="캐릭터/성우 동기화 유형">
+            {castActionItems.map((item) => (
+              <button
+                className={selectedCastAction === item.key ? 'admin-cast-mode is-active' : 'admin-cast-mode'}
+                key={item.key}
+                type="button"
+                role="tab"
+                aria-selected={selectedCastAction === item.key}
+                onClick={() => setSelectedCastAction(item.key)}
+              >
+                <strong>{item.label}</strong>
+                <span>{item.description}</span>
+              </button>
+            ))}
+          </div>
+
+          {selectedCastItem.content}
+        </div>
       ),
     },
   ]

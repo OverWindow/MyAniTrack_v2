@@ -184,6 +184,58 @@
   gap: 8px;
 }
 
+.admin-cast-tool {
+  display: grid;
+  gap: 16px;
+}
+
+.admin-cast-mode-list {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.admin-cast-mode {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid rgba(120, 113, 108, 0.14);
+  border-radius: 12px;
+  background: var(--bg-neutral);
+  color: var(--text-primary);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  transition:
+    transform var(--duration-normal) ease,
+    border-color var(--duration-normal) ease,
+    background-color var(--duration-normal) ease;
+}
+
+.admin-cast-mode strong {
+  font-size: 0.94rem;
+}
+
+.admin-cast-mode span {
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.admin-cast-mode.is-active,
+.admin-cast-mode:hover,
+.admin-cast-mode:focus-visible {
+  border-color: rgba(245, 158, 11, 0.34);
+  background: var(--point-softest);
+  outline: none;
+}
+
+.admin-cast-mode:hover,
+.admin-cast-mode:focus-visible {
+  transform: translateY(-1px);
+}
+
 .admin-action-card {
   padding: 24px;
   display: grid;
@@ -264,7 +316,8 @@
   .admin-summary-grid,
   .admin-overview-grid,
   .admin-workspace,
-  .admin-form-grid {
+  .admin-form-grid,
+  .admin-cast-mode-list {
     grid-template-columns: 1fr;
   }
 }
