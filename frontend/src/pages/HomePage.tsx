@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { fetchPopularAnime, getDisplayTitle, getPrimaryPoster } from '../lib/anime'
 import type { PopularAnimeItem } from '../types/anime'
@@ -10,7 +10,15 @@ type HomeState = {
   error: string | null
 }
 
-const PLATFORM_ANIME_COUNT = 22201
+const FEATURE_ROTATION_MS = 6000
+
+function getPopularityLabel(value?: number | null) {
+  if (!value) {
+    return '인기 집계 중'
+  }
+
+  return `인기도 ${value.toLocaleString()}`
+}
 
 export function HomePage() {
   const [state, setState] = useState<HomeState>({
@@ -18,6 +26,7 @@ export function HomePage() {
     isLoading: true,
     error: null,
   })
+  const [featuredIndex, setFeaturedIndex] = useState(0)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -25,7 +34,7 @@ export function HomePage() {
     const loadPopularAnime = async () => {
       try {
         const popularAnime = await fetchPopularAnime({
-          limit: 16,
+          limit: 18,
           signal: controller.signal,
         })
 
@@ -34,7 +43,7 @@ export function HomePage() {
         }
 
         setState({
-          popularAnime: popularAnime.slice(0, 16),
+          popularAnime: popularAnime.slice(0, 18),
           isLoading: false,
           error: null,
         })
@@ -56,111 +65,112 @@ export function HomePage() {
     return () => controller.abort()
   }, [])
 
+  useEffect(() => {
+    if (state.popularAnime.length <= 1) {
+      return
+    }
+
+    const timer = window.setInterval(() => {
+      setFeaturedIndex((current) => (current + 1) % state.popularAnime.length)
+    }, FEATURE_ROTATION_MS)
+
+    return () => window.clearInterval(timer)
+  }, [state.popularAnime.length])
+
+  useEffect(() => {
+    if (featuredIndex < state.popularAnime.length) {
+      return
+    }
+
+    setFeaturedIndex(0)
+  }, [featuredIndex, state.popularAnime.length])
+
+  const featuredAnime = state.popularAnime[featuredIndex] ?? state.popularAnime[0] ?? null
+  const railAnime = useMemo(
+    () => state.popularAnime.slice(0, 12),
+    [state.popularAnime],
+  )
+
   return (
     <div className="home-page">
-      <section className="home-gallery-hero">
-        <div className="home-gallery-copy">
-          <span className="summary-kicker">Trending now</span>
-          <h1>지금 많이 찾는 작품</h1>
+      <section className="home-cinematic-hero" aria-label="인기 애니 쇼케이스">
+        {featuredAnime && (
+          <div
+            className="home-cinematic-backdrop"
+            style={{
+              backgroundImage: `linear-gradient(90deg, rgba(35, 29, 25, 0.95) 0%, rgba(35, 29, 25, 0.8) 42%, rgba(35, 29, 25, 0.26) 100%), url(${getPrimaryPoster(featuredAnime)})`,
+            }}
+          />
+        )}
+
+        <div className="home-cinematic-copy">
+          <span className="section-kicker">MyAniTrack spotlight</span>
+          <h1>{featuredAnime ? getDisplayTitle(featuredAnime) : '지금 많이 찾는 애니'}</h1>
+          <div className="home-feature-meta">
+            <span>Anime</span>
+            <span>Collection</span>
+            <span>{featuredAnime ? getPopularityLabel(featuredAnime.popularity) : 'Trending'}</span>
+          </div>
           <p>
-            인기 애니 포스터를 한눈에 둘러보고, 마음에 드는 작품은 바로 기록해보세요.
+            오늘의 인기 작품을 둘러보고, 마음에 드는 애니를 컬렉션에 담아 취향 분석까지 이어가세요.
           </p>
 
-          <div className="home-hero-actions">
+          <div className="home-cinematic-actions">
             <Link className="primary-button" to="/explore">
-              전체 탐색하기
+              탐색 시작하기
             </Link>
-            {state.popularAnime[0] && (
-              <Link className="secondary-button" to={`/anime/${state.popularAnime[0].id}`} state={{ fromPage: 'explore' }}>
+            {featuredAnime && (
+              <Link className="secondary-button" to={`/anime/${featuredAnime.id}`} state={{ fromPage: 'explore' }}>
                 대표 작품 보기
               </Link>
             )}
           </div>
         </div>
 
-        <div className="home-anime-showcase" aria-label="인기 애니 전시">
-          <div className="home-anime-showcase-wrapper">
-          {state.popularAnime.length > 0 ? (
-            state.popularAnime.slice(0, 16).map((anime, index) => (
-              <Link
-                className={`home-showcase-card home-showcase-card-${index + 1}`}
-                key={anime.id}
-                to={`/anime/${anime.id}`}
-                state={{ fromPage: 'explore' }}
-                aria-label={getDisplayTitle(anime)}
-              >
-                <img
-                  src={getPrimaryPoster({
-                    coverImageLarge: anime.coverImageLarge,
-                    coverImageExtraLarge: anime.coverImageExtraLarge,
-                  })}
-                  alt={getDisplayTitle(anime)}
-                  loading={index < 3 ? 'eager' : 'lazy'}
-                />
-              </Link>
-            ))
+        <div className="home-feature-poster-wrap" aria-hidden={!featuredAnime}>
+          {featuredAnime ? (
+            <img
+              className="home-feature-poster"
+              src={getPrimaryPoster(featuredAnime)}
+              alt={getDisplayTitle(featuredAnime)}
+            />
           ) : (
-            !state.isLoading && <div className="feedback-card">인기 애니 정보를 아직 보여드릴 수 없어요.</div>
+            <div className="home-feature-poster-placeholder" />
           )}
-          </div>
         </div>
 
-        <aside className="home-platform-card" aria-label="플랫폼 현황">
-          <span className="section-kicker">Platform</span>
-          <strong>{PLATFORM_ANIME_COUNT.toLocaleString()}편</strong>
-          <p>현재 MyAniTrack에 등록된 <br/>애니 수</p>
-        </aside>
+        <div className="home-poster-rail" aria-label="인기 애니 목록">
+          {state.isLoading && (
+            Array.from({ length: 6 }).map((_, index) => (
+              <div className="home-rail-card skeleton-card" key={`home-rail-loading-${index}`}>
+                <div className="skeleton-line long" />
+              </div>
+            ))
+          )}
+
+          {!state.isLoading && railAnime.length > 0 && railAnime.map((anime, index) => (
+            <button
+              className={featuredAnime?.id === anime.id ? 'home-rail-card is-active' : 'home-rail-card'}
+              key={anime.id}
+              type="button"
+              onClick={() => setFeaturedIndex(index)}
+              aria-label={`${getDisplayTitle(anime)} 대표로 보기`}
+            >
+              <img
+                src={getPrimaryPoster(anime)}
+                alt={getDisplayTitle(anime)}
+                loading={index < 4 ? 'eager' : 'lazy'}
+              />
+            </button>
+          ))}
+
+          {!state.isLoading && railAnime.length === 0 && !state.error && (
+            <div className="feedback-card">인기 애니 정보를 아직 보여드릴 수 없어요.</div>
+          )}
+        </div>
       </section>
 
       {state.error && <div className="feedback-card is-error">{state.error}</div>}
-
-      <section className="home-flow-section" aria-labelledby="home-flow-title">
-        <div className="home-flow-heading">
-          <span className="section-kicker">How it works</span>
-          <h2 id="home-flow-title">MyAniTrack 사용 방법</h2>
-        </div>
-
-        <div className="home-flow-card-grid">
-          <Link className="home-flow-card home-flow-card-explore" to="/explore">
-            <span className="home-flow-number">1</span>
-            <div className="home-flow-card-copy">
-              <h3>탐색</h3>
-              <p>마음에 드는 애니를 찾아 내 리스트에 추가하고, 바로 별점과 진행도를 남겨요.</p>
-            </div>
-            <div className="home-flow-visual home-flow-visual-explore" aria-hidden="true">
-              <span />
-              <span />
-              <span />
-            </div>
-          </Link>
-
-          <Link className="home-flow-card home-flow-card-analysis" to="/analysis">
-            <span className="home-flow-number">2</span>
-            <div className="home-flow-card-copy">
-              <h3>분석</h3>
-              <p>추가한 애니를 기준으로 취향, 장르, 평점 분포를 한눈에 확인해요.</p>
-            </div>
-            <div className="home-flow-visual home-flow-visual-analysis" aria-hidden="true">
-              <span />
-              <span />
-              <span />
-            </div>
-          </Link>
-
-          <Link className="home-flow-card home-flow-card-friends" to="/friends">
-            <span className="home-flow-number">3</span>
-            <div className="home-flow-card-copy">
-              <h3>친구</h3>
-              <p>친구를 만들고 서로의 컬렉션과 분석을 보면서 새로운 작품을 발견해요.</p>
-            </div>
-            <div className="home-flow-visual home-flow-visual-friends" aria-hidden="true">
-              <span />
-              <span />
-              <span />
-            </div>
-          </Link>
-        </div>
-      </section>
     </div>
   )
 }

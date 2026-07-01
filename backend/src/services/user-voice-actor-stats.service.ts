@@ -379,8 +379,7 @@ export async function recalculateUserVoiceActorStats(userId: number) {
               character_count,
               rated_anime_count,
               score_sum,
-              average_score,
-              last_calculated_at
+              average_score
             )
             VALUES ?
             `,
