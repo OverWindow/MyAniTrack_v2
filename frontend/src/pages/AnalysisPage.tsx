@@ -1,5 +1,7 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { AnalysisAnimeToast } from '../components/AnalysisAnimeToast'
+import { ReleaseDecadeProgress } from '../components/ReleaseDecadeProgress'
 import { VoiceActorRankingSection } from '../components/VoiceActorRankingSection'
 import { useAuth } from '../contexts/AuthContext'
 import { getProfileImageSrc, handleProfileImageError } from '../lib/avatar'
@@ -123,170 +125,6 @@ function getStarFillPercent(score: number, starIndex: number) {
   return `${fill * 100}%`
 }
 
-function AnalysisYearAnimeList({
-  selectedYear,
-  items,
-  isLoading,
-  error,
-}: YearAnimeState) {
-  if (!selectedYear) {
-    return (
-      <section className="analysis-panel analysis-year-anime-panel">
-        <div className="analysis-panel-heading">
-          <span className="detail-label">Year detail</span>
-          <h2>연도별 감상 작품</h2>
-          <p>그래프의 연도 막대를 누르면 해당 연도에 방영된 감상 작품을 볼 수 있어요.</p>
-        </div>
-      </section>
-    )
-  }
-
-  return (
-    <section className="analysis-panel analysis-year-anime-panel">
-      <div className="analysis-panel-heading">
-        <span className="detail-label">Year detail</span>
-        <h2>{selectedYear}년 감상 작품</h2>
-        <p>선택한 연도에 방영된 작품 중 내 컬렉션에 담긴 애니예요.</p>
-      </div>
-
-      {isLoading && <div className="analysis-empty-state">해당 연도 작품을 불러오는 중이에요.</div>}
-      {error && !isLoading && <div className="analysis-empty-state">{error}</div>}
-      {!isLoading && !error && items.length === 0 && (
-        <div className="analysis-empty-state">해당 연도에 표시할 작품이 없어요.</div>
-      )}
-      {!isLoading && !error && items.length > 0 && (
-        <div className="analysis-year-anime-list">
-          {items.map((entry) => (
-            <Link className="analysis-year-anime-card" key={entry.id} to={`/anime/${entry.anime.id}`}>
-              <img
-                src={entry.anime.coverImageExtraLarge || entry.anime.coverImageLarge}
-                alt={entry.anime.title}
-                loading="lazy"
-              />
-              <div className="analysis-year-anime-copy">
-                <strong>{entry.anime.title}</strong>
-                <span>
-                  {entry.anime.seasonYear ?? selectedYear}
-                  {entry.score !== null && entry.score !== undefined ? ` · ${Number(entry.score).toFixed(1)}점` : ''}
-                </span>
-              </div>
-            </Link>
-          ))}
-        </div>
-      )}
-    </section>
-  )
-}
-
-function AnalysisGenreAnimeList({
-  selectedGenre,
-  items,
-  isLoading,
-  error,
-}: GenreAnimeState) {
-  if (!selectedGenre) {
-    return (
-      <section className="analysis-panel analysis-genre-anime-panel">
-        <div className="analysis-panel-heading">
-          <span className="detail-label">Genre detail</span>
-          <h2>장르별 감상 작품</h2>
-          <p>장르 항목을 누르면 해당 장르에 속한 내 감상 작품이 여기에 표시돼요.</p>
-        </div>
-      </section>
-    )
-  }
-
-  return (
-    <section className="analysis-panel analysis-genre-anime-panel">
-      <div className="analysis-panel-heading">
-        <span className="detail-label">Genre detail</span>
-        <h2>{getGenreLabel(selectedGenre)} 감상 작품</h2>
-        <p>선택한 장르에 속한 내 컬렉션 작품들이에요.</p>
-      </div>
-
-      {isLoading && <div className="analysis-empty-state">해당 장르 작품을 불러오는 중이에요.</div>}
-      {error && !isLoading && <div className="analysis-empty-state">{error}</div>}
-      {!isLoading && !error && items.length === 0 && (
-        <div className="analysis-empty-state">해당 장르에 표시할 작품이 없어요.</div>
-      )}
-      {!isLoading && !error && items.length > 0 && (
-        <div className="analysis-year-anime-list">
-          {items.map((entry) => (
-            <Link className="analysis-year-anime-card" key={entry.id} to={`/anime/${entry.anime.id}`}>
-              <img
-                src={entry.anime.coverImageExtraLarge || entry.anime.coverImageLarge}
-                alt={entry.anime.title}
-                loading="lazy"
-              />
-              <div className="analysis-year-anime-copy">
-                <strong>{entry.anime.title}</strong>
-                <span>
-                  {getGenreLabel(selectedGenre)}
-                  {entry.score !== null && entry.score !== undefined ? ` · ${Number(entry.score).toFixed(1)}점` : ''}
-                </span>
-              </div>
-            </Link>
-          ))}
-        </div>
-      )}
-    </section>
-  )
-}
-
-function AnalysisScoreAnimeList({
-  selectedScore,
-  items,
-  isLoading,
-  error,
-}: ScoreAnimeState) {
-  if (!selectedScore) {
-    return (
-      <section className="analysis-panel analysis-score-anime-panel">
-        <div className="analysis-panel-heading">
-          <span className="detail-label">Score detail</span>
-          <h2>평점별 감상 작품</h2>
-          <p>평점 막대를 누르면 해당 평점에 속한 내 감상 작품이 여기에 표시돼요.</p>
-        </div>
-      </section>
-    )
-  }
-
-  return (
-    <section className="analysis-panel analysis-score-anime-panel">
-      <div className="analysis-panel-heading">
-        <span className="detail-label">Score detail</span>
-        <h2>{selectedScore}점대 감상 작품</h2>
-        <p>선택한 평점에 해당하는 내 컬렉션 작품들이에요.</p>
-      </div>
-
-      {isLoading && <div className="analysis-empty-state">해당 평점 작품을 불러오는 중이에요.</div>}
-      {error && !isLoading && <div className="analysis-empty-state">{error}</div>}
-      {!isLoading && !error && items.length === 0 && (
-        <div className="analysis-empty-state">해당 평점에 표시할 작품이 없어요.</div>
-      )}
-      {!isLoading && !error && items.length > 0 && (
-        <div className="analysis-year-anime-list">
-          {items.map((entry) => (
-            <Link className="analysis-year-anime-card" key={entry.id} to={`/anime/${entry.anime.id}`}>
-              <img
-                src={entry.anime.coverImageExtraLarge || entry.anime.coverImageLarge}
-                alt={entry.anime.title}
-                loading="lazy"
-              />
-              <div className="analysis-year-anime-copy">
-                <strong>{entry.anime.title}</strong>
-                <span>
-                  {entry.score !== null && entry.score !== undefined ? `${Number(entry.score).toFixed(1)}점` : `${selectedScore}점대`}
-                </span>
-              </div>
-            </Link>
-          ))}
-        </div>
-      )}
-    </section>
-  )
-}
-
 export function AnalysisPage() {
   const { isAuthenticated, user } = useAuth()
   const [state, setState] = useState<AnalysisState>({
@@ -315,18 +153,6 @@ export function AnalysisPage() {
     isLoading: false,
     error: null,
   })
-  const genreDetailRef = useRef<HTMLDivElement | null>(null)
-  const yearDetailRef = useRef<HTMLDivElement | null>(null)
-  const scoreDetailRef = useRef<HTMLDivElement | null>(null)
-
-  const scrollToDetailCard = (target: RefObject<HTMLDivElement | null>) => {
-    window.setTimeout(() => {
-      target.current?.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start',
-      })
-    }, 80)
-  }
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -426,7 +252,6 @@ export function AnalysisPage() {
         isLoading: false,
         error: '이 항목은 단일 연도가 아니라 기간이라서 작품 목록을 불러올 수 없어요.',
       })
-      scrollToDetailCard(yearDetailRef)
       return
     }
 
@@ -436,7 +261,6 @@ export function AnalysisPage() {
       isLoading: true,
       error: null,
     })
-    scrollToDetailCard(yearDetailRef)
 
     try {
       const response = await fetchMyCollection({
@@ -471,7 +295,6 @@ export function AnalysisPage() {
       isLoading: true,
       error: null,
     })
-    scrollToDetailCard(genreDetailRef)
 
     try {
       const response = await fetchMyCollection({
@@ -509,7 +332,6 @@ export function AnalysisPage() {
         isLoading: false,
         error: '선택한 평점 형식이 올바르지 않아요.',
       })
-      scrollToDetailCard(scoreDetailRef)
       return
     }
 
@@ -519,7 +341,6 @@ export function AnalysisPage() {
       isLoading: true,
       error: null,
     })
-    scrollToDetailCard(scoreDetailRef)
 
     try {
       const response = await fetchMyCollection({
@@ -826,9 +647,6 @@ export function AnalysisPage() {
                 ) : renderEmptyMessage('아직 장르별 시청 시간 데이터가 없어요.')}
               </section>
 
-              <div className="analysis-detail-scroll-target" ref={genreDetailRef}>
-                <AnalysisGenreAnimeList {...genreAnimeState} />
-              </div>
             </div>
           )}
 
@@ -840,21 +658,21 @@ export function AnalysisPage() {
                   <h2>연도별 감상 작품 수</h2>
                 </div>
                 {releaseYearChartData.length > 0 ? (
-                  <Suspense fallback={<div className="analysis-chart-skeleton analysis-chart-skeleton-wide" />}>
-                    <ReleaseYearBarChart
-                      data={releaseYearChartData}
-                      selectedYear={yearAnimeState.selectedYear}
-                      onSelectYear={(year) => {
-                        void handleSelectReleaseYear(year)
-                      }}
-                    />
-                  </Suspense>
+                  <>
+                    <Suspense fallback={<div className="analysis-chart-skeleton analysis-chart-skeleton-wide" />}>
+                      <ReleaseYearBarChart
+                        data={releaseYearChartData}
+                        selectedYear={yearAnimeState.selectedYear}
+                        onSelectYear={(year) => {
+                          void handleSelectReleaseYear(year)
+                        }}
+                      />
+                    </Suspense>
+                    <ReleaseDecadeProgress entries={releaseDistribution} />
+                  </>
                 ) : renderEmptyMessage('아직 연도별 감상 데이터가 없어요.')}
               </section>
 
-              <div className="analysis-detail-scroll-target" ref={yearDetailRef}>
-                <AnalysisYearAnimeList {...yearAnimeState} />
-              </div>
             </div>
           )}
 
@@ -878,13 +696,58 @@ export function AnalysisPage() {
                 ) : renderEmptyMessage('아직 평점 분포 데이터가 없어요.')}
               </section>
 
-              <div className="analysis-detail-scroll-target" ref={scoreDetailRef}>
-                <AnalysisScoreAnimeList {...scoreAnimeState} />
-              </div>
             </div>
           )}
         </div>
       </div>
+
+      <AnalysisAnimeToast
+        title={
+          activeTab === 'genre'
+            ? `${getGenreLabel(genreAnimeState.selectedGenre)} 감상 작품`
+            : activeTab === 'year'
+              ? `${yearAnimeState.selectedYear}년 감상 작품`
+              : `${scoreAnimeState.selectedScore}점대 감상 작품`
+        }
+        description="선택한 분석 항목에 해당하는 애니예요."
+        items={
+          activeTab === 'genre'
+            ? genreAnimeState.items
+            : activeTab === 'year'
+              ? yearAnimeState.items
+              : scoreAnimeState.items
+        }
+        isLoading={
+          activeTab === 'genre'
+            ? genreAnimeState.isLoading
+            : activeTab === 'year'
+              ? yearAnimeState.isLoading
+              : scoreAnimeState.isLoading
+        }
+        error={
+          activeTab === 'genre'
+            ? genreAnimeState.error
+            : activeTab === 'year'
+              ? yearAnimeState.error
+              : scoreAnimeState.error
+        }
+        isOpen={
+          activeTab === 'genre'
+            ? Boolean(genreAnimeState.selectedGenre)
+            : activeTab === 'year'
+              ? Boolean(yearAnimeState.selectedYear)
+              : Boolean(scoreAnimeState.selectedScore)
+        }
+        onClose={() => {
+          if (activeTab === 'genre') {
+            setGenreAnimeState({ selectedGenre: null, items: [], isLoading: false, error: null })
+          } else if (activeTab === 'year') {
+            setYearAnimeState({ selectedYear: null, items: [], isLoading: false, error: null })
+          } else {
+            setScoreAnimeState({ selectedScore: null, items: [], isLoading: false, error: null })
+          }
+        }}
+      />
 
       <VoiceActorRankingSection ownerLabel="내" />
     </section>

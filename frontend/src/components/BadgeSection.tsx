@@ -50,13 +50,9 @@ export function BadgeSection({
       )}
 
       {isLoading ? (
-        <div className="badge-grid">
-          {Array.from({ length: 3 }).map((_, index) => (
-            <article className="badge-card skeleton-card" key={`badge-skeleton-${index}`}>
-              <div className="skeleton-line short" />
-              <div className="skeleton-line long" />
-            </article>
-          ))}
+        <div className="badge-loading-state" role="status" aria-label="배지를 불러오는 중">
+          <span className="badge-loading-spinner" aria-hidden="true" />
+          <strong>배지를 불러오는 중이에요.</strong>
         </div>
       ) : error ? (
         <div className="badge-empty-state">{error}</div>

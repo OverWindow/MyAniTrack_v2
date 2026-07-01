@@ -125,6 +125,33 @@
   font-weight: 800;
 }
 
+.badge-loading-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  width: fit-content;
+  padding: 14px 16px;
+  border: 1px solid rgba(120, 113, 108, 0.14);
+  border-radius: 10px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+
+.badge-loading-spinner {
+  width: 22px;
+  height: 22px;
+  border: 3px solid rgba(120, 113, 108, 0.18);
+  border-top-color: var(--point-color);
+  border-radius: 50%;
+  animation: badgeSpinner 780ms linear infinite;
+}
+
+@keyframes badgeSpinner {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .badge-card {
   position: relative;
   display: grid;
