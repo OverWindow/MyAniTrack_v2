@@ -145,3 +145,97 @@ export type VoiceActorAnimeResponse = {
     nextCursor?: string | null
   }
 }
+
+export type StudioRankingSort = 'count' | 'score' | 'watchTime'
+
+export type AnimeStudio = {
+  id: number
+  anilistId: number
+  name: string
+  isAnimationStudio: boolean
+  siteUrl: string | null
+}
+
+export type StudioRankingItem = {
+  studio: AnimeStudio
+  animeCount: number
+  completedAnimeCount: number
+  ratedAnimeCount: number
+  scoreSum: number | null
+  averageScore: number | null
+  communityAverageScore: number | null
+  totalWatchedEpisodes: number
+  totalWatchMinutes: number
+  totalWatchHours: number | null
+  firstReleaseYear: number | null
+  latestReleaseYear: number | null
+}
+
+export type StudioRankingResponse = {
+  success: boolean
+  items: StudioRankingItem[]
+  pageInfo: {
+    limit: number
+    sort: StudioRankingSort
+    status: 'completed' | 'all'
+    mainOnly: boolean
+    minAnimeCount: number
+    minRatedAnimeCount: number
+    hasNext: boolean
+    nextCursor: string | null
+  }
+  summary: {
+    studioCount: number
+    source: {
+      status: 'completed' | 'all'
+      mainOnly: boolean
+    }
+  }
+}
+
+export type StudioAnimeItem = {
+  anime: {
+    id: number
+    anilistId: number
+    title: string | null
+    titles: {
+      korean: string | null
+      english: string | null
+      native: string | null
+      romaji: string | null
+      userPreferred: string | null
+    }
+    coverImageLarge: string | null
+    coverImageExtraLarge: string | null
+    bannerImage: string | null
+    seasonYear: number | null
+    format: string | null
+    status: string | null
+    episodes: number | null
+    duration: number | null
+    averageScore: number | null
+  }
+  userList: {
+    status: string
+    score: number | null
+    progress: number
+    updatedAt: string
+  }
+  studioRelation: {
+    isMain: boolean
+  }
+}
+
+export type StudioAnimeResponse = {
+  success: boolean
+  studio: AnimeStudio
+  items: StudioAnimeItem[]
+  pageInfo: {
+    limit: number
+    titleLanguage: 'ko' | 'en' | 'ja'
+    status: 'completed' | 'all'
+    mainOnly: boolean
+    hasNext: boolean
+    nextCursor: string | null
+  }
+}

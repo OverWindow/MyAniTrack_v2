@@ -14,13 +14,23 @@ import {
   recalculateEveryUserBadges,
   recalculateMyBadges,
 } from '../controllers/badge.controller';
+import {
+  getMyStudioAnime,
+  getMyStudioRanking,
+  getUserStudioAnimeController,
+  getUserStudioRankingController,
+} from '../controllers/user-studio-stats.controller';
 
 const router = Router();
 
 router.get('/me/anime-stats', requireAuth, getMyAnimeStats);
 router.get('/me/anime-stats/genre-bubble', requireAuth, getMyGenreBubbleChart);
+router.get('/me/anime-stats/studios', requireAuth, getMyStudioRanking);
+router.get('/me/anime-stats/studios/:studioId/anime', requireAuth, getMyStudioAnime);
 router.get('/users/:userId/anime-stats', getUserStats);
 router.get('/users/:userId/anime-stats/genre-bubble', getUserGenreBubbleChartController);
+router.get('/users/:userId/anime-stats/studios', getUserStudioRankingController);
+router.get('/users/:userId/anime-stats/studios/:studioId/anime', getUserStudioAnimeController);
 router.post('/me/anime-stats/recalculate', requireAuth, recalculateMyAnimeStats);
 router.get('/me/badges', requireAuth, getMyBadges);
 router.get('/users/:userId/badges', getUserBadges);

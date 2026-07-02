@@ -82,6 +82,7 @@ function App() {
   return (
     <div className="site-shell">
       <Header />
+      <div id="collection-carousel-root" />
       <main className="landing-page">
         <Routes location={backgroundLocation ?? location}>
           <Route path="/" element={<HomePage />} />

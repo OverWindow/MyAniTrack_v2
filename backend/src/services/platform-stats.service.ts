@@ -5,6 +5,8 @@ interface PlatformStatsRow extends RowDataPacket {
   registeredUserCount: number;
   storedAnimeCount: number;
   translatedKoreanTitleCount: number;
+  studioCount: number;
+  studioSyncedAnimeCount: number;
   castSyncedAnimeCount: number;
   characterCount: number;
   voiceActorCount: number;
@@ -38,6 +40,11 @@ export async function getPlatformStats() {
       (SELECT COUNT(*) FROM users) AS registeredUserCount,
       (SELECT COUNT(*) FROM anime) AS storedAnimeCount,
       (SELECT COUNT(*) FROM anime_korean_titles) AS translatedKoreanTitleCount,
+      (SELECT COUNT(*) FROM studios) AS studioCount,
+      (
+        SELECT COUNT(DISTINCT anime_id)
+        FROM anime_studios
+      ) AS studioSyncedAnimeCount,
       (
         SELECT COUNT(*)
         FROM anime_cast_sync_state
@@ -51,6 +58,7 @@ export async function getPlatformStats() {
   const stats = rows[0];
   const storedAnimeCount = stats?.storedAnimeCount ?? 0;
   const translatedKoreanTitleCount = stats?.translatedKoreanTitleCount ?? 0;
+  const studioSyncedAnimeCount = stats?.studioSyncedAnimeCount ?? 0;
   const castSyncedAnimeCount = stats?.castSyncedAnimeCount ?? 0;
 
   return {
@@ -59,6 +67,11 @@ export async function getPlatformStats() {
     translatedKoreanTitleCount,
     translationProgressRate: storedAnimeCount > 0
       ? Number(((translatedKoreanTitleCount / storedAnimeCount) * 100).toFixed(2))
+      : 0,
+    studioCount: stats?.studioCount ?? 0,
+    studioSyncedAnimeCount,
+    studioSyncProgressRate: storedAnimeCount > 0
+      ? Number(((studioSyncedAnimeCount / storedAnimeCount) * 100).toFixed(2))
       : 0,
     castSyncedAnimeCount,
     castSyncProgressRate: storedAnimeCount > 0

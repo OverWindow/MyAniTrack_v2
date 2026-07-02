@@ -9,11 +9,19 @@ import { fetchMyCollection } from '../lib/collection'
 import {
   fetchMyAnimeStats,
   fetchGenreBubbleStats,
+  fetchStudioAnime,
+  fetchStudioRanking,
   formatUpdatedAt,
   getGenreLabel,
   recalculateMyAnimeStats,
 } from '../lib/stats'
-import type { AnimeStatsItem, GenreBubbleResponse } from '../types/stats'
+import type {
+  AnimeStatsItem,
+  GenreBubbleResponse,
+  StudioAnimeItem,
+  StudioRankingItem,
+  StudioRankingSort,
+} from '../types/stats'
 import type { AnimeGenre } from '../types/anime'
 import type { UserAnimeListItem } from '../types/collection'
 import '../styles/pages/AnalysisPage.css'
@@ -68,6 +76,12 @@ const analysisTabs: Array<{ value: AnalysisTab; label: string }> = [
   { value: 'genre', label: '장르별 분석' },
   { value: 'year', label: '연도별 분석' },
   { value: 'score', label: '평점별 분석' },
+]
+
+const studioSortOptions: Array<{ value: StudioRankingSort; label: string; description: string }> = [
+  { value: 'count', label: '작품 수', description: '가장 많이 본 스튜디오' },
+  { value: 'score', label: '평균 점수', description: '내 평점이 높은 스튜디오' },
+  { value: 'watchTime', label: '시청 시간', description: '가장 오래 본 스튜디오' },
 ]
 
 const GenreDistributionPieChart = lazy(async () => {
@@ -128,6 +142,247 @@ function getStarFillPercent(score: number, starIndex: number) {
   const scoreInStars = score / 2
   const fill = Math.max(0, Math.min(1, scoreInStars - starIndex))
   return `${fill * 100}%`
+}
+
+function getStudioAnimeTitle(item: StudioAnimeItem) {
+  return item.anime.titles.korean || item.anime.titles.english || item.anime.title || item.anime.titles.romaji || '제목 없음'
+}
+
+function formatStudioWatchTime(hours?: number | null, minutes?: number | null) {
+  if (typeof hours === 'number' && Number.isFinite(hours) && hours > 0) {
+    return `${hours.toLocaleString(undefined, { maximumFractionDigits: 1 })}시간`
+  }
+
+  if (typeof minutes === 'number' && Number.isFinite(minutes) && minutes > 0) {
+    return `${Math.round(minutes / 60).toLocaleString()}시간`
+  }
+
+  return '0시간'
+}
+
+function StudioRankingSection() {
+  const [sort, setSort] = useState<StudioRankingSort>('count')
+  const [rankingState, setRankingState] = useState<{
+    items: StudioRankingItem[]
+    isLoading: boolean
+    error: string | null
+    studioCount: number
+  }>({
+    items: [],
+    isLoading: true,
+    error: null,
+    studioCount: 0,
+  })
+  const [selectedStudio, setSelectedStudio] = useState<StudioRankingItem | null>(null)
+  const [animeState, setAnimeState] = useState<{
+    items: StudioAnimeItem[]
+    isLoading: boolean
+    error: string | null
+  }>({
+    items: [],
+    isLoading: false,
+    error: null,
+  })
+
+  useEffect(() => {
+    const controller = new AbortController()
+
+    const loadRanking = async () => {
+      setRankingState((current) => ({ ...current, isLoading: true, error: null }))
+
+      try {
+        const response = await fetchStudioRanking({
+          sort,
+          limit: 12,
+          minRatedAnimeCount: sort === 'score' ? 1 : undefined,
+          signal: controller.signal,
+        })
+
+        setRankingState({
+          items: response.items,
+          isLoading: false,
+          error: null,
+          studioCount: response.summary.studioCount,
+        })
+        setSelectedStudio((current) => {
+          if (!current) {
+            return response.items[0] ?? null
+          }
+
+          return response.items.find((entry) => entry.studio.id === current.studio.id) ?? response.items[0] ?? null
+        })
+      } catch (loadError) {
+        if (loadError instanceof DOMException && loadError.name === 'AbortError') {
+          return
+        }
+
+        setRankingState({
+          items: [],
+          isLoading: false,
+          error: loadError instanceof Error ? loadError.message : '스튜디오 랭킹을 불러오지 못했어요.',
+          studioCount: 0,
+        })
+        setSelectedStudio(null)
+      }
+    }
+
+    void loadRanking()
+
+    return () => controller.abort()
+  }, [sort])
+
+  useEffect(() => {
+    if (!selectedStudio) {
+      setAnimeState({ items: [], isLoading: false, error: null })
+      return
+    }
+
+    const controller = new AbortController()
+
+    const loadAnime = async () => {
+      setAnimeState({ items: [], isLoading: true, error: null })
+
+      try {
+        const response = await fetchStudioAnime({
+          studioId: selectedStudio.studio.id,
+          limit: 12,
+          signal: controller.signal,
+        })
+
+        setAnimeState({ items: response.items, isLoading: false, error: null })
+      } catch (loadError) {
+        if (loadError instanceof DOMException && loadError.name === 'AbortError') {
+          return
+        }
+
+        setAnimeState({
+          items: [],
+          isLoading: false,
+          error: loadError instanceof Error ? loadError.message : '스튜디오 작품을 불러오지 못했어요.',
+        })
+      }
+    }
+
+    void loadAnime()
+
+    return () => controller.abort()
+  }, [selectedStudio])
+
+  return (
+    <section className="analysis-panel studio-ranking-section">
+      <div className="analysis-panel-heading studio-ranking-title-row">
+        <div>
+          <span className="detail-label">Studio ranking</span>
+          <h2>스튜디오 분석</h2>
+          <p>내가 본 작품을 제작 스튜디오 기준으로 묶어 작품 수, 평균 점수, 시청 시간을 비교해요.</p>
+        </div>
+        <span className="studio-ranking-count">{rankingState.studioCount.toLocaleString()}개 스튜디오</span>
+      </div>
+
+      <div className="studio-ranking-tabs" role="tablist" aria-label="스튜디오 정렬 기준">
+        {studioSortOptions.map((option) => (
+          <button
+            className={sort === option.value ? 'studio-ranking-tab is-active' : 'studio-ranking-tab'}
+            key={option.value}
+            type="button"
+            role="tab"
+            aria-selected={sort === option.value}
+            onClick={() => setSort(option.value)}
+          >
+            <strong>{option.label}</strong>
+            <span>{option.description}</span>
+          </button>
+        ))}
+      </div>
+
+      {rankingState.isLoading && <div className="analysis-empty-state">스튜디오 랭킹을 불러오는 중이에요.</div>}
+      {rankingState.error && !rankingState.isLoading && (
+        <div className="analysis-empty-state">{rankingState.error}</div>
+      )}
+      {!rankingState.isLoading && !rankingState.error && rankingState.items.length === 0 && (
+        <div className="analysis-empty-state">표시할 스튜디오 데이터가 아직 없어요.</div>
+      )}
+
+      {!rankingState.isLoading && !rankingState.error && rankingState.items.length > 0 && (
+        <div className="studio-ranking-layout">
+          <div className="studio-ranking-list">
+            {rankingState.items.map((entry, index) => (
+              <button
+                className={
+                  selectedStudio?.studio.id === entry.studio.id
+                    ? 'studio-ranking-card is-active'
+                    : 'studio-ranking-card'
+                }
+                key={entry.studio.id}
+                type="button"
+                onClick={() => setSelectedStudio(entry)}
+              >
+                <span className="studio-ranking-rank">#{index + 1}</span>
+                <span className="studio-ranking-copy">
+                  <strong>{entry.studio.name}</strong>
+                  <small>
+                    {entry.animeCount.toLocaleString()}편 · 평균 {entry.averageScore !== null ? entry.averageScore.toFixed(1) : '-'}점
+                  </small>
+                </span>
+                <span className="studio-ranking-metric">
+                  {sort === 'watchTime'
+                    ? formatStudioWatchTime(entry.totalWatchHours, entry.totalWatchMinutes)
+                    : sort === 'score'
+                      ? `${entry.averageScore !== null ? entry.averageScore.toFixed(1) : '-'}`
+                      : `${entry.animeCount.toLocaleString()}편`}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          <div className="studio-anime-panel">
+            <div className="studio-anime-heading">
+              <div>
+                <span className="detail-label">Studio works</span>
+                <h3>{selectedStudio?.studio.name ?? '스튜디오'}</h3>
+              </div>
+              {selectedStudio?.studio.siteUrl && (
+                <a href={selectedStudio.studio.siteUrl} target="_blank" rel="noreferrer">
+                  AniList
+                </a>
+              )}
+            </div>
+
+            {animeState.isLoading && <div className="analysis-empty-state">작품 목록을 불러오는 중이에요.</div>}
+            {animeState.error && !animeState.isLoading && (
+              <div className="analysis-empty-state">{animeState.error}</div>
+            )}
+            {!animeState.isLoading && !animeState.error && animeState.items.length === 0 && (
+              <div className="analysis-empty-state">이 스튜디오의 작품 목록이 아직 없어요.</div>
+            )}
+            {!animeState.isLoading && !animeState.error && animeState.items.length > 0 && (
+              <div className="studio-anime-list">
+                {animeState.items.map((entry) => {
+                  const title = getStudioAnimeTitle(entry)
+
+                  return (
+                    <Link className="studio-anime-card" key={entry.anime.id} to={`/anime/${entry.anime.id}`}>
+                      <img
+                        src={entry.anime.coverImageExtraLarge || entry.anime.coverImageLarge || ''}
+                        alt={title}
+                        loading="lazy"
+                      />
+                      <span>
+                        <strong>{title}</strong>
+                        <small>
+                          {entry.anime.seasonYear ?? '연도 미상'} · {entry.userList.score !== null ? `${entry.userList.score.toFixed(1)}점` : '평점 없음'}
+                        </small>
+                      </span>
+                    </Link>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </section>
+  )
 }
 
 export function AnalysisPage() {
@@ -814,6 +1069,8 @@ export function AnalysisPage() {
           <div className="analysis-empty-state">표시할 장르 취향 데이터가 아직 없어요.</div>
         )}
       </section>
+
+      <StudioRankingSection />
 
       <VoiceActorRankingSection ownerLabel="내" />
     </section>

@@ -543,6 +543,14 @@ export function GenrePreferenceBubbleChart({ data }: { data: GenreBubbleItem[] }
 
   return (
     <div className="analysis-bubble-chart-shell">
+      <div className="analysis-bubble-corner-guide is-top-left">
+        <strong>내 취향이 더 강함</strong>
+        <span>커뮤니티보다 내가 더 좋아하는 장르</span>
+      </div>
+      <div className="analysis-bubble-corner-guide is-bottom-right">
+        <strong>대중 평가 우세</strong>
+        <span>대중 평가는 높지만 내 취향은 덜한 장르</span>
+      </div>
       <ResponsiveContainer width="100%" height={470}>
         <ScatterChart margin={{ top: 32, right: 38, bottom: 46, left: 18 }}>
           <CartesianGrid stroke="rgba(120, 113, 108, 0.12)" />
@@ -635,14 +643,9 @@ export function GenrePreferenceBubbleChart({ data }: { data: GenreBubbleItem[] }
         </ScatterChart>
       </ResponsiveContainer>
 
-      <div className="analysis-bubble-guide">
-        <span>우측 위: 나와 커뮤니티 모두 평균보다 높게 보는 장르</span>
-        <span>좌측 위: 커뮤니티보다 내가 더 강하게 좋아하는 장르</span>
-        <span>우측 아래: 대중 평가는 높지만 내 취향은 덜한 장르</span>
-        <span>좌측 아래: 나와 커뮤니티 모두 평균보다 낮게 보는 장르</span>
-        <span>점선보다 위: 커뮤니티 대비 내 선호가 더 강한 쪽</span>
-        {compression.hasCompression && <span>≈ 표시는 아웃라이어를 물결 구간으로 압축한 값</span>}
-      </div>
+      {compression.hasCompression && (
+        <div className="analysis-bubble-compression-note">≈ 표시는 아웃라이어를 물결 구간으로 압축한 값</div>
+      )}
     </div>
   )
 }

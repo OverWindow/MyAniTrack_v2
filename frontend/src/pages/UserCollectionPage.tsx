@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { CollectionCarousel } from '../components/CollectionCarousel'
 import { genreOptions } from '../lib/anime'
 import { fetchPublicUserCollection } from '../lib/users'
 import type { AnimeGenre } from '../types/anime'
@@ -18,6 +19,12 @@ type PublicCollectionState = {
   isLoadingMore: boolean
   error: string | null
   requestKey: string
+}
+
+type PublicCarouselState = {
+  items: UserAnimeListItem[]
+  isLoading: boolean
+  error: string | null
 }
 
 const sortOptions: Array<{ value: UserAnimeListSort; label: string }> = [
@@ -85,9 +92,15 @@ export function UserCollectionPage() {
   const selectedGenreLabel = genre === 'all' ? '전체 장르' : genreOptions.find((option) => option.value === genre)?.label ?? genre
   const requestKey = `${userId ?? 'unknown'}:${sort}:${genre}`
   const [state, setState] = useState<PublicCollectionState>(() => createInitialState(requestKey))
+  const [carouselState, setCarouselState] = useState<PublicCarouselState>({
+    items: [],
+    isLoading: true,
+    error: null,
+  })
   const sentinelRef = useRef<HTMLDivElement | null>(null)
   const { user, items, nextCursor, hasNext, isLoading, isLoadingMore, error } = state
   const isRefreshingQuery = state.requestKey !== requestKey
+  const totalAnimeCount = user?.animeListCount ?? items.length
 
   const filteredItems = items.filter((item) =>
     getCollectionSearchText(item).includes(searchTerm.trim().toLowerCase()),
@@ -142,6 +155,48 @@ export function UserCollectionPage() {
 
     return () => controller.abort()
   }, [genre, requestKey, selectedGenre, sort, userId])
+
+  useEffect(() => {
+    if (!userId) {
+      return
+    }
+
+    const controller = new AbortController()
+
+    const loadCarouselItems = async () => {
+      setCarouselState((current) => ({ ...current, isLoading: true, error: null }))
+
+      try {
+        const data = await fetchPublicUserCollection({
+          userId,
+          sort: 'score',
+          score: 10,
+          limit: 12,
+          signal: controller.signal,
+        })
+
+        setCarouselState({
+          items: data.items,
+          isLoading: false,
+          error: null,
+        })
+      } catch (fetchError) {
+        if (fetchError instanceof DOMException && fetchError.name === 'AbortError') {
+          return
+        }
+
+        setCarouselState({
+          items: [],
+          isLoading: false,
+          error: fetchError instanceof Error ? fetchError.message : '최애 애니를 불러오지 못했어요.',
+        })
+      }
+    }
+
+    void loadCarouselItems()
+
+    return () => controller.abort()
+  }, [userId])
 
   useEffect(() => {
     const node = sentinelRef.current
@@ -221,19 +276,26 @@ export function UserCollectionPage() {
   return (
     <section className="collection-page user-collection-page">
       <div className="user-catalog-header">
-        <Link className="detail-back-link" to={`/users/${userId}/profile`}>
-          프로필로 돌아가기
-        </Link>
-        {user && <h1>{user.username}님의 컬렉션</h1>}
-      </div>
-
-      <div className="explore-toolbar-shell">
-        <div className="explore-summary">
-          <span className="summary-label">리스트</span>
-          <strong>{items.length.toLocaleString()}</strong>
+        <div className="user-catalog-title-group">
+          <Link className="detail-back-link" to={`/users/${userId}/profile`}>
+            프로필로 돌아가기
+          </Link>
+          {user && <h1>{user.username}님의 컬렉션</h1>}
+        </div>
+        <div className="user-collection-count-card">
+          <span className="summary-label">공개 컬렉션</span>
+          <strong>{totalAnimeCount.toLocaleString()}</strong>
           <span className="summary-label">편</span>
         </div>
+      </div>
 
+      <CollectionCarousel
+        state={carouselState}
+        title={`${user?.username ?? '친구'}님의 최애 애니`}
+        ariaLabel={`${user?.username ?? '친구'}님의 최애 애니`}
+      />
+
+      <div className="explore-toolbar-shell">
         <div className="explore-toolbar">
           <div className="search-group">
             <label className="search-field minimalist-search" htmlFor="user-collection-search">

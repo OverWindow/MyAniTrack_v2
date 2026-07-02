@@ -104,6 +104,9 @@ export type PlatformStats = {
   translationProgressRate: number
   castSyncedAnimeCount: number
   castSyncProgressRate: number
+  studioCount: number
+  studioSyncedAnimeCount: number
+  studioSyncProgressRate: number
   characterCount: number
   voiceActorCount: number
 }

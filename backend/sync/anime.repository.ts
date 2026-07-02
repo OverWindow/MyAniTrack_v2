@@ -1,6 +1,11 @@
-import { PoolConnection } from 'mysql2/promise';
+import { PoolConnection, RowDataPacket } from 'mysql2/promise';
 import { pool } from '../config/db';
 import { AniListAnime } from './anilist.client';
+
+interface StudioIdRow extends RowDataPacket {
+  id: number;
+  anilistId: number;
+}
 
 function fromUnixTimestampToMySQLDateTime(unixTs?: number | null): string | null {
   if (!unixTs) return null;
@@ -42,6 +47,115 @@ function dedupeAnimeTags(tags: NonNullable<AniListAnime['tags']>) {
   }
 
   return Array.from(uniqueTags.values());
+}
+
+function dedupeAnimeStudios(studios: NonNullable<NonNullable<AniListAnime['studios']>['edges']>) {
+  const uniqueStudios = new Map<number, {
+    anilistId: number;
+    name: string;
+    isAnimationStudio: boolean;
+    siteUrl: string | null;
+    isMain: boolean;
+  }>();
+
+  for (const edge of studios) {
+    const studio = edge.node;
+    const anilistId = studio?.id;
+    const name = studio?.name?.trim();
+
+    if (!anilistId || !name) {
+      continue;
+    }
+
+    const existing = uniqueStudios.get(anilistId);
+
+    uniqueStudios.set(anilistId, {
+      anilistId,
+      name,
+      isAnimationStudio: studio.isAnimationStudio ?? existing?.isAnimationStudio ?? true,
+      siteUrl: studio.siteUrl ?? existing?.siteUrl ?? null,
+      isMain: existing?.isMain || (edge.isMain ?? false),
+    });
+  }
+
+  return Array.from(uniqueStudios.values());
+}
+
+async function upsertAnimeStudios(
+  conn: PoolConnection,
+  animeId: number,
+  studios?: AniListAnime['studios']
+) {
+  await conn.execute(`DELETE FROM anime_studios WHERE anime_id = ?`, [animeId]);
+
+  const studioEdges = studios?.edges;
+
+  if (!studioEdges?.length) {
+    return;
+  }
+
+  const dedupedStudios = dedupeAnimeStudios(studioEdges);
+
+  if (dedupedStudios.length === 0) {
+    return;
+  }
+
+  await conn.query(
+    `
+    INSERT INTO studios (
+      anilist_id,
+      name,
+      is_animation_studio,
+      site_url
+    )
+    VALUES ?
+    ON DUPLICATE KEY UPDATE
+      name = VALUES(name),
+      is_animation_studio = VALUES(is_animation_studio),
+      site_url = VALUES(site_url)
+    `,
+    [
+      dedupedStudios.map((studio) => [
+        studio.anilistId,
+        studio.name,
+        studio.isAnimationStudio,
+        studio.siteUrl,
+      ]),
+    ]
+  );
+
+  const [rows] = await conn.query<StudioIdRow[]>(
+    `
+    SELECT
+      id,
+      anilist_id AS anilistId
+    FROM studios
+    WHERE anilist_id IN (?)
+    `,
+    [dedupedStudios.map((studio) => studio.anilistId)]
+  );
+
+  const studioIdByAnilistId = new Map(rows.map((row) => [row.anilistId, row.id]));
+  const relationValues = dedupedStudios
+    .map((studio) => {
+      const studioId = studioIdByAnilistId.get(studio.anilistId);
+      return studioId ? [animeId, studioId, studio.isMain] : null;
+    })
+    .filter((value): value is Array<number | boolean> => value !== null);
+
+  if (relationValues.length > 0) {
+    await conn.query(
+      `
+      INSERT INTO anime_studios (
+        anime_id,
+        studio_id,
+        is_main
+      )
+      VALUES ?
+      `,
+      [relationValues]
+    );
+  }
 }
 
 export async function upsertAnimeFull(anime: AniListAnime): Promise<void> {
@@ -179,7 +293,13 @@ export async function upsertAnimeFull(anime: AniListAnime): Promise<void> {
     }
 
     // ==========================
-    // 5️⃣ SYNONYMS
+    // 5️⃣ STUDIOS
+    // ==========================
+
+    await upsertAnimeStudios(conn, animeId, anime.studios);
+
+    // ==========================
+    // 6️⃣ SYNONYMS
     // ==========================
 
     // await conn.execute(`DELETE FROM anime_synonyms WHERE anime_id = ?`, [animeId]);

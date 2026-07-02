@@ -12,6 +12,18 @@ export interface AniListTag {
   isMediaSpoiler?: boolean | null;
 }
 
+export interface AniListStudio {
+  id: number;
+  name?: string | null;
+  isAnimationStudio?: boolean | null;
+  siteUrl?: string | null;
+}
+
+export interface AniListStudioEdge {
+  isMain?: boolean | null;
+  node?: AniListStudio | null;
+}
+
 export interface AniListAnime {
   id: number;
   title: {
@@ -31,6 +43,9 @@ export interface AniListAnime {
   countryOfOrigin?: string | null;
   isAdult?: boolean | null;
   genres?: string[] | null;
+  studios?: {
+    edges?: AniListStudioEdge[] | null;
+  } | null;
   averageScore?: number | null;
   meanScore?: number | null;
   popularity?: number | null;

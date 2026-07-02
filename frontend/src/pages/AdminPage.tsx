@@ -244,6 +244,7 @@ export function AdminPage() {
         { label: '저장된 애니', value: '-', hint: '플랫폼 통계 불러오기 전' },
         { label: '번역 진행률', value: '-', hint: '플랫폼 통계 불러오기 전' },
         { label: '캐스트 동기화율', value: '-', hint: '플랫폼 통계 불러오기 전' },
+        { label: '스튜디오 동기화율', value: '-', hint: '플랫폼 통계 불러오기 전' },
         { label: '캐릭터 / 성우', value: '-', hint: '플랫폼 통계 불러오기 전' },
       ]
     }
@@ -255,6 +256,10 @@ export function AdminPage() {
     const castSyncRate = platformStats.castSyncProgressRate
       ?? (platformStats.storedAnimeCount > 0
         ? (platformStats.castSyncedAnimeCount / platformStats.storedAnimeCount) * 100
+        : 0)
+    const studioSyncRate = platformStats.studioSyncProgressRate
+      ?? (platformStats.storedAnimeCount > 0
+        ? (platformStats.studioSyncedAnimeCount / platformStats.storedAnimeCount) * 100
         : 0)
 
     return [
@@ -277,6 +282,11 @@ export function AdminPage() {
         label: '캐스트 동기화율',
         value: formatPercent(castSyncRate),
         hint: `${formatNumber(platformStats.castSyncedAnimeCount)} / ${formatNumber(platformStats.storedAnimeCount)}`,
+      },
+      {
+        label: '스튜디오 동기화율',
+        value: formatPercent(studioSyncRate),
+        hint: `${formatNumber(platformStats.studioSyncedAnimeCount)} / ${formatNumber(platformStats.storedAnimeCount)} · 스튜디오 ${formatNumber(platformStats.studioCount)}개`,
       },
       {
         label: '캐릭터 / 성우',

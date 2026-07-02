@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import { CollectionCarousel } from '../components/CollectionCarousel'
 import { useAuth } from '../contexts/AuthContext'
 import { fetchMyCollection, getCachedCollectionPage, saveCollectionPageCache } from '../lib/collection'
 import { genreOptions } from '../lib/anime'
@@ -16,6 +17,12 @@ type CollectionState = {
   isLoadingMore: boolean
   error: string | null
   requestKey: string
+}
+
+type PerfectScoreState = {
+  items: UserAnimeListItem[]
+  isLoading: boolean
+  error: string | null
 }
 
 const sortOptions: Array<{ value: UserAnimeListSort; label: string }> = [
@@ -92,6 +99,11 @@ export function CollectionPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
   const [reloadKey, setReloadKey] = useState(0)
+  const [perfectScoreState, setPerfectScoreState] = useState<PerfectScoreState>({
+    items: [],
+    isLoading: true,
+    error: null,
+  })
   const selectedGenre = genre === 'all' ? null : genre
   const requestKey = `${sort}:${genre}`
   const [state, setState] = useState<CollectionState>(() => createInitialCollectionState(requestKey))
@@ -114,6 +126,48 @@ export function CollectionPage() {
   const filteredItems = items.filter((item) =>
     getCollectionSearchText(item).includes(debouncedSearchTerm.trim().toLowerCase()),
   )
+
+  useEffect(() => {
+    if (isBootstrapping || !isAuthenticated) {
+      return
+    }
+
+    const controller = new AbortController()
+
+    const loadPerfectScoreAnime = async () => {
+      try {
+        const data = await fetchMyCollection({
+          sort: 'score',
+          score: 10,
+          limit: 12,
+          signal: controller.signal,
+        })
+
+        setPerfectScoreState({
+          items: data.items,
+          isLoading: false,
+          error: null,
+        })
+      } catch (fetchError) {
+        if (fetchError instanceof DOMException && fetchError.name === 'AbortError') {
+          return
+        }
+
+        setPerfectScoreState({
+          items: [],
+          isLoading: false,
+          error:
+            fetchError instanceof Error
+              ? fetchError.message
+              : '만점 작품을 불러오지 못했어요.',
+        })
+      }
+    }
+
+    void loadPerfectScoreAnime()
+
+    return () => controller.abort()
+  }, [isAuthenticated, isBootstrapping, reloadKey])
 
   const fetchFullCollection = useCallback(async (signal?: AbortSignal) => {
     const firstPage = await fetchMyCollection({
@@ -395,8 +449,15 @@ export function CollectionPage() {
   }
 
   return (
-    <section className="collection-page">
-      <div className="explore-toolbar-shell">
+    <>
+      <CollectionCarousel
+        state={perfectScoreState}
+        location={location}
+        portalRootId="collection-carousel-root"
+      />
+
+      <section className="collection-page">
+        <div className="explore-toolbar-shell">
         <div className="explore-toolbar">
           <div className="search-group">
             <label className="search-field minimalist-search" htmlFor="collection-search">
@@ -449,7 +510,7 @@ export function CollectionPage() {
             </label>
           </div>
         </div>
-      </div>
+        </div>
 
       {error && <div className="feedback-card is-error">{error}</div>}
 
@@ -513,6 +574,7 @@ export function CollectionPage() {
           )}
         </>
       )}
-    </section>
+      </section>
+    </>
   )
 }

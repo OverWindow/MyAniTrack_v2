@@ -3,6 +3,9 @@ import { genreOptions } from './anime'
 import type {
   AnimeStatsResponse,
   GenreBubbleResponse,
+  StudioAnimeResponse,
+  StudioRankingResponse,
+  StudioRankingSort,
   TopGenreAnimeItem,
   VoiceActorAnimeResponse,
   VoiceActorRankingResponse,
@@ -246,6 +249,29 @@ type VoiceActorAnimeParams = {
   signal?: AbortSignal
 }
 
+type StudioRankingParams = {
+  userId?: string
+  status?: 'completed' | 'all'
+  sort?: StudioRankingSort
+  mainOnly?: boolean
+  minAnimeCount?: number
+  minRatedAnimeCount?: number
+  limit?: number
+  cursor?: string | null
+  signal?: AbortSignal
+}
+
+type StudioAnimeParams = {
+  userId?: string
+  studioId: number
+  status?: 'completed' | 'all'
+  mainOnly?: boolean
+  titleLanguage?: 'ko' | 'en' | 'ja'
+  limit?: number
+  cursor?: string | null
+  signal?: AbortSignal
+}
+
 function createVoiceActorRankingUrl(params: VoiceActorRankingParams) {
   const path = params.userId
     ? `/api/users/${params.userId}/voice-actors/ranking`
@@ -268,6 +294,44 @@ function createVoiceActorAnimeUrl(params: VoiceActorAnimeParams) {
     : `/api/me/voice-actors/${params.voiceActorId}/anime`
   const url = new URL(path, getApiBaseUrl())
 
+  url.searchParams.set('titleLanguage', params.titleLanguage ?? 'ko')
+  url.searchParams.set('limit', String(params.limit ?? 20))
+
+  if (params.cursor) {
+    url.searchParams.set('cursor', params.cursor)
+  }
+
+  return url
+}
+
+function createStudioRankingUrl(params: StudioRankingParams = {}) {
+  const path = params.userId
+    ? `/api/users/${params.userId}/anime-stats/studios`
+    : '/api/me/anime-stats/studios'
+  const url = new URL(path, getApiBaseUrl())
+
+  url.searchParams.set('status', params.status ?? 'completed')
+  url.searchParams.set('sort', params.sort ?? 'count')
+  url.searchParams.set('mainOnly', String(params.mainOnly ?? true))
+  url.searchParams.set('minAnimeCount', String(params.minAnimeCount ?? 1))
+  url.searchParams.set('minRatedAnimeCount', String(params.minRatedAnimeCount ?? 1))
+  url.searchParams.set('limit', String(params.limit ?? 20))
+
+  if (params.cursor) {
+    url.searchParams.set('cursor', params.cursor)
+  }
+
+  return url
+}
+
+function createStudioAnimeUrl(params: StudioAnimeParams) {
+  const path = params.userId
+    ? `/api/users/${params.userId}/anime-stats/studios/${params.studioId}/anime`
+    : `/api/me/anime-stats/studios/${params.studioId}/anime`
+  const url = new URL(path, getApiBaseUrl())
+
+  url.searchParams.set('status', params.status ?? 'completed')
+  url.searchParams.set('mainOnly', String(params.mainOnly ?? true))
   url.searchParams.set('titleLanguage', params.titleLanguage ?? 'ko')
   url.searchParams.set('limit', String(params.limit ?? 20))
 
@@ -310,6 +374,38 @@ export async function fetchVoiceActorAnime(params: VoiceActorAnimeParams) {
   }
 
   return (await response.json()) as VoiceActorAnimeResponse
+}
+
+export async function fetchStudioRanking(params: StudioRankingParams = {}) {
+  const response = await authFetch(createStudioRankingUrl(params).toString(), {
+    signal: params.signal,
+  })
+
+  if (response.status === 401) {
+    throw new Error('로그인이 필요해요.')
+  }
+
+  if (!response.ok) {
+    throw new Error(`스튜디오 랭킹을 불러오지 못했습니다. (${response.status})`)
+  }
+
+  return (await response.json()) as StudioRankingResponse
+}
+
+export async function fetchStudioAnime(params: StudioAnimeParams) {
+  const response = await authFetch(createStudioAnimeUrl(params).toString(), {
+    signal: params.signal,
+  })
+
+  if (response.status === 401) {
+    throw new Error('로그인이 필요해요.')
+  }
+
+  if (!response.ok) {
+    throw new Error(`스튜디오 작품 목록을 불러오지 못했습니다. (${response.status})`)
+  }
+
+  return (await response.json()) as StudioAnimeResponse
 }
 
 export function getGenreLabel(genre?: string | null) {

@@ -26,6 +26,17 @@ export const ANILIST_ANIME_PAGE_QUERY = `
         countryOfOrigin
         isAdult
         genres
+        studios {
+          edges {
+            isMain
+            node {
+              id
+              name
+              isAnimationStudio
+              siteUrl
+            }
+          }
+        }
         averageScore
         meanScore
         popularity
@@ -81,6 +92,17 @@ export const ANILIST_SEASON_ANIME_PAGE_QUERY = `
         countryOfOrigin
         isAdult
         genres
+        studios {
+          edges {
+            isMain
+            node {
+              id
+              name
+              isAnimationStudio
+              siteUrl
+            }
+          }
+        }
         averageScore
         meanScore
         popularity

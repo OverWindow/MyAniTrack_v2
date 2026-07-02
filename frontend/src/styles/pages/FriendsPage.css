@@ -274,8 +274,8 @@ button.friends-summary-card {
 }
 
 .friends-avatar {
-  width: 48px;
-  height: 48px;
+  width: 64px;
+  height: 64px;
   flex-shrink: 0;
   border-radius: 10px;
   display: grid;
@@ -284,6 +284,11 @@ button.friends-summary-card {
   color: var(--point-hover);
   font-weight: 700;
   border: 1px solid rgba(251, 191, 36, 0.24);
+}
+
+.friend-card-compact .friends-avatar {
+  width: 54px;
+  height: 54px;
 }
 
 .friends-avatar-image {
