@@ -799,7 +799,7 @@ export function AnalysisPage() {
         <div className="analysis-panel-heading">
           <span className="detail-label">Genre preference</span>
           <h2>장르 취향 버블 차트</h2>
-          <p>커뮤니티 평균 평점과 내 평균 평점을 비교해, 대중보다 내가 더 좋아하는 장르를 볼 수 있어요.</p>
+          <p>내 평균과 커뮤니티 평균을 각각의 전체 평균 대비로 정규화해, 취향이 어느 쪽으로 기우는지 볼 수 있어요.</p>
         </div>
         {genreBubbleState.isLoading && <div className="analysis-empty-state">장르 취향 차트를 불러오는 중이에요.</div>}
         {genreBubbleState.error && !genreBubbleState.isLoading && (

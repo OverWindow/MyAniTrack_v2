@@ -5,6 +5,7 @@ import {
   Cell,
   Pie,
   PieChart,
+  ReferenceLine,
   ResponsiveContainer,
   Scatter,
   ScatterChart,
@@ -31,6 +32,14 @@ type ScoreDistributionChartDatum = {
   score: string
   label: string
   count: number
+}
+
+type NormalizedGenreBubbleItem = GenreBubbleItem & {
+  normalizedCommunityAverage: number
+  normalizedMyAverage: number
+  displayCommunityAverage: number
+  displayMyAverage: number
+  hasCompressedValue: boolean
 }
 
 const CHART_COLORS = ['#f59e0b', '#fb7185', '#fbbf24', '#fdba74', '#f97316', '#f43f5e', '#fca5a5', '#fed7aa']
@@ -64,17 +73,92 @@ function toNumber(value: number | string | undefined, fallback: number) {
   return Number.isFinite(numericValue) ? numericValue : fallback
 }
 
-function getBubbleDomain(values: number[]) {
+function getSharedNormalizedBubbleDomain(values: number[]) {
   if (values.length === 0) {
-    return [0, 10] as [number, number]
+    return [-1, 1] as [number, number]
   }
 
-  const min = Math.min(...values)
-  const max = Math.max(...values)
+  const min = Math.min(...values, 0)
+  const max = Math.max(...values, 0)
   const spread = max - min
-  const padding = spread === 0 ? 0.35 : Math.max(0.08, spread * 0.06)
+  const padding = spread === 0 ? 0.18 : Math.max(0.03, spread * 0.04)
 
-  return [Math.max(0, min - padding), Math.min(10, max + padding)] as [number, number]
+  return [min - padding, max + padding] as [number, number]
+}
+
+function getAverage(values: number[]) {
+  if (values.length === 0) {
+    return 0
+  }
+
+  return values.reduce((sum, value) => sum + value, 0) / values.length
+}
+
+function createBubbleCompression(values: number[]) {
+  const absoluteValues = values.map((value) => Math.abs(value)).filter((value) => Number.isFinite(value))
+
+  if (absoluteValues.length === 0) {
+    return {
+      hasCompression: false,
+      displayDomain: [-1, 1] as [number, number],
+      transform: (value: number) => value,
+      formatTick: (value: number) => value.toFixed(1),
+      isCompressedValue: (_value: number) => false,
+    }
+  }
+
+  const sortedValues = [...absoluteValues].sort((left, right) => left - right)
+  const maxValue = Math.max(sortedValues[sortedValues.length - 1] ?? 0, 0.4)
+  const upperQuartile = sortedValues[Math.floor((sortedValues.length - 1) * 0.75)] ?? maxValue
+  const breakStart = Math.max(0.35, upperQuartile)
+  const hasCompression = maxValue > breakStart * 1.65 && maxValue - breakStart > 0.25
+  const compressedMax = hasCompression
+    ? breakStart + Math.max(0.22, (maxValue - breakStart) * 0.38)
+    : maxValue
+  const padding = compressedMax * 0.08
+
+  const transform = (value: number) => {
+    if (!hasCompression || Math.abs(value) <= breakStart) {
+      return value
+    }
+
+    const sign = Math.sign(value)
+    const overflow = Math.abs(value) - breakStart
+    const totalOverflow = Math.max(maxValue - breakStart, 0.001)
+    const compressedOverflow = Math.log1p(overflow) / Math.log1p(totalOverflow) * (compressedMax - breakStart)
+
+    return sign * (breakStart + compressedOverflow)
+  }
+
+  const invert = (value: number) => {
+    if (!hasCompression || Math.abs(value) <= breakStart) {
+      return value
+    }
+
+    const sign = Math.sign(value)
+    const overflow = Math.abs(value) - breakStart
+    const compressedSpan = Math.max(compressedMax - breakStart, 0.001)
+    const totalOverflow = Math.max(maxValue - breakStart, 0.001)
+    const originalOverflow = Math.expm1((overflow / compressedSpan) * Math.log1p(totalOverflow))
+
+    return sign * (breakStart + originalOverflow)
+  }
+
+  const isCompressedValue = (value: number) => hasCompression && Math.abs(value) > breakStart
+
+  return {
+    hasCompression,
+    displayDomain: [-(compressedMax + padding), compressedMax + padding] as [number, number],
+    transform,
+    formatTick: (value: number) => {
+      const originalValue = invert(value)
+      const prefix = isCompressedValue(originalValue) ? '≈' : ''
+      const sign = originalValue > 0 ? '+' : ''
+
+      return `${prefix}${sign}${originalValue.toFixed(1)}`
+    },
+    isCompressedValue,
+  }
 }
 
 function getBubbleLabel(label: string) {
@@ -91,7 +175,7 @@ function renderBubbleShape(props: {
   fillOpacity?: number
   stroke?: string
   strokeWidth?: number
-  payload?: GenreBubbleItem
+  payload?: NormalizedGenreBubbleItem
 }) {
   const { payload } = props
 
@@ -424,25 +508,57 @@ export function ScoreDistributionBarChart({
 }
 
 export function GenrePreferenceBubbleChart({ data }: { data: GenreBubbleItem[] }) {
-  const xDomain = getBubbleDomain(data.map((entry) => entry.communityAverageScore))
-  const yDomain = getBubbleDomain(data.map((entry) => entry.myAverageScore))
+  const myAverageBaseline = getAverage(data.map((entry) => entry.myAverageScore))
+  const communityAverageBaseline = getAverage(data.map((entry) => entry.communityAverageScore))
+  const baseNormalizedData = data.map((entry) => {
+    const normalizedCommunityAverage = entry.communityAverageScore - communityAverageBaseline
+    const normalizedMyAverage = entry.myAverageScore - myAverageBaseline
+
+    return {
+      ...entry,
+      normalizedCommunityAverage,
+      normalizedMyAverage,
+    }
+  })
+  const compression = createBubbleCompression(
+    baseNormalizedData.flatMap((entry) => [entry.normalizedCommunityAverage, entry.normalizedMyAverage]),
+  )
+  const normalizedData: NormalizedGenreBubbleItem[] = baseNormalizedData.map((entry) => ({
+    ...entry,
+    displayCommunityAverage: compression.transform(entry.normalizedCommunityAverage),
+    displayMyAverage: compression.transform(entry.normalizedMyAverage),
+    hasCompressedValue:
+      compression.isCompressedValue(entry.normalizedCommunityAverage) ||
+      compression.isCompressedValue(entry.normalizedMyAverage),
+  }))
+  const sharedDomain = compression.hasCompression
+    ? compression.displayDomain
+    : getSharedNormalizedBubbleDomain(
+        normalizedData.flatMap((entry) => [entry.displayCommunityAverage, entry.displayMyAverage]),
+      )
+  const equalityLine: [{ x: number; y: number }, { x: number; y: number }] = [
+    { x: sharedDomain[0], y: sharedDomain[0] },
+    { x: sharedDomain[1], y: sharedDomain[1] },
+  ]
 
   return (
     <div className="analysis-bubble-chart-shell">
-      <ResponsiveContainer width="100%" height={420}>
-        <ScatterChart margin={{ top: 28, right: 34, bottom: 44, left: 18 }}>
+      <ResponsiveContainer width="100%" height={470}>
+        <ScatterChart margin={{ top: 32, right: 38, bottom: 46, left: 18 }}>
           <CartesianGrid stroke="rgba(120, 113, 108, 0.12)" />
           <XAxis
             type="number"
-            dataKey="communityAverageScore"
-            name="커뮤니티 평균"
-            domain={xDomain}
+            dataKey="displayCommunityAverage"
+            name="커뮤니티 평균 대비"
+            domain={sharedDomain}
             tickLine={false}
             axisLine={false}
             tick={{ fill: '#78716c', fontSize: 12 }}
-            tickFormatter={(value) => Number(value).toFixed(1)}
+            tickFormatter={(value) => {
+              return compression.formatTick(Number(value))
+            }}
             label={{
-              value: '커뮤니티 평균 평점',
+              value: '커뮤니티 평균 대비',
               position: 'insideBottom',
               offset: -26,
               fill: '#57534e',
@@ -452,16 +568,18 @@ export function GenrePreferenceBubbleChart({ data }: { data: GenreBubbleItem[] }
           />
           <YAxis
             type="number"
-            dataKey="myAverageScore"
-            name="내 평균"
-            domain={yDomain}
+            dataKey="displayMyAverage"
+            name="내 평균 대비"
+            domain={sharedDomain}
             tickLine={false}
             axisLine={false}
             tick={{ fill: '#78716c', fontSize: 12 }}
-            tickFormatter={(value) => Number(value).toFixed(1)}
+            tickFormatter={(value) => {
+              return compression.formatTick(Number(value))
+            }}
             width={52}
             label={{
-              value: '내 평균 평점',
+              value: '내 평균 대비',
               angle: -90,
               position: 'insideLeft',
               fill: '#57534e',
@@ -470,6 +588,13 @@ export function GenrePreferenceBubbleChart({ data }: { data: GenreBubbleItem[] }
             }}
           />
           <ZAxis type="number" dataKey="bubbleSize" range={[900, 3600]} />
+          <ReferenceLine
+            segment={equalityLine}
+            stroke="#44403c"
+            strokeDasharray="6 6"
+            strokeOpacity={0.44}
+            ifOverflow="extendDomain"
+          />
           <Tooltip
             cursor={{ strokeDasharray: '4 4', stroke: 'rgba(120, 113, 108, 0.26)' }}
             content={({ active, payload }) => {
@@ -477,12 +602,15 @@ export function GenrePreferenceBubbleChart({ data }: { data: GenreBubbleItem[] }
                 return null
               }
 
-              const entry = payload[0]?.payload as GenreBubbleItem
+              const entry = payload[0]?.payload as NormalizedGenreBubbleItem
               const topAnime = entry.topRatedAnime?.[0]
 
               return (
                 <div className="analysis-chart-tooltip analysis-bubble-tooltip">
                   <strong>{getGenreLabel(entry.genre)}</strong>
+                  <span>내 평균 대비 {entry.normalizedMyAverage >= 0 ? '+' : ''}{entry.normalizedMyAverage.toFixed(2)}</span>
+                  <span>커뮤니티 평균 대비 {entry.normalizedCommunityAverage >= 0 ? '+' : ''}{entry.normalizedCommunityAverage.toFixed(2)}</span>
+                  {entry.hasCompressedValue && <span>≈ 축에서 압축 표시된 아웃라이어</span>}
                   <span>내 평균 {entry.myAverageScore.toFixed(2)}점</span>
                   <span>커뮤니티 평균 {entry.communityAverageScore.toFixed(2)}점</span>
                   <span>차이 {entry.preferenceScore >= 0 ? '+' : ''}{entry.preferenceScore.toFixed(2)}</span>
@@ -493,8 +621,8 @@ export function GenrePreferenceBubbleChart({ data }: { data: GenreBubbleItem[] }
               )
             }}
           />
-          <Scatter data={data} name="장르 취향" shape={renderBubbleShape}>
-            {data.map((entry, index) => (
+          <Scatter data={normalizedData} name="장르 취향" shape={renderBubbleShape}>
+            {normalizedData.map((entry, index) => (
               <Cell
                 key={`genre-bubble-${entry.genre}`}
                 fill={BUBBLE_COLORS[index % BUBBLE_COLORS.length]}
@@ -507,13 +635,13 @@ export function GenrePreferenceBubbleChart({ data }: { data: GenreBubbleItem[] }
         </ScatterChart>
       </ResponsiveContainer>
 
-      <div className="analysis-bubble-legend">
-        {data.map((entry, index) => (
-          <span key={`genre-bubble-legend-${entry.genre}`}>
-            <i style={{ background: BUBBLE_COLORS[index % BUBBLE_COLORS.length] }} />
-            {getGenreLabel(entry.genre)}
-          </span>
-        ))}
+      <div className="analysis-bubble-guide">
+        <span>우측 위: 나와 커뮤니티 모두 평균보다 높게 보는 장르</span>
+        <span>좌측 위: 커뮤니티보다 내가 더 강하게 좋아하는 장르</span>
+        <span>우측 아래: 대중 평가는 높지만 내 취향은 덜한 장르</span>
+        <span>좌측 아래: 나와 커뮤니티 모두 평균보다 낮게 보는 장르</span>
+        <span>점선보다 위: 커뮤니티 대비 내 선호가 더 강한 쪽</span>
+        {compression.hasCompression && <span>≈ 표시는 아웃라이어를 물결 구간으로 압축한 값</span>}
       </div>
     </div>
   )

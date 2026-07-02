@@ -1178,7 +1178,7 @@
 .analysis-bubble-chart-shell {
   display: grid;
   gap: 10px;
-  min-height: 460px;
+  min-height: 520px;
   margin-top: 6px;
 }
 
@@ -1196,6 +1196,23 @@
 
 .analysis-bubble-tooltip {
   min-width: 220px;
+}
+
+.analysis-bubble-guide {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(120, 113, 108, 0.1);
+  border-radius: 8px;
+  background: rgba(250, 247, 241, 0.64);
+}
+
+.analysis-bubble-guide span {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1.35;
 }
 
 .analysis-bubble-legend {
@@ -1367,6 +1384,10 @@
   }
 
   .voice-actor-character-result-list {
+    grid-template-columns: 1fr;
+  }
+
+  .analysis-bubble-guide {
     grid-template-columns: 1fr;
   }
 
