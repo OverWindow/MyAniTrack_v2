@@ -1215,6 +1215,108 @@ Response example:
 }
 ```
 
+## Genre Preference Bubble Chart
+
+사용자가 본 애니를 장르 단위 버블로 집계합니다. 버블 하나는 작품 하나가 아니라 **장르 하나**입니다.
+
+차트 매핑:
+
+- X축: `communityAverageScore`
+- Y축: `myAverageScore`
+- 버블 크기: `bubbleSize`
+- 색상/group: `genre`
+- 선호 차이: `preferenceScore = myAverageScore - communityAverageScore`
+
+### `GET /me/anime-stats/genre-bubble`
+내 장르 취향 bubble chart 데이터를 조회합니다.
+
+인증 필요.
+
+Query:
+
+- `minCount`: 최소 작품 수, `1~100`, 기본값 `5`
+- `weighting`: `full | fractional`, 기본값 `fractional`
+- `status`: `completed | all`, 기본값 `completed`
+- `communityScore`: `average | mean`, 기본값 `average`
+- `titleLanguage`: `ko | en | ja`, 기본값 `ko`
+- `topLimit`: 장르별 top rated anime 개수, `1~10`, 기본값 `3`
+
+Example request:
+
+```http
+GET /api/me/anime-stats/genre-bubble?minCount=5&weighting=fractional&status=completed&communityScore=average&titleLanguage=ko
+```
+
+Response example:
+
+```json
+{
+  "success": true,
+  "item": {
+    "userId": 1,
+    "weighting": "fractional",
+    "communityScore": "average",
+    "status": "completed",
+    "minCount": 5,
+    "titleLanguage": "ko",
+    "items": [
+      {
+        "genre": "Fantasy",
+        "animeCount": 34,
+        "weightedAnimeCount": 21.75,
+        "myAverageScore": 9.2,
+        "communityAverageScore": 8.0,
+        "preferenceScore": 1.2,
+        "totalWatchMinutes": 54720,
+        "totalWatchHours": 912,
+        "averageReleaseYear": 2018.4,
+        "bubbleSize": 4.66,
+        "topRatedAnime": [
+          {
+            "animeId": 123,
+            "anilistId": 456,
+            "title": "장송의 프리렌",
+            "score": 10,
+            "communityScore": 9.1,
+            "coverImageLarge": "https://..."
+          }
+        ]
+      }
+    ],
+    "axis": {
+      "x": {
+        "field": "communityAverageScore",
+        "min": 7.1,
+        "max": 9.3
+      },
+      "y": {
+        "field": "myAverageScore",
+        "min": 6.8,
+        "max": 9.8
+      }
+    },
+    "summary": {
+      "genreCount": 12,
+      "sourceAnimeCount": 88,
+      "displayedTopAnimeCount": 30
+    }
+  }
+}
+```
+
+### `GET /users/:userId/anime-stats/genre-bubble`
+타 사용자 장르 취향 bubble chart 데이터를 조회합니다.
+
+Query와 `item` 구조는 `/me/anime-stats/genre-bubble`과 같습니다. 응답에 공개 프로필 `user`가 추가됩니다.
+
+Frontend notes:
+
+- `items[].genre`별로 고유 색상을 지정합니다.
+- `x = communityAverageScore`, `y = myAverageScore`, `z = bubbleSize`로 차트에 매핑합니다.
+- 툴팁에는 `genre`, `myAverageScore`, `communityAverageScore`, `preferenceScore`, `animeCount`, `totalWatchHours`, `topRatedAnime[0]`를 우선 표시합니다.
+- `axis.x/y.min/max`는 실제 데이터 범위입니다. 프론트에서 padding을 조금 더해 축을 잡으면 버블이 넓게 퍼집니다.
+- `weighting=fractional`은 여러 장르를 가진 작품을 장르 수로 나누어 반영합니다. 취향 분석 기본값으로 추천합니다.
+
 ## Voice Actor Analysis
 
 유저 컬렉션과 캐릭터/성우 동기화 데이터를 기반으로 성우 취향을 분석합니다.

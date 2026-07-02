@@ -2,6 +2,7 @@ import { authFetch } from './auth'
 import { genreOptions } from './anime'
 import type {
   AnimeStatsResponse,
+  GenreBubbleResponse,
   TopGenreAnimeItem,
   VoiceActorAnimeResponse,
   VoiceActorRankingResponse,
@@ -180,6 +181,52 @@ export async function recalculateMyAnimeStats() {
   const payload = await response.json()
   console.log('[MyAniTrack] POST /api/me/anime-stats/recalculate response', payload)
   return normalizeStatsItem(payload)
+}
+
+type GenreBubbleParams = {
+  userId?: string
+  minCount?: number
+  weighting?: 'fractional' | 'full'
+  status?: 'completed' | 'all'
+  communityScore?: 'average' | 'mean'
+  titleLanguage?: 'ko' | 'en' | 'ja'
+  topLimit?: number
+  signal?: AbortSignal
+}
+
+function createGenreBubbleUrl(params: GenreBubbleParams = {}) {
+  const path = params.userId
+    ? `/api/users/${params.userId}/anime-stats/genre-bubble`
+    : '/api/me/anime-stats/genre-bubble'
+  const url = new URL(path, getApiBaseUrl())
+
+  url.searchParams.set('minCount', String(params.minCount ?? 5))
+  url.searchParams.set('weighting', params.weighting ?? 'fractional')
+  url.searchParams.set('status', params.status ?? 'completed')
+  url.searchParams.set('communityScore', params.communityScore ?? 'average')
+  url.searchParams.set('titleLanguage', params.titleLanguage ?? 'ko')
+
+  url.searchParams.set('topLimit', String(params.topLimit ?? 3))
+
+  return url
+}
+
+export async function fetchGenreBubbleStats(params: GenreBubbleParams = {}) {
+  const response = await authFetch(createGenreBubbleUrl(params).toString(), {
+    signal: params.signal,
+  })
+
+  if (response.status === 401) {
+    throw new Error('로그인이 필요해요.')
+  }
+
+  if (!response.ok) {
+    throw new Error(`장르 취향 버블 차트를 불러오지 못했습니다. (${response.status})`)
+  }
+
+  const payload = (await response.json()) as GenreBubbleResponse
+
+  return payload.item
 }
 
 type VoiceActorRankingParams = {

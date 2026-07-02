@@ -80,6 +80,40 @@ interface RecommendationCandidateRow extends RowDataPacket {
   genres: string | null;
 }
 
+interface GenreBubbleSourceRow extends RowDataPacket {
+  animeId: number;
+  anilistId: number;
+  userStatus: string;
+  userScore: number | string | null;
+  progress: number;
+  episodes: number | null;
+  duration: number | null;
+  seasonYear: number | null;
+  averageScore: number | null;
+  meanScore: number | null;
+  titleRomaji: string | null;
+  titleEnglish: string | null;
+  titleNative: string | null;
+  titleUserPreferred: string | null;
+  titleKorean: string | null;
+  coverImageLarge: string | null;
+  genre: string;
+  genreCount: number;
+}
+
+export type GenreBubbleWeighting = 'full' | 'fractional';
+export type GenreBubbleStatus = 'all' | 'completed';
+export type GenreBubbleCommunityScore = 'average' | 'mean';
+
+export interface GenreBubbleParams {
+  titleLanguage: 'ko' | 'en' | 'ja';
+  minCount: number;
+  weighting: GenreBubbleWeighting;
+  status: GenreBubbleStatus;
+  communityScore: GenreBubbleCommunityScore;
+  topLimit: number;
+}
+
 export interface UserAnimeStats {
   userId: number;
   totalCount: number;
@@ -129,6 +163,10 @@ function parseNullableNumber(value: number | string | null): number | null {
 
   const parsedNumber = Number(value);
   return Number.isFinite(parsedNumber) ? parsedNumber : null;
+}
+
+function roundMetric(value: number, fractionDigits = 2) {
+  return Number(value.toFixed(fractionDigits));
 }
 
 function parseTopGenreAnimeList(
@@ -811,6 +849,227 @@ export async function getRecommendedAnime(
   return {
     stats,
     items: scoredItems,
+  };
+}
+
+function pickGenreBubbleTitle(row: GenreBubbleSourceRow, titleLanguage: 'ko' | 'en' | 'ja') {
+  if (titleLanguage === 'ko') {
+    return row.titleKorean
+      ?? row.titleEnglish
+      ?? row.titleRomaji
+      ?? row.titleUserPreferred
+      ?? row.titleNative
+      ?? 'Unknown title';
+  }
+
+  if (titleLanguage === 'en') {
+    return row.titleEnglish
+      ?? row.titleKorean
+      ?? row.titleRomaji
+      ?? row.titleUserPreferred
+      ?? row.titleNative
+      ?? 'Unknown title';
+  }
+
+  return row.titleNative
+    ?? row.titleRomaji
+    ?? row.titleUserPreferred
+    ?? row.titleEnglish
+    ?? row.titleKorean
+    ?? 'Unknown title';
+}
+
+export async function getUserGenreBubbleChart(userId: number, params: GenreBubbleParams) {
+  const scoreColumn = params.communityScore === 'mean'
+    ? 'a.mean_score'
+    : 'a.average_score';
+  const statusWhere = params.status === 'completed'
+    ? "AND ual.status = 'completed'"
+    : '';
+
+  const [rows] = await pool.query<GenreBubbleSourceRow[]>(
+    `
+    SELECT
+      ual.anime_id AS animeId,
+      a.anilist_id AS anilistId,
+      ual.status AS userStatus,
+      ual.score AS userScore,
+      ual.progress,
+      a.episodes,
+      a.duration,
+      a.season_year AS seasonYear,
+      a.average_score AS averageScore,
+      a.mean_score AS meanScore,
+      a.title_romaji AS titleRomaji,
+      a.title_english AS titleEnglish,
+      a.title_native AS titleNative,
+      a.title_user_preferred AS titleUserPreferred,
+      akt.full_title AS titleKorean,
+      a.cover_image_large AS coverImageLarge,
+      ag.genre,
+      genre_counts.genre_count AS genreCount
+    FROM user_anime_lists ual
+    INNER JOIN anime a
+      ON a.id = ual.anime_id
+    INNER JOIN anime_genres ag
+      ON ag.anime_id = a.id
+    INNER JOIN (
+      SELECT
+        anime_id,
+        COUNT(*) AS genre_count
+      FROM anime_genres
+      GROUP BY anime_id
+    ) genre_counts
+      ON genre_counts.anime_id = a.id
+    LEFT JOIN anime_korean_titles akt
+      ON akt.anime_id = a.id
+      AND akt.is_primary = TRUE
+    WHERE ual.user_id = ?
+      ${statusWhere}
+      AND ual.score IS NOT NULL
+      AND ${scoreColumn} IS NOT NULL
+      AND ag.genre IS NOT NULL
+    `,
+    [userId]
+  );
+
+  const genreMap = new Map<string, {
+    genre: string;
+    animeIds: Set<number>;
+    weightedAnimeCount: number;
+    myScoreSum: number;
+    communityScoreSum: number;
+    releaseYearSum: number;
+    releaseYearWeight: number;
+    totalWatchMinutes: number;
+    topRatedAnime: Array<{
+      animeId: number;
+      anilistId: number;
+      title: string;
+      score: number;
+      communityScore: number;
+      coverImageLarge: string | null;
+    }>;
+  }>();
+
+  for (const row of rows) {
+    const myScore = parseNullableNumber(row.userScore);
+    const rawCommunityScore = params.communityScore === 'mean'
+      ? row.meanScore
+      : row.averageScore;
+
+    if (myScore === null || rawCommunityScore === null) {
+      continue;
+    }
+
+    const communityScore = rawCommunityScore / 10;
+    const genreCount = Math.max(Number(row.genreCount) || 1, 1);
+    const weight = params.weighting === 'fractional' ? 1 / genreCount : 1;
+    const effectiveEpisodes = getEffectiveWatchedEpisodes({
+      status: row.userStatus,
+      progress: row.progress,
+      episodes: row.episodes,
+    });
+    const currentGenre = genreMap.get(row.genre) ?? {
+      genre: row.genre,
+      animeIds: new Set<number>(),
+      weightedAnimeCount: 0,
+      myScoreSum: 0,
+      communityScoreSum: 0,
+      releaseYearSum: 0,
+      releaseYearWeight: 0,
+      totalWatchMinutes: 0,
+      topRatedAnime: [],
+    };
+
+    currentGenre.animeIds.add(row.animeId);
+    currentGenre.weightedAnimeCount += weight;
+    currentGenre.myScoreSum += myScore * weight;
+    currentGenre.communityScoreSum += communityScore * weight;
+    currentGenre.totalWatchMinutes += effectiveEpisodes * (row.duration ?? 0) * weight;
+
+    if (row.seasonYear) {
+      currentGenre.releaseYearSum += row.seasonYear * weight;
+      currentGenre.releaseYearWeight += weight;
+    }
+
+    currentGenre.topRatedAnime.push({
+      animeId: row.animeId,
+      anilistId: row.anilistId,
+      title: pickGenreBubbleTitle(row, params.titleLanguage),
+      score: myScore,
+      communityScore: roundMetric(communityScore),
+      coverImageLarge: row.coverImageLarge,
+    });
+
+    genreMap.set(row.genre, currentGenre);
+  }
+
+  const items = Array.from(genreMap.values())
+    .filter((item) => item.animeIds.size >= params.minCount)
+    .map((item) => {
+      const myAverageScore = item.myScoreSum / item.weightedAnimeCount;
+      const communityAverageScore = item.communityScoreSum / item.weightedAnimeCount;
+      const preferenceScore = myAverageScore - communityAverageScore;
+      const bubbleBase = params.weighting === 'fractional'
+        ? item.weightedAnimeCount
+        : item.animeIds.size;
+
+      return {
+        genre: item.genre,
+        animeCount: item.animeIds.size,
+        weightedAnimeCount: roundMetric(item.weightedAnimeCount),
+        myAverageScore: roundMetric(myAverageScore),
+        communityAverageScore: roundMetric(communityAverageScore),
+        preferenceScore: roundMetric(preferenceScore),
+        totalWatchMinutes: Math.round(item.totalWatchMinutes),
+        totalWatchHours: roundMetric(item.totalWatchMinutes / 60),
+        averageReleaseYear: item.releaseYearWeight > 0
+          ? roundMetric(item.releaseYearSum / item.releaseYearWeight, 1)
+          : null,
+        bubbleSize: roundMetric(Math.sqrt(Math.max(bubbleBase, 0))),
+        topRatedAnime: item.topRatedAnime
+          .sort((a, b) => b.score - a.score || b.communityScore - a.communityScore || b.animeId - a.animeId)
+          .slice(0, params.topLimit),
+      };
+    })
+    .sort((a, b) => b.preferenceScore - a.preferenceScore || b.animeCount - a.animeCount || a.genre.localeCompare(b.genre));
+
+  const communityScores = items.map((item) => item.communityAverageScore);
+  const myScores = items.map((item) => item.myAverageScore);
+  const displayedAnimeIds = new Set<number>();
+
+  for (const item of items) {
+    for (const anime of item.topRatedAnime) {
+      displayedAnimeIds.add(anime.animeId);
+    }
+  }
+
+  return {
+    userId,
+    weighting: params.weighting,
+    communityScore: params.communityScore,
+    status: params.status,
+    minCount: params.minCount,
+    titleLanguage: params.titleLanguage,
+    items,
+    axis: {
+      x: {
+        field: 'communityAverageScore',
+        min: communityScores.length ? Math.min(...communityScores) : null,
+        max: communityScores.length ? Math.max(...communityScores) : null,
+      },
+      y: {
+        field: 'myAverageScore',
+        min: myScores.length ? Math.min(...myScores) : null,
+        max: myScores.length ? Math.max(...myScores) : null,
+      },
+    },
+    summary: {
+      genreCount: items.length,
+      sourceAnimeCount: new Set(rows.map((row) => row.animeId)).size,
+      displayedTopAnimeCount: displayedAnimeIds.size,
+    },
   };
 }
 

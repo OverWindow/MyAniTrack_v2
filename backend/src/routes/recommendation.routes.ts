@@ -1,8 +1,10 @@
 import { Router } from 'express';
 import { requireAdmin, requireAuth } from '../middleware/auth.middleware';
 import {
+  getMyGenreBubbleChart,
   getMyAnimeStats,
   getMyRecommendations,
+  getUserGenreBubbleChartController,
   getUserStats,
   recalculateMyAnimeStats,
 } from '../controllers/recommendation.controller';
@@ -16,7 +18,9 @@ import {
 const router = Router();
 
 router.get('/me/anime-stats', requireAuth, getMyAnimeStats);
+router.get('/me/anime-stats/genre-bubble', requireAuth, getMyGenreBubbleChart);
 router.get('/users/:userId/anime-stats', getUserStats);
+router.get('/users/:userId/anime-stats/genre-bubble', getUserGenreBubbleChartController);
 router.post('/me/anime-stats/recalculate', requireAuth, recalculateMyAnimeStats);
 router.get('/me/badges', requireAuth, getMyBadges);
 router.get('/users/:userId/badges', getUserBadges);

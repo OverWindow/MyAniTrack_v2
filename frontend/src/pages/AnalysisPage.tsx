@@ -8,11 +8,12 @@ import { getProfileImageSrc, handleProfileImageError } from '../lib/avatar'
 import { fetchMyCollection } from '../lib/collection'
 import {
   fetchMyAnimeStats,
+  fetchGenreBubbleStats,
   formatUpdatedAt,
   getGenreLabel,
   recalculateMyAnimeStats,
 } from '../lib/stats'
-import type { AnimeStatsItem } from '../types/stats'
+import type { AnimeStatsItem, GenreBubbleResponse } from '../types/stats'
 import type { AnimeGenre } from '../types/anime'
 import type { UserAnimeListItem } from '../types/collection'
 import '../styles/pages/AnalysisPage.css'
@@ -85,6 +86,10 @@ const ScoreDistributionBarChart = lazy(async () => {
   const module = await import('../components/AnalysisCharts')
   return { default: module.ScoreDistributionBarChart }
 })
+const GenrePreferenceBubbleChart = lazy(async () => {
+  const module = await import('../components/AnalysisCharts')
+  return { default: module.GenrePreferenceBubbleChart }
+})
 
 const RECALCULATE_COOLDOWN_SECONDS = 30
 
@@ -153,6 +158,15 @@ export function AnalysisPage() {
     isLoading: false,
     error: null,
   })
+  const [genreBubbleState, setGenreBubbleState] = useState<{
+    item: GenreBubbleResponse['item'] | null
+    isLoading: boolean
+    error: string | null
+  }>({
+    item: null,
+    isLoading: true,
+    error: null,
+  })
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -186,6 +200,38 @@ export function AnalysisPage() {
     }
 
     void loadStats()
+
+    return () => controller.abort()
+  }, [isAuthenticated])
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      return
+    }
+
+    const controller = new AbortController()
+
+    const loadGenreBubble = async () => {
+      setGenreBubbleState((current) => ({ ...current, isLoading: true, error: null }))
+
+      try {
+        const item = await fetchGenreBubbleStats({ signal: controller.signal })
+
+        setGenreBubbleState({ item, isLoading: false, error: null })
+      } catch (loadError) {
+        if (loadError instanceof DOMException && loadError.name === 'AbortError') {
+          return
+        }
+
+        setGenreBubbleState({
+          item: null,
+          isLoading: false,
+          error: loadError instanceof Error ? loadError.message : '장르 취향 버블 차트를 불러오지 못했어요.',
+        })
+      }
+    }
+
+    void loadGenreBubble()
 
     return () => controller.abort()
   }, [isAuthenticated])
@@ -748,6 +794,26 @@ export function AnalysisPage() {
           }
         }}
       />
+
+      <section className="analysis-panel analysis-bubble-panel">
+        <div className="analysis-panel-heading">
+          <span className="detail-label">Genre preference</span>
+          <h2>장르 취향 버블 차트</h2>
+          <p>커뮤니티 평균 평점과 내 평균 평점을 비교해, 대중보다 내가 더 좋아하는 장르를 볼 수 있어요.</p>
+        </div>
+        {genreBubbleState.isLoading && <div className="analysis-empty-state">장르 취향 차트를 불러오는 중이에요.</div>}
+        {genreBubbleState.error && !genreBubbleState.isLoading && (
+          <div className="analysis-empty-state">{genreBubbleState.error}</div>
+        )}
+        {!genreBubbleState.isLoading && !genreBubbleState.error && genreBubbleState.item && genreBubbleState.item.items.length > 0 && (
+          <Suspense fallback={<div className="analysis-chart-skeleton analysis-chart-skeleton-wide" />}>
+            <GenrePreferenceBubbleChart data={genreBubbleState.item.items} />
+          </Suspense>
+        )}
+        {!genreBubbleState.isLoading && !genreBubbleState.error && (!genreBubbleState.item || genreBubbleState.item.items.length === 0) && (
+          <div className="analysis-empty-state">표시할 장르 취향 데이터가 아직 없어요.</div>
+        )}
+      </section>
 
       <VoiceActorRankingSection ownerLabel="내" />
     </section>

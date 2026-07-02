@@ -4,11 +4,11 @@ import { AnalysisAnimeToast } from '../components/AnalysisAnimeToast'
 import { ReleaseDecadeProgress } from '../components/ReleaseDecadeProgress'
 import { VoiceActorRankingSection } from '../components/VoiceActorRankingSection'
 import { getProfileImageSrc, handleProfileImageError } from '../lib/avatar'
-import { formatUpdatedAt, formatWatchHours, getGenreLabel } from '../lib/stats'
+import { fetchGenreBubbleStats, formatUpdatedAt, formatWatchHours, getGenreLabel } from '../lib/stats'
 import { fetchPublicUserAnimeStats, fetchPublicUserCollection } from '../lib/users'
 import type { AnimeGenre } from '../types/anime'
 import type { UserAnimeListItem } from '../types/collection'
-import type { AnimeStatsItem } from '../types/stats'
+import type { AnimeStatsItem, GenreBubbleResponse } from '../types/stats'
 import type { PublicUserProfile } from '../types/users'
 import '../styles/pages/AnalysisPage.css'
 import '../styles/pages/UserAnalysisPage.css'
@@ -67,6 +67,10 @@ const ReleaseYearBarChart = lazy(async () => {
 const ScoreDistributionBarChart = lazy(async () => {
   const module = await import('../components/AnalysisCharts')
   return { default: module.ScoreDistributionBarChart }
+})
+const GenrePreferenceBubbleChart = lazy(async () => {
+  const module = await import('../components/AnalysisCharts')
+  return { default: module.GenrePreferenceBubbleChart }
 })
 
 function getTopEntries(record: Record<string, number>, limit = 8) {
@@ -133,6 +137,15 @@ export function UserAnalysisPage() {
     isLoading: false,
     error: null,
   })
+  const [genreBubbleState, setGenreBubbleState] = useState<{
+    item: GenreBubbleResponse['item'] | null
+    isLoading: boolean
+    error: string | null
+  }>({
+    item: null,
+    isLoading: true,
+    error: null,
+  })
 
   useEffect(() => {
     if (!userId) {
@@ -160,6 +173,37 @@ export function UserAnalysisPage() {
     }
 
     void loadStats()
+
+    return () => controller.abort()
+  }, [userId])
+
+  useEffect(() => {
+    if (!userId) {
+      return
+    }
+
+    const controller = new AbortController()
+
+    const loadGenreBubble = async () => {
+      setGenreBubbleState((current) => ({ ...current, isLoading: true, error: null }))
+
+      try {
+        const item = await fetchGenreBubbleStats({ userId, signal: controller.signal })
+        setGenreBubbleState({ item, isLoading: false, error: null })
+      } catch (loadError) {
+        if (loadError instanceof DOMException && loadError.name === 'AbortError') {
+          return
+        }
+
+        setGenreBubbleState({
+          item: null,
+          isLoading: false,
+          error: loadError instanceof Error ? loadError.message : '장르 취향 버블 차트를 불러오지 못했어요.',
+        })
+      }
+    }
+
+    void loadGenreBubble()
 
     return () => controller.abort()
   }, [userId])
@@ -614,6 +658,26 @@ export function UserAnalysisPage() {
           }
         }}
       />
+
+      <section className="analysis-panel analysis-bubble-panel">
+        <div className="analysis-panel-heading">
+          <span className="detail-label">Genre preference</span>
+          <h2>장르 취향 버블 차트</h2>
+          <p>커뮤니티 평균 평점과 이 유저의 평균 평점을 비교해 선호 장르를 볼 수 있어요.</p>
+        </div>
+        {genreBubbleState.isLoading && <div className="analysis-empty-state">장르 취향 차트를 불러오는 중이에요.</div>}
+        {genreBubbleState.error && !genreBubbleState.isLoading && (
+          <div className="analysis-empty-state">{genreBubbleState.error}</div>
+        )}
+        {!genreBubbleState.isLoading && !genreBubbleState.error && genreBubbleState.item && genreBubbleState.item.items.length > 0 && (
+          <Suspense fallback={<div className="analysis-chart-skeleton analysis-chart-skeleton-wide" />}>
+            <GenrePreferenceBubbleChart data={genreBubbleState.item.items} />
+          </Suspense>
+        )}
+        {!genreBubbleState.isLoading && !genreBubbleState.error && (!genreBubbleState.item || genreBubbleState.item.items.length === 0) && (
+          <div className="analysis-empty-state">표시할 장르 취향 데이터가 아직 없어요.</div>
+        )}
+      </section>
 
       <VoiceActorRankingSection userId={userId} ownerLabel={user.username} />
     </section>

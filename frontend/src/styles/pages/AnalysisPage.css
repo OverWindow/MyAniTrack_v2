@@ -934,6 +934,145 @@
   outline: none;
 }
 
+.voice-actor-character-result-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.voice-actor-character-result-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid rgba(120, 113, 108, 0.12);
+  border-radius: 8px;
+  background: rgba(250, 247, 241, 0.68);
+}
+
+.voice-actor-character-result-card > img {
+  width: 58px;
+  height: 74px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--bg-soft-beige);
+}
+
+.voice-actor-character-result-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.voice-actor-character-result-copy strong,
+.voice-actor-character-result-copy a,
+.voice-actor-character-result-copy span,
+.voice-actor-character-result-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.voice-actor-character-result-copy strong {
+  color: var(--text-primary);
+  font-size: 0.92rem;
+}
+
+.voice-actor-character-result-copy a,
+.voice-actor-character-result-copy span,
+.voice-actor-character-result-copy small {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.voice-actor-character-result-copy a {
+  text-decoration: none;
+}
+
+.voice-actor-character-result-copy a:hover,
+.voice-actor-character-result-copy a:focus-visible {
+  color: var(--point-hover);
+  outline: none;
+}
+
+.voice-actor-character-menu-wrap {
+  position: relative;
+}
+
+.voice-actor-character-menu-button {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid rgba(120, 113, 108, 0.14);
+  border-radius: 8px;
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.voice-actor-character-menu-button:hover,
+.voice-actor-character-menu-button:focus-visible {
+  border-color: var(--point-border);
+  color: var(--point-hover);
+  outline: none;
+}
+
+.voice-actor-character-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 4;
+  display: grid;
+  gap: 4px;
+  width: min(260px, 72vw);
+  max-height: 240px;
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid rgba(120, 113, 108, 0.16);
+  border-radius: 10px;
+  background: var(--bg-card);
+  box-shadow: 0 18px 44px rgba(41, 37, 36, 0.18);
+}
+
+.voice-actor-character-menu a {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 8px;
+  border-radius: 8px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.voice-actor-character-menu a:hover,
+.voice-actor-character-menu a:focus-visible {
+  background: var(--point-softest);
+  outline: none;
+}
+
+.voice-actor-character-menu strong,
+.voice-actor-character-menu span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.voice-actor-character-menu strong {
+  color: var(--text-primary);
+  font-size: 0.84rem;
+}
+
+.voice-actor-character-menu span {
+  color: var(--text-secondary);
+  font-size: 0.76rem;
+}
+
 .voice-actor-anime-list {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1029,6 +1168,56 @@
 
 .analysis-score-chart-shell {
   height: 330px;
+}
+
+.analysis-bubble-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.analysis-bubble-chart-shell {
+  display: grid;
+  gap: 10px;
+  min-height: 460px;
+  margin-top: 6px;
+}
+
+.analysis-bubble-point-label {
+  fill: #ffffff;
+  font-size: 0.86rem;
+  font-weight: 900;
+  letter-spacing: 0;
+  paint-order: stroke;
+  pointer-events: none;
+  stroke: rgba(28, 25, 23, 0.38);
+  stroke-linejoin: round;
+  stroke-width: 4px;
+}
+
+.analysis-bubble-tooltip {
+  min-width: 220px;
+}
+
+.analysis-bubble-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+.analysis-bubble-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.analysis-bubble-legend i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 
 .analysis-chart-tooltip {
@@ -1174,6 +1363,10 @@
   }
 
   .voice-actor-anime-list {
+    grid-template-columns: 1fr;
+  }
+
+  .voice-actor-character-result-list {
     grid-template-columns: 1fr;
   }
 

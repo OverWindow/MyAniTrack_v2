@@ -28,6 +28,19 @@ type DetailState = {
   error: string | null
 }
 
+type CharacterAppearance = {
+  id: number
+  name: string
+  imageUrl: string | null
+  role?: string | null
+  works: Array<{
+    id: number
+    title: string
+    score?: number | null
+    progress?: number | null
+  }>
+}
+
 const INITIAL_VISIBLE_RANKING_COUNT = 5
 
 function getPersonName(name?: VoiceActorPersonName | null) {
@@ -40,6 +53,42 @@ function getVoiceActorImage(item: VoiceActorRankingItem | VoiceActorAnimeRespons
 
 function getCharacterImage(character: VoiceActorAnimeResponse['items'][number]['characters'][number]) {
   return character.image.large || character.image.medium || null
+}
+
+function getCharacterAppearances(detail: VoiceActorAnimeResponse) {
+  const characterMap = new Map<number, CharacterAppearance>()
+
+  for (const entry of detail.items) {
+    for (const character of entry.characters) {
+      const characterName = getPersonName(character.name)
+      const current = characterMap.get(character.id) ?? {
+        id: character.id,
+        name: characterName,
+        imageUrl: getCharacterImage(character),
+        role: character.role,
+        works: [],
+      }
+
+      if (!current.works.some((work) => work.id === entry.anime.id)) {
+        current.works.push({
+          id: entry.anime.id,
+          title: entry.anime.title,
+          score: entry.userList?.score,
+          progress: entry.userList?.progress,
+        })
+      }
+
+      characterMap.set(character.id, current)
+    }
+  }
+
+  return Array.from(characterMap.values()).sort((left, right) => {
+    if (right.works.length !== left.works.length) {
+      return right.works.length - left.works.length
+    }
+
+    return left.name.localeCompare(right.name)
+  })
 }
 
 function getRankingMeta(item: VoiceActorRankingItem, sort: VoiceActorRankingSort) {
@@ -128,6 +177,7 @@ export function VoiceActorRankingSection({ userId, ownerLabel = '이 사용자' 
     count: false,
     score: false,
   })
+  const [openCharacterWorksId, setOpenCharacterWorksId] = useState<number | null>(null)
   const detailRequestIdRef = useRef(0)
 
   useEffect(() => {
@@ -181,6 +231,7 @@ export function VoiceActorRankingSection({ userId, ownerLabel = '이 사용자' 
       isLoading: false,
       error: null,
     })
+    setOpenCharacterWorksId(null)
   }
 
   useEffect(() => {
@@ -209,6 +260,7 @@ export function VoiceActorRankingSection({ userId, ownerLabel = '이 사용자' 
       isLoading: true,
       error: null,
     })
+    setOpenCharacterWorksId(null)
 
     try {
       const detail = await fetchVoiceActorAnime({
@@ -249,6 +301,7 @@ export function VoiceActorRankingSection({ userId, ownerLabel = '이 사용자' 
   const selectedName = detailState.selected
     ? getPersonName(detailState.selected.voiceActor.name)
     : null
+  const characterAppearances = detailState.item ? getCharacterAppearances(detailState.item) : []
 
   return (
     <section className="analysis-panel voice-actor-section">
@@ -336,48 +389,64 @@ export function VoiceActorRankingSection({ userId, ownerLabel = '이 사용자' 
             {detailState.error && !detailState.isLoading && (
               <div className="analysis-empty-state">{detailState.error}</div>
             )}
-            {!detailState.isLoading && !detailState.error && detailState.item?.items.length === 0 && (
-              <div className="analysis-empty-state">표시할 출연 작품이 없어요.</div>
+            {!detailState.isLoading && !detailState.error && characterAppearances.length === 0 && (
+              <div className="analysis-empty-state">표시할 캐릭터 정보가 없어요.</div>
             )}
-            {!detailState.isLoading && !detailState.error && detailState.item && detailState.item.items.length > 0 && (
-              <div className="voice-actor-anime-list">
-                {detailState.item.items.map((entry) => {
-                  const characterNames = entry.characters.map((character) => getPersonName(character.name)).join(', ')
+            {!detailState.isLoading && !detailState.error && characterAppearances.length > 0 && (
+              <div className="voice-actor-character-result-list">
+                {characterAppearances.map((character) => {
+                  const singleWork = character.works.length === 1 ? character.works[0] : null
 
                   return (
-                    <Link className="voice-actor-anime-card" key={entry.anime.id} to={`/anime/${entry.anime.id}`}>
-                      {entry.characters.length > 0 && (
-                        <div className="voice-actor-character-list" aria-label="연기한 캐릭터">
-                          {entry.characters.slice(0, 4).map((character) => {
-                            const characterName = getPersonName(character.name)
+                    <article className="voice-actor-character-result-card" key={character.id}>
+                      <img
+                        src={getProfileImageSrc(character.imageUrl)}
+                        alt={character.name}
+                        loading="lazy"
+                        onError={handleProfileImageError}
+                      />
+                      <div className="voice-actor-character-result-copy">
+                        <strong>{character.name}</strong>
+                        {singleWork ? (
+                          <Link to={`/anime/${singleWork.id}`}>{singleWork.title}</Link>
+                        ) : (
+                          <span>{character.works.length.toLocaleString()}개 작품</span>
+                        )}
+                        {character.role && <small>{character.role}</small>}
+                      </div>
 
-                            return (
-                              <span className="voice-actor-character-chip" key={character.id}>
-                                <img
-                                  src={getProfileImageSrc(getCharacterImage(character))}
-                                  alt={characterName}
-                                  loading="lazy"
-                                  onError={handleProfileImageError}
-                                />
-                                <span>{characterName}</span>
-                              </span>
-                            )
-                          })}
+                      {!singleWork && (
+                        <div className="voice-actor-character-menu-wrap">
+                          <button
+                            className="voice-actor-character-menu-button"
+                            type="button"
+                            aria-label={`${character.name} 출연 작품 보기`}
+                            aria-expanded={openCharacterWorksId === character.id}
+                            onClick={() => setOpenCharacterWorksId((current) => (current === character.id ? null : character.id))}
+                          >
+                            •••
+                          </button>
+
+                          {openCharacterWorksId === character.id && (
+                            <div className="voice-actor-character-menu" role="menu">
+                              {character.works.map((work) => (
+                                <Link key={work.id} to={`/anime/${work.id}`} role="menuitem">
+                                  <strong>{work.title}</strong>
+                                  <span>
+                                    {work.score !== null && work.score !== undefined
+                                      ? `${Number(work.score).toFixed(1)}점`
+                                      : '미평점'}
+                                    {work.progress !== null && work.progress !== undefined
+                                      ? ` · ${work.progress}화`
+                                      : ''}
+                                  </span>
+                                </Link>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       )}
-                      <div className="voice-actor-anime-copy">
-                        <strong>{entry.anime.title}</strong>
-                        <span>{characterNames || '캐릭터 정보 없음'}</span>
-                        <small>
-                          {entry.userList?.score !== null && entry.userList?.score !== undefined
-                            ? `${Number(entry.userList.score).toFixed(1)}점`
-                            : '미평점'}
-                          {entry.userList?.progress !== null && entry.userList?.progress !== undefined
-                            ? ` · ${entry.userList.progress}화`
-                            : ''}
-                        </small>
-                      </div>
-                    </Link>
+                    </article>
                   )
                 })}
               </div>

@@ -35,6 +35,52 @@ export type AnimeStatsResponse = {
   item: AnimeStatsItem
 }
 
+export type GenreBubbleTopAnime = {
+  animeId?: number
+  id?: number
+  title: string
+  score?: number | null
+  coverImageLarge?: string | null
+}
+
+export type GenreBubbleItem = {
+  genre: string
+  animeCount: number
+  weightedAnimeCount: number
+  myAverageScore: number
+  communityAverageScore: number
+  preferenceScore: number
+  totalWatchMinutes: number
+  totalWatchHours: number
+  averageReleaseYear: number | null
+  bubbleSize: number
+  topRatedAnime: GenreBubbleTopAnime[]
+}
+
+export type GenreBubbleResponse = {
+  success: boolean
+  item: {
+    userId: number
+    weighting: 'fractional' | 'full'
+    communityScore: 'average' | 'mean'
+    status: 'completed' | 'all'
+    minCount: number
+    items: GenreBubbleItem[]
+    axis: {
+      x: {
+        field: string
+        min: number
+        max: number
+      }
+      y: {
+        field: string
+        min: number
+        max: number
+      }
+    }
+  }
+}
+
 export type VoiceActorRankingSort = 'count' | 'score'
 
 export type VoiceActorPersonName = {
