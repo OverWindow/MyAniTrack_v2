@@ -4,8 +4,20 @@ import { AnalysisAnimeToast } from '../components/AnalysisAnimeToast'
 import { ReleaseDecadeProgress } from '../components/ReleaseDecadeProgress'
 import { VoiceActorRankingSection } from '../components/VoiceActorRankingSection'
 import { useAuth } from '../contexts/AuthContext'
+import {
+  deleteAnalysisCachePrefix,
+  getAnalysisCache,
+  getAnalysisCacheKey,
+  getAnalysisCachePrefix,
+  getAnalysisViewState,
+  getStoredStudioSort,
+  saveAnalysisViewState,
+  saveStoredStudioSort,
+  setAnalysisCache,
+} from '../lib/analysisCache'
 import { getProfileImageSrc, handleProfileImageError } from '../lib/avatar'
 import { fetchMyCollection } from '../lib/collection'
+import { SERVER_CONNECTION_ERROR_MESSAGE, getFriendlyErrorMessage } from '../lib/errors'
 import {
   fetchMyAnimeStats,
   fetchGenreBubbleStats,
@@ -18,8 +30,10 @@ import {
 import type {
   AnimeStatsItem,
   GenreBubbleResponse,
+  StudioAnimeResponse,
   StudioAnimeItem,
   StudioRankingItem,
+  StudioRankingResponse,
   StudioRankingSort,
 } from '../types/stats'
 import type { AnimeGenre } from '../types/anime'
@@ -131,6 +145,10 @@ function toFiniteNumber(value: unknown) {
 }
 
 function renderEmptyMessage(message: string) {
+  if (message === SERVER_CONNECTION_ERROR_MESSAGE) {
+    return <div className="connection-error-plain">{message}</div>
+  }
+
   return <div className="analysis-empty-state">{message}</div>
 }
 
@@ -160,8 +178,8 @@ function formatStudioWatchTime(hours?: number | null, minutes?: number | null) {
   return '0시간'
 }
 
-function StudioRankingSection() {
-  const [sort, setSort] = useState<StudioRankingSort>('count')
+function StudioRankingSection({ userId, cacheVersion }: { userId?: number | string | null, cacheVersion: number }) {
+  const [sort, setSort] = useState<StudioRankingSort>(() => getStoredStudioSort(userId) ?? 'count')
   const [rankingState, setRankingState] = useState<{
     items: StudioRankingItem[]
     isLoading: boolean
@@ -185,18 +203,63 @@ function StudioRankingSection() {
   })
 
   useEffect(() => {
+    setSort(getStoredStudioSort(userId) ?? 'count')
+  }, [userId])
+
+  useEffect(() => {
+    if (userId) {
+      saveStoredStudioSort(userId, sort)
+    }
+  }, [sort, userId])
+
+  useEffect(() => {
+    if (!userId) {
+      return
+    }
+
     const controller = new AbortController()
+    let isCancelled = false
 
     const loadRanking = async () => {
       setRankingState((current) => ({ ...current, isLoading: true, error: null }))
+      const cacheKey = getAnalysisCacheKey(userId, 'studioRanking', sort)
 
       try {
+        const cached = await getAnalysisCache<StudioRankingResponse>(cacheKey)
+
+        if (isCancelled || controller.signal.aborted) {
+          return
+        }
+
+        if (cached) {
+          setRankingState({
+            items: cached.items,
+            isLoading: false,
+            error: null,
+            studioCount: cached.summary.studioCount,
+          })
+          setSelectedStudio((current) => {
+            if (!current) {
+              return cached.items[0] ?? null
+            }
+
+            return cached.items.find((entry) => entry.studio.id === current.studio.id) ?? cached.items[0] ?? null
+          })
+          return
+        }
+
         const response = await fetchStudioRanking({
           sort,
           limit: 12,
           minRatedAnimeCount: sort === 'score' ? 1 : undefined,
           signal: controller.signal,
         })
+
+        if (isCancelled || controller.signal.aborted) {
+          return
+        }
+
+        await setAnalysisCache(cacheKey, response)
 
         setRankingState({
           items: response.items,
@@ -219,7 +282,7 @@ function StudioRankingSection() {
         setRankingState({
           items: [],
           isLoading: false,
-          error: loadError instanceof Error ? loadError.message : '스튜디오 랭킹을 불러오지 못했어요.',
+          error: getFriendlyErrorMessage(loadError, '스튜디오 랭킹을 불러오지 못했어요.'),
           studioCount: 0,
         })
         setSelectedStudio(null)
@@ -228,26 +291,48 @@ function StudioRankingSection() {
 
     void loadRanking()
 
-    return () => controller.abort()
-  }, [sort])
+    return () => {
+      isCancelled = true
+      controller.abort()
+    }
+  }, [cacheVersion, sort, userId])
 
   useEffect(() => {
-    if (!selectedStudio) {
+    if (!selectedStudio || !userId) {
       setAnimeState({ items: [], isLoading: false, error: null })
       return
     }
 
     const controller = new AbortController()
+    let isCancelled = false
 
     const loadAnime = async () => {
       setAnimeState({ items: [], isLoading: true, error: null })
+      const cacheKey = getAnalysisCacheKey(userId, 'studioAnime', String(selectedStudio.studio.id))
 
       try {
+        const cached = await getAnalysisCache<StudioAnimeResponse>(cacheKey)
+
+        if (isCancelled || controller.signal.aborted) {
+          return
+        }
+
+        if (cached) {
+          setAnimeState({ items: cached.items, isLoading: false, error: null })
+          return
+        }
+
         const response = await fetchStudioAnime({
           studioId: selectedStudio.studio.id,
           limit: 12,
           signal: controller.signal,
         })
+
+        if (isCancelled || controller.signal.aborted) {
+          return
+        }
+
+        await setAnalysisCache(cacheKey, response)
 
         setAnimeState({ items: response.items, isLoading: false, error: null })
       } catch (loadError) {
@@ -258,15 +343,18 @@ function StudioRankingSection() {
         setAnimeState({
           items: [],
           isLoading: false,
-          error: loadError instanceof Error ? loadError.message : '스튜디오 작품을 불러오지 못했어요.',
+          error: getFriendlyErrorMessage(loadError, '스튜디오 작품을 불러오지 못했어요.'),
         })
       }
     }
 
     void loadAnime()
 
-    return () => controller.abort()
-  }, [selectedStudio])
+    return () => {
+      isCancelled = true
+      controller.abort()
+    }
+  }, [cacheVersion, selectedStudio, userId])
 
   return (
     <section className="analysis-panel studio-ranking-section">
@@ -296,9 +384,7 @@ function StudioRankingSection() {
       </div>
 
       {rankingState.isLoading && <div className="analysis-empty-state">스튜디오 랭킹을 불러오는 중이에요.</div>}
-      {rankingState.error && !rankingState.isLoading && (
-        <div className="analysis-empty-state">{rankingState.error}</div>
-      )}
+      {rankingState.error && !rankingState.isLoading && renderEmptyMessage(rankingState.error)}
       {!rankingState.isLoading && !rankingState.error && rankingState.items.length === 0 && (
         <div className="analysis-empty-state">표시할 스튜디오 데이터가 아직 없어요.</div>
       )}
@@ -349,9 +435,7 @@ function StudioRankingSection() {
             </div>
 
             {animeState.isLoading && <div className="analysis-empty-state">작품 목록을 불러오는 중이에요.</div>}
-            {animeState.error && !animeState.isLoading && (
-              <div className="analysis-empty-state">{animeState.error}</div>
-            )}
+            {animeState.error && !animeState.isLoading && renderEmptyMessage(animeState.error)}
             {!animeState.isLoading && !animeState.error && animeState.items.length === 0 && (
               <div className="analysis-empty-state">이 스튜디오의 작품 목록이 아직 없어요.</div>
             )}
@@ -387,6 +471,7 @@ function StudioRankingSection() {
 
 export function AnalysisPage() {
   const { isAuthenticated, user } = useAuth()
+  const userId = user?.id ?? null
   const [state, setState] = useState<AnalysisState>({
     item: null,
     isLoading: true,
@@ -394,6 +479,7 @@ export function AnalysisPage() {
   })
   const [cooldownLeft, setCooldownLeft] = useState(0)
   const [isRecalculating, setIsRecalculating] = useState(false)
+  const [cacheVersion, setCacheVersion] = useState(0)
   const [activeTab, setActiveTab] = useState<AnalysisTab>('genre')
   const [yearAnimeState, setYearAnimeState] = useState<YearAnimeState>({
     selectedYear: null,
@@ -424,15 +510,157 @@ export function AnalysisPage() {
   })
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    const viewState = getAnalysisViewState(userId)
+
+    if (!viewState) {
+      return
+    }
+
+    if (viewState.activeTab) {
+      setActiveTab(viewState.activeTab)
+    }
+
+    setGenreAnimeState((current) => ({ ...current, selectedGenre: viewState.selectedGenre ?? null }))
+    setYearAnimeState((current) => ({ ...current, selectedYear: viewState.selectedYear ?? null }))
+    setScoreAnimeState((current) => ({ ...current, selectedScore: viewState.selectedScore ?? null }))
+  }, [userId])
+
+  useEffect(() => {
+    if (!userId) {
+      return
+    }
+
+    saveAnalysisViewState(userId, {
+      activeTab,
+      selectedGenre: genreAnimeState.selectedGenre,
+      selectedYear: yearAnimeState.selectedYear,
+      selectedScore: scoreAnimeState.selectedScore,
+    })
+  }, [
+    activeTab,
+    genreAnimeState.selectedGenre,
+    scoreAnimeState.selectedScore,
+    userId,
+    yearAnimeState.selectedYear,
+  ])
+
+  useEffect(() => {
+    if (!userId || !genreAnimeState.selectedGenre || genreAnimeState.isLoading || genreAnimeState.items.length > 0) {
+      return
+    }
+
+    const selectedGenre = genreAnimeState.selectedGenre
+
+    const restoreGenreItems = async () => {
+      const cached = await getAnalysisCache<UserAnimeListItem[]>(
+        getAnalysisCacheKey(userId, 'filteredAnime', `genre:${selectedGenre}`),
+      )
+
+      if (!cached) {
+        return
+      }
+
+      setGenreAnimeState({
+        selectedGenre,
+        items: cached,
+        isLoading: false,
+        error: null,
+      })
+    }
+
+    void restoreGenreItems()
+  }, [genreAnimeState.isLoading, genreAnimeState.items.length, genreAnimeState.selectedGenre, userId])
+
+  useEffect(() => {
+    if (!userId || !yearAnimeState.selectedYear || yearAnimeState.isLoading || yearAnimeState.items.length > 0) {
+      return
+    }
+
+    const selectedYear = yearAnimeState.selectedYear
+
+    const restoreYearItems = async () => {
+      const cached = await getAnalysisCache<UserAnimeListItem[]>(
+        getAnalysisCacheKey(userId, 'filteredAnime', `year:${selectedYear}`),
+      )
+
+      if (!cached) {
+        return
+      }
+
+      setYearAnimeState({
+        selectedYear,
+        items: cached,
+        isLoading: false,
+        error: null,
+      })
+    }
+
+    void restoreYearItems()
+  }, [userId, yearAnimeState.isLoading, yearAnimeState.items.length, yearAnimeState.selectedYear])
+
+  useEffect(() => {
+    if (!userId || !scoreAnimeState.selectedScore || scoreAnimeState.isLoading || scoreAnimeState.items.length > 0) {
+      return
+    }
+
+    const selectedScore = scoreAnimeState.selectedScore
+
+    const restoreScoreItems = async () => {
+      const cached = await getAnalysisCache<UserAnimeListItem[]>(
+        getAnalysisCacheKey(userId, 'filteredAnime', `score:${Number(selectedScore)}`),
+      )
+
+      if (!cached) {
+        return
+      }
+
+      setScoreAnimeState({
+        selectedScore,
+        items: cached,
+        isLoading: false,
+        error: null,
+      })
+    }
+
+    void restoreScoreItems()
+  }, [scoreAnimeState.isLoading, scoreAnimeState.items.length, scoreAnimeState.selectedScore, userId])
+
+  useEffect(() => {
+    if (!isAuthenticated || !userId) {
       return
     }
 
     const controller = new AbortController()
+    let isCancelled = false
 
     const loadStats = async () => {
+      const cacheKey = getAnalysisCacheKey(userId, 'myStats')
+      setState({ item: null, isLoading: true, error: null })
+
       try {
+        const cached = await getAnalysisCache<AnimeStatsItem>(cacheKey)
+
+        if (isCancelled || controller.signal.aborted) {
+          return
+        }
+
+        if (cached) {
+          setState({
+            item: cached,
+            isLoading: false,
+            error: null,
+          })
+          return
+        }
+
         const item = await fetchMyAnimeStats(controller.signal)
+
+        if (isCancelled || controller.signal.aborted) {
+          return
+        }
+
+        await setAnalysisCache(cacheKey, item)
+
         setState({
           item,
           isLoading: false,
@@ -447,30 +675,50 @@ export function AnalysisPage() {
           item: null,
           isLoading: false,
           error:
-            loadError instanceof Error
-              ? loadError.message
-              : '분석 정보를 불러오지 못했어요.',
+            getFriendlyErrorMessage(loadError, '분석 정보를 불러오지 못했어요.'),
         })
       }
     }
 
     void loadStats()
 
-    return () => controller.abort()
-  }, [isAuthenticated])
+    return () => {
+      isCancelled = true
+      controller.abort()
+    }
+  }, [isAuthenticated, userId])
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated || !userId) {
       return
     }
 
     const controller = new AbortController()
+    let isCancelled = false
 
     const loadGenreBubble = async () => {
       setGenreBubbleState((current) => ({ ...current, isLoading: true, error: null }))
+      const cacheKey = getAnalysisCacheKey(userId, 'genreBubble')
 
       try {
+        const cached = await getAnalysisCache<GenreBubbleResponse['item']>(cacheKey)
+
+        if (isCancelled || controller.signal.aborted) {
+          return
+        }
+
+        if (cached) {
+          setGenreBubbleState({ item: cached, isLoading: false, error: null })
+          return
+        }
+
         const item = await fetchGenreBubbleStats({ signal: controller.signal })
+
+        if (isCancelled || controller.signal.aborted) {
+          return
+        }
+
+        await setAnalysisCache(cacheKey, item)
 
         setGenreBubbleState({ item, isLoading: false, error: null })
       } catch (loadError) {
@@ -481,15 +729,18 @@ export function AnalysisPage() {
         setGenreBubbleState({
           item: null,
           isLoading: false,
-          error: loadError instanceof Error ? loadError.message : '장르 취향 버블 차트를 불러오지 못했어요.',
+          error: getFriendlyErrorMessage(loadError, '장르 취향 버블 차트를 불러오지 못했어요.'),
         })
       }
     }
 
     void loadGenreBubble()
 
-    return () => controller.abort()
-  }, [isAuthenticated])
+    return () => {
+      isCancelled = true
+      controller.abort()
+    }
+  }, [cacheVersion, isAuthenticated, userId])
 
   useEffect(() => {
     if (cooldownLeft <= 0) {
@@ -564,11 +815,28 @@ export function AnalysisPage() {
     })
 
     try {
+      const cacheKey = userId ? getAnalysisCacheKey(userId, 'filteredAnime', `year:${normalizedYear}`) : null
+      const cached = cacheKey ? await getAnalysisCache<UserAnimeListItem[]>(cacheKey) : null
+
+      if (cached) {
+        setYearAnimeState({
+          selectedYear: year,
+          items: cached,
+          isLoading: false,
+          error: null,
+        })
+        return
+      }
+
       const response = await fetchMyCollection({
         sort: 'score',
         limit: 50,
         year: normalizedYear,
       })
+
+      if (cacheKey) {
+        await setAnalysisCache(cacheKey, response.items)
+      }
 
       setYearAnimeState({
         selectedYear: year,
@@ -582,9 +850,7 @@ export function AnalysisPage() {
         items: [],
         isLoading: false,
         error:
-          yearError instanceof Error
-            ? yearError.message
-            : '해당 연도 작품을 불러오지 못했어요.',
+          getFriendlyErrorMessage(yearError, '해당 연도 작품을 불러오지 못했어요.'),
       })
     }
   }
@@ -598,11 +864,28 @@ export function AnalysisPage() {
     })
 
     try {
+      const cacheKey = userId ? getAnalysisCacheKey(userId, 'filteredAnime', `genre:${genre}`) : null
+      const cached = cacheKey ? await getAnalysisCache<UserAnimeListItem[]>(cacheKey) : null
+
+      if (cached) {
+        setGenreAnimeState({
+          selectedGenre: genre,
+          items: cached,
+          isLoading: false,
+          error: null,
+        })
+        return
+      }
+
       const response = await fetchMyCollection({
         sort: 'score',
         limit: 50,
         genre: genre as AnimeGenre,
       })
+
+      if (cacheKey) {
+        await setAnalysisCache(cacheKey, response.items)
+      }
 
       setGenreAnimeState({
         selectedGenre: genre,
@@ -616,9 +899,7 @@ export function AnalysisPage() {
         items: [],
         isLoading: false,
         error:
-          genreError instanceof Error
-            ? genreError.message
-            : '해당 장르 작품을 불러오지 못했어요.',
+          getFriendlyErrorMessage(genreError, '해당 장르 작품을 불러오지 못했어요.'),
       })
     }
   }
@@ -644,11 +925,28 @@ export function AnalysisPage() {
     })
 
     try {
+      const cacheKey = userId ? getAnalysisCacheKey(userId, 'filteredAnime', `score:${normalizedScore}`) : null
+      const cached = cacheKey ? await getAnalysisCache<UserAnimeListItem[]>(cacheKey) : null
+
+      if (cached) {
+        setScoreAnimeState({
+          selectedScore: score,
+          items: cached,
+          isLoading: false,
+          error: null,
+        })
+        return
+      }
+
       const response = await fetchMyCollection({
         sort: 'score',
         limit: 50,
         score: normalizedScore,
       })
+
+      if (cacheKey) {
+        await setAnalysisCache(cacheKey, response.items)
+      }
 
       setScoreAnimeState({
         selectedScore: score,
@@ -662,15 +960,13 @@ export function AnalysisPage() {
         items: [],
         isLoading: false,
         error:
-          scoreError instanceof Error
-            ? scoreError.message
-            : '해당 평점 작품을 불러오지 못했어요.',
+          getFriendlyErrorMessage(scoreError, '해당 평점 작품을 불러오지 못했어요.'),
       })
     }
   }
 
   const handleRecalculate = async () => {
-    if (cooldownLeft > 0 || isRecalculating) {
+    if (cooldownLeft > 0 || isRecalculating || !userId) {
       return
     }
 
@@ -678,19 +974,23 @@ export function AnalysisPage() {
 
     try {
       const item = await recalculateMyAnimeStats()
+      await deleteAnalysisCachePrefix(getAnalysisCachePrefix(userId))
+      await setAnalysisCache(getAnalysisCacheKey(userId, 'myStats'), item)
       setState({
         item,
         isLoading: false,
         error: null,
       })
+      setGenreAnimeState({ selectedGenre: null, items: [], isLoading: false, error: null })
+      setYearAnimeState({ selectedYear: null, items: [], isLoading: false, error: null })
+      setScoreAnimeState({ selectedScore: null, items: [], isLoading: false, error: null })
+      setCacheVersion((current) => current + 1)
       setCooldownLeft(RECALCULATE_COOLDOWN_SECONDS)
     } catch (refreshError) {
       setState((current) => ({
         ...current,
         error:
-          refreshError instanceof Error
-            ? refreshError.message
-            : '분석을 다시 계산하지 못했어요.',
+          getFriendlyErrorMessage(refreshError, '분석을 다시 계산하지 못했어요.'),
       }))
     } finally {
       setIsRecalculating(false)
@@ -726,7 +1026,9 @@ export function AnalysisPage() {
   if (state.error && !state.item) {
     return (
       <section className="analysis-page">
-        <div className="feedback-card is-error">{state.error}</div>
+        {state.error === SERVER_CONNECTION_ERROR_MESSAGE
+          ? <div className="connection-error-plain">{state.error}</div>
+          : <div className="feedback-card is-error">{state.error}</div>}
       </section>
     )
   }
@@ -788,7 +1090,11 @@ export function AnalysisPage() {
         </div>
       </div>
 
-      {state.error && <div className="feedback-card is-error">{state.error}</div>}
+      {state.error && (
+        state.error === SERVER_CONNECTION_ERROR_MESSAGE
+          ? <div className="connection-error-plain">{state.error}</div>
+          : <div className="feedback-card is-error">{state.error}</div>
+      )}
 
       <section className="analysis-summary-card">
         <div className="analysis-summary-grid">
@@ -1057,9 +1363,7 @@ export function AnalysisPage() {
           <p>내 평균과 커뮤니티 평균을 각각의 전체 평균 대비로 정규화해, 취향이 어느 쪽으로 기우는지 볼 수 있어요.</p>
         </div>
         {genreBubbleState.isLoading && <div className="analysis-empty-state">장르 취향 차트를 불러오는 중이에요.</div>}
-        {genreBubbleState.error && !genreBubbleState.isLoading && (
-          <div className="analysis-empty-state">{genreBubbleState.error}</div>
-        )}
+        {genreBubbleState.error && !genreBubbleState.isLoading && renderEmptyMessage(genreBubbleState.error)}
         {!genreBubbleState.isLoading && !genreBubbleState.error && genreBubbleState.item && genreBubbleState.item.items.length > 0 && (
           <Suspense fallback={<div className="analysis-chart-skeleton analysis-chart-skeleton-wide" />}>
             <GenrePreferenceBubbleChart data={genreBubbleState.item.items} />
@@ -1070,9 +1374,9 @@ export function AnalysisPage() {
         )}
       </section>
 
-      <StudioRankingSection />
+      <StudioRankingSection userId={userId} cacheVersion={cacheVersion} />
 
-      <VoiceActorRankingSection ownerLabel="내" />
+      <VoiceActorRankingSection cacheOwnerId={userId} cacheVersion={cacheVersion} ownerLabel="내" />
     </section>
   )
 }

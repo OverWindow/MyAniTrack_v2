@@ -19,6 +19,7 @@ import {
   sortFriendsByNewest,
   updateFriendRequest,
 } from '../lib/friends'
+import { getFriendlyErrorMessage } from '../lib/errors'
 import type { FriendItem, FriendRequestAction, FriendRequestItem } from '../types/friends'
 
 const FRIENDS_PENDING_REFRESH_INTERVAL_MS = 15_000
@@ -124,7 +125,7 @@ export function FriendsProvider({ children }: { children: ReactNode }) {
         setState((current) => ({
           ...current,
           isLoading: false,
-          error: error instanceof Error ? error.message : '친구 정보를 불러오지 못했어요.',
+          error: getFriendlyErrorMessage(error, '친구 정보를 불러오지 못했어요.'),
         }))
       }
     },

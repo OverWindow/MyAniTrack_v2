@@ -4,6 +4,7 @@ import { AnalysisAnimeToast } from '../components/AnalysisAnimeToast'
 import { ReleaseDecadeProgress } from '../components/ReleaseDecadeProgress'
 import { VoiceActorRankingSection } from '../components/VoiceActorRankingSection'
 import { getProfileImageSrc, handleProfileImageError } from '../lib/avatar'
+import { SERVER_CONNECTION_ERROR_MESSAGE, getFriendlyErrorMessage } from '../lib/errors'
 import { fetchGenreBubbleStats, formatUpdatedAt, formatWatchHours, getGenreLabel } from '../lib/stats'
 import { fetchPublicUserAnimeStats, fetchPublicUserCollection } from '../lib/users'
 import type { AnimeGenre } from '../types/anime'
@@ -97,6 +98,10 @@ function toFiniteNumber(value: unknown) {
 }
 
 function renderEmptyMessage(message: string) {
+  if (message === SERVER_CONNECTION_ERROR_MESSAGE) {
+    return <div className="connection-error-plain">{message}</div>
+  }
+
   return <div className="analysis-empty-state">{message}</div>
 }
 
@@ -167,7 +172,7 @@ export function UserAnalysisPage() {
           user: null,
           item: null,
           isLoading: false,
-          error: loadError instanceof Error ? loadError.message : '분석 정보를 불러오지 못했어요.',
+          error: getFriendlyErrorMessage(loadError, '분석 정보를 불러오지 못했어요.'),
         })
       }
     }
@@ -198,7 +203,7 @@ export function UserAnalysisPage() {
         setGenreBubbleState({
           item: null,
           isLoading: false,
-          error: loadError instanceof Error ? loadError.message : '장르 취향 버블 차트를 불러오지 못했어요.',
+          error: getFriendlyErrorMessage(loadError, '장르 취향 버블 차트를 불러오지 못했어요.'),
         })
       }
     }
@@ -265,7 +270,7 @@ export function UserAnalysisPage() {
         selectedValue: genre,
         items: [],
         isLoading: false,
-        error: error instanceof Error ? error.message : '해당 장르 작품을 불러오지 못했어요.',
+        error: getFriendlyErrorMessage(error, '해당 장르 작품을 불러오지 못했어요.'),
       })
     }
   }
@@ -302,7 +307,7 @@ export function UserAnalysisPage() {
         selectedValue: year,
         items: [],
         isLoading: false,
-        error: error instanceof Error ? error.message : '해당 연도 작품을 불러오지 못했어요.',
+        error: getFriendlyErrorMessage(error, '해당 연도 작품을 불러오지 못했어요.'),
       })
     }
   }
@@ -339,7 +344,7 @@ export function UserAnalysisPage() {
         selectedValue: score,
         items: [],
         isLoading: false,
-        error: error instanceof Error ? error.message : '해당 평점 작품을 불러오지 못했어요.',
+        error: getFriendlyErrorMessage(error, '해당 평점 작품을 불러오지 못했어요.'),
       })
     }
   }
@@ -370,7 +375,9 @@ export function UserAnalysisPage() {
   if (state.error || !state.item || !state.user) {
     return (
       <section className="analysis-page">
-        <div className="feedback-card is-error">{state.error ?? '분석 정보를 찾을 수 없어요.'}</div>
+        {state.error === SERVER_CONNECTION_ERROR_MESSAGE
+          ? <div className="connection-error-plain">{state.error}</div>
+          : <div className="feedback-card is-error">{state.error ?? '분석 정보를 찾을 수 없어요.'}</div>}
       </section>
     )
   }
@@ -666,9 +673,7 @@ export function UserAnalysisPage() {
           <p>이 유저의 평균과 커뮤니티 평균을 각각의 전체 평균 대비로 정규화해, 취향이 어느 쪽으로 기우는지 볼 수 있어요.</p>
         </div>
         {genreBubbleState.isLoading && <div className="analysis-empty-state">장르 취향 차트를 불러오는 중이에요.</div>}
-        {genreBubbleState.error && !genreBubbleState.isLoading && (
-          <div className="analysis-empty-state">{genreBubbleState.error}</div>
-        )}
+        {genreBubbleState.error && !genreBubbleState.isLoading && renderEmptyMessage(genreBubbleState.error)}
         {!genreBubbleState.isLoading && !genreBubbleState.error && genreBubbleState.item && genreBubbleState.item.items.length > 0 && (
           <Suspense fallback={<div className="analysis-chart-skeleton analysis-chart-skeleton-wide" />}>
             <GenrePreferenceBubbleChart data={genreBubbleState.item.items} />

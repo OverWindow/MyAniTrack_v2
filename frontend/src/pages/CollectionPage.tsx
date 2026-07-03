@@ -4,6 +4,7 @@ import { CollectionCarousel } from '../components/CollectionCarousel'
 import { useAuth } from '../contexts/AuthContext'
 import { fetchMyCollection, getCachedCollectionPage, saveCollectionPageCache } from '../lib/collection'
 import { genreOptions } from '../lib/anime'
+import { getFriendlyErrorMessage } from '../lib/errors'
 import type { AnimeGenre } from '../types/anime'
 import type { UserAnimeListItem, UserAnimeListSort } from '../types/collection'
 import '../styles/pages/CatalogPage.css'
@@ -157,9 +158,7 @@ export function CollectionPage() {
           items: [],
           isLoading: false,
           error:
-            fetchError instanceof Error
-              ? fetchError.message
-              : '만점 작품을 불러오지 못했어요.',
+            getFriendlyErrorMessage(fetchError, '만점 작품을 불러오지 못했어요.'),
         })
       }
     }
@@ -292,9 +291,7 @@ export function CollectionPage() {
           isLoading: false,
           isLoadingMore: false,
           error:
-            fetchError instanceof Error
-              ? fetchError.message
-              : '컬렉션을 불러오지 못했어요.',
+            getFriendlyErrorMessage(fetchError, '컬렉션을 불러오지 못했어요.'),
           requestKey,
         })
       }
@@ -391,9 +388,7 @@ export function CollectionPage() {
                 ...current,
                 isLoadingMore: false,
                 error:
-                  fetchError instanceof Error
-                    ? fetchError.message
-                    : '추가 컬렉션을 불러오지 못했어요.',
+                  getFriendlyErrorMessage(fetchError, '추가 컬렉션을 불러오지 못했어요.'),
               }
             })
           } finally {

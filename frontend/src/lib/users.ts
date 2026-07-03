@@ -154,12 +154,13 @@ export async function fetchPublicUserCollection(params: {
   genre?: AnimeGenre | null
   year?: number | string | null
   score?: number | string | null
+  titleLanguage?: 'ko' | 'en' | 'ja'
   cursor?: string | null
   signal?: AbortSignal
 }) {
   const url = new URL(`/api/users/${params.userId}/anime-list`, getApiBaseUrl())
   url.searchParams.set('sort', params.sort)
-  url.searchParams.set('titleLanguage', 'ko')
+  url.searchParams.set('titleLanguage', params.titleLanguage ?? 'ko')
   url.searchParams.set('limit', String(params.limit))
 
   if (params.genre) {

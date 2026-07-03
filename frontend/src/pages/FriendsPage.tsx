@@ -7,6 +7,7 @@ import {
   getFriendPreviewName,
 } from '../lib/friends'
 import { getProfileImageSrc, handleProfileImageError } from '../lib/avatar'
+import { SERVER_CONNECTION_ERROR_MESSAGE } from '../lib/errors'
 import type { FriendItem, FriendRequestAction, FriendRequestItem } from '../types/friends'
 import '../styles/pages/FriendsPage.css'
 
@@ -213,7 +214,11 @@ export function FriendsPage() {
           {feedback}
         </div>
       )}
-      {error && <div className="feedback-card is-error">{error}</div>}
+      {error && (
+        error === SERVER_CONNECTION_ERROR_MESSAGE
+          ? <div className="connection-error-plain">{error}</div>
+          : <div className="feedback-card is-error">{error}</div>
+      )}
 
       <div className="friends-layout">
         <section className="friends-panel friends-list-panel friends-left-column">

@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { BadgeSection } from '../components/BadgeSection'
 import { getProfileImageSrc, handleProfileImageError } from '../lib/avatar'
 import { fetchPublicUserBadges } from '../lib/badges'
+import { getFriendlyErrorMessage } from '../lib/errors'
 import { fetchPublicUserProfile } from '../lib/users'
 import type { UserBadge } from '../types/badges'
 import type { PublicUserProfile } from '../types/users'
@@ -45,7 +46,7 @@ export function UserProfilePage() {
           .then((badges) => ({ badges, error: null }))
           .catch((badgesError: unknown) => ({
             badges: { items: [], earnedCount: 0, totalCount: 0 },
-            error: badgesError instanceof Error ? badgesError.message : '사용자 배지를 불러오지 못했어요.',
+            error: getFriendlyErrorMessage(badgesError, '사용자 배지를 불러오지 못했어요.'),
           }))
 
         setState({
@@ -68,7 +69,7 @@ export function UserProfilePage() {
           earnedCount: 0,
           totalCount: 0,
           isLoading: false,
-          error: loadError instanceof Error ? loadError.message : '사용자 프로필을 불러오지 못했어요.',
+          error: getFriendlyErrorMessage(loadError, '사용자 프로필을 불러오지 못했어요.'),
           badgesError: null,
         })
       }
@@ -90,9 +91,9 @@ export function UserProfilePage() {
   if (state.isLoading) {
     return (
       <section className="user-profile-page">
-        <div className="profile-hero-card skeleton-card">
-          <div className="skeleton-line short" />
-          <div className="skeleton-line long" />
+        <div className="profile-loading-card">
+          <span className="profile-loading-spinner" aria-hidden="true" />
+          <strong>프로필과 배지를 불러오는 중이에요.</strong>
         </div>
       </section>
     )

@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { UserAnimeListItem } from '../types/collection'
 
@@ -11,6 +12,8 @@ type AnalysisAnimeToastProps = {
   onClose: () => void
 }
 
+const ITEMS_PER_PAGE = 6
+
 export function AnalysisAnimeToast({
   title,
   description,
@@ -20,6 +23,21 @@ export function AnalysisAnimeToast({
   isOpen,
   onClose,
 }: AnalysisAnimeToastProps) {
+  const [page, setPage] = useState(1)
+  const totalPages = Math.max(1, Math.ceil(items.length / ITEMS_PER_PAGE))
+  const visibleItems = useMemo(
+    () => items.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE),
+    [items, page],
+  )
+
+  useEffect(() => {
+    setPage(1)
+  }, [items, title])
+
+  useEffect(() => {
+    setPage((current) => Math.min(current, totalPages))
+  }, [totalPages])
+
   if (!isOpen) {
     return null
   }
@@ -42,25 +60,46 @@ export function AnalysisAnimeToast({
         <div className="analysis-anime-toast-state">표시할 작품이 없어요.</div>
       )}
       {!isLoading && !error && items.length > 0 && (
-        <div className="analysis-anime-toast-list">
-          {items.map((entry) => (
-            <Link className="analysis-anime-toast-card" key={entry.id} to={`/anime/${entry.anime.id}`}>
-              <span className="analysis-anime-toast-poster">
-                <img
-                  src={entry.anime.coverImageExtraLarge || entry.anime.coverImageLarge}
-                  alt={entry.anime.title}
-                  loading="lazy"
-                />
-                <small>
-                  {entry.score !== null && entry.score !== undefined
-                    ? `${Number(entry.score).toFixed(1)}점`
-                    : entry.anime.seasonYear ?? '정보 없음'}
-                </small>
-              </span>
-              <strong>{entry.anime.title}</strong>
-            </Link>
-          ))}
-        </div>
+        <>
+          <div className="analysis-anime-toast-list">
+            {visibleItems.map((entry) => (
+              <Link className="analysis-anime-toast-card" key={entry.id} to={`/anime/${entry.anime.id}`}>
+                <span className="analysis-anime-toast-poster">
+                  <img
+                    src={entry.anime.coverImageExtraLarge || entry.anime.coverImageLarge}
+                    alt={entry.anime.title}
+                    loading="lazy"
+                  />
+                  <small>
+                    {entry.score !== null && entry.score !== undefined
+                      ? `${Number(entry.score).toFixed(1)}점`
+                      : entry.anime.seasonYear ?? '정보 없음'}
+                  </small>
+                </span>
+                <strong>{entry.anime.title}</strong>
+              </Link>
+            ))}
+          </div>
+          {totalPages > 1 && (
+            <div className="analysis-anime-toast-pagination" aria-label="감상 작품 페이지">
+              <button
+                type="button"
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+                disabled={page === 1}
+              >
+                이전
+              </button>
+              <span>{page} / {totalPages}</span>
+              <button
+                type="button"
+                onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                disabled={page === totalPages}
+              >
+                다음
+              </button>
+            </div>
+          )}
+        </>
       )}
     </aside>
   )

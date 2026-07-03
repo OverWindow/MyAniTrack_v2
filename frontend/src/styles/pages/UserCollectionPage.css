@@ -16,20 +16,49 @@
 }
 
 .user-collection-count-card {
-  display: grid;
-  gap: 4px;
-  min-width: 150px;
-  padding: 14px 16px;
+  display: flex;
+  gap: 10px;
+  min-width: 240px;
+  padding: 14px 22px;
   border: 1px solid rgba(120, 113, 108, 0.14);
   border-radius: 10px;
   background: var(--bg-card);
-  text-align: right;
+  justify-content: center;
+  align-items: end;
 }
 
 .user-collection-count-card strong {
   color: var(--point-hover);
   font-size: 1.6rem;
   line-height: 1;
+}
+
+.user-collection-page .search-language-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--point-softest);
+}
+
+.user-collection-page .search-language-button {
+  min-width: 44px;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.user-collection-page .search-language-button.is-active {
+  background: var(--point-color);
+  color: var(--text-inverse);
 }
 
 @media (max-width: 760px) {

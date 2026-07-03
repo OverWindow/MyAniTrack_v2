@@ -16,6 +16,7 @@ import {
   searchMyAnime,
   sortOptions,
 } from '../lib/anime'
+import { SERVER_CONNECTION_ERROR_MESSAGE, getFriendlyErrorMessage } from '../lib/errors'
 import type { AnimeGenre, AnimeListItem, AnimeSort } from '../types/anime'
 import '../styles/pages/CatalogPage.css'
 import '../styles/pages/ExplorePage.css'
@@ -332,9 +333,7 @@ export function ExplorePage() {
           isLoading: false,
           isLoadingMore: false,
           error:
-            fetchError instanceof Error
-              ? fetchError.message
-              : '알 수 없는 오류로 목록을 가져오지 못했습니다.',
+            getFriendlyErrorMessage(fetchError, '알 수 없는 오류로 목록을 가져오지 못했습니다.'),
           requestKey,
         })
       }
@@ -435,9 +434,7 @@ export function ExplorePage() {
                 ...current,
                 isLoadingMore: false,
                 error:
-                  fetchError instanceof Error
-                    ? fetchError.message
-                    : '추가 목록을 불러오지 못했습니다.',
+                  getFriendlyErrorMessage(fetchError, '추가 목록을 불러오지 못했습니다.'),
               }
             })
           } finally {
@@ -541,7 +538,11 @@ export function ExplorePage() {
         </div>
       </div>
 
-      {error && <div className="feedback-card is-error">{error}</div>}
+      {error && (
+        error === SERVER_CONNECTION_ERROR_MESSAGE
+          ? <div className="connection-error-plain">{error}</div>
+          : <div className="feedback-card is-error">{error}</div>
+      )}
 
       {!error && (isLoading || isRefreshingQuery) && (
         <div className="anime-grid">

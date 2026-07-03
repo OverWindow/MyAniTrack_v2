@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { CollectionCarousel } from '../components/CollectionCarousel'
 import { genreOptions } from '../lib/anime'
+import { getFriendlyErrorMessage } from '../lib/errors'
 import { fetchPublicUserCollection } from '../lib/users'
 import type { AnimeGenre } from '../types/anime'
 import type { UserAnimeListItem, UserAnimeListSort } from '../types/collection'
@@ -88,9 +89,9 @@ export function UserCollectionPage() {
   const [sort, setSort] = useState<UserAnimeListSort>('latest')
   const [genre, setGenre] = useState<AnimeGenre | 'all'>('all')
   const [searchTerm, setSearchTerm] = useState('')
+  const [searchLanguage, setSearchLanguage] = useState<'ko' | 'en'>('ko')
   const selectedGenre = genre === 'all' ? null : genre
-  const selectedGenreLabel = genre === 'all' ? '전체 장르' : genreOptions.find((option) => option.value === genre)?.label ?? genre
-  const requestKey = `${userId ?? 'unknown'}:${sort}:${genre}`
+  const requestKey = `${userId ?? 'unknown'}:${sort}:${genre}:${searchLanguage}`
   const [state, setState] = useState<PublicCollectionState>(() => createInitialState(requestKey))
   const [carouselState, setCarouselState] = useState<PublicCarouselState>({
     items: [],
@@ -119,6 +120,7 @@ export function UserCollectionPage() {
           userId,
           sort,
           genre: selectedGenre,
+          titleLanguage: searchLanguage,
           limit: 24,
           signal: controller.signal,
         })
@@ -145,7 +147,7 @@ export function UserCollectionPage() {
           hasNext: false,
           isLoading: false,
           isLoadingMore: false,
-          error: fetchError instanceof Error ? fetchError.message : '컬렉션을 불러오지 못했어요.',
+          error: getFriendlyErrorMessage(fetchError, '컬렉션을 불러오지 못했어요.'),
           requestKey,
         })
       }
@@ -154,7 +156,7 @@ export function UserCollectionPage() {
     void loadFirstPage()
 
     return () => controller.abort()
-  }, [genre, requestKey, selectedGenre, sort, userId])
+  }, [genre, requestKey, searchLanguage, selectedGenre, sort, userId])
 
   useEffect(() => {
     if (!userId) {
@@ -188,7 +190,7 @@ export function UserCollectionPage() {
         setCarouselState({
           items: [],
           isLoading: false,
-          error: fetchError instanceof Error ? fetchError.message : '최애 애니를 불러오지 못했어요.',
+          error: getFriendlyErrorMessage(fetchError, '최애 애니를 불러오지 못했어요.'),
         })
       }
     }
@@ -221,6 +223,7 @@ export function UserCollectionPage() {
               userId,
               sort,
               genre: selectedGenre,
+              titleLanguage: searchLanguage,
               limit: 24,
               cursor: nextCursor,
             })
@@ -250,7 +253,7 @@ export function UserCollectionPage() {
             setState((current) => ({
               ...current,
               isLoadingMore: false,
-              error: fetchError instanceof Error ? fetchError.message : '추가 컬렉션을 불러오지 못했어요.',
+              error: getFriendlyErrorMessage(fetchError, '추가 컬렉션을 불러오지 못했어요.'),
             }))
           }
         }
@@ -263,7 +266,7 @@ export function UserCollectionPage() {
     observer.observe(node)
 
     return () => observer.disconnect()
-  }, [hasNext, isLoading, isLoadingMore, isRefreshingQuery, nextCursor, selectedGenre, sort, userId])
+  }, [hasNext, isLoading, isLoadingMore, isRefreshingQuery, nextCursor, searchLanguage, selectedGenre, sort, userId])
 
   if (!userId) {
     return (
@@ -307,6 +310,22 @@ export function UserCollectionPage() {
                 onChange={(event) => setSearchTerm(event.target.value)}
               />
             </label>
+            <div className="search-language-switch" aria-label="검색 언어 선택">
+              <button
+                className={searchLanguage === 'ko' ? 'search-language-button is-active' : 'search-language-button'}
+                type="button"
+                onClick={() => setSearchLanguage('ko')}
+              >
+                한
+              </button>
+              <button
+                className={searchLanguage === 'en' ? 'search-language-button is-active' : 'search-language-button'}
+                type="button"
+                onClick={() => setSearchLanguage('en')}
+              >
+                EN
+              </button>
+            </div>
           </div>
 
           <div className="catalog-control-group">
@@ -346,12 +365,6 @@ export function UserCollectionPage() {
 
       {!isLoading && !isRefreshingQuery && !error && (
         <>
-          <div className="results-meta minimalist-meta">
-            <span>{filteredItems.length}개의 작품 표시 중</span>
-            <span>제목 우선순위: 한국어 → 영어</span>
-            <span>{selectedGenreLabel}</span>
-          </div>
-
           {filteredItems.length === 0 ? (
             <div className="feedback-card">아직 공개된 컬렉션이 없거나, 검색 결과가 없어요.</div>
           ) : (

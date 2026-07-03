@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import {
+  getAnalysisCache,
+  getAnalysisCacheKey,
+  setAnalysisCache,
+} from '../lib/analysisCache'
 import { getProfileImageSrc, handleProfileImageError } from '../lib/avatar'
 import { fetchVoiceActorAnime, fetchVoiceActorRanking } from '../lib/stats'
 import type {
@@ -10,6 +15,8 @@ import type {
 } from '../types/stats'
 
 type VoiceActorRankingSectionProps = {
+  cacheOwnerId?: number | string | null
+  cacheVersion?: number
   userId?: string
   ownerLabel?: string
 }
@@ -160,7 +167,12 @@ function VoiceActorRankingList({
   )
 }
 
-export function VoiceActorRankingSection({ userId, ownerLabel = '이 사용자' }: VoiceActorRankingSectionProps) {
+export function VoiceActorRankingSection({
+  cacheOwnerId,
+  cacheVersion = 0,
+  userId,
+  ownerLabel = '이 사용자',
+}: VoiceActorRankingSectionProps) {
   const [rankingState, setRankingState] = useState<RankingState>({
     count: [],
     score: [],
@@ -181,12 +193,31 @@ export function VoiceActorRankingSection({ userId, ownerLabel = '이 사용자' 
   const detailRequestIdRef = useRef(0)
 
   useEffect(() => {
+    if (!cacheOwnerId && !userId) {
+      return
+    }
+
     const controller = new AbortController()
+    let isCancelled = false
 
     const loadRanking = async () => {
       setRankingState((current) => ({ ...current, isLoading: true, error: null }))
+      const cacheKey = cacheOwnerId ? getAnalysisCacheKey(cacheOwnerId, 'voiceActorRanking') : null
 
       try {
+        const cached = cacheKey
+          ? await getAnalysisCache<{ count: VoiceActorRankingItem[], score: VoiceActorRankingItem[] }>(cacheKey)
+          : null
+
+        if (isCancelled || controller.signal.aborted) {
+          return
+        }
+
+        if (cached) {
+          setRankingState({ count: cached.count, score: cached.score, isLoading: false, error: null })
+          return
+        }
+
         const [count, score] = await Promise.all([
           fetchVoiceActorRanking({
             userId,
@@ -202,6 +233,14 @@ export function VoiceActorRankingSection({ userId, ownerLabel = '이 사용자' 
             signal: controller.signal,
           }),
         ])
+
+        if (isCancelled || controller.signal.aborted) {
+          return
+        }
+
+        if (cacheKey) {
+          await setAnalysisCache(cacheKey, { count, score })
+        }
 
         setRankingState({ count, score, isLoading: false, error: null })
       } catch (loadError) {
@@ -220,8 +259,11 @@ export function VoiceActorRankingSection({ userId, ownerLabel = '이 사용자' 
 
     void loadRanking()
 
-    return () => controller.abort()
-  }, [userId])
+    return () => {
+      isCancelled = true
+      controller.abort()
+    }
+  }, [cacheOwnerId, cacheVersion, userId])
 
   const closeDetailModal = () => {
     detailRequestIdRef.current += 1
@@ -263,6 +305,23 @@ export function VoiceActorRankingSection({ userId, ownerLabel = '이 사용자' 
     setOpenCharacterWorksId(null)
 
     try {
+      const cacheKey = cacheOwnerId ? getAnalysisCacheKey(cacheOwnerId, 'voiceActorAnime', String(item.voiceActor.id)) : null
+      const cached = cacheKey ? await getAnalysisCache<VoiceActorAnimeResponse>(cacheKey) : null
+
+      if (detailRequestIdRef.current !== requestId) {
+        return
+      }
+
+      if (cached) {
+        setDetailState({
+          selected: item,
+          item: cached,
+          isLoading: false,
+          error: null,
+        })
+        return
+      }
+
       const detail = await fetchVoiceActorAnime({
         userId,
         voiceActorId: item.voiceActor.id,
@@ -272,6 +331,10 @@ export function VoiceActorRankingSection({ userId, ownerLabel = '이 사용자' 
 
       if (detailRequestIdRef.current !== requestId) {
         return
+      }
+
+      if (cacheKey) {
+        await setAnalysisCache(cacheKey, detail)
       }
 
       setDetailState({

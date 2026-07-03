@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { fetchPopularAnime, getDisplayTitle, getPrimaryPoster } from '../lib/anime'
+import { getFriendlyErrorMessage } from '../lib/errors'
 import type { PopularAnimeItem } from '../types/anime'
 import '../styles/pages/HomePage.css'
 
@@ -55,7 +56,7 @@ export function HomePage() {
         setState({
           popularAnime: [],
           isLoading: false,
-          error: error instanceof Error ? error.message : '홈 정보를 불러오지 못했어요.',
+          error: getFriendlyErrorMessage(error, '홈 정보를 불러오지 못했어요.'),
         })
       }
     }
@@ -93,6 +94,9 @@ export function HomePage() {
 
   return (
     <div className="home-page">
+      {state.error ? (
+        <div className="connection-error-plain home-connection-error">{state.error}</div>
+      ) : (
       <section className="home-cinematic-hero" aria-label="인기 애니 쇼케이스">
         {featuredAnime && (
           <div
@@ -169,8 +173,7 @@ export function HomePage() {
           )}
         </div>
       </section>
-
-      {state.error && <div className="feedback-card is-error">{state.error}</div>}
+      )}
     </div>
   )
 }

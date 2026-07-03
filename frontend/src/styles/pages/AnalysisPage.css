@@ -404,7 +404,7 @@
   z-index: 72;
   display: grid;
   gap: 12px;
-  width: min(920px, calc(100vw - 28px));
+  width: min(760px, calc(100vw - 28px));
   padding: 14px;
   border: 1px solid rgba(120, 113, 108, 0.16);
   border-radius: 12px;
@@ -461,23 +461,15 @@
 
 .analysis-anime-toast-list {
   display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: 104px;
-  gap: 12px;
-  overflow-x: auto;
-  padding-bottom: 2px;
-  scrollbar-width: none;
-}
-
-.analysis-anime-toast-list::-webkit-scrollbar {
-  display: none;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .analysis-anime-toast-card {
   position: relative;
   display: grid;
   gap: 6px;
-  min-width: 104px;
+  min-width: 0;
   padding: 0;
   border: 0;
   background: transparent;
@@ -488,8 +480,8 @@
 .analysis-anime-toast-poster {
   position: relative;
   display: block;
-  width: 104px;
-  height: 146px;
+  width: 100%;
+  aspect-ratio: 3 / 4.2;
   overflow: hidden;
   border-radius: 8px;
   background: var(--bg-soft-beige);
@@ -530,7 +522,7 @@
 }
 
 .analysis-anime-toast-card strong {
-  width: 104px;
+  min-width: 0;
   overflow: hidden;
   color: var(--text-primary);
   font-size: 0.82rem;
@@ -538,6 +530,37 @@
   text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.analysis-anime-toast-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.analysis-anime-toast-pagination button {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid rgba(120, 113, 108, 0.14);
+  border-radius: 8px;
+  background: var(--bg-neutral);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.analysis-anime-toast-pagination button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.analysis-anime-toast-pagination span {
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  font-weight: 800;
 }
 
 .analysis-anime-toast-state {
@@ -1277,42 +1300,49 @@
 }
 
 .studio-ranking-tabs {
-  display: grid;
+  display: inline-grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  gap: 4px;
+  width: min(100%, 560px);
+  padding: 4px;
+  border: 1px solid rgba(120, 113, 108, 0.12);
+  border-radius: 10px;
+  background: var(--bg-card);
+  box-shadow: var(--shadow-soft);
 }
 
 .studio-ranking-tab {
-  display: grid;
-  gap: 2px;
-  min-height: 58px;
-  padding: 10px 12px;
-  border: 1px solid rgba(120, 113, 108, 0.12);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 0 14px;
+  border: 0;
   border-radius: 8px;
-  background: rgba(250, 247, 241, 0.68);
-  color: inherit;
+  background: transparent;
+  color: var(--text-secondary);
   font: inherit;
-  text-align: left;
+  font-size: 0.9rem;
+  font-weight: 800;
+  text-align: center;
   cursor: pointer;
 }
 
 .studio-ranking-tab strong {
-  color: var(--text-primary);
-  font-size: 0.92rem;
+  color: inherit;
+  font-size: inherit;
   line-height: 1.2;
 }
 
 .studio-ranking-tab span {
-  color: var(--text-secondary);
-  font-size: 0.78rem;
-  line-height: 1.35;
+  display: none;
 }
 
 .studio-ranking-tab:hover,
 .studio-ranking-tab:focus-visible,
 .studio-ranking-tab.is-active {
-  border-color: var(--point-border);
-  background: var(--point-softest);
+  background: var(--point-color);
+  color: var(--text-inverse);
   outline: none;
 }
 
@@ -1547,18 +1577,18 @@
   }
 
   .analysis-anime-toast-list {
-    grid-auto-columns: 92px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .analysis-anime-toast-card,
   .analysis-anime-toast-poster,
   .analysis-anime-toast-card strong {
-    width: 92px;
-    min-width: 92px;
+    width: auto;
+    min-width: 0;
   }
 
   .analysis-anime-toast-poster {
-    height: 130px;
+    height: auto;
   }
 
   .analysis-summary-grid {
@@ -1604,7 +1634,8 @@
   }
 
   .studio-ranking-tabs {
-    grid-template-columns: 1fr;
+    width: 100%;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .analysis-segment {

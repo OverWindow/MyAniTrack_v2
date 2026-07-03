@@ -4,6 +4,7 @@ import { BadgeSection } from '../components/BadgeSection'
 import { useAuth } from '../contexts/AuthContext'
 import { getProfileImageSrc, handleProfileImageError } from '../lib/avatar'
 import { fetchMyBadges } from '../lib/badges'
+import { getFriendlyErrorMessage } from '../lib/errors'
 import type { UserBadge } from '../types/badges'
 import '../styles/pages/ProfilePage.css'
 
@@ -57,7 +58,7 @@ export function ProfilePage() {
           earnedCount: 0,
           totalCount: 0,
           isLoading: false,
-          error: error instanceof Error ? error.message : '내 배지를 불러오지 못했어요.',
+          error: getFriendlyErrorMessage(error, '내 배지를 불러오지 못했어요.'),
         })
       }
     }

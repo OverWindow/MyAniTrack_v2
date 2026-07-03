@@ -3,6 +3,7 @@ import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent }
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import type { Location } from 'react-router-dom'
+import { SERVER_CONNECTION_ERROR_MESSAGE } from '../lib/errors'
 import type { UserAnimeListItem } from '../types/collection'
 
 type CollectionCarouselState = {
@@ -77,6 +78,7 @@ function CollectionCarouselContent({
   const carouselRef = useRef<HTMLDivElement | null>(null)
   const scrollLeftRef = useRef(0)
   const animationFrameRef = useRef<number | null>(null)
+  const [loadedImageIds, setLoadedImageIds] = useState<Set<number>>(() => new Set())
   const dragStateRef = useRef({
     isDragging: false,
     hasMoved: false,
@@ -86,6 +88,10 @@ function CollectionCarouselContent({
     scrollLeft: 0,
   })
   const suppressClickRef = useRef(false)
+
+  useEffect(() => {
+    setLoadedImageIds(new Set())
+  }, [state.items])
 
   const updateCards = useCallback((scrollDirection = 0) => {
     const carousel = carouselRef.current
@@ -263,7 +269,21 @@ function CollectionCarouselContent({
   }, [centerInitialCard, state.isLoading, state.items.length, updateCards])
 
   if (!state.isLoading && state.items.length === 0 && !state.error) {
-    return null
+    return (
+      <section className="perfect-score-showcase" aria-label={ariaLabel}>
+        <div className="perfect-score-heading">
+          <div>
+            <h2>{title}</h2>
+          </div>
+        </div>
+        <div className="perfect-score-carousel perfect-score-carousel-empty">
+          <div className="perfect-score-empty-message">
+            아직 최애 애니가 없네요ㅠㅠ<br />
+            가장 좋아하는 애니에 10점을 줘서 최애 애니로 전시하세요
+          </div>
+        </div>
+      </section>
+    )
   }
 
   return (
@@ -293,7 +313,11 @@ function CollectionCarouselContent({
       )}
 
       {!state.isLoading && state.error && (
-        <div className="perfect-score-empty">{state.error}</div>
+        <div className="perfect-score-carousel perfect-score-carousel-empty">
+          <div className="connection-error-plain">
+            {state.error || SERVER_CONNECTION_ERROR_MESSAGE}
+          </div>
+        </div>
       )}
 
       {!state.isLoading && !state.error && state.items.length > 0 && (
@@ -310,10 +334,12 @@ function CollectionCarouselContent({
         >
           {state.items.slice(0, 12).map((item, displayIndex, displayItems) => {
             const itemTitle = getDisplayTitle(item)
+            const imageSrc = item.anime.coverImageExtraLarge || item.anime.coverImageLarge
+            const isImageLoaded = loadedImageIds.has(item.id)
 
             return (
               <Link
-                className="perfect-score-card"
+                className={isImageLoaded ? 'perfect-score-card' : 'perfect-score-card is-image-loading'}
                 key={item.id}
                 to={`/anime/${item.anime.id}`}
                 state={location ? { fromPage: 'collection', backgroundLocation: location } : undefined}
@@ -323,10 +349,29 @@ function CollectionCarouselContent({
                   zIndex: Math.round(displayItems.length * 10 - Math.abs(displayIndex - (displayItems.length - 1) / 2)),
                 }}
               >
+                {!isImageLoaded && (
+                  <div className="perfect-score-image-loader" aria-hidden="true">
+                    <span />
+                  </div>
+                )}
                 <img
                   className="perfect-score-cover"
-                  src={item.anime.coverImageExtraLarge || item.anime.coverImageLarge}
+                  src={imageSrc}
                   alt={itemTitle}
+                  onLoad={() => {
+                    setLoadedImageIds((current) => {
+                      const next = new Set(current)
+                      next.add(item.id)
+                      return next
+                    })
+                  }}
+                  onError={() => {
+                    setLoadedImageIds((current) => {
+                      const next = new Set(current)
+                      next.add(item.id)
+                      return next
+                    })
+                  }}
                 />
                 <div className="perfect-score-card-copy">
                   <strong>{itemTitle}</strong>

@@ -565,6 +565,21 @@
   color: #7f1d1d;
 }
 
+.connection-error-plain {
+  min-height: 220px;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  color: var(--text-secondary);
+  font-size: 1rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.home-connection-error {
+  min-height: calc(100svh - 180px);
+}
+
 .feedback-inline {
   text-align: center;
   color: var(--text-secondary);
