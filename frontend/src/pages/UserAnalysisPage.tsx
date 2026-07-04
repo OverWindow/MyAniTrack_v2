@@ -5,11 +5,11 @@ import { ReleaseDecadeProgress } from '../components/ReleaseDecadeProgress'
 import { VoiceActorRankingSection } from '../components/VoiceActorRankingSection'
 import { getProfileImageSrc, handleProfileImageError } from '../lib/avatar'
 import { SERVER_CONNECTION_ERROR_MESSAGE, getFriendlyErrorMessage } from '../lib/errors'
-import { fetchGenreBubbleStats, formatUpdatedAt, formatWatchHours, getGenreLabel } from '../lib/stats'
+import { fetchGenreBubbleStats, fetchYearlyScoreStats, formatUpdatedAt, formatWatchHours, getGenreLabel } from '../lib/stats'
 import { fetchPublicUserAnimeStats, fetchPublicUserCollection } from '../lib/users'
 import type { AnimeGenre } from '../types/anime'
 import type { UserAnimeListItem } from '../types/collection'
-import type { AnimeStatsItem, GenreBubbleResponse } from '../types/stats'
+import type { AnimeStatsItem, GenreBubbleResponse, YearlyScoreStats } from '../types/stats'
 import type { PublicUserProfile } from '../types/users'
 import '../styles/pages/AnalysisPage.css'
 import '../styles/pages/UserAnalysisPage.css'
@@ -69,6 +69,10 @@ const ScoreDistributionBarChart = lazy(async () => {
   const module = await import('../components/AnalysisCharts')
   return { default: module.ScoreDistributionBarChart }
 })
+const YearlyScoreLineChart = lazy(async () => {
+  const module = await import('../components/AnalysisCharts')
+  return { default: module.YearlyScoreLineChart }
+})
 const GenrePreferenceBubbleChart = lazy(async () => {
   const module = await import('../components/AnalysisCharts')
   return { default: module.GenrePreferenceBubbleChart }
@@ -115,6 +119,10 @@ function getStarFillPercent(score: number, starIndex: number) {
   return `${fill * 100}%`
 }
 
+function formatAnalysisScore(value?: number | null) {
+  return typeof value === 'number' && Number.isFinite(value) ? value.toFixed(2) : '-'
+}
+
 export function UserAnalysisPage() {
   const { userId } = useParams<{ userId: string }>()
   const [state, setState] = useState<UserAnalysisState>({
@@ -151,6 +159,15 @@ export function UserAnalysisPage() {
     isLoading: true,
     error: null,
   })
+  const [yearlyScoreState, setYearlyScoreState] = useState<{
+    item: YearlyScoreStats | null
+    isLoading: boolean
+    error: string | null
+  }>({
+    item: null,
+    isLoading: true,
+    error: null,
+  })
 
   useEffect(() => {
     if (!userId) {
@@ -178,6 +195,37 @@ export function UserAnalysisPage() {
     }
 
     void loadStats()
+
+    return () => controller.abort()
+  }, [userId])
+
+  useEffect(() => {
+    if (!userId) {
+      return
+    }
+
+    const controller = new AbortController()
+
+    const loadYearlyScores = async () => {
+      setYearlyScoreState((current) => ({ ...current, isLoading: true, error: null }))
+
+      try {
+        const item = await fetchYearlyScoreStats({ userId, signal: controller.signal })
+        setYearlyScoreState({ item, isLoading: false, error: null })
+      } catch (loadError) {
+        if (loadError instanceof DOMException && loadError.name === 'AbortError') {
+          return
+        }
+
+        setYearlyScoreState({
+          item: null,
+          isLoading: false,
+          error: getFriendlyErrorMessage(loadError, '연도별 평점 분석을 불러오지 못했어요.'),
+        })
+      }
+    }
+
+    void loadYearlyScores()
 
     return () => controller.abort()
   }, [userId])
@@ -588,6 +636,44 @@ export function UserAnalysisPage() {
                     <ReleaseDecadeProgress entries={releaseDistribution} />
                   </>
                 ) : renderEmptyMessage('아직 연도별 감상 데이터가 없어요.')}
+              </section>
+
+              <section className="analysis-panel analysis-panel-wide">
+                <div className="analysis-panel-heading">
+                  <span className="detail-label">Year score</span>
+                  <h2>연도별 평균 평점</h2>
+                  <p>평점이 있는 작품이 3편 이상인 연도만 모아 이 유저의 평균과 커뮤니티 평균을 비교해요.</p>
+                </div>
+                {yearlyScoreState.isLoading && <div className="analysis-empty-state">연도별 평점 분석을 불러오는 중이에요.</div>}
+                {yearlyScoreState.error && !yearlyScoreState.isLoading && renderEmptyMessage(yearlyScoreState.error)}
+                {!yearlyScoreState.isLoading && !yearlyScoreState.error && yearlyScoreState.item && yearlyScoreState.item.items.length > 0 && (
+                  <>
+                    <div className="analysis-year-score-summary">
+                      <article>
+                        <span>최고 연도</span>
+                        <strong>{yearlyScoreState.item.summary.bestYear ?? '-'}</strong>
+                      </article>
+                      <article>
+                        <span>최저 연도</span>
+                        <strong>{yearlyScoreState.item.summary.worstYear ?? '-'}</strong>
+                      </article>
+                      <article>
+                        <span>전체 평균</span>
+                        <strong>{formatAnalysisScore(yearlyScoreState.item.summary.averageScore)}점</strong>
+                      </article>
+                      <article>
+                        <span>분석 연도</span>
+                        <strong>{yearlyScoreState.item.summary.yearCount.toLocaleString()}개</strong>
+                      </article>
+                    </div>
+                    <Suspense fallback={<div className="analysis-chart-skeleton analysis-chart-skeleton-wide" />}>
+                      <YearlyScoreLineChart data={yearlyScoreState.item.items} />
+                    </Suspense>
+                  </>
+                )}
+                {!yearlyScoreState.isLoading && !yearlyScoreState.error && (!yearlyScoreState.item || yearlyScoreState.item.items.length === 0) && (
+                  <div className="analysis-empty-state">연도별 평점 분석에 표시할 데이터가 아직 없어요.</div>
+                )}
               </section>
 
             </div>

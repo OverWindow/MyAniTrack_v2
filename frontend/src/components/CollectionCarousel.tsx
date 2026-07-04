@@ -24,6 +24,10 @@ function getDisplayTitle(item: UserAnimeListItem) {
   return item.anime.titles?.korean || item.anime.titles?.english || item.anime.title
 }
 
+function getCoverImageSrc(item: UserAnimeListItem) {
+  return item.anime.coverImageExtraLarge || item.anime.coverImageLarge || ''
+}
+
 function formatScore(score?: number | null) {
   const numericScore =
     typeof score === 'number'
@@ -90,8 +94,37 @@ function CollectionCarouselContent({
   const suppressClickRef = useRef(false)
 
   useEffect(() => {
-    setLoadedImageIds(new Set())
+    setLoadedImageIds((current) => {
+      const visibleIds = new Set(state.items.slice(0, 12).map((item) => item.id))
+      const next = new Set<number>()
+
+      current.forEach((id) => {
+        if (visibleIds.has(id)) {
+          next.add(id)
+        }
+      })
+
+      state.items.slice(0, 12).forEach((item) => {
+        if (!getCoverImageSrc(item)) {
+          next.add(item.id)
+        }
+      })
+
+      return next
+    })
   }, [state.items])
+
+  const markImageLoaded = useCallback((itemId: number) => {
+    setLoadedImageIds((current) => {
+      if (current.has(itemId)) {
+        return current
+      }
+
+      const next = new Set(current)
+      next.add(itemId)
+      return next
+    })
+  }, [])
 
   const updateCards = useCallback((scrollDirection = 0) => {
     const carousel = carouselRef.current
@@ -334,7 +367,7 @@ function CollectionCarouselContent({
         >
           {state.items.slice(0, 12).map((item, displayIndex, displayItems) => {
             const itemTitle = getDisplayTitle(item)
-            const imageSrc = item.anime.coverImageExtraLarge || item.anime.coverImageLarge
+            const imageSrc = getCoverImageSrc(item)
             const isImageLoaded = loadedImageIds.has(item.id)
 
             return (
@@ -358,19 +391,16 @@ function CollectionCarouselContent({
                   className="perfect-score-cover"
                   src={imageSrc}
                   alt={itemTitle}
+                  ref={(node) => {
+                    if (node?.complete) {
+                      markImageLoaded(item.id)
+                    }
+                  }}
                   onLoad={() => {
-                    setLoadedImageIds((current) => {
-                      const next = new Set(current)
-                      next.add(item.id)
-                      return next
-                    })
+                    markImageLoaded(item.id)
                   }}
                   onError={() => {
-                    setLoadedImageIds((current) => {
-                      const next = new Set(current)
-                      next.add(item.id)
-                      return next
-                    })
+                    markImageLoaded(item.id)
                   }}
                 />
                 <div className="perfect-score-card-copy">

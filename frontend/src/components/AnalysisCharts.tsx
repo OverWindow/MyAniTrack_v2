@@ -3,6 +3,8 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  Line,
+  ComposedChart,
   Pie,
   PieChart,
   ReferenceLine,
@@ -15,7 +17,7 @@ import {
   ZAxis,
 } from 'recharts'
 import { formatWatchHours, getGenreLabel } from '../lib/stats'
-import type { GenreBubbleItem } from '../types/stats'
+import type { GenreBubbleItem, YearlyScoreStatsItem } from '../types/stats'
 
 type PieDatum = {
   key: string
@@ -33,6 +35,8 @@ type ScoreDistributionChartDatum = {
   label: string
   count: number
 }
+
+type YearlyScoreChartDatum = YearlyScoreStatsItem
 
 type NormalizedGenreBubbleItem = GenreBubbleItem & {
   normalizedCommunityAverage: number
@@ -503,6 +507,99 @@ export function ScoreDistributionBarChart({
           </defs>
         </BarChart>
       </ResponsiveContainer>
+    </div>
+  )
+}
+
+export function YearlyScoreLineChart({ data }: { data: YearlyScoreChartDatum[] }) {
+  return (
+    <div className="analysis-year-score-chart-shell">
+      <ResponsiveContainer width="100%" height={340}>
+        <ComposedChart data={data} margin={{ top: 18, right: 18, left: -8, bottom: 8 }}>
+          <CartesianGrid stroke="rgba(120, 113, 108, 0.12)" vertical={false} />
+          <XAxis
+            dataKey="year"
+            tickLine={false}
+            axisLine={false}
+            tick={{ fill: '#78716c', fontSize: 12 }}
+          />
+          <YAxis
+            yAxisId="score"
+            domain={[0, 10]}
+            tickLine={false}
+            axisLine={false}
+            tick={{ fill: '#78716c', fontSize: 12 }}
+            width={36}
+          />
+          <YAxis
+            yAxisId="count"
+            orientation="right"
+            allowDecimals={false}
+            tickLine={false}
+            axisLine={false}
+            tick={{ fill: '#78716c', fontSize: 12 }}
+            width={38}
+          />
+          <Tooltip
+            cursor={{ stroke: 'rgba(120, 113, 108, 0.28)', strokeDasharray: '4 4' }}
+            content={({ active, payload, label }) => {
+              if (!active || !payload || payload.length === 0) {
+                return null
+              }
+
+              const entry = payload[0]?.payload as YearlyScoreChartDatum
+              const formatScore = (value?: number | null) => (
+                typeof value === 'number' ? `${value.toFixed(2)}점` : '정보 없음'
+              )
+
+              return (
+                <div className="analysis-chart-tooltip">
+                  <strong>{label}년</strong>
+                  <span>내 평균 {formatScore(entry.averageScore)}</span>
+                  <span>커뮤니티 평균 {formatScore(entry.communityAverageScore)}</span>
+                  <span>차이 {typeof entry.preferenceDelta === 'number' ? `${entry.preferenceDelta >= 0 ? '+' : ''}${entry.preferenceDelta.toFixed(2)}점` : '정보 없음'}</span>
+                  <span>감상 {entry.animeCount.toLocaleString()}편 / 평가 {entry.ratedAnimeCount.toLocaleString()}편</span>
+                </div>
+              )
+            }}
+          />
+          <Bar
+            yAxisId="count"
+            dataKey="animeCount"
+            name="감상 작품 수"
+            fill="rgba(251, 191, 36, 0.24)"
+            radius={[10, 10, 4, 4]}
+            maxBarSize={34}
+          />
+          <Line
+            yAxisId="score"
+            type="monotone"
+            dataKey="averageScore"
+            name="내 평균"
+            stroke="#f59e0b"
+            strokeWidth={3}
+            dot={{ r: 4, fill: '#f59e0b', stroke: '#fff7ed', strokeWidth: 2 }}
+            activeDot={{ r: 6 }}
+            connectNulls
+          />
+          <Line
+            yAxisId="score"
+            type="monotone"
+            dataKey="communityAverageScore"
+            name="커뮤니티 평균"
+            stroke="#2563eb"
+            strokeWidth={2.5}
+            strokeDasharray="6 5"
+            dot={{ r: 3.5, fill: '#2563eb', stroke: '#eff6ff', strokeWidth: 2 }}
+            connectNulls
+          />
+        </ComposedChart>
+      </ResponsiveContainer>
+      <div className="analysis-year-score-legend">
+        <span><i className="is-count" />감상 작품 수</span>
+        <span><i className="is-mine" />내 평균</span>
+        <span><i className="is-community" />커뮤니티 평균</span>
+      </div>
     </div>
   )
 }

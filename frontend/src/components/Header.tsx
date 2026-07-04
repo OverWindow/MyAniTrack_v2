@@ -125,7 +125,7 @@ export function Header() {
                       <strong className="profile-name">{displayName}</strong>
                       {isAdmin && <span className="admin-badge">관리자</span>}
                     </div>
-                    <span className="profile-status">{user.bio || user.email}</span>
+                    {user.bio && <span className="profile-status">{user.bio}</span>}
                   </div>
                   <span className="profile-menu-caret" aria-hidden="true">▾</span>
                 </button>

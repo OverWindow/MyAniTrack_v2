@@ -251,6 +251,76 @@
   gap: 14px;
 }
 
+.analysis-year-score-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.analysis-year-score-summary article {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid rgba(120, 113, 108, 0.1);
+  border-radius: 8px;
+  background: rgba(250, 247, 241, 0.68);
+}
+
+.analysis-year-score-summary span {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.analysis-year-score-summary strong {
+  color: var(--point-hover);
+  font-size: 1.12rem;
+  line-height: 1.1;
+}
+
+.analysis-year-score-chart-shell {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.analysis-year-score-legend {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.analysis-year-score-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.analysis-year-score-legend i {
+  width: 18px;
+  height: 3px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.analysis-year-score-legend i.is-mine {
+  background: #f59e0b;
+}
+
+.analysis-year-score-legend i.is-community {
+  background: #2563eb;
+}
+
+.analysis-year-score-legend i.is-count {
+  height: 8px;
+  background: rgba(251, 191, 36, 0.48);
+}
+
 .analysis-anime-insight-list {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -835,11 +905,58 @@
   outline: none;
 }
 
+.voice-actor-ranking-card.is-top-rank,
+.studio-ranking-card.is-top-rank {
+  border-color: rgba(245, 158, 11, 0.28);
+  background:
+    linear-gradient(90deg, rgba(251, 191, 36, 0.16), rgba(255, 255, 255, 0.72));
+}
+
+.voice-actor-ranking-card.is-rank-1,
+.studio-ranking-card.is-rank-1 {
+  border-color: rgba(245, 158, 11, 0.44);
+  box-shadow: inset 4px 0 0 rgba(245, 158, 11, 0.82);
+}
+
+.voice-actor-ranking-card.is-rank-2,
+.studio-ranking-card.is-rank-2 {
+  box-shadow: inset 4px 0 0 rgba(120, 113, 108, 0.42);
+}
+
+.voice-actor-ranking-card.is-rank-3,
+.studio-ranking-card.is-rank-3 {
+  box-shadow: inset 4px 0 0 rgba(217, 119, 6, 0.42);
+}
+
 .voice-actor-rank {
-  width: 34px;
+  width: 42px;
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(245, 158, 11, 0.12);
   color: var(--point-hover);
   font-size: 0.82rem;
   font-weight: 900;
+}
+
+.voice-actor-ranking-card.is-rank-1 .voice-actor-rank,
+.studio-ranking-card.is-rank-1 .studio-ranking-rank {
+  background: #f59e0b;
+  color: var(--text-inverse);
+}
+
+.voice-actor-ranking-card.is-rank-2 .voice-actor-rank,
+.studio-ranking-card.is-rank-2 .studio-ranking-rank {
+  background: #a8a29e;
+  color: var(--text-inverse);
+}
+
+.voice-actor-ranking-card.is-rank-3 .voice-actor-rank,
+.studio-ranking-card.is-rank-3 .studio-ranking-rank {
+  background: #d97706;
+  color: var(--text-inverse);
 }
 
 .voice-actor-avatar {
@@ -1303,7 +1420,7 @@
   display: inline-grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 4px;
-  width: min(100%, 560px);
+  width: 100%;
   padding: 4px;
   border: 1px solid rgba(120, 113, 108, 0.12);
   border-radius: 10px;
@@ -1384,9 +1501,19 @@
 }
 
 .studio-ranking-rank {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(245, 158, 11, 0.12);
   color: var(--point-hover);
   font-size: 0.82rem;
   font-weight: 900;
+}
+
+.studio-ranking-more-button {
+  width: 100%;
 }
 
 .studio-ranking-copy {
@@ -1592,6 +1719,10 @@
   }
 
   .analysis-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .analysis-year-score-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 

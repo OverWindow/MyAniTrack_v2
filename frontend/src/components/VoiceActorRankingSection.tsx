@@ -133,15 +133,17 @@ function VoiceActorRankingList({
       <div className="voice-actor-ranking-list">
         {visibleItems.map((item, index) => {
           const name = getPersonName(item.voiceActor.name)
+          const rank = index + 1
+          const rankClassName = rank <= 3 ? ` is-top-rank is-rank-${rank}` : ''
 
           return (
             <button
-              className={selectedId === item.voiceActor.id ? 'voice-actor-ranking-card is-active' : 'voice-actor-ranking-card'}
+              className={`${selectedId === item.voiceActor.id ? 'voice-actor-ranking-card is-active' : 'voice-actor-ranking-card'}${rankClassName}`}
               key={`${sort}-${item.voiceActor.id}`}
               type="button"
               onClick={() => onSelect(item)}
             >
-              <span className="voice-actor-rank">#{index + 1}</span>
+              <span className="voice-actor-rank">{rank}위</span>
               <img
                 className="voice-actor-avatar"
                 src={getProfileImageSrc(getVoiceActorImage(item))}

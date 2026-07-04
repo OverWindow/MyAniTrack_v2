@@ -23,6 +23,7 @@ import {
   fetchGenreBubbleStats,
   fetchStudioAnime,
   fetchStudioRanking,
+  fetchYearlyScoreStats,
   formatUpdatedAt,
   getGenreLabel,
   recalculateMyAnimeStats,
@@ -35,6 +36,7 @@ import type {
   StudioRankingItem,
   StudioRankingResponse,
   StudioRankingSort,
+  YearlyScoreStats,
 } from '../types/stats'
 import type { AnimeGenre } from '../types/anime'
 import type { UserAnimeListItem } from '../types/collection'
@@ -114,12 +116,17 @@ const ScoreDistributionBarChart = lazy(async () => {
   const module = await import('../components/AnalysisCharts')
   return { default: module.ScoreDistributionBarChart }
 })
+const YearlyScoreLineChart = lazy(async () => {
+  const module = await import('../components/AnalysisCharts')
+  return { default: module.YearlyScoreLineChart }
+})
 const GenrePreferenceBubbleChart = lazy(async () => {
   const module = await import('../components/AnalysisCharts')
   return { default: module.GenrePreferenceBubbleChart }
 })
 
 const RECALCULATE_COOLDOWN_SECONDS = 30
+const INITIAL_VISIBLE_STUDIO_RANKING_COUNT = 5
 
 function getTopEntries(record: Record<string, number>, limit = 8) {
   return Object.entries(record)
@@ -178,8 +185,13 @@ function formatStudioWatchTime(hours?: number | null, minutes?: number | null) {
   return '0시간'
 }
 
+function formatAnalysisScore(value?: number | null) {
+  return typeof value === 'number' && Number.isFinite(value) ? value.toFixed(2) : '-'
+}
+
 function StudioRankingSection({ userId, cacheVersion }: { userId?: number | string | null, cacheVersion: number }) {
   const [sort, setSort] = useState<StudioRankingSort>(() => getStoredStudioSort(userId) ?? 'count')
+  const [isStudioRankingExpanded, setIsStudioRankingExpanded] = useState(false)
   const [rankingState, setRankingState] = useState<{
     items: StudioRankingItem[]
     isLoading: boolean
@@ -210,6 +222,7 @@ function StudioRankingSection({ userId, cacheVersion }: { userId?: number | stri
     if (userId) {
       saveStoredStudioSort(userId, sort)
     }
+    setIsStudioRankingExpanded(false)
   }, [sort, userId])
 
   useEffect(() => {
@@ -356,6 +369,11 @@ function StudioRankingSection({ userId, cacheVersion }: { userId?: number | stri
     }
   }, [cacheVersion, selectedStudio, userId])
 
+  const visibleStudioItems = isStudioRankingExpanded
+    ? rankingState.items
+    : rankingState.items.slice(0, INITIAL_VISIBLE_STUDIO_RANKING_COUNT)
+  const hasMoreStudioItems = rankingState.items.length > INITIAL_VISIBLE_STUDIO_RANKING_COUNT
+
   return (
     <section className="analysis-panel studio-ranking-section">
       <div className="analysis-panel-heading studio-ranking-title-row">
@@ -392,33 +410,49 @@ function StudioRankingSection({ userId, cacheVersion }: { userId?: number | stri
       {!rankingState.isLoading && !rankingState.error && rankingState.items.length > 0 && (
         <div className="studio-ranking-layout">
           <div className="studio-ranking-list">
-            {rankingState.items.map((entry, index) => (
+            {visibleStudioItems.map((entry, index) => {
+              const rank = index + 1
+              const rankClassName = rank <= 3 ? ` is-top-rank is-rank-${rank}` : ''
+
+              return (
+                <button
+                  className={
+                    `${selectedStudio?.studio.id === entry.studio.id
+                      ? 'studio-ranking-card is-active'
+                      : 'studio-ranking-card'}${rankClassName}`
+                  }
+                  key={entry.studio.id}
+                  type="button"
+                  onClick={() => setSelectedStudio(entry)}
+                >
+                  <span className="studio-ranking-rank">{rank}위</span>
+                  <span className="studio-ranking-copy">
+                    <strong>{entry.studio.name}</strong>
+                    <small>
+                      {entry.animeCount.toLocaleString()}편 · 평균 {entry.averageScore !== null ? entry.averageScore.toFixed(1) : '-'}점
+                    </small>
+                  </span>
+                  <span className="studio-ranking-metric">
+                    {sort === 'watchTime'
+                      ? formatStudioWatchTime(entry.totalWatchHours, entry.totalWatchMinutes)
+                      : sort === 'score'
+                        ? `${entry.averageScore !== null ? entry.averageScore.toFixed(1) : '-'}`
+                        : `${entry.animeCount.toLocaleString()}편`}
+                  </span>
+                </button>
+              )
+            })}
+            {hasMoreStudioItems && (
               <button
-                className={
-                  selectedStudio?.studio.id === entry.studio.id
-                    ? 'studio-ranking-card is-active'
-                    : 'studio-ranking-card'
-                }
-                key={entry.studio.id}
+                className="voice-actor-more-button studio-ranking-more-button"
                 type="button"
-                onClick={() => setSelectedStudio(entry)}
+                onClick={() => setIsStudioRankingExpanded((current) => !current)}
               >
-                <span className="studio-ranking-rank">#{index + 1}</span>
-                <span className="studio-ranking-copy">
-                  <strong>{entry.studio.name}</strong>
-                  <small>
-                    {entry.animeCount.toLocaleString()}편 · 평균 {entry.averageScore !== null ? entry.averageScore.toFixed(1) : '-'}점
-                  </small>
-                </span>
-                <span className="studio-ranking-metric">
-                  {sort === 'watchTime'
-                    ? formatStudioWatchTime(entry.totalWatchHours, entry.totalWatchMinutes)
-                    : sort === 'score'
-                      ? `${entry.averageScore !== null ? entry.averageScore.toFixed(1) : '-'}`
-                      : `${entry.animeCount.toLocaleString()}편`}
-                </span>
+                {isStudioRankingExpanded
+                  ? '접기'
+                  : `더보기 ${rankingState.items.length - INITIAL_VISIBLE_STUDIO_RANKING_COUNT}개`}
               </button>
-            ))}
+            )}
           </div>
 
           <div className="studio-anime-panel">
@@ -501,6 +535,15 @@ export function AnalysisPage() {
   })
   const [genreBubbleState, setGenreBubbleState] = useState<{
     item: GenreBubbleResponse['item'] | null
+    isLoading: boolean
+    error: string | null
+  }>({
+    item: null,
+    isLoading: true,
+    error: null,
+  })
+  const [yearlyScoreState, setYearlyScoreState] = useState<{
+    item: YearlyScoreStats | null
     isLoading: boolean
     error: string | null
   }>({
@@ -735,6 +778,60 @@ export function AnalysisPage() {
     }
 
     void loadGenreBubble()
+
+    return () => {
+      isCancelled = true
+      controller.abort()
+    }
+  }, [cacheVersion, isAuthenticated, userId])
+
+  useEffect(() => {
+    if (!isAuthenticated || !userId) {
+      return
+    }
+
+    const controller = new AbortController()
+    let isCancelled = false
+
+    const loadYearlyScores = async () => {
+      setYearlyScoreState((current) => ({ ...current, isLoading: true, error: null }))
+      const cacheKey = getAnalysisCacheKey(userId, 'yearlyScores')
+
+      try {
+        const cached = await getAnalysisCache<YearlyScoreStats>(cacheKey)
+
+        if (isCancelled || controller.signal.aborted) {
+          return
+        }
+
+        if (cached) {
+          setYearlyScoreState({ item: cached, isLoading: false, error: null })
+          return
+        }
+
+        const item = await fetchYearlyScoreStats({ signal: controller.signal })
+
+        if (isCancelled || controller.signal.aborted) {
+          return
+        }
+
+        await setAnalysisCache(cacheKey, item)
+
+        setYearlyScoreState({ item, isLoading: false, error: null })
+      } catch (loadError) {
+        if (loadError instanceof DOMException && loadError.name === 'AbortError') {
+          return
+        }
+
+        setYearlyScoreState({
+          item: null,
+          isLoading: false,
+          error: getFriendlyErrorMessage(loadError, '연도별 평점 분석을 불러오지 못했어요.'),
+        })
+      }
+    }
+
+    void loadYearlyScores()
 
     return () => {
       isCancelled = true
@@ -1278,6 +1375,44 @@ export function AnalysisPage() {
                     <ReleaseDecadeProgress entries={releaseDistribution} />
                   </>
                 ) : renderEmptyMessage('아직 연도별 감상 데이터가 없어요.')}
+              </section>
+
+              <section className="analysis-panel analysis-panel-wide">
+                <div className="analysis-panel-heading">
+                  <span className="detail-label">Year score</span>
+                  <h2>연도별 평균 평점</h2>
+                  <p>평점이 있는 작품이 3편 이상인 연도만 모아 내 평균과 커뮤니티 평균을 비교해요.</p>
+                </div>
+                {yearlyScoreState.isLoading && <div className="analysis-empty-state">연도별 평점 분석을 불러오는 중이에요.</div>}
+                {yearlyScoreState.error && !yearlyScoreState.isLoading && renderEmptyMessage(yearlyScoreState.error)}
+                {!yearlyScoreState.isLoading && !yearlyScoreState.error && yearlyScoreState.item && yearlyScoreState.item.items.length > 0 && (
+                  <>
+                    <div className="analysis-year-score-summary">
+                      <article>
+                        <span>최고 연도</span>
+                        <strong>{yearlyScoreState.item.summary.bestYear ?? '-'}</strong>
+                      </article>
+                      <article>
+                        <span>최저 연도</span>
+                        <strong>{yearlyScoreState.item.summary.worstYear ?? '-'}</strong>
+                      </article>
+                      <article>
+                        <span>전체 평균</span>
+                        <strong>{formatAnalysisScore(yearlyScoreState.item.summary.averageScore)}점</strong>
+                      </article>
+                      <article>
+                        <span>분석 연도</span>
+                        <strong>{yearlyScoreState.item.summary.yearCount.toLocaleString()}개</strong>
+                      </article>
+                    </div>
+                    <Suspense fallback={<div className="analysis-chart-skeleton analysis-chart-skeleton-wide" />}>
+                      <YearlyScoreLineChart data={yearlyScoreState.item.items} />
+                    </Suspense>
+                  </>
+                )}
+                {!yearlyScoreState.isLoading && !yearlyScoreState.error && (!yearlyScoreState.item || yearlyScoreState.item.items.length === 0) && (
+                  <div className="analysis-empty-state">연도별 평점 분석에 표시할 데이터가 아직 없어요.</div>
+                )}
               </section>
 
             </div>

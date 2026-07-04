@@ -81,6 +81,33 @@ export type GenreBubbleResponse = {
   }
 }
 
+export type YearlyScoreStatsItem = {
+  year: number
+  animeCount: number
+  ratedAnimeCount: number
+  averageScore: number | null
+  communityAverageScore: number | null
+  preferenceDelta: number | null
+}
+
+export type YearlyScoreStats = {
+  userId: number
+  status: 'completed' | 'all'
+  minRatedAnimeCount: number
+  items: YearlyScoreStatsItem[]
+  summary: {
+    yearCount: number
+    bestYear: number | null
+    worstYear: number | null
+    averageScore: number | null
+  }
+}
+
+export type YearlyScoreStatsResponse = {
+  success: boolean
+  item: YearlyScoreStats
+}
+
 export type VoiceActorRankingSort = 'count' | 'score'
 
 export type VoiceActorPersonName = {

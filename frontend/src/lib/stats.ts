@@ -10,6 +10,7 @@ import type {
   VoiceActorAnimeResponse,
   VoiceActorRankingResponse,
   VoiceActorRankingSort,
+  YearlyScoreStatsResponse,
 } from '../types/stats'
 
 function getApiBaseUrl() {
@@ -197,6 +198,13 @@ type GenreBubbleParams = {
   signal?: AbortSignal
 }
 
+type YearlyScoreParams = {
+  userId?: string
+  status?: 'completed' | 'all'
+  minRatedAnimeCount?: number
+  signal?: AbortSignal
+}
+
 function createGenreBubbleUrl(params: GenreBubbleParams = {}) {
   const path = params.userId
     ? `/api/users/${params.userId}/anime-stats/genre-bubble`
@@ -210,6 +218,18 @@ function createGenreBubbleUrl(params: GenreBubbleParams = {}) {
   url.searchParams.set('titleLanguage', params.titleLanguage ?? 'ko')
 
   url.searchParams.set('topLimit', String(params.topLimit ?? 3))
+
+  return url
+}
+
+function createYearlyScoreUrl(params: YearlyScoreParams = {}) {
+  const path = params.userId
+    ? `/api/users/${params.userId}/anime-stats/yearly-scores`
+    : '/api/me/anime-stats/yearly-scores'
+  const url = new URL(path, getApiBaseUrl())
+
+  url.searchParams.set('status', params.status ?? 'completed')
+  url.searchParams.set('minRatedAnimeCount', String(params.minRatedAnimeCount ?? 3))
 
   return url
 }
@@ -228,6 +248,24 @@ export async function fetchGenreBubbleStats(params: GenreBubbleParams = {}) {
   }
 
   const payload = (await response.json()) as GenreBubbleResponse
+
+  return payload.item
+}
+
+export async function fetchYearlyScoreStats(params: YearlyScoreParams = {}) {
+  const response = await authFetch(createYearlyScoreUrl(params).toString(), {
+    signal: params.signal,
+  })
+
+  if (response.status === 401) {
+    throw new Error('로그인이 필요해요.')
+  }
+
+  if (!response.ok) {
+    throw new Error(`연도별 평점 분석을 불러오지 못했습니다. (${response.status})`)
+  }
+
+  const payload = (await response.json()) as YearlyScoreStatsResponse
 
   return payload.item
 }
