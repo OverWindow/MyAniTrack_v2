@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { syncAnimePage, syncAllAnime, syncAnimeInChunks, syncSeasonAnime } from '../../sync/anime.sync.service';
+import { syncAnimePage, syncAllAnime, syncAnimeInChunks, syncMissingAnimeStudios, syncSeasonAnime } from '../../sync/anime.sync.service';
 import {
   getAnimeCastSyncState,
   syncAnimeCastBatch,
@@ -125,6 +125,25 @@ export async function syncSeasonAnimeController(req: Request, res: Response) {
     return res.json({
       success: true,
       message: 'Season anime sync completed',
+      result,
+    });
+  } catch (error) {
+    return sendError(res, error);
+  }
+}
+
+export async function syncMissingAnimeStudiosController(req: Request, res: Response) {
+  try {
+    const result = await syncMissingAnimeStudios({
+      limit: req.body.limit,
+      batchSize: req.body.batchSize,
+      retryFailed: req.body.retryFailed,
+      delayMs: req.body.delayMs,
+    });
+
+    return res.json({
+      success: true,
+      message: 'Missing anime studios synced successfully',
       result,
     });
   } catch (error) {

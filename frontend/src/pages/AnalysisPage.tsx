@@ -189,8 +189,19 @@ function formatAnalysisScore(value?: number | null) {
   return typeof value === 'number' && Number.isFinite(value) ? value.toFixed(2) : '-'
 }
 
-function StudioRankingSection({ userId, cacheVersion }: { userId?: number | string | null, cacheVersion: number }) {
-  const [sort, setSort] = useState<StudioRankingSort>(() => getStoredStudioSort(userId) ?? 'count')
+type StudioRankingSectionProps = {
+  apiUserId?: string
+  cacheOwnerId?: number | string | null
+  cacheVersion?: number
+}
+
+export function StudioRankingSection({
+  apiUserId,
+  cacheOwnerId,
+  cacheVersion = 0,
+}: StudioRankingSectionProps) {
+  const storageOwnerId = cacheOwnerId ?? (apiUserId ? `public:${apiUserId}` : null)
+  const [sort, setSort] = useState<StudioRankingSort>(() => getStoredStudioSort(storageOwnerId) ?? 'count')
   const [isStudioRankingExpanded, setIsStudioRankingExpanded] = useState(false)
   const [rankingState, setRankingState] = useState<{
     items: StudioRankingItem[]
@@ -215,18 +226,18 @@ function StudioRankingSection({ userId, cacheVersion }: { userId?: number | stri
   })
 
   useEffect(() => {
-    setSort(getStoredStudioSort(userId) ?? 'count')
-  }, [userId])
+    setSort(getStoredStudioSort(storageOwnerId) ?? 'count')
+  }, [storageOwnerId])
 
   useEffect(() => {
-    if (userId) {
-      saveStoredStudioSort(userId, sort)
+    if (storageOwnerId) {
+      saveStoredStudioSort(storageOwnerId, sort)
     }
     setIsStudioRankingExpanded(false)
-  }, [sort, userId])
+  }, [sort, storageOwnerId])
 
   useEffect(() => {
-    if (!userId) {
+    if (!storageOwnerId) {
       return
     }
 
@@ -235,7 +246,7 @@ function StudioRankingSection({ userId, cacheVersion }: { userId?: number | stri
 
     const loadRanking = async () => {
       setRankingState((current) => ({ ...current, isLoading: true, error: null }))
-      const cacheKey = getAnalysisCacheKey(userId, 'studioRanking', sort)
+      const cacheKey = getAnalysisCacheKey(storageOwnerId, 'studioRanking', sort)
 
       try {
         const cached = await getAnalysisCache<StudioRankingResponse>(cacheKey)
@@ -262,6 +273,7 @@ function StudioRankingSection({ userId, cacheVersion }: { userId?: number | stri
         }
 
         const response = await fetchStudioRanking({
+          userId: apiUserId,
           sort,
           limit: 12,
           minRatedAnimeCount: sort === 'score' ? 1 : undefined,
@@ -308,10 +320,10 @@ function StudioRankingSection({ userId, cacheVersion }: { userId?: number | stri
       isCancelled = true
       controller.abort()
     }
-  }, [cacheVersion, sort, userId])
+  }, [apiUserId, cacheVersion, sort, storageOwnerId])
 
   useEffect(() => {
-    if (!selectedStudio || !userId) {
+    if (!selectedStudio || !storageOwnerId) {
       setAnimeState({ items: [], isLoading: false, error: null })
       return
     }
@@ -321,7 +333,7 @@ function StudioRankingSection({ userId, cacheVersion }: { userId?: number | stri
 
     const loadAnime = async () => {
       setAnimeState({ items: [], isLoading: true, error: null })
-      const cacheKey = getAnalysisCacheKey(userId, 'studioAnime', String(selectedStudio.studio.id))
+      const cacheKey = getAnalysisCacheKey(storageOwnerId, 'studioAnime', String(selectedStudio.studio.id))
 
       try {
         const cached = await getAnalysisCache<StudioAnimeResponse>(cacheKey)
@@ -336,6 +348,7 @@ function StudioRankingSection({ userId, cacheVersion }: { userId?: number | stri
         }
 
         const response = await fetchStudioAnime({
+          userId: apiUserId,
           studioId: selectedStudio.studio.id,
           limit: 12,
           signal: controller.signal,
@@ -367,7 +380,7 @@ function StudioRankingSection({ userId, cacheVersion }: { userId?: number | stri
       isCancelled = true
       controller.abort()
     }
-  }, [cacheVersion, selectedStudio, userId])
+  }, [apiUserId, cacheVersion, selectedStudio, storageOwnerId])
 
   const visibleStudioItems = isStudioRankingExpanded
     ? rankingState.items
@@ -1406,7 +1419,13 @@ export function AnalysisPage() {
                       </article>
                     </div>
                     <Suspense fallback={<div className="analysis-chart-skeleton analysis-chart-skeleton-wide" />}>
-                      <YearlyScoreLineChart data={yearlyScoreState.item.items} />
+                      <YearlyScoreLineChart
+                        data={yearlyScoreState.item.items}
+                        selectedYear={yearAnimeState.selectedYear}
+                        onSelectYear={(year) => {
+                          void handleSelectReleaseYear(year)
+                        }}
+                      />
                     </Suspense>
                   </>
                 )}
@@ -1501,7 +1520,14 @@ export function AnalysisPage() {
         {genreBubbleState.error && !genreBubbleState.isLoading && renderEmptyMessage(genreBubbleState.error)}
         {!genreBubbleState.isLoading && !genreBubbleState.error && genreBubbleState.item && genreBubbleState.item.items.length > 0 && (
           <Suspense fallback={<div className="analysis-chart-skeleton analysis-chart-skeleton-wide" />}>
-            <GenrePreferenceBubbleChart data={genreBubbleState.item.items} />
+            <GenrePreferenceBubbleChart
+              data={genreBubbleState.item.items}
+              selectedGenre={genreAnimeState.selectedGenre}
+              onSelectGenre={(genre) => {
+                setActiveTab('genre')
+                void handleSelectGenre(genre)
+              }}
+            />
           </Suspense>
         )}
         {!genreBubbleState.isLoading && !genreBubbleState.error && (!genreBubbleState.item || genreBubbleState.item.items.length === 0) && (
@@ -1509,7 +1535,7 @@ export function AnalysisPage() {
         )}
       </section>
 
-      <StudioRankingSection userId={userId} cacheVersion={cacheVersion} />
+      <StudioRankingSection cacheOwnerId={userId} cacheVersion={cacheVersion} />
 
       <VoiceActorRankingSection cacheOwnerId={userId} cacheVersion={cacheVersion} ownerLabel="내" />
     </section>

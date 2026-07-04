@@ -65,6 +65,26 @@ export type AdminCastSyncStatusPayload = {
   animeId: number
 }
 
+export type AdminStudioSyncMissingPayload = {
+  limit: number
+  batchSize: number
+  retryFailed: boolean
+  delayMs: number
+}
+
+export type AdminStudioSyncMissingResult = {
+  selectedAnimeCount: number
+  processedAnimeCount: number
+  syncedAnimeCount: number
+  failedAnimeCount: number
+  failed?: Array<{ anilistId: number; message: string }>
+  retryFailed: boolean
+  limit: number
+  batchSize: number
+  delayMs: number
+  hasMore: boolean
+}
+
 export type AdminUpdateKoreanTitlePayload = {
   title: string
   subtitle?: string
@@ -106,6 +126,9 @@ export type PlatformStats = {
   castSyncProgressRate: number
   studioCount: number
   studioSyncedAnimeCount: number
+  studioMappedAnimeCount: number
+  studioPendingAnimeCount: number
+  studioFailedAnimeCount: number
   studioSyncProgressRate: number
   characterCount: number
   voiceActorCount: number

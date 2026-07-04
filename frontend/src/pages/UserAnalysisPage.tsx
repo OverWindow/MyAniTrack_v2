@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { AnalysisAnimeToast } from '../components/AnalysisAnimeToast'
 import { ReleaseDecadeProgress } from '../components/ReleaseDecadeProgress'
 import { VoiceActorRankingSection } from '../components/VoiceActorRankingSection'
+import { StudioRankingSection } from './AnalysisPage'
 import { getProfileImageSrc, handleProfileImageError } from '../lib/avatar'
 import { SERVER_CONNECTION_ERROR_MESSAGE, getFriendlyErrorMessage } from '../lib/errors'
 import { fetchGenreBubbleStats, fetchYearlyScoreStats, formatUpdatedAt, formatWatchHours, getGenreLabel } from '../lib/stats'
@@ -667,7 +668,13 @@ export function UserAnalysisPage() {
                       </article>
                     </div>
                     <Suspense fallback={<div className="analysis-chart-skeleton analysis-chart-skeleton-wide" />}>
-                      <YearlyScoreLineChart data={yearlyScoreState.item.items} />
+                      <YearlyScoreLineChart
+                        data={yearlyScoreState.item.items}
+                        selectedYear={yearAnimeState.selectedValue}
+                        onSelectYear={(year) => {
+                          void handleSelectReleaseYear(year)
+                        }}
+                      />
                     </Suspense>
                   </>
                 )}
@@ -762,13 +769,22 @@ export function UserAnalysisPage() {
         {genreBubbleState.error && !genreBubbleState.isLoading && renderEmptyMessage(genreBubbleState.error)}
         {!genreBubbleState.isLoading && !genreBubbleState.error && genreBubbleState.item && genreBubbleState.item.items.length > 0 && (
           <Suspense fallback={<div className="analysis-chart-skeleton analysis-chart-skeleton-wide" />}>
-            <GenrePreferenceBubbleChart data={genreBubbleState.item.items} />
+            <GenrePreferenceBubbleChart
+              data={genreBubbleState.item.items}
+              selectedGenre={genreAnimeState.selectedValue}
+              onSelectGenre={(genre) => {
+                setActiveTab('genre')
+                void handleSelectGenre(genre)
+              }}
+            />
           </Suspense>
         )}
         {!genreBubbleState.isLoading && !genreBubbleState.error && (!genreBubbleState.item || genreBubbleState.item.items.length === 0) && (
           <div className="analysis-empty-state">표시할 장르 취향 데이터가 아직 없어요.</div>
         )}
       </section>
+
+      <StudioRankingSection apiUserId={userId} cacheOwnerId={`public:${userId}`} />
 
       <VoiceActorRankingSection userId={userId} ownerLabel={user.username} />
     </section>

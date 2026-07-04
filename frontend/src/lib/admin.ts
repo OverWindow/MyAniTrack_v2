@@ -5,6 +5,8 @@ import type {
   AdminCastSyncBatchPayload,
   AdminCastSyncChunkedPayload,
   AdminCastSyncStatusPayload,
+  AdminStudioSyncMissingPayload,
+  AdminStudioSyncMissingResult,
   AdminSyncAllPayload,
   AdminSyncChunkedPayload,
   AdminSyncPagePayload,
@@ -69,6 +71,22 @@ async function postAdminAction<TPayload>(path: string, payload: TPayload, fallba
   return (await response.json()) as AdminActionResponse
 }
 
+async function postAdminRaw<TPayload, TResult>(path: string, payload: TPayload, fallback: string) {
+  const response = await authFetch(createAdminUrl(path), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  })
+
+  if (!response.ok) {
+    throw new Error(getAdminErrorMessage(response.status, fallback))
+  }
+
+  return (await response.json()) as TResult
+}
+
 export async function fetchPlatformStats() {
   const response = await fetch(createAdminUrl('/api/stats/platform'))
 
@@ -115,6 +133,22 @@ export function syncAnimeCastBatch(payload: AdminCastSyncBatchPayload) {
 
 export function syncAnimeCastChunked(payload: AdminCastSyncChunkedPayload) {
   return postAdminAction('/admin/anime/sync/cast/chunked', payload, '캐릭터/성우 청크 동기화에 실패했어요.')
+}
+
+export async function syncMissingAnimeStudios(payload: AdminStudioSyncMissingPayload) {
+  const result = await postAdminRaw<AdminStudioSyncMissingPayload, AdminStudioSyncMissingResult>(
+    '/admin/anime/sync/studios/missing',
+    payload,
+    '스튜디오 미동기화 애니 처리에 실패했어요.',
+  )
+
+  return {
+    success: result.failedAnimeCount === 0,
+    message: result.hasMore
+      ? '스튜디오 동기화를 처리했어요. 아직 남은 항목이 있어요.'
+      : '스튜디오 동기화를 모두 처리했어요.',
+    result: result as unknown as Record<string, unknown>,
+  } satisfies AdminActionResponse
 }
 
 export async function fetchAnimeCastSyncStatus(payload: AdminCastSyncStatusPayload) {

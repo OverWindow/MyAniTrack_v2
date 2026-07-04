@@ -158,6 +158,91 @@ async function upsertAnimeStudios(
   }
 }
 
+async function findInternalAnimeId(conn: PoolConnection, anilistId: number) {
+  const [rows] = await conn.query<Array<RowDataPacket & { id: number }>>(
+    `SELECT id FROM anime WHERE anilist_id = ? LIMIT 1`,
+    [anilistId]
+  );
+
+  return rows[0]?.id ?? null;
+}
+
+async function markAnimeStudioSyncState(
+  conn: PoolConnection,
+  animeId: number,
+  status: 'syncing' | 'success' | 'failed',
+  sourceUpdatedAt?: number | null,
+  lastError?: string | null
+) {
+  await conn.execute(
+    `
+    INSERT INTO anime_studio_sync_state (
+      anime_id,
+      status,
+      source_updated_at,
+      last_error,
+      synced_at
+    )
+    VALUES (?, ?, ?, ?, ?)
+    ON DUPLICATE KEY UPDATE
+      status = VALUES(status),
+      source_updated_at = VALUES(source_updated_at),
+      last_error = VALUES(last_error),
+      synced_at = VALUES(synced_at),
+      updated_at = CURRENT_TIMESTAMP
+    `,
+    [
+      animeId,
+      status,
+      fromUnixTimestampToMySQLDateTime(sourceUpdatedAt),
+      lastError ?? null,
+      status === 'syncing' ? null : new Date().toISOString().slice(0, 19).replace('T', ' '),
+    ]
+  );
+}
+
+export async function upsertAnimeStudiosOnly(anime: Pick<AniListAnime, 'id' | 'studios' | 'updatedAt'>): Promise<void> {
+  const conn = await pool.getConnection();
+
+  try {
+    await conn.beginTransaction();
+
+    const animeId = await findInternalAnimeId(conn, anime.id);
+
+    if (!animeId) {
+      throw new Error('Anime not found');
+    }
+
+    await markAnimeStudioSyncState(conn, animeId, 'syncing');
+    await upsertAnimeStudios(conn, animeId, anime.studios);
+    await markAnimeStudioSyncState(conn, animeId, 'success', anime.updatedAt);
+
+    await conn.commit();
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
+  }
+}
+
+export async function markAnimeStudioSyncFailedByAnilistId(anilistId: number, error: unknown): Promise<void> {
+  const conn = await pool.getConnection();
+
+  try {
+    const animeId = await findInternalAnimeId(conn, anilistId);
+
+    if (!animeId) {
+      return;
+    }
+
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    await markAnimeStudioSyncState(conn, animeId, 'failed', null, message.slice(0, 1000));
+  } finally {
+    conn.release();
+  }
+}
+
 export async function upsertAnimeFull(anime: AniListAnime): Promise<void> {
   const conn = await pool.getConnection();
 
@@ -296,7 +381,9 @@ export async function upsertAnimeFull(anime: AniListAnime): Promise<void> {
     // 5️⃣ STUDIOS
     // ==========================
 
+    await markAnimeStudioSyncState(conn, animeId, 'syncing');
     await upsertAnimeStudios(conn, animeId, anime.studios);
+    await markAnimeStudioSyncState(conn, animeId, 'success', anime.updatedAt);
 
     // ==========================
     // 6️⃣ SYNONYMS

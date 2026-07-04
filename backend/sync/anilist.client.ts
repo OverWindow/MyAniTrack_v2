@@ -1,6 +1,7 @@
 import {
   ANILIST_ANIME_CAST_QUERY,
   ANILIST_ANIME_PAGE_QUERY,
+  ANILIST_ANIME_STUDIOS_BY_IDS_QUERY,
   ANILIST_SEASON_ANIME_PAGE_QUERY,
 } from './anilist.queries';
 
@@ -222,6 +223,36 @@ export async function fetchSeasonAnimePage(
     currentPage: pageData.pageInfo.currentPage,
     lastPage: pageData.pageInfo.lastPage,
   };
+}
+
+export async function fetchAnimeStudiosByAnilistIds(anilistIds: number[]): Promise<AniListAnime[]> {
+  if (anilistIds.length === 0) {
+    return [];
+  }
+
+  const response = await fetch(ANILIST_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
+    body: JSON.stringify({
+      query: ANILIST_ANIME_STUDIOS_BY_IDS_QUERY,
+      variables: { ids: anilistIds },
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`AniList studios request failed: ${response.status} ${response.statusText}`);
+  }
+
+  const json = (await response.json()) as AniListPageResponse;
+
+  if (json.errors?.length) {
+    throw new Error(`AniList GraphQL error: ${json.errors.map(e => e.message).join(', ')}`);
+  }
+
+  return json.data?.Page?.media ?? [];
 }
 
 export async function fetchAnimeCastPage(

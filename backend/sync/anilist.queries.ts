@@ -125,6 +125,28 @@ export const ANILIST_SEASON_ANIME_PAGE_QUERY = `
   }
 `;
 
+export const ANILIST_ANIME_STUDIOS_BY_IDS_QUERY = `
+  query ($ids: [Int]) {
+    Page(page: 1, perPage: 50) {
+      media(type: ANIME, id_in: $ids, sort: ID) {
+        id
+        updatedAt
+        studios {
+          edges {
+            isMain
+            node {
+              id
+              name
+              isAnimationStudio
+              siteUrl
+            }
+          }
+        }
+      }
+    }
+  }
+`;
+
 export const ANILIST_ANIME_CAST_QUERY = `
   query ($anilistId: Int, $page: Int, $perPage: Int, $language: StaffLanguage) {
     Media(id: $anilistId, type: ANIME) {

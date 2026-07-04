@@ -7,6 +7,7 @@ import {
   syncAnimeCastInChunksController,
   syncAnimeInChunksController,
   syncAnimePageController,
+  syncMissingAnimeStudiosController,
   syncSeasonAnimeController,
   getAnimeCastSyncStateController,
   translateAnimeKoreanTitlesController,
@@ -21,6 +22,7 @@ router.post('/admin/anime/sync/page', syncAnimePageController);
 router.post('/admin/anime/sync/all', syncAllAnimeController);
 router.post('/admin/anime/sync/chunked', syncAnimeInChunksController);
 router.post('/admin/anime/sync/season', syncSeasonAnimeController);
+router.post('/admin/anime/sync/studios/missing', syncMissingAnimeStudiosController);
 router.post('/admin/anime/sync/cast/batch', syncAnimeCastBatchController);
 router.post('/admin/anime/sync/cast/chunked', syncAnimeCastInChunksController);
 router.post('/admin/anime/:animeId/sync/cast', syncAnimeCastController);

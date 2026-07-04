@@ -511,7 +511,15 @@ export function ScoreDistributionBarChart({
   )
 }
 
-export function YearlyScoreLineChart({ data }: { data: YearlyScoreChartDatum[] }) {
+export function YearlyScoreLineChart({
+  data,
+  selectedYear,
+  onSelectYear,
+}: {
+  data: YearlyScoreChartDatum[]
+  selectedYear?: string | null
+  onSelectYear?: (year: string) => void
+}) {
   return (
     <div className="analysis-year-score-chart-shell">
       <ResponsiveContainer width="100%" height={340}>
@@ -567,10 +575,24 @@ export function YearlyScoreLineChart({ data }: { data: YearlyScoreChartDatum[] }
             yAxisId="count"
             dataKey="animeCount"
             name="감상 작품 수"
-            fill="rgba(251, 191, 36, 0.24)"
             radius={[10, 10, 4, 4]}
             maxBarSize={34}
-          />
+            cursor={onSelectYear ? 'pointer' : 'default'}
+            onClick={(entry) => {
+              const payload = (entry as { payload?: YearlyScoreChartDatum }).payload
+
+              if (payload?.year) {
+                onSelectYear?.(String(payload.year))
+              }
+            }}
+          >
+            {data.map((entry) => (
+              <Cell
+                key={`year-score-count-${entry.year}`}
+                fill={selectedYear === String(entry.year) ? 'rgba(251, 191, 36, 0.48)' : 'rgba(251, 191, 36, 0.24)'}
+              />
+            ))}
+          </Bar>
           <Line
             yAxisId="score"
             type="monotone"
@@ -581,6 +603,13 @@ export function YearlyScoreLineChart({ data }: { data: YearlyScoreChartDatum[] }
             dot={{ r: 4, fill: '#f59e0b', stroke: '#fff7ed', strokeWidth: 2 }}
             activeDot={{ r: 6 }}
             connectNulls
+            onClick={(entry) => {
+              const payload = (entry as { payload?: YearlyScoreChartDatum }).payload
+
+              if (payload?.year) {
+                onSelectYear?.(String(payload.year))
+              }
+            }}
           />
           <Line
             yAxisId="score"
@@ -592,6 +621,13 @@ export function YearlyScoreLineChart({ data }: { data: YearlyScoreChartDatum[] }
             strokeDasharray="6 5"
             dot={{ r: 3.5, fill: '#2563eb', stroke: '#eff6ff', strokeWidth: 2 }}
             connectNulls
+            onClick={(entry) => {
+              const payload = (entry as { payload?: YearlyScoreChartDatum }).payload
+
+              if (payload?.year) {
+                onSelectYear?.(String(payload.year))
+              }
+            }}
           />
         </ComposedChart>
       </ResponsiveContainer>
@@ -604,7 +640,15 @@ export function YearlyScoreLineChart({ data }: { data: YearlyScoreChartDatum[] }
   )
 }
 
-export function GenrePreferenceBubbleChart({ data }: { data: GenreBubbleItem[] }) {
+export function GenrePreferenceBubbleChart({
+  data,
+  selectedGenre,
+  onSelectGenre,
+}: {
+  data: GenreBubbleItem[]
+  selectedGenre?: string | null
+  onSelectGenre?: (genre: string) => void
+}) {
   const myAverageBaseline = getAverage(data.map((entry) => entry.myAverageScore))
   const communityAverageBaseline = getAverage(data.map((entry) => entry.communityAverageScore))
   const baseNormalizedData = data.map((entry) => {
@@ -726,14 +770,28 @@ export function GenrePreferenceBubbleChart({ data }: { data: GenreBubbleItem[] }
               )
             }}
           />
-          <Scatter data={normalizedData} name="장르 취향" shape={renderBubbleShape}>
+          <Scatter
+            data={normalizedData}
+            name="장르 취향"
+            shape={renderBubbleShape}
+            cursor={onSelectGenre ? 'pointer' : 'default'}
+            onClick={(entry) => {
+              const payload =
+                (entry as { payload?: NormalizedGenreBubbleItem }).payload ??
+                (entry as unknown as NormalizedGenreBubbleItem)
+
+              if (payload?.genre) {
+                onSelectGenre?.(payload.genre)
+              }
+            }}
+          >
             {normalizedData.map((entry, index) => (
               <Cell
                 key={`genre-bubble-${entry.genre}`}
                 fill={BUBBLE_COLORS[index % BUBBLE_COLORS.length]}
                 fillOpacity={0.86}
-                stroke="#ffffff"
-                strokeWidth={2}
+                stroke={selectedGenre === entry.genre ? '#292524' : '#ffffff'}
+                strokeWidth={selectedGenre === entry.genre ? 3 : 2}
               />
             ))}
           </Scatter>

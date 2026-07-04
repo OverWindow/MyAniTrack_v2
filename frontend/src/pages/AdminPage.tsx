@@ -11,6 +11,7 @@ import {
   syncAnimeChunked,
   syncAnimePage,
   syncAnimeSeason,
+  syncMissingAnimeStudios,
   translateKoreanTitles,
 } from '../lib/admin'
 import type {
@@ -21,6 +22,7 @@ import type {
   AdminCastSyncChunkedPayload,
   AdminCastSyncStatusPayload,
   AdminSeason,
+  AdminStudioSyncMissingPayload,
   AdminSyncAllPayload,
   AdminSyncChunkedPayload,
   AdminSyncPagePayload,
@@ -52,6 +54,7 @@ type AdminActionKey =
   | 'sync-chunked'
   | 'sync-season'
   | 'translate-korean'
+  | 'studio-sync-missing'
   | 'cast-sync'
 
 type AdminCastActionKey =
@@ -69,7 +72,7 @@ function formatNumber(value: number) {
 }
 
 function formatPercent(value: number) {
-  return `${value.toFixed(1)}%`
+  return `${Number.isFinite(value) ? value.toFixed(1) : '0.0'}%`
 }
 
 function AdminResponsePreview({ response }: { response: AdminActionResponse }) {
@@ -223,6 +226,12 @@ export function AdminPage() {
   const [castStatusValues, setCastStatusValues] = useState<AdminCastSyncStatusPayload>({
     animeId: 1,
   })
+  const [studioSyncValues, setStudioSyncValues] = useState<AdminStudioSyncMissingPayload>({
+    limit: 200,
+    batchSize: 50,
+    retryFailed: false,
+    delayMs: 2500,
+  })
 
   const [selectedAction, setSelectedAction] = useState<AdminActionKey>('sync-page')
   const [selectedCastAction, setSelectedCastAction] = useState<AdminCastActionKey>('cast-sync-anime')
@@ -249,19 +258,23 @@ export function AdminPage() {
       ]
     }
 
+    const storedAnimeCount = platformStats.storedAnimeCount ?? 0
+    const studioMappedAnimeCount = platformStats.studioMappedAnimeCount ?? 0
+    const studioPendingAnimeCount = platformStats.studioPendingAnimeCount ?? Math.max(0, storedAnimeCount - studioMappedAnimeCount)
+    const studioSyncedAnimeCount = platformStats.studioSyncedAnimeCount ?? 0
+    const studioFailedAnimeCount = platformStats.studioFailedAnimeCount ?? 0
+    const studioSyncRate = platformStats.studioSyncProgressRate
+      ?? (storedAnimeCount > 0
+        ? (studioSyncedAnimeCount / storedAnimeCount) * 100
+        : 0)
     const translationRate = platformStats.translationProgressRate
-      ?? (platformStats.storedAnimeCount > 0
-        ? (platformStats.translatedKoreanTitleCount / platformStats.storedAnimeCount) * 100
+      ?? (storedAnimeCount > 0
+        ? (platformStats.translatedKoreanTitleCount / storedAnimeCount) * 100
         : 0)
     const castSyncRate = platformStats.castSyncProgressRate
-      ?? (platformStats.storedAnimeCount > 0
-        ? (platformStats.castSyncedAnimeCount / platformStats.storedAnimeCount) * 100
+      ?? (storedAnimeCount > 0
+        ? (platformStats.castSyncedAnimeCount / storedAnimeCount) * 100
         : 0)
-    const studioSyncRate = platformStats.studioSyncProgressRate
-      ?? (platformStats.storedAnimeCount > 0
-        ? (platformStats.studioSyncedAnimeCount / platformStats.storedAnimeCount) * 100
-        : 0)
-
     return [
       {
         label: '등록 유저',
@@ -270,23 +283,29 @@ export function AdminPage() {
       },
       {
         label: '저장된 애니',
-        value: formatNumber(platformStats.storedAnimeCount),
+        value: formatNumber(storedAnimeCount),
         hint: '현재 DB 기준 저장 작품 수',
       },
       {
         label: '번역 진행률',
         value: formatPercent(translationRate),
-        hint: `${formatNumber(platformStats.translatedKoreanTitleCount)} / ${formatNumber(platformStats.storedAnimeCount)}`,
+        hint: `${formatNumber(platformStats.translatedKoreanTitleCount)} / ${formatNumber(storedAnimeCount)}`,
       },
       {
         label: '캐스트 동기화율',
         value: formatPercent(castSyncRate),
-        hint: `${formatNumber(platformStats.castSyncedAnimeCount)} / ${formatNumber(platformStats.storedAnimeCount)}`,
+        hint: `${formatNumber(platformStats.castSyncedAnimeCount)} / ${formatNumber(storedAnimeCount)}`,
       },
       {
         label: '스튜디오 동기화율',
         value: formatPercent(studioSyncRate),
-        hint: `${formatNumber(platformStats.studioSyncedAnimeCount)} / ${formatNumber(platformStats.storedAnimeCount)} · 스튜디오 ${formatNumber(platformStats.studioCount)}개`,
+        hint: [
+          `${formatNumber(studioSyncedAnimeCount)} 성공`,
+          `${formatNumber(studioMappedAnimeCount)} 매핑`,
+          `${formatNumber(studioPendingAnimeCount)} 대기`,
+          `${formatNumber(studioFailedAnimeCount)} 실패`,
+          `스튜디오 ${formatNumber(platformStats.studioCount ?? 0)}개`,
+        ].join(' · '),
       },
       {
         label: '캐릭터 / 성우',
@@ -565,6 +584,42 @@ export function AdminPage() {
           onChange={(key, value) => setTranslateValues((current) => ({ ...current, [key]: value }))}
           onSubmit={() => { void runAction('translate-korean', () => translateKoreanTitles(translateValues)) }}
           response={responseMap['translate-korean'] ?? null}
+        />
+      ),
+    },
+    {
+      key: 'studio-sync-missing' as const,
+      group: '스튜디오',
+      label: '스튜디오 미동기화 백필',
+      description: '스튜디오 상태가 없거나 대기 중인 애니를 채웁니다.',
+      content: (
+        <AdminActionCard
+          title="스튜디오 미동기화 애니 백필"
+          description="스튜디오 sync 상태가 없거나 pending인 애니를 처리합니다. hasMore가 true면 반복 실행하고, 실패분만 다시 처리하려면 retryFailed를 켜서 실행하세요."
+          fields={[
+            { key: 'limit', label: '선택할 애니 수', type: 'number' },
+            { key: 'batchSize', label: '배치 크기', type: 'number' },
+            { key: 'retryFailed', label: '실패 항목 재시도', type: 'checkbox' },
+            { key: 'delayMs', label: '배치 사이 지연(ms)', type: 'number' },
+          ]}
+          values={studioSyncValues}
+          isRunning={activeAction === 'studio-sync-missing'}
+          onChange={(key, value) => setStudioSyncValues((current) => ({ ...current, [key]: value }))}
+          onSubmit={() => {
+            void runAction('studio-sync-missing', async () => {
+              const result = await syncMissingAnimeStudios(studioSyncValues)
+
+              try {
+                const nextStats = await fetchPlatformStats()
+                setPlatformStats(nextStats)
+              } catch {
+                // The action result is still useful even if the summary refresh fails.
+              }
+
+              return result
+            })
+          }}
+          response={responseMap['studio-sync-missing'] ?? null}
         />
       ),
     },

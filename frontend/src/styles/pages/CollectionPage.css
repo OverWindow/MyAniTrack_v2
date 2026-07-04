@@ -5,12 +5,12 @@
 }
 
 .perfect-score-showcase {
+  position: relative;
   display: grid;
-  
   max-width: 100dvw;
   min-width: 0;
   margin: 15px 0 0 0;
-  padding: 18px 0 10px;
+  padding: 0 0 10px;
   overflow: hidden;
   border-block: 1px solid rgba(120, 113, 108, 0.12);
   background:
@@ -21,12 +21,16 @@
 }
 
 .perfect-score-heading {
+  position: relative;
+  z-index: 5;
   display: flex;
   align-items: end;
   justify-content: space-between;
   gap: 14px;
   width: min(1280px, calc(100% - 48px));
   margin-inline: auto;
+  transform: translateY(34px);
+  pointer-events: none;
 }
 
 .perfect-score-heading h2 {
@@ -50,7 +54,7 @@
   min-height: 350px;
   overflow-x: auto;
   overflow-y: hidden;
-  padding: 42px max(18px, calc(50% - var(--perfect-score-card-width) / 2)) 34px;
+  padding: 24px max(18px, calc(50% - var(--perfect-score-card-width) / 2)) 34px;
   width: 100%;
   perspective: 1800px;
   perspective-origin: center center;
@@ -343,6 +347,7 @@
 
   .perfect-score-heading {
     width: min(100%, calc(100% - 32px));
+    transform: translateY(24px);
   }
 
   .perfect-score-carousel {
@@ -352,7 +357,7 @@
     justify-content: start;
     min-height: 284px;
     overflow-x: auto;
-    padding: 34px max(16px, calc(50% - var(--perfect-score-card-width) / 2)) 24px;
+    padding: 20px max(16px, calc(50% - var(--perfect-score-card-width) / 2)) 24px;
     perspective: 1000px;
   }
 

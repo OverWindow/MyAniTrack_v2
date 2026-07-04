@@ -1455,7 +1455,6 @@
   display: none;
 }
 
-.studio-ranking-tab:hover,
 .studio-ranking-tab:focus-visible,
 .studio-ranking-tab.is-active {
   background: var(--point-color);
