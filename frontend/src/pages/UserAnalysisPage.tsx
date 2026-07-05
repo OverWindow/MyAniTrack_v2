@@ -538,15 +538,17 @@ export function UserAnalysisPage() {
                   <h2>장르별 평균 점수</h2>
                 </div>
                 <div className="analysis-list">
-                  {genreAvgScore.length > 0 ? genreAvgScore.map(([genre, rawScore]) => {
+                  {genreAvgScore.length > 0 ? genreAvgScore.map(([genre, rawScore], index) => {
                     const normalizedScore = toFiniteNumber(rawScore) ?? 0
+                    const rank = index + 1
+                    const rankClassName = rank <= 3 ? ` is-top-rank is-rank-${rank}` : ''
 
                     return (
                       <button
                         className={
                           genreAnimeState.selectedValue === genre
-                            ? 'analysis-genre-score-row analysis-genre-score-button is-active'
-                            : 'analysis-genre-score-row analysis-genre-score-button'
+                            ? `analysis-genre-score-row analysis-genre-score-button is-active${rankClassName}`
+                            : `analysis-genre-score-row analysis-genre-score-button${rankClassName}`
                         }
                         key={`score-${genre}`}
                         type="button"
@@ -554,6 +556,7 @@ export function UserAnalysisPage() {
                           void handleSelectGenre(genre)
                         }}
                       >
+                        <span className="analysis-genre-score-rank">{rank}위</span>
                         <div className="analysis-genre-score-copy">
                           <span>{getGenreLabel(genre)}</span>
                           <div className="analysis-score-stars" aria-hidden="true">

@@ -48,8 +48,6 @@ type CharacterAppearance = {
   }>
 }
 
-const INITIAL_VISIBLE_RANKING_COUNT = 5
-
 function getPersonName(name?: VoiceActorPersonName | null) {
   return name?.userPreferred || name?.full || name?.native || '이름 정보 없음'
 }
@@ -110,62 +108,47 @@ function VoiceActorRankingList({
   items,
   sort,
   selectedId,
-  isExpanded,
-  onToggleExpanded,
   onSelect,
 }: {
   items: VoiceActorRankingItem[]
   sort: VoiceActorRankingSort
   selectedId?: number
-  isExpanded: boolean
-  onToggleExpanded: () => void
   onSelect: (item: VoiceActorRankingItem) => void
 }) {
   if (items.length === 0) {
     return <div className="analysis-empty-state">아직 표시할 성우 랭킹이 없어요.</div>
   }
 
-  const visibleItems = isExpanded ? items : items.slice(0, INITIAL_VISIBLE_RANKING_COUNT)
-  const hasMore = items.length > INITIAL_VISIBLE_RANKING_COUNT
-
   return (
-    <>
-      <div className="voice-actor-ranking-list">
-        {visibleItems.map((item, index) => {
-          const name = getPersonName(item.voiceActor.name)
-          const rank = index + 1
-          const rankClassName = rank <= 3 ? ` is-top-rank is-rank-${rank}` : ''
+    <div className="voice-actor-ranking-list">
+      {items.map((item, index) => {
+        const name = getPersonName(item.voiceActor.name)
+        const rank = index + 1
+        const rankClassName = rank <= 3 ? ` is-top-rank is-rank-${rank}` : ''
 
-          return (
-            <button
-              className={`${selectedId === item.voiceActor.id ? 'voice-actor-ranking-card is-active' : 'voice-actor-ranking-card'}${rankClassName}`}
-              key={`${sort}-${item.voiceActor.id}`}
-              type="button"
-              onClick={() => onSelect(item)}
-            >
-              <span className="voice-actor-rank">{rank}위</span>
-              <img
-                className="voice-actor-avatar"
-                src={getProfileImageSrc(getVoiceActorImage(item))}
-                alt={name}
-                loading="lazy"
-                onError={handleProfileImageError}
-              />
-              <span className="voice-actor-ranking-copy">
-                <strong>{name}</strong>
-                <small>{getRankingMeta(item, sort)}</small>
-              </span>
-            </button>
-          )
-        })}
-      </div>
-
-      {hasMore && (
-        <button className="voice-actor-more-button" type="button" onClick={onToggleExpanded}>
-          {isExpanded ? '접기' : `더보기 ${items.length - INITIAL_VISIBLE_RANKING_COUNT}명`}
-        </button>
-      )}
-    </>
+        return (
+          <button
+            className={`${selectedId === item.voiceActor.id ? 'voice-actor-ranking-card is-active' : 'voice-actor-ranking-card'}${rankClassName}`}
+            key={`${sort}-${item.voiceActor.id}`}
+            type="button"
+            onClick={() => onSelect(item)}
+          >
+            <span className="voice-actor-rank">{rank}위</span>
+            <img
+              className="voice-actor-avatar"
+              src={getProfileImageSrc(getVoiceActorImage(item))}
+              alt={name}
+              loading="lazy"
+              onError={handleProfileImageError}
+            />
+            <span className="voice-actor-ranking-copy">
+              <strong>{name}</strong>
+              <small>{getRankingMeta(item, sort)}</small>
+            </span>
+          </button>
+        )
+      })}
+    </div>
   )
 }
 
@@ -186,10 +169,6 @@ export function VoiceActorRankingSection({
     item: null,
     isLoading: false,
     error: null,
-  })
-  const [expandedRankings, setExpandedRankings] = useState<Record<VoiceActorRankingSort, boolean>>({
-    count: false,
-    score: false,
   })
   const [openCharacterWorksId, setOpenCharacterWorksId] = useState<number | null>(null)
   const detailRequestIdRef = useRef(0)
@@ -392,8 +371,6 @@ export function VoiceActorRankingSection({
               items={rankingState.count}
               sort="count"
               selectedId={detailState.selected?.voiceActor.id}
-              isExpanded={expandedRankings.count}
-              onToggleExpanded={() => setExpandedRankings((current) => ({ ...current, count: !current.count }))}
               onSelect={(item) => {
                 void handleSelect(item)
               }}
@@ -409,8 +386,6 @@ export function VoiceActorRankingSection({
               items={rankingState.score}
               sort="score"
               selectedId={detailState.selected?.voiceActor.id}
-              isExpanded={expandedRankings.score}
-              onToggleExpanded={() => setExpandedRankings((current) => ({ ...current, score: !current.score }))}
               onSelect={(item) => {
                 void handleSelect(item)
               }}

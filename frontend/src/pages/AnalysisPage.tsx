@@ -126,7 +126,8 @@ const GenrePreferenceBubbleChart = lazy(async () => {
 })
 
 const RECALCULATE_COOLDOWN_SECONDS = 30
-const INITIAL_VISIBLE_STUDIO_RANKING_COUNT = 5
+const INITIAL_VISIBLE_STUDIO_ANIME_COUNT = 3
+const STUDIO_ANIME_TOAST_PAGE_SIZE = 6
 
 function getTopEntries(record: Record<string, number>, limit = 8) {
   return Object.entries(record)
@@ -185,6 +186,34 @@ function formatStudioWatchTime(hours?: number | null, minutes?: number | null) {
   return '0시간'
 }
 
+function getStudioAnimeWatchMinutes(item: StudioAnimeItem) {
+  const progress = Number.isFinite(item.userList.progress) ? item.userList.progress : 0
+  const duration = typeof item.anime.duration === 'number' && Number.isFinite(item.anime.duration)
+    ? item.anime.duration
+    : 0
+
+  return Math.max(0, progress * duration)
+}
+
+function formatStudioAnimeWatchTime(item: StudioAnimeItem) {
+  const minutes = getStudioAnimeWatchMinutes(item)
+
+  if (minutes <= 0) {
+    return '시청 시간 정보 없음'
+  }
+
+  if (minutes < 60) {
+    return `${minutes.toLocaleString()}분`
+  }
+
+  const hours = Math.floor(minutes / 60)
+  const restMinutes = minutes % 60
+
+  return restMinutes > 0
+    ? `${hours.toLocaleString()}시간 ${restMinutes}분`
+    : `${hours.toLocaleString()}시간`
+}
+
 function formatAnalysisScore(value?: number | null) {
   return typeof value === 'number' && Number.isFinite(value) ? value.toFixed(2) : '-'
 }
@@ -202,7 +231,8 @@ export function StudioRankingSection({
 }: StudioRankingSectionProps) {
   const storageOwnerId = cacheOwnerId ?? (apiUserId ? `public:${apiUserId}` : null)
   const [sort, setSort] = useState<StudioRankingSort>(() => getStoredStudioSort(storageOwnerId) ?? 'count')
-  const [isStudioRankingExpanded, setIsStudioRankingExpanded] = useState(false)
+  const [isStudioAnimeToastOpen, setIsStudioAnimeToastOpen] = useState(false)
+  const [studioAnimeToastPage, setStudioAnimeToastPage] = useState(1)
   const [rankingState, setRankingState] = useState<{
     items: StudioRankingItem[]
     isLoading: boolean
@@ -233,7 +263,6 @@ export function StudioRankingSection({
     if (storageOwnerId) {
       saveStoredStudioSort(storageOwnerId, sort)
     }
-    setIsStudioRankingExpanded(false)
   }, [sort, storageOwnerId])
 
   useEffect(() => {
@@ -332,6 +361,8 @@ export function StudioRankingSection({
     let isCancelled = false
 
     const loadAnime = async () => {
+      setIsStudioAnimeToastOpen(false)
+      setStudioAnimeToastPage(1)
       setAnimeState({ items: [], isLoading: true, error: null })
       const cacheKey = getAnalysisCacheKey(storageOwnerId, 'studioAnime', String(selectedStudio.studio.id))
 
@@ -382,10 +413,29 @@ export function StudioRankingSection({
     }
   }, [apiUserId, cacheVersion, selectedStudio, storageOwnerId])
 
-  const visibleStudioItems = isStudioRankingExpanded
-    ? rankingState.items
-    : rankingState.items.slice(0, INITIAL_VISIBLE_STUDIO_RANKING_COUNT)
-  const hasMoreStudioItems = rankingState.items.length > INITIAL_VISIBLE_STUDIO_RANKING_COUNT
+  const visibleStudioItems = rankingState.items
+  const sortedStudioAnime = useMemo(
+    () => [...animeState.items].sort((left, right) => {
+      const rightPopularity = right.anime.popularity ?? right.anime.averageScore ?? right.userList.score ?? 0
+      const leftPopularity = left.anime.popularity ?? left.anime.averageScore ?? left.userList.score ?? 0
+
+      return rightPopularity - leftPopularity
+    }),
+    [animeState.items],
+  )
+  const representativeStudioAnime = sortedStudioAnime.slice(0, INITIAL_VISIBLE_STUDIO_ANIME_COUNT)
+  const hiddenStudioAnime = sortedStudioAnime.slice(INITIAL_VISIBLE_STUDIO_ANIME_COUNT)
+  const hiddenStudioAnimeCount = hiddenStudioAnime.length
+  const hasMoreStudioAnime = hiddenStudioAnimeCount > 0
+  const studioAnimeToastTotalPages = Math.max(1, Math.ceil(hiddenStudioAnime.length / STUDIO_ANIME_TOAST_PAGE_SIZE))
+  const visibleStudioAnimeToastItems = hiddenStudioAnime.slice(
+    (studioAnimeToastPage - 1) * STUDIO_ANIME_TOAST_PAGE_SIZE,
+    studioAnimeToastPage * STUDIO_ANIME_TOAST_PAGE_SIZE,
+  )
+
+  useEffect(() => {
+    setStudioAnimeToastPage((current) => Math.min(current, studioAnimeToastTotalPages))
+  }, [studioAnimeToastTotalPages])
 
   return (
     <section className="analysis-panel studio-ranking-section">
@@ -455,17 +505,6 @@ export function StudioRankingSection({
                 </button>
               )
             })}
-            {hasMoreStudioItems && (
-              <button
-                className="voice-actor-more-button studio-ranking-more-button"
-                type="button"
-                onClick={() => setIsStudioRankingExpanded((current) => !current)}
-              >
-                {isStudioRankingExpanded
-                  ? '접기'
-                  : `더보기 ${rankingState.items.length - INITIAL_VISIBLE_STUDIO_RANKING_COUNT}개`}
-              </button>
-            )}
           </div>
 
           <div className="studio-anime-panel">
@@ -487,30 +526,113 @@ export function StudioRankingSection({
               <div className="analysis-empty-state">이 스튜디오의 작품 목록이 아직 없어요.</div>
             )}
             {!animeState.isLoading && !animeState.error && animeState.items.length > 0 && (
-              <div className="studio-anime-list">
-                {animeState.items.map((entry) => {
+              <div className="studio-anime-showcase">
+                <div className="studio-anime-carousel" aria-label="인기도 순 대표작">
+                  {representativeStudioAnime.map((entry, index) => {
                   const title = getStudioAnimeTitle(entry)
 
                   return (
-                    <Link className="studio-anime-card" key={entry.anime.id} to={`/anime/${entry.anime.id}`}>
+                    <Link
+                      className={`studio-anime-3d-card is-card-${index + 1}`}
+                      key={entry.anime.id}
+                      to={`/anime/${entry.anime.id}`}
+                    >
                       <img
                         src={entry.anime.coverImageExtraLarge || entry.anime.coverImageLarge || ''}
                         alt={title}
                         loading="lazy"
                       />
-                      <span>
+                      <span className="studio-anime-3d-overlay">
+                        <em>#{index + 1}</em>
                         <strong>{title}</strong>
                         <small>
-                          {entry.anime.seasonYear ?? '연도 미상'} · {entry.userList.score !== null ? `${entry.userList.score.toFixed(1)}점` : '평점 없음'}
+                          {entry.userList.score !== null ? `${entry.userList.score.toFixed(1)}점` : '평점 없음'} · {formatStudioAnimeWatchTime(entry)}
                         </small>
                       </span>
                     </Link>
                   )
                 })}
+                </div>
+                {hasMoreStudioAnime && (
+                  <button
+                    className="voice-actor-more-button studio-anime-more-button"
+                    type="button"
+                    onClick={() => {
+                      setStudioAnimeToastPage(1)
+                      setIsStudioAnimeToastOpen(true)
+                    }}
+                  >
+                    더보기 {hiddenStudioAnimeCount}편
+                  </button>
+                )}
               </div>
             )}
           </div>
         </div>
+      )}
+      {isStudioAnimeToastOpen && selectedStudio && (
+        <aside className="analysis-anime-toast" aria-live="polite">
+          <div className="analysis-anime-toast-heading">
+            <div>
+              <strong>{selectedStudio.studio.name} 작품</strong>
+              <span>내가 본 이 스튜디오의 애니예요.</span>
+            </div>
+            <button
+              className="analysis-anime-toast-close"
+              type="button"
+              onClick={() => setIsStudioAnimeToastOpen(false)}
+              aria-label="스튜디오 작품 닫기"
+            >
+              ×
+            </button>
+          </div>
+
+          <div className="analysis-anime-toast-list studio-anime-toast-list">
+            {visibleStudioAnimeToastItems.map((entry) => {
+              const title = getStudioAnimeTitle(entry)
+
+              return (
+                <Link
+                  className="analysis-anime-toast-card"
+                  key={entry.anime.id}
+                  to={`/anime/${entry.anime.id}`}
+                  onClick={() => setIsStudioAnimeToastOpen(false)}
+                >
+                  <span className="analysis-anime-toast-poster">
+                    <img
+                      src={entry.anime.coverImageExtraLarge || entry.anime.coverImageLarge || ''}
+                      alt={title}
+                      loading="lazy"
+                    />
+                    <small>
+                      {entry.userList.score !== null ? `${entry.userList.score.toFixed(1)}점` : '평점 없음'} · {formatStudioAnimeWatchTime(entry)}
+                    </small>
+                  </span>
+                  <strong>{title}</strong>
+                </Link>
+              )
+            })}
+          </div>
+          {studioAnimeToastTotalPages > 1 && (
+            <div className="analysis-anime-toast-pagination" aria-label="스튜디오 작품 페이지">
+              <button
+                type="button"
+                onClick={() => setStudioAnimeToastPage((current) => Math.max(1, current - 1))}
+                disabled={studioAnimeToastPage === 1}
+              >
+                이전
+              </button>
+              <span>{studioAnimeToastPage} / {studioAnimeToastTotalPages}</span>
+              <button
+                type="button"
+                onClick={() => setStudioAnimeToastPage((current) => Math.min(studioAnimeToastTotalPages, current + 1))}
+                disabled={studioAnimeToastPage === studioAnimeToastTotalPages}
+              >
+                다음
+              </button>
+            </div>
+          )}
+        </aside>
       )}
     </section>
   )
@@ -1289,15 +1411,17 @@ export function AnalysisPage() {
                   <h2>장르별 평균 점수</h2>
                 </div>
                 <div className="analysis-list">
-                  {genreAvgScore.length > 0 ? genreAvgScore.map(([genre, rawScore]) => {
+                  {genreAvgScore.length > 0 ? genreAvgScore.map(([genre, rawScore], index) => {
                     const normalizedScore = toFiniteNumber(rawScore) ?? 0
+                    const rank = index + 1
+                    const rankClassName = rank <= 3 ? ` is-top-rank is-rank-${rank}` : ''
 
                     return (
                       <button
                         className={
                           genreAnimeState.selectedGenre === genre
-                            ? 'analysis-genre-score-row analysis-genre-score-button is-active'
-                            : 'analysis-genre-score-row analysis-genre-score-button'
+                            ? `analysis-genre-score-row analysis-genre-score-button is-active${rankClassName}`
+                            : `analysis-genre-score-row analysis-genre-score-button${rankClassName}`
                         }
                         key={`score-${genre}`}
                         type="button"
@@ -1305,6 +1429,7 @@ export function AnalysisPage() {
                           void handleSelectGenre(genre)
                         }}
                       >
+                        <span className="analysis-genre-score-rank">{rank}위</span>
                         <div className="analysis-genre-score-copy">
                           <span>{getGenreLabel(genre)}</span>
                           <div className="analysis-score-stars" aria-hidden="true">

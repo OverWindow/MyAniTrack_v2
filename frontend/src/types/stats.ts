@@ -241,6 +241,7 @@ export type StudioAnimeItem = {
     episodes: number | null
     duration: number | null
     averageScore: number | null
+    popularity?: number | null
   }
   userList: {
     status: string
