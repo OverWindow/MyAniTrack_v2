@@ -122,6 +122,69 @@
   line-height: 1.05;
 }
 
+.analysis-watch-comparison {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  margin: 0 8px;
+  padding: 10px 12px 8px;
+  border-top: 1px solid rgba(120, 113, 108, 0.1);
+  background: transparent;
+}
+
+.analysis-watch-comparison-window {
+  position: relative;
+  min-height: 34px;
+  overflow: hidden;
+  perspective: 760px;
+  transform-style: preserve-3d;
+}
+
+.analysis-watch-comparison-window p {
+  position: absolute;
+  top: 50%;
+  left: 20px;
+  right: 0;
+  transform-origin: 50% 50%;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: clamp(0.82rem, 1.2vw, 0.94rem);
+  font-weight: 700;
+  line-height: 1.4;
+  backface-visibility: hidden;
+  transform: translate3d(0, -50%, 0);
+  transform-style: preserve-3d;
+  transition:
+    opacity 900ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 900ms cubic-bezier(0.16, 1, 0.3, 1),
+    color 900ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+
+.analysis-watch-comparison-window p.is-active {
+  opacity: 1;
+  color: var(--text-secondary);
+  transform: translate3d(0, -50%, 26px) rotateX(0deg) scale(1);
+}
+
+.analysis-watch-comparison-window p.is-previous {
+  opacity: 0;
+  pointer-events: none;
+  transform: translate3d(0, calc(-50% - 46px), -72px) rotateX(42deg) scale(0.96);
+}
+
+.analysis-watch-comparison-window p.is-next {
+  opacity: 0;
+  pointer-events: none;
+  transform: translate3d(0, calc(-50% + 46px), -72px) rotateX(-42deg) scale(0.96);
+}
+
+.analysis-watch-comparison-window p.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translate3d(0, calc(-50% + 68px), -120px) rotateX(-58deg) scale(0.92);
+}
+
 .analysis-panel-grid {
   display: grid;
   grid-template-columns: minmax(210px, 260px) minmax(0, 1fr);
@@ -144,7 +207,7 @@
 }
 
 .analysis-panel-wide {
-  grid-column: auto;
+  grid-column: 1 / -1;
 }
 
 .analysis-panel-heading {
@@ -229,11 +292,87 @@
   color: var(--text-inverse);
 }
 
+.analysis-format-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.analysis-format-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(150px, 0.26fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.analysis-format-chart-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.analysis-format-chart-shell {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.analysis-format-chart-shell > strong {
+  color: var(--text-primary);
+  font-size: 0.92rem;
+  text-align: center;
+}
+
+.analysis-format-summary {
+  display: grid;
+  gap: 8px;
+}
+
+.analysis-format-summary article {
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid rgba(120, 113, 108, 0.1);
+  border-radius: 8px;
+  background: rgba(250, 247, 241, 0.68);
+}
+
+.analysis-format-summary span {
+  display: block;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.analysis-format-summary strong {
+  display: block;
+  margin-top: 3px;
+  overflow: hidden;
+  color: var(--text-primary);
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .analysis-tab-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
   align-items: start;
+}
+
+.analysis-genre-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.95fr) minmax(0, 1.05fr);
+  grid-auto-rows: auto;
+  gap: 14px;
+  align-items: stretch;
+}
+
+.analysis-genre-score-panel {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+}
+
+.analysis-genre-chart-panel {
+  grid-column: 2;
 }
 
 .analysis-anime-insight-panel,
@@ -653,14 +792,14 @@
 
 .analysis-pie-slice-label {
   fill: var(--text-secondary);
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: 700;
   pointer-events: none;
 }
 
 .analysis-pie-slice-label tspan + tspan {
   fill: var(--text-primary);
-  font-size: 0.68rem;
+  font-size: 0.64rem;
   font-weight: 800;
 }
 
@@ -727,9 +866,15 @@
 
 .analysis-genre-score-copy {
   display: grid;
-  gap: 4px;
+  gap: 3px;
   min-width: 0;
   flex: 1;
+}
+
+.analysis-genre-score-copy small {
+  color: var(--text-secondary);
+  font-size: 0.76rem;
+  font-weight: 800;
 }
 
 .analysis-genre-score-rank {
@@ -1688,16 +1833,19 @@
 }
 
 .studio-anime-3d-card.is-card-1 {
+  grid-column: 1;
   z-index: 1;
   transform: translateX(18px) rotateY(14deg) scale(0.9);
 }
 
 .studio-anime-3d-card.is-card-2 {
+  grid-column: 2;
   z-index: 3;
   transform: translateZ(56px) scale(1.04);
 }
 
 .studio-anime-3d-card.is-card-3 {
+  grid-column: 3;
   z-index: 1;
   transform: translateX(-18px) rotateY(-14deg) scale(0.9);
 }
@@ -1842,9 +1990,28 @@
 
   .analysis-panel-grid,
   .analysis-tab-grid,
+  .analysis-genre-layout,
   .studio-ranking-layout,
   .voice-actor-ranking-grid {
     grid-template-columns: 1fr;
+  }
+
+  .analysis-genre-score-panel,
+  .analysis-genre-chart-panel {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .analysis-format-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .analysis-format-chart-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .analysis-format-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .analysis-anime-insight-list {

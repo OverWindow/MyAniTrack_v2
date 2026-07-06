@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { ConnectionErrorState } from '../components/ConnectionErrorState'
 import { useAuth } from '../contexts/AuthContext'
 import { useFriends } from '../contexts/FriendsContext'
 import {
@@ -216,7 +217,7 @@ export function FriendsPage() {
       )}
       {error && (
         error === SERVER_CONNECTION_ERROR_MESSAGE
-          ? <div className="connection-error-plain">{error}</div>
+          ? <ConnectionErrorState message={error} />
           : <div className="feedback-card is-error">{error}</div>
       )}
 

@@ -16,13 +16,15 @@ import {
   YAxis,
   ZAxis,
 } from 'recharts'
+import { genreOptions } from '../lib/anime'
 import { formatWatchHours, getGenreLabel } from '../lib/stats'
-import type { GenreBubbleItem, YearlyScoreStatsItem } from '../types/stats'
+import type { FormatDistributionItem, GenreBubbleItem, YearlyScoreStatsItem } from '../types/stats'
 
 type PieDatum = {
   key: string
   label: string
   value: number
+  count?: number
 }
 
 type ReleaseYearChartDatum = {
@@ -46,7 +48,24 @@ type NormalizedGenreBubbleItem = GenreBubbleItem & {
   hasCompressedValue: boolean
 }
 
-const CHART_COLORS = ['#f59e0b', '#fb7185', '#fbbf24', '#fdba74', '#f97316', '#f43f5e', '#fca5a5', '#fed7aa']
+const CHART_COLORS = [
+  '#2563eb',
+  '#dc2626',
+  '#16a34a',
+  '#9333ea',
+  '#ea580c',
+  '#0891b2',
+  '#db2777',
+  '#65a30d',
+  '#7c3aed',
+  '#ca8a04',
+  '#0f766e',
+  '#be123c',
+]
+const GENRE_COLOR_MAP = new Map<string, string>(genreOptions.map((option, index) => [
+  option.value,
+  CHART_COLORS[index % CHART_COLORS.length],
+]))
 const BUBBLE_COLORS = [
   '#2563eb',
   '#dc2626',
@@ -61,7 +80,32 @@ const BUBBLE_COLORS = [
   '#0d9488',
   '#7c3aed',
 ]
+const FORMAT_COLORS = ['#2563eb', '#f59e0b', '#16a34a', '#dc2626', '#9333ea', '#0891b2', '#db2777', '#65a30d']
+const FORMAT_COLOR_MAP = new Map<string, string>([
+  ['TV', '#2563eb'],
+  ['TV_SHORT', '#60a5fa'],
+  ['MOVIE', '#f59e0b'],
+  ['OVA', '#16a34a'],
+  ['ONA', '#9333ea'],
+  ['SPECIAL', '#dc2626'],
+  ['MUSIC', '#0891b2'],
+])
+const OTHER_FORMAT_COLOR = '#a8a29e'
+const MIN_FORMAT_PERCENT = 5
 const RADIAN = Math.PI / 180
+
+type FormatPieMetric = 'count' | 'watchTime'
+
+type FormatPieDatum = {
+  format: string
+  label: string
+  value: number
+  percentage: number
+  animeCount: number
+  watchMinutes: number
+  averageScore: number | null
+  isOther?: boolean
+}
 
 type PieLabelProps = {
   cx?: number | string
@@ -217,7 +261,25 @@ function renderBubbleShape(props: {
   )
 }
 
-function renderPieLabel(formatValue: (value: number) => string) {
+function formatPercent(value: number, total: number) {
+  if (total <= 0) {
+    return '0%'
+  }
+
+  const percent = value / total * 100
+
+  return percent >= 10 ? `${percent.toFixed(0)}%` : `${percent.toFixed(1)}%`
+}
+
+function formatAnimeCount(count?: number) {
+  return `${Math.max(0, count ?? 0).toLocaleString()}편`
+}
+
+function getGenreColor(key: string, index: number) {
+  return GENRE_COLOR_MAP.get(key) ?? CHART_COLORS[index % CHART_COLORS.length]
+}
+
+function renderPieLabel(total: number) {
   return ({ cx, cy, midAngle, outerRadius, payload }: PieLabelProps) => {
     if (!payload || midAngle === undefined) {
       return null
@@ -233,7 +295,7 @@ function renderPieLabel(formatValue: (value: number) => string) {
     return (
       <text className="analysis-pie-slice-label" x={x} y={y} textAnchor={textAnchor} dominantBaseline="central">
         <tspan x={x} dy="-0.35em">{payload.label}</tspan>
-        <tspan x={x} dy="1.25em">{formatValue(payload.value)}</tspan>
+        <tspan x={x} dy="1.25em">{formatPercent(payload.value, total)} · {formatAnimeCount(payload.count ?? payload.value)}</tspan>
       </text>
     )
   }
@@ -244,14 +306,14 @@ function AnalysisGenrePieChart({
   selectedKey,
   onSelectGenre,
   formatTooltipValue,
-  formatLabelValue,
 }: {
   data: PieDatum[]
   selectedKey?: string | null
   onSelectGenre?: (genre: string) => void
   formatTooltipValue: (value: number) => string
-  formatLabelValue: (value: number) => string
 }) {
+  const total = data.reduce((sum, entry) => sum + entry.value, 0)
+
   return (
     <div className="analysis-pie-shell">
       <ResponsiveContainer width="100%" height={300}>
@@ -263,7 +325,7 @@ function AnalysisGenrePieChart({
             innerRadius={62}
             outerRadius={88}
             paddingAngle={2}
-            label={renderPieLabel(formatLabelValue)}
+            label={renderPieLabel(total)}
             labelLine={false}
             cursor={onSelectGenre ? 'pointer' : 'default'}
             onClick={(entry) => {
@@ -277,7 +339,7 @@ function AnalysisGenrePieChart({
             {data.map((entry, index) => (
               <Cell
                 key={`${entry.label}-${index}`}
-                fill={CHART_COLORS[index % CHART_COLORS.length]}
+                fill={getGenreColor(entry.key, index)}
                 stroke={selectedKey === entry.key ? '#292524' : '#fff7ed'}
                 strokeWidth={selectedKey === entry.key ? 3 : 1}
               />
@@ -294,7 +356,8 @@ function AnalysisGenrePieChart({
               return (
                 <div className="analysis-chart-tooltip">
                   <strong>{entry.label}</strong>
-                  <span>{formatTooltipValue(entry.value)}</span>
+                  <span>{formatTooltipValue(entry.value)} · {formatPercent(entry.value, total)}</span>
+                  <span>작품 {formatAnimeCount(entry.count ?? entry.value)}</span>
                 </div>
               )
             }}
@@ -320,7 +383,6 @@ export function GenreDistributionPieChart({
       selectedKey={selectedKey}
       onSelectGenre={onSelectGenre}
       formatTooltipValue={(value) => `${value.toLocaleString()}편 감상`}
-      formatLabelValue={(value) => `${value.toLocaleString()}편`}
     />
   )
 }
@@ -340,8 +402,163 @@ export function GenreWatchMinutesPieChart({
       selectedKey={selectedKey}
       onSelectGenre={onSelectGenre}
       formatTooltipValue={formatWatchHours}
-      formatLabelValue={formatWatchHours}
     />
+  )
+}
+
+export function FormatDistributionPieChart({
+  data,
+}: {
+  data: FormatDistributionItem[]
+}) {
+  const countData = getFormatPieData(data, 'count')
+  const watchTimeData = getFormatPieData(data, 'watchTime')
+
+  return (
+    <div className="analysis-format-chart-grid">
+      <FormatMetricPieChart title="작품 수 기준" data={countData} metric="count" />
+      <FormatMetricPieChart title="시청 시간 기준" data={watchTimeData} metric="watchTime" />
+    </div>
+  )
+}
+
+function getFormatColor(format: string, index: number) {
+  if (format === 'OTHER') {
+    return OTHER_FORMAT_COLOR
+  }
+
+  return FORMAT_COLOR_MAP.get(format) ?? FORMAT_COLORS[index % FORMAT_COLORS.length]
+}
+
+function getFormatPieData(data: FormatDistributionItem[], metric: FormatPieMetric) {
+  const total = data.reduce((sum, entry) => sum + (metric === 'count' ? entry.animeCount : entry.watchMinutes), 0)
+
+  if (total <= 0) {
+    return [] as FormatPieDatum[]
+  }
+
+  const normalized = data.map((entry): FormatPieDatum => {
+    const value = metric === 'count' ? entry.animeCount : entry.watchMinutes
+
+    return {
+      format: entry.format,
+      label: entry.label,
+      value,
+      percentage: value / total * 100,
+      animeCount: entry.animeCount,
+      watchMinutes: entry.watchMinutes,
+      averageScore: entry.averageScore,
+    }
+  })
+
+  const visible = normalized.filter((entry) => entry.percentage >= MIN_FORMAT_PERCENT)
+  const small = normalized.filter((entry) => entry.percentage < MIN_FORMAT_PERCENT)
+
+  if (small.length === 0) {
+    return normalized
+  }
+
+  const otherValue = small.reduce((sum, entry) => sum + entry.value, 0)
+  const otherAnimeCount = small.reduce((sum, entry) => sum + entry.animeCount, 0)
+  const otherWatchMinutes = small.reduce((sum, entry) => sum + entry.watchMinutes, 0)
+  const weightedScoreSum = small.reduce(
+    (sum, entry) => sum + (entry.averageScore !== null ? entry.averageScore * entry.animeCount : 0),
+    0,
+  )
+  const ratedCount = small.reduce((sum, entry) => sum + (entry.averageScore !== null ? entry.animeCount : 0), 0)
+
+  return [
+    ...visible,
+    {
+      format: 'OTHER',
+      label: '기타',
+      value: otherValue,
+      percentage: otherValue / total * 100,
+      animeCount: otherAnimeCount,
+      watchMinutes: otherWatchMinutes,
+      averageScore: ratedCount > 0 ? weightedScoreSum / ratedCount : null,
+      isOther: true,
+    },
+  ].sort((left, right) => right.value - left.value)
+}
+
+function FormatMetricPieChart({
+  title,
+  data,
+  metric,
+}: {
+  title: string
+  data: FormatPieDatum[]
+  metric: FormatPieMetric
+}) {
+  return (
+    <div className="analysis-format-chart-shell">
+      <strong>{title}</strong>
+      <ResponsiveContainer width="100%" height={260}>
+        <PieChart margin={{ top: 12, right: 78, bottom: 12, left: 78 }}>
+          <Pie
+            data={data}
+            dataKey="value"
+            nameKey="label"
+            innerRadius={58}
+            outerRadius={86}
+            paddingAngle={2}
+            label={({ cx, cy, midAngle, outerRadius, payload }: PieLabelProps & { payload?: FormatPieDatum }) => {
+              if (!payload || midAngle === undefined) {
+                return null
+              }
+
+              const centerX = toNumber(cx, 0)
+              const centerY = toNumber(cy, 0)
+              const radius = toNumber(outerRadius, 86) + 22
+              const x = centerX + radius * Math.cos(-midAngle * RADIAN)
+              const y = centerY + radius * Math.sin(-midAngle * RADIAN)
+              const textAnchor = x >= centerX ? 'start' : 'end'
+              const detail = metric === 'count'
+                ? `${payload.animeCount.toLocaleString()}편`
+                : formatWatchHours(payload.watchMinutes)
+
+              return (
+                <text className="analysis-pie-slice-label" x={x} y={y} textAnchor={textAnchor} dominantBaseline="central">
+                  <tspan x={x} dy="-0.35em">{payload.label}</tspan>
+                  <tspan x={x} dy="1.25em">{payload.percentage.toFixed(1)}% · {detail}</tspan>
+                </text>
+              )
+            }}
+            labelLine={false}
+          >
+            {data.map((entry, index) => (
+              <Cell
+                key={`${metric}-${entry.format}`}
+                fill={getFormatColor(entry.format, index)}
+                stroke="#fff7ed"
+                strokeWidth={1}
+              />
+            ))}
+          </Pie>
+          <Tooltip
+            content={({ active, payload }) => {
+              if (!active || !payload || payload.length === 0) {
+                return null
+              }
+
+              const entry = payload[0]?.payload as FormatPieDatum
+
+              return (
+                <div className="analysis-chart-tooltip">
+                  <strong>{entry.label}</strong>
+                  <span>{metric === 'count' ? '작품 수' : '시청 시간'} 비중 {entry.percentage.toFixed(1)}%</span>
+                  <span>작품 {entry.animeCount.toLocaleString()}편</span>
+                  <span>시청 시간 {formatWatchHours(entry.watchMinutes)}</span>
+                  <span>평균 {entry.averageScore !== null ? `${entry.averageScore.toFixed(1)}점` : '평점 없음'}</span>
+                  {entry.isOther && <span>작은 비중의 포맷을 묶었어요.</span>}
+                </div>
+              )
+            }}
+          />
+        </PieChart>
+      </ResponsiveContainer>
+    </div>
   )
 }
 

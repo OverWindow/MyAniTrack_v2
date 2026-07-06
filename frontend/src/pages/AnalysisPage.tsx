@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AnalysisAnimeToast } from '../components/AnalysisAnimeToast'
+import { ConnectionErrorState } from '../components/ConnectionErrorState'
 import { ReleaseDecadeProgress } from '../components/ReleaseDecadeProgress'
 import { VoiceActorRankingSection } from '../components/VoiceActorRankingSection'
 import { useAuth } from '../contexts/AuthContext'
@@ -19,6 +20,7 @@ import { getProfileImageSrc, handleProfileImageError } from '../lib/avatar'
 import { fetchMyCollection } from '../lib/collection'
 import { SERVER_CONNECTION_ERROR_MESSAGE, getFriendlyErrorMessage } from '../lib/errors'
 import {
+  fetchFormatDistributionStats,
   fetchMyAnimeStats,
   fetchGenreBubbleStats,
   fetchStudioAnime,
@@ -30,6 +32,7 @@ import {
 } from '../lib/stats'
 import type {
   AnimeStatsItem,
+  FormatDistributionStats,
   GenreBubbleResponse,
   StudioAnimeResponse,
   StudioAnimeItem,
@@ -84,6 +87,7 @@ type PieDatum = {
   key: string
   label: string
   value: number
+  count?: number
 }
 
 type AnalysisTab = 'genre' | 'year' | 'score'
@@ -124,10 +128,35 @@ const GenrePreferenceBubbleChart = lazy(async () => {
   const module = await import('../components/AnalysisCharts')
   return { default: module.GenrePreferenceBubbleChart }
 })
+const FormatDistributionPieChart = lazy(async () => {
+  const module = await import('../components/AnalysisCharts')
+  return { default: module.FormatDistributionPieChart }
+})
 
 const RECALCULATE_COOLDOWN_SECONDS = 30
 const INITIAL_VISIBLE_STUDIO_ANIME_COUNT = 3
 const STUDIO_ANIME_TOAST_PAGE_SIZE = 6
+const WATCH_TIME_ROTATION_MS = 6800
+const WATCH_TIME_COMPARISONS = [
+  {
+    key: 'one-piece',
+    title: '《원피스》 TV 시리즈',
+    minutes: 1169 * 24,
+    template: (count: string) => `《원피스》 TV 시리즈를 처음부터 끝까지 ${count}번 볼 수 있는 시간입니다.`,
+  },
+  {
+    key: 'conan',
+    title: '《명탐정 코난》 TV 시리즈',
+    minutes: 1180 * 24,
+    template: (count: string) => `《명탐정 코난》 TV 시리즈를 처음부터 끝까지 ${count}번 볼 수 있는 시간입니다.`,
+  },
+  {
+    key: 'harry-potter',
+    title: '《해리 포터》 시리즈',
+    minutes: 1083594 / 250,
+    template: (count: string) => `《해리 포터》 시리즈를 ${count}번 완독할 수 있는 시간입니다.`,
+  },
+]
 
 function getTopEntries(record: Record<string, number>, limit = 8) {
   return Object.entries(record)
@@ -154,7 +183,7 @@ function toFiniteNumber(value: unknown) {
 
 function renderEmptyMessage(message: string) {
   if (message === SERVER_CONNECTION_ERROR_MESSAGE) {
-    return <div className="connection-error-plain">{message}</div>
+    return <ConnectionErrorState message={message} />
   }
 
   return <div className="analysis-empty-state">{message}</div>
@@ -216,6 +245,83 @@ function formatStudioAnimeWatchTime(item: StudioAnimeItem) {
 
 function formatAnalysisScore(value?: number | null) {
   return typeof value === 'number' && Number.isFinite(value) ? value.toFixed(2) : '-'
+}
+
+function formatComparisonCount(value: number) {
+  if (!Number.isFinite(value) || value <= 0) {
+    return '0'
+  }
+
+  if (value < 10) {
+    return value.toFixed(1)
+  }
+
+  return Math.floor(value).toLocaleString()
+}
+
+function getNextComparisonIndex(currentIndex: number) {
+  if (WATCH_TIME_COMPARISONS.length <= 1) {
+    return 0
+  }
+
+  const nextIndex = Math.floor(Math.random() * (WATCH_TIME_COMPARISONS.length - 1))
+
+  return nextIndex >= currentIndex ? nextIndex + 1 : nextIndex
+}
+
+function getWatchComparisonCarouselPosition(index: number, activeIndex: number) {
+  const total = WATCH_TIME_COMPARISONS.length
+  const previousIndex = (activeIndex - 1 + total) % total
+  const nextIndex = (activeIndex + 1) % total
+
+  if (index === activeIndex) {
+    return 'is-active'
+  }
+
+  if (index === previousIndex) {
+    return 'is-previous'
+  }
+
+  if (index === nextIndex) {
+    return 'is-next'
+  }
+
+  return 'is-hidden'
+}
+
+export function WatchTimeComparisonTicker({ totalWatchMinutes }: { totalWatchMinutes: number }) {
+  const [activeIndex, setActiveIndex] = useState(() => Math.floor(Math.random() * WATCH_TIME_COMPARISONS.length))
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setActiveIndex((current) => getNextComparisonIndex(current))
+    }, WATCH_TIME_ROTATION_MS)
+
+    return () => window.clearInterval(intervalId)
+  }, [])
+
+  const activeItem = WATCH_TIME_COMPARISONS[activeIndex] ?? WATCH_TIME_COMPARISONS[0]
+
+  return (
+    <section className="analysis-watch-comparison" aria-live="polite">
+      <span className="detail-label">Watch time scale</span>
+      <div className="analysis-watch-comparison-window">
+        {WATCH_TIME_COMPARISONS.map((item, index) => {
+          const count = formatComparisonCount(totalWatchMinutes / item.minutes)
+
+          return (
+            <p
+              className={getWatchComparisonCarouselPosition(index, activeIndex)}
+              key={item.key}
+              aria-hidden={item.key !== activeItem.key}
+            >
+              {item.template(count)}
+            </p>
+          )
+        })}
+      </div>
+    </section>
+  )
 }
 
 type StudioRankingSectionProps = {
@@ -364,7 +470,7 @@ export function StudioRankingSection({
       setIsStudioAnimeToastOpen(false)
       setStudioAnimeToastPage(1)
       setAnimeState({ items: [], isLoading: true, error: null })
-      const cacheKey = getAnalysisCacheKey(storageOwnerId, 'studioAnime', String(selectedStudio.studio.id))
+      const cacheKey = getAnalysisCacheKey(storageOwnerId, 'studioAnime', `${selectedStudio.studio.id}:all-v2`)
 
       try {
         const cached = await getAnalysisCache<StudioAnimeResponse>(cacheKey)
@@ -381,7 +487,7 @@ export function StudioRankingSection({
         const response = await fetchStudioAnime({
           userId: apiUserId,
           studioId: selectedStudio.studio.id,
-          limit: 12,
+          limit: 50,
           signal: controller.signal,
         })
 
@@ -389,9 +495,39 @@ export function StudioRankingSection({
           return
         }
 
-        await setAnalysisCache(cacheKey, response)
+        const items = [...response.items]
+        let pageInfo = response.pageInfo
+        let cursor = response.pageInfo.nextCursor
+        const seenCursors = new Set<string>()
 
-        setAnimeState({ items: response.items, isLoading: false, error: null })
+        while (pageInfo.hasNext && cursor && !seenCursors.has(cursor) && !isCancelled && !controller.signal.aborted) {
+          seenCursors.add(cursor)
+          const nextResponse = await fetchStudioAnime({
+            userId: apiUserId,
+            studioId: selectedStudio.studio.id,
+            limit: 50,
+            cursor,
+            signal: controller.signal,
+          })
+
+          items.push(...nextResponse.items)
+          pageInfo = nextResponse.pageInfo
+          cursor = nextResponse.pageInfo.nextCursor
+        }
+
+        if (isCancelled || controller.signal.aborted) {
+          return
+        }
+
+        const mergedResponse = {
+          ...response,
+          items,
+          pageInfo,
+        }
+
+        await setAnalysisCache(cacheKey, mergedResponse)
+
+        setAnimeState({ items, isLoading: false, error: null })
       } catch (loadError) {
         if (loadError instanceof DOMException && loadError.name === 'AbortError') {
           return
@@ -423,7 +559,12 @@ export function StudioRankingSection({
     }),
     [animeState.items],
   )
-  const representativeStudioAnime = sortedStudioAnime.slice(0, INITIAL_VISIBLE_STUDIO_ANIME_COUNT)
+  const topStudioAnime = sortedStudioAnime.slice(0, INITIAL_VISIBLE_STUDIO_ANIME_COUNT)
+  const representativeStudioAnimeCards = [
+    topStudioAnime[1] ? { entry: topStudioAnime[1], rank: 2, cardPosition: 1 } : null,
+    topStudioAnime[0] ? { entry: topStudioAnime[0], rank: 1, cardPosition: 2 } : null,
+    topStudioAnime[2] ? { entry: topStudioAnime[2], rank: 3, cardPosition: 3 } : null,
+  ].filter((item): item is { entry: StudioAnimeItem; rank: number; cardPosition: number } => item !== null)
   const hiddenStudioAnime = sortedStudioAnime.slice(INITIAL_VISIBLE_STUDIO_ANIME_COUNT)
   const hiddenStudioAnimeCount = hiddenStudioAnime.length
   const hasMoreStudioAnime = hiddenStudioAnimeCount > 0
@@ -528,12 +669,12 @@ export function StudioRankingSection({
             {!animeState.isLoading && !animeState.error && animeState.items.length > 0 && (
               <div className="studio-anime-showcase">
                 <div className="studio-anime-carousel" aria-label="인기도 순 대표작">
-                  {representativeStudioAnime.map((entry, index) => {
+                  {representativeStudioAnimeCards.map(({ entry, rank, cardPosition }) => {
                   const title = getStudioAnimeTitle(entry)
 
                   return (
                     <Link
-                      className={`studio-anime-3d-card is-card-${index + 1}`}
+                      className={`studio-anime-3d-card is-card-${cardPosition}`}
                       key={entry.anime.id}
                       to={`/anime/${entry.anime.id}`}
                     >
@@ -543,7 +684,7 @@ export function StudioRankingSection({
                         loading="lazy"
                       />
                       <span className="studio-anime-3d-overlay">
-                        <em>#{index + 1}</em>
+                        <em>#{rank}</em>
                         <strong>{title}</strong>
                         <small>
                           {entry.userList.score !== null ? `${entry.userList.score.toFixed(1)}점` : '평점 없음'} · {formatStudioAnimeWatchTime(entry)}
@@ -679,6 +820,15 @@ export function AnalysisPage() {
   })
   const [yearlyScoreState, setYearlyScoreState] = useState<{
     item: YearlyScoreStats | null
+    isLoading: boolean
+    error: string | null
+  }>({
+    item: null,
+    isLoading: true,
+    error: null,
+  })
+  const [formatDistributionState, setFormatDistributionState] = useState<{
+    item: FormatDistributionStats | null
     isLoading: boolean
     error: string | null
   }>({
@@ -928,6 +1078,60 @@ export function AnalysisPage() {
     const controller = new AbortController()
     let isCancelled = false
 
+    const loadFormatDistribution = async () => {
+      setFormatDistributionState((current) => ({ ...current, isLoading: true, error: null }))
+      const cacheKey = getAnalysisCacheKey(userId, 'formatDistribution')
+
+      try {
+        const cached = await getAnalysisCache<FormatDistributionStats>(cacheKey)
+
+        if (isCancelled || controller.signal.aborted) {
+          return
+        }
+
+        if (cached) {
+          setFormatDistributionState({ item: cached, isLoading: false, error: null })
+          return
+        }
+
+        const item = await fetchFormatDistributionStats({ signal: controller.signal })
+
+        if (isCancelled || controller.signal.aborted) {
+          return
+        }
+
+        await setAnalysisCache(cacheKey, item)
+
+        setFormatDistributionState({ item, isLoading: false, error: null })
+      } catch (loadError) {
+        if (loadError instanceof DOMException && loadError.name === 'AbortError') {
+          return
+        }
+
+        setFormatDistributionState({
+          item: null,
+          isLoading: false,
+          error: getFriendlyErrorMessage(loadError, '포맷별 분석을 불러오지 못했어요.'),
+        })
+      }
+    }
+
+    void loadFormatDistribution()
+
+    return () => {
+      isCancelled = true
+      controller.abort()
+    }
+  }, [cacheVersion, isAuthenticated, userId])
+
+  useEffect(() => {
+    if (!isAuthenticated || !userId) {
+      return
+    }
+
+    const controller = new AbortController()
+    let isCancelled = false
+
     const loadYearlyScores = async () => {
       setYearlyScoreState((current) => ({ ...current, isLoading: true, error: null }))
       const cacheKey = getAnalysisCacheKey(userId, 'yearlyScores')
@@ -1007,12 +1211,20 @@ export function AnalysisPage() {
     [releaseDistribution],
   )
   const genreDistributionChartData = useMemo<PieDatum[]>(
-    () => getPieData(genreDistribution).map((entry) => ({ ...entry, label: getGenreLabel(entry.key) })),
+    () => getPieData(genreDistribution).map((entry) => ({
+      ...entry,
+      count: entry.value,
+      label: getGenreLabel(entry.key),
+    })),
     [genreDistribution],
   )
   const genreWatchMinutesChartData = useMemo<PieDatum[]>(
-    () => getPieData(genreWatchMinutes).map((entry) => ({ ...entry, label: getGenreLabel(entry.key) })),
-    [genreWatchMinutes],
+    () => getPieData(genreWatchMinutes).map((entry) => ({
+      ...entry,
+      count: state.item?.genreDistribution[entry.key] ?? 0,
+      label: getGenreLabel(entry.key),
+    })),
+    [genreWatchMinutes, state.item?.genreDistribution],
   )
   const scoreDistribution = useMemo(
     () =>
@@ -1259,7 +1471,7 @@ export function AnalysisPage() {
     return (
       <section className="analysis-page">
         {state.error === SERVER_CONNECTION_ERROR_MESSAGE
-          ? <div className="connection-error-plain">{state.error}</div>
+          ? <ConnectionErrorState message={state.error} />
           : <div className="feedback-card is-error">{state.error}</div>}
       </section>
     )
@@ -1324,7 +1536,7 @@ export function AnalysisPage() {
 
       {state.error && (
         state.error === SERVER_CONNECTION_ERROR_MESSAGE
-          ? <div className="connection-error-plain">{state.error}</div>
+          ? <ConnectionErrorState message={state.error} />
           : <div className="feedback-card is-error">{state.error}</div>
       )}
 
@@ -1347,6 +1559,7 @@ export function AnalysisPage() {
             <strong>{(item.totalWatchMinutes / 60).toFixed(1)}시간</strong>
           </article>
         </div>
+        <WatchTimeComparisonTicker totalWatchMinutes={item.totalWatchMinutes} />
       </section>
 
       <div className="analysis-panel-grid">
@@ -1388,6 +1601,54 @@ export function AnalysisPage() {
         </section>
 
         <div className="analysis-tab-area">
+          <section className="analysis-panel analysis-format-panel">
+            <div className="analysis-panel-heading">
+              <span className="detail-label">Format distribution</span>
+              <h2>포맷별 감상 분포</h2>
+              <p>TV, 영화, OVA 같은 포맷별로 감상 비중과 시청 시간을 비교해요.</p>
+            </div>
+            {formatDistributionState.isLoading && (
+              <div className="analysis-chart-skeleton" />
+            )}
+            {formatDistributionState.error && !formatDistributionState.isLoading && (
+              renderEmptyMessage(formatDistributionState.error)
+            )}
+            {!formatDistributionState.isLoading
+              && !formatDistributionState.error
+              && formatDistributionState.item
+              && formatDistributionState.item.items.length > 0 && (
+                <div className="analysis-format-layout">
+                  <Suspense fallback={<div className="analysis-chart-skeleton" />}>
+                    <FormatDistributionPieChart data={formatDistributionState.item.items} />
+                  </Suspense>
+                  <div className="analysis-format-summary">
+                    <article>
+                      <span>대표 포맷</span>
+                      <strong>{formatDistributionState.item.summary.topFormatLabel ?? '정보 없음'}</strong>
+                    </article>
+                    <article>
+                      <span>포맷 수</span>
+                      <strong>{formatDistributionState.item.summary.formatCount.toLocaleString()}개</strong>
+                    </article>
+                    <article>
+                      <span>총 작품 수</span>
+                      <strong>{formatDistributionState.item.totalAnimeCount.toLocaleString()}편</strong>
+                    </article>
+                    <article>
+                      <span>총 시청 시간</span>
+                      <strong>{formatDistributionState.item.totalWatchHours !== null
+                        ? `${formatDistributionState.item.totalWatchHours.toLocaleString(undefined, { maximumFractionDigits: 1 })}시간`
+                        : `${Math.round(formatDistributionState.item.totalWatchMinutes / 60).toLocaleString()}시간`}</strong>
+                    </article>
+                  </div>
+                </div>
+              )}
+            {!formatDistributionState.isLoading
+              && !formatDistributionState.error
+              && (!formatDistributionState.item || formatDistributionState.item.items.length === 0)
+              && renderEmptyMessage('아직 포맷별 분석 데이터가 없어요.')}
+          </section>
+
           <div className="analysis-segmented-control" role="tablist" aria-label="분석 종류 선택">
             {analysisTabs.map((tab) => (
               <button
@@ -1404,8 +1665,44 @@ export function AnalysisPage() {
           </div>
 
           {activeTab === 'genre' && (
-            <div className="analysis-tab-grid" role="tabpanel">
-              <section className="analysis-panel">
+            <div className="analysis-genre-layout" role="tabpanel">
+              <section className="analysis-panel analysis-genre-chart-panel">
+                <div className="analysis-panel-heading">
+                  <span className="detail-label">Genre</span>
+                  <h2>장르 분포</h2>
+                </div>
+                {genreDistributionChartData.length > 0 ? (
+                  <Suspense fallback={<div className="analysis-chart-skeleton" />}>
+                    <GenreDistributionPieChart
+                      data={genreDistributionChartData}
+                      selectedKey={genreAnimeState.selectedGenre}
+                      onSelectGenre={(genre) => {
+                        void handleSelectGenre(genre)
+                      }}
+                    />
+                  </Suspense>
+                ) : renderEmptyMessage('아직 장르 분포 데이터가 없어요.')}
+              </section>
+
+              <section className="analysis-panel analysis-genre-chart-panel">
+                <div className="analysis-panel-heading">
+                  <span className="detail-label">Watch time</span>
+                  <h2>장르별 시청 시간</h2>
+                </div>
+                {genreWatchMinutesChartData.length > 0 ? (
+                  <Suspense fallback={<div className="analysis-chart-skeleton" />}>
+                    <GenreWatchMinutesPieChart
+                      data={genreWatchMinutesChartData}
+                      selectedKey={genreAnimeState.selectedGenre}
+                      onSelectGenre={(genre) => {
+                        void handleSelectGenre(genre)
+                      }}
+                    />
+                  </Suspense>
+                ) : renderEmptyMessage('아직 장르별 시청 시간 데이터가 없어요.')}
+              </section>
+
+              <section className="analysis-panel analysis-genre-score-panel">
                 <div className="analysis-panel-heading">
                   <span className="detail-label">Genre score</span>
                   <h2>장르별 평균 점수</h2>
@@ -1415,6 +1712,7 @@ export function AnalysisPage() {
                     const normalizedScore = toFiniteNumber(rawScore) ?? 0
                     const rank = index + 1
                     const rankClassName = rank <= 3 ? ` is-top-rank is-rank-${rank}` : ''
+                    const genreAnimeCount = item.genreDistribution[genre] ?? 0
 
                     return (
                       <button
@@ -1432,6 +1730,7 @@ export function AnalysisPage() {
                         <span className="analysis-genre-score-rank">{rank}위</span>
                         <div className="analysis-genre-score-copy">
                           <span>{getGenreLabel(genre)}</span>
+                          <small>{genreAnimeCount.toLocaleString()}편</small>
                           <div className="analysis-score-stars" aria-hidden="true">
                             {Array.from({ length: 5 }).map((_, index) => (
                               <div className="analysis-score-star-shell" key={`${genre}-${index}`}>
@@ -1451,42 +1750,6 @@ export function AnalysisPage() {
                     )
                   }) : renderEmptyMessage('아직 장르별 평균 점수 데이터가 없어요.')}
                 </div>
-              </section>
-
-              <section className="analysis-panel">
-                <div className="analysis-panel-heading">
-                  <span className="detail-label">Genre</span>
-                  <h2>장르 분포</h2>
-                </div>
-                {genreDistributionChartData.length > 0 ? (
-                  <Suspense fallback={<div className="analysis-chart-skeleton" />}>
-                    <GenreDistributionPieChart
-                      data={genreDistributionChartData}
-                      selectedKey={genreAnimeState.selectedGenre}
-                      onSelectGenre={(genre) => {
-                        void handleSelectGenre(genre)
-                      }}
-                    />
-                  </Suspense>
-                ) : renderEmptyMessage('아직 장르 분포 데이터가 없어요.')}
-              </section>
-
-              <section className="analysis-panel">
-                <div className="analysis-panel-heading">
-                  <span className="detail-label">Watch time</span>
-                  <h2>장르별 시청 시간</h2>
-                </div>
-                {genreWatchMinutesChartData.length > 0 ? (
-                  <Suspense fallback={<div className="analysis-chart-skeleton" />}>
-                    <GenreWatchMinutesPieChart
-                      data={genreWatchMinutesChartData}
-                      selectedKey={genreAnimeState.selectedGenre}
-                      onSelectGenre={(genre) => {
-                        void handleSelectGenre(genre)
-                      }}
-                    />
-                  </Suspense>
-                ) : renderEmptyMessage('아직 장르별 시청 시간 데이터가 없어요.')}
               </section>
 
             </div>

@@ -568,12 +568,23 @@
 .connection-error-plain {
   min-height: 220px;
   display: grid;
+  gap: 14px;
   place-items: center;
   padding: 24px;
   color: var(--text-secondary);
   font-size: 1rem;
   font-weight: 800;
   text-align: center;
+}
+
+.connection-error-plain img {
+  width: min(220px, 58vw);
+  max-height: 220px;
+  object-fit: contain;
+}
+
+.connection-error-plain p {
+  margin: 0;
 }
 
 .home-connection-error {

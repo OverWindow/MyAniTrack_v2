@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { CollectionButton } from '../components/CollectionButton'
+import { ConnectionErrorState } from '../components/ConnectionErrorState'
 import { useAuth } from '../contexts/AuthContext'
 import {
   addToCollection,
@@ -540,7 +541,7 @@ export function ExplorePage() {
 
       {error && (
         error === SERVER_CONNECTION_ERROR_MESSAGE
-          ? <div className="connection-error-plain">{error}</div>
+          ? <ConnectionErrorState message={error} />
           : <div className="feedback-card is-error">{error}</div>
       )}
 

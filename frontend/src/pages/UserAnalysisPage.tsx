@@ -1,16 +1,24 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { AnalysisAnimeToast } from '../components/AnalysisAnimeToast'
+import { ConnectionErrorState } from '../components/ConnectionErrorState'
 import { ReleaseDecadeProgress } from '../components/ReleaseDecadeProgress'
 import { VoiceActorRankingSection } from '../components/VoiceActorRankingSection'
-import { StudioRankingSection } from './AnalysisPage'
+import { StudioRankingSection, WatchTimeComparisonTicker } from './AnalysisPage'
 import { getProfileImageSrc, handleProfileImageError } from '../lib/avatar'
 import { SERVER_CONNECTION_ERROR_MESSAGE, getFriendlyErrorMessage } from '../lib/errors'
-import { fetchGenreBubbleStats, fetchYearlyScoreStats, formatUpdatedAt, formatWatchHours, getGenreLabel } from '../lib/stats'
+import {
+  fetchFormatDistributionStats,
+  fetchGenreBubbleStats,
+  fetchYearlyScoreStats,
+  formatUpdatedAt,
+  formatWatchHours,
+  getGenreLabel,
+} from '../lib/stats'
 import { fetchPublicUserAnimeStats, fetchPublicUserCollection } from '../lib/users'
 import type { AnimeGenre } from '../types/anime'
 import type { UserAnimeListItem } from '../types/collection'
-import type { AnimeStatsItem, GenreBubbleResponse, YearlyScoreStats } from '../types/stats'
+import type { AnimeStatsItem, FormatDistributionStats, GenreBubbleResponse, YearlyScoreStats } from '../types/stats'
 import type { PublicUserProfile } from '../types/users'
 import '../styles/pages/AnalysisPage.css'
 import '../styles/pages/UserAnalysisPage.css'
@@ -44,6 +52,7 @@ type PieDatum = {
   key: string
   label: string
   value: number
+  count?: number
 }
 
 type AnalysisTab = 'genre' | 'year' | 'score'
@@ -78,6 +87,10 @@ const GenrePreferenceBubbleChart = lazy(async () => {
   const module = await import('../components/AnalysisCharts')
   return { default: module.GenrePreferenceBubbleChart }
 })
+const FormatDistributionPieChart = lazy(async () => {
+  const module = await import('../components/AnalysisCharts')
+  return { default: module.FormatDistributionPieChart }
+})
 
 function getTopEntries(record: Record<string, number>, limit = 8) {
   return Object.entries(record)
@@ -104,7 +117,7 @@ function toFiniteNumber(value: unknown) {
 
 function renderEmptyMessage(message: string) {
   if (message === SERVER_CONNECTION_ERROR_MESSAGE) {
-    return <div className="connection-error-plain">{message}</div>
+    return <ConnectionErrorState message={message} />
   }
 
   return <div className="analysis-empty-state">{message}</div>
@@ -169,6 +182,15 @@ export function UserAnalysisPage() {
     isLoading: true,
     error: null,
   })
+  const [formatDistributionState, setFormatDistributionState] = useState<{
+    item: FormatDistributionStats | null
+    isLoading: boolean
+    error: string | null
+  }>({
+    item: null,
+    isLoading: true,
+    error: null,
+  })
 
   useEffect(() => {
     if (!userId) {
@@ -196,6 +218,37 @@ export function UserAnalysisPage() {
     }
 
     void loadStats()
+
+    return () => controller.abort()
+  }, [userId])
+
+  useEffect(() => {
+    if (!userId) {
+      return
+    }
+
+    const controller = new AbortController()
+
+    const loadFormatDistribution = async () => {
+      setFormatDistributionState((current) => ({ ...current, isLoading: true, error: null }))
+
+      try {
+        const item = await fetchFormatDistributionStats({ userId, signal: controller.signal })
+        setFormatDistributionState({ item, isLoading: false, error: null })
+      } catch (loadError) {
+        if (loadError instanceof DOMException && loadError.name === 'AbortError') {
+          return
+        }
+
+        setFormatDistributionState({
+          item: null,
+          isLoading: false,
+          error: getFriendlyErrorMessage(loadError, '포맷별 분석을 불러오지 못했어요.'),
+        })
+      }
+    }
+
+    void loadFormatDistribution()
 
     return () => controller.abort()
   }, [userId])
@@ -283,12 +336,20 @@ export function UserAnalysisPage() {
     [state.item?.scoreDistribution],
   )
   const genreDistributionChartData = useMemo<PieDatum[]>(
-    () => getPieData(genreDistribution).map((entry) => ({ ...entry, label: getGenreLabel(entry.key) })),
+    () => getPieData(genreDistribution).map((entry) => ({
+      ...entry,
+      count: entry.value,
+      label: getGenreLabel(entry.key),
+    })),
     [genreDistribution],
   )
   const genreWatchMinutesChartData = useMemo<PieDatum[]>(
-    () => getPieData(genreWatchMinutes).map((entry) => ({ ...entry, label: getGenreLabel(entry.key) })),
-    [genreWatchMinutes],
+    () => getPieData(genreWatchMinutes).map((entry) => ({
+      ...entry,
+      count: state.item?.genreDistribution[entry.key] ?? 0,
+      label: getGenreLabel(entry.key),
+    })),
+    [genreWatchMinutes, state.item?.genreDistribution],
   )
   const releaseYearChartData = useMemo<ReleaseYearChartDatum[]>(
     () => releaseDistribution.map(([year, count]) => ({ year, count })),
@@ -425,7 +486,7 @@ export function UserAnalysisPage() {
     return (
       <section className="analysis-page">
         {state.error === SERVER_CONNECTION_ERROR_MESSAGE
-          ? <div className="connection-error-plain">{state.error}</div>
+          ? <ConnectionErrorState message={state.error} />
           : <div className="feedback-card is-error">{state.error ?? '분석 정보를 찾을 수 없어요.'}</div>}
       </section>
     )
@@ -495,6 +556,7 @@ export function UserAnalysisPage() {
             <strong>{formatWatchHours(item.totalWatchMinutes)}</strong>
           </article>
         </div>
+        <WatchTimeComparisonTicker totalWatchMinutes={item.totalWatchMinutes} />
       </section>
 
       <div className="analysis-panel-grid">
@@ -515,6 +577,54 @@ export function UserAnalysisPage() {
         </section>
 
         <div className="analysis-tab-area">
+          <section className="analysis-panel analysis-format-panel">
+            <div className="analysis-panel-heading">
+              <span className="detail-label">Format distribution</span>
+              <h2>포맷별 감상 분포</h2>
+              <p>TV, 영화, OVA 같은 포맷별로 감상 비중과 시청 시간을 비교해요.</p>
+            </div>
+            {formatDistributionState.isLoading && (
+              <div className="analysis-chart-skeleton" />
+            )}
+            {formatDistributionState.error && !formatDistributionState.isLoading && (
+              renderEmptyMessage(formatDistributionState.error)
+            )}
+            {!formatDistributionState.isLoading
+              && !formatDistributionState.error
+              && formatDistributionState.item
+              && formatDistributionState.item.items.length > 0 && (
+                <div className="analysis-format-layout">
+                  <Suspense fallback={<div className="analysis-chart-skeleton" />}>
+                    <FormatDistributionPieChart data={formatDistributionState.item.items} />
+                  </Suspense>
+                  <div className="analysis-format-summary">
+                    <article>
+                      <span>대표 포맷</span>
+                      <strong>{formatDistributionState.item.summary.topFormatLabel ?? '정보 없음'}</strong>
+                    </article>
+                    <article>
+                      <span>포맷 수</span>
+                      <strong>{formatDistributionState.item.summary.formatCount.toLocaleString()}개</strong>
+                    </article>
+                    <article>
+                      <span>총 작품 수</span>
+                      <strong>{formatDistributionState.item.totalAnimeCount.toLocaleString()}편</strong>
+                    </article>
+                    <article>
+                      <span>총 시청 시간</span>
+                      <strong>{formatDistributionState.item.totalWatchHours !== null
+                        ? `${formatDistributionState.item.totalWatchHours.toLocaleString(undefined, { maximumFractionDigits: 1 })}시간`
+                        : `${Math.round(formatDistributionState.item.totalWatchMinutes / 60).toLocaleString()}시간`}</strong>
+                    </article>
+                  </div>
+                </div>
+              )}
+            {!formatDistributionState.isLoading
+              && !formatDistributionState.error
+              && (!formatDistributionState.item || formatDistributionState.item.items.length === 0)
+              && renderEmptyMessage('아직 포맷별 분석 데이터가 없어요.')}
+          </section>
+
           <div className="analysis-segmented-control" role="tablist" aria-label="분석 종류 선택">
             {analysisTabs.map((tab) => (
               <button
@@ -531,8 +641,44 @@ export function UserAnalysisPage() {
           </div>
 
           {activeTab === 'genre' && (
-            <div className="analysis-tab-grid" role="tabpanel">
-              <section className="analysis-panel">
+            <div className="analysis-genre-layout" role="tabpanel">
+              <section className="analysis-panel analysis-genre-chart-panel">
+                <div className="analysis-panel-heading">
+                  <span className="detail-label">Genre</span>
+                  <h2>장르 분포</h2>
+                </div>
+                {genreDistributionChartData.length > 0 ? (
+                  <Suspense fallback={<div className="analysis-chart-skeleton" />}>
+                    <GenreDistributionPieChart
+                      data={genreDistributionChartData}
+                      selectedKey={genreAnimeState.selectedValue}
+                      onSelectGenre={(genre) => {
+                        void handleSelectGenre(genre)
+                      }}
+                    />
+                  </Suspense>
+                ) : renderEmptyMessage('아직 장르 분포 데이터가 없어요.')}
+              </section>
+
+              <section className="analysis-panel analysis-genre-chart-panel">
+                <div className="analysis-panel-heading">
+                  <span className="detail-label">Watch time</span>
+                  <h2>장르별 시청 시간</h2>
+                </div>
+                {genreWatchMinutesChartData.length > 0 ? (
+                  <Suspense fallback={<div className="analysis-chart-skeleton" />}>
+                    <GenreWatchMinutesPieChart
+                      data={genreWatchMinutesChartData}
+                      selectedKey={genreAnimeState.selectedValue}
+                      onSelectGenre={(genre) => {
+                        void handleSelectGenre(genre)
+                      }}
+                    />
+                  </Suspense>
+                ) : renderEmptyMessage('아직 장르별 시청 시간 데이터가 없어요.')}
+              </section>
+
+              <section className="analysis-panel analysis-genre-score-panel">
                 <div className="analysis-panel-heading">
                   <span className="detail-label">Genre score</span>
                   <h2>장르별 평균 점수</h2>
@@ -542,6 +688,7 @@ export function UserAnalysisPage() {
                     const normalizedScore = toFiniteNumber(rawScore) ?? 0
                     const rank = index + 1
                     const rankClassName = rank <= 3 ? ` is-top-rank is-rank-${rank}` : ''
+                    const genreAnimeCount = item.genreDistribution[genre] ?? 0
 
                     return (
                       <button
@@ -559,6 +706,7 @@ export function UserAnalysisPage() {
                         <span className="analysis-genre-score-rank">{rank}위</span>
                         <div className="analysis-genre-score-copy">
                           <span>{getGenreLabel(genre)}</span>
+                          <small>{genreAnimeCount.toLocaleString()}편</small>
                           <div className="analysis-score-stars" aria-hidden="true">
                             {Array.from({ length: 5 }).map((_, index) => (
                               <div className="analysis-score-star-shell" key={`${genre}-${index}`}>
@@ -578,42 +726,6 @@ export function UserAnalysisPage() {
                     )
                   }) : renderEmptyMessage('아직 장르별 평균 점수 데이터가 없어요.')}
                 </div>
-              </section>
-
-              <section className="analysis-panel">
-                <div className="analysis-panel-heading">
-                  <span className="detail-label">Genre</span>
-                  <h2>장르 분포</h2>
-                </div>
-                {genreDistributionChartData.length > 0 ? (
-                  <Suspense fallback={<div className="analysis-chart-skeleton" />}>
-                    <GenreDistributionPieChart
-                      data={genreDistributionChartData}
-                      selectedKey={genreAnimeState.selectedValue}
-                      onSelectGenre={(genre) => {
-                        void handleSelectGenre(genre)
-                      }}
-                    />
-                  </Suspense>
-                ) : renderEmptyMessage('아직 장르 분포 데이터가 없어요.')}
-              </section>
-
-              <section className="analysis-panel">
-                <div className="analysis-panel-heading">
-                  <span className="detail-label">Watch time</span>
-                  <h2>장르별 시청 시간</h2>
-                </div>
-                {genreWatchMinutesChartData.length > 0 ? (
-                  <Suspense fallback={<div className="analysis-chart-skeleton" />}>
-                    <GenreWatchMinutesPieChart
-                      data={genreWatchMinutesChartData}
-                      selectedKey={genreAnimeState.selectedValue}
-                      onSelectGenre={(genre) => {
-                        void handleSelectGenre(genre)
-                      }}
-                    />
-                  </Suspense>
-                ) : renderEmptyMessage('아직 장르별 시청 시간 데이터가 없어요.')}
               </section>
 
             </div>

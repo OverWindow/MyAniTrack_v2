@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { CollectionCarousel } from '../components/CollectionCarousel'
+import { ConnectionErrorState } from '../components/ConnectionErrorState'
 import { useAuth } from '../contexts/AuthContext'
 import { fetchMyCollection, getCachedCollectionPage, saveCollectionPageCache } from '../lib/collection'
 import { genreOptions } from '../lib/anime'
-import { getFriendlyErrorMessage } from '../lib/errors'
+import { SERVER_CONNECTION_ERROR_MESSAGE, getFriendlyErrorMessage } from '../lib/errors'
 import type { AnimeGenre } from '../types/anime'
 import type { UserAnimeListItem, UserAnimeListSort } from '../types/collection'
 import '../styles/pages/CatalogPage.css'
@@ -507,7 +508,11 @@ export function CollectionPage() {
         </div>
         </div>
 
-      {error && <div className="feedback-card is-error">{error}</div>}
+      {error && (
+        error === SERVER_CONNECTION_ERROR_MESSAGE
+          ? <ConnectionErrorState message={error} />
+          : <div className="feedback-card is-error">{error}</div>
+      )}
 
       {!error && (isLoading || isRefreshingQuery) && (
         <div className="collection-grid">

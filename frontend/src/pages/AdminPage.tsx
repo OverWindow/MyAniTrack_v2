@@ -49,11 +49,16 @@ type AdminActionCardProps<TPayload> = {
 }
 
 type AdminActionKey =
+  | 'sync-tools'
+  | 'translate-korean'
+  | 'studio-sync-missing'
+  | 'cast-sync'
+
+type AdminSyncActionKey =
   | 'sync-page'
   | 'sync-all'
   | 'sync-chunked'
   | 'sync-season'
-  | 'translate-korean'
   | 'studio-sync-missing'
   | 'cast-sync'
 
@@ -233,7 +238,8 @@ export function AdminPage() {
     delayMs: 2500,
   })
 
-  const [selectedAction, setSelectedAction] = useState<AdminActionKey>('sync-page')
+  const [selectedAction, setSelectedAction] = useState<AdminActionKey>('sync-tools')
+  const [selectedSyncAction, setSelectedSyncAction] = useState<AdminSyncActionKey>('sync-page')
   const [selectedCastAction, setSelectedCastAction] = useState<AdminCastActionKey>('cast-sync-anime')
   const [activeAction, setActiveAction] = useState<string | null>(null)
   const [responseMap, setResponseMap] = useState<Record<string, AdminActionResponse | null>>({})
@@ -474,7 +480,7 @@ export function AdminPage() {
   ]
   const selectedCastItem = castActionItems.find((item) => item.key === selectedCastAction) ?? castActionItems[0]
 
-  const actionItems = [
+  const syncActionItems = [
     {
       key: 'sync-page' as const,
       group: '동기화',
@@ -650,6 +656,49 @@ export function AdminPage() {
         </div>
       ),
     },
+  ]
+
+  const syncToolItems = syncActionItems.filter((item) => (
+    item.key !== 'translate-korean'
+    && item.key !== 'studio-sync-missing'
+    && item.key !== 'cast-sync'
+  ))
+  const selectedSyncItem = syncToolItems.find((item) => item.key === selectedSyncAction) ?? syncToolItems[0]
+  const translateActionItem = syncActionItems.find((item) => item.key === 'translate-korean')
+  const studioActionItem = syncActionItems.find((item) => item.key === 'studio-sync-missing')
+  const castActionItem = syncActionItems.find((item) => item.key === 'cast-sync')
+  const actionItems = [
+    {
+      key: 'sync-tools' as const,
+      group: '동기화',
+      label: '동기화 관리',
+      description: '애니, 시즌, 스튜디오, 캐릭터/성우 동기화를 한 곳에서 실행합니다.',
+      content: (
+        <div className="admin-sync-tool">
+          <div className="admin-sync-mode-list" role="tablist" aria-label="동기화 작업 유형">
+            {syncToolItems.map((item) => (
+              <button
+                className={selectedSyncAction === item.key ? 'admin-sync-mode is-active' : 'admin-sync-mode'}
+                key={item.key}
+                type="button"
+                role="tab"
+                aria-selected={selectedSyncAction === item.key}
+                onClick={() => setSelectedSyncAction(item.key as AdminSyncActionKey)}
+              >
+                <span className="admin-sidebar-group">{item.group}</span>
+                <strong>{item.label}</strong>
+                <small>{item.description}</small>
+              </button>
+            ))}
+          </div>
+
+          {selectedSyncItem.content}
+        </div>
+      ),
+    },
+    ...(studioActionItem ? [studioActionItem] : []),
+    ...(castActionItem ? [castActionItem] : []),
+    ...(translateActionItem ? [translateActionItem] : []),
   ]
 
   const selectedItem = actionItems.find((item) => item.key === selectedAction) ?? actionItems[0]

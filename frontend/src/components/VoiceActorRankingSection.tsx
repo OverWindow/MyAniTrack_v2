@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { ConnectionErrorState } from './ConnectionErrorState'
 import {
   getAnalysisCache,
   getAnalysisCacheKey,
   setAnalysisCache,
 } from '../lib/analysisCache'
 import { getProfileImageSrc, handleProfileImageError } from '../lib/avatar'
+import { SERVER_CONNECTION_ERROR_MESSAGE, getFriendlyErrorMessage } from '../lib/errors'
 import { fetchVoiceActorAnime, fetchVoiceActorRanking } from '../lib/stats'
 import type {
   VoiceActorAnimeResponse,
@@ -233,7 +235,7 @@ export function VoiceActorRankingSection({
           count: [],
           score: [],
           isLoading: false,
-          error: loadError instanceof Error ? loadError.message : '성우 랭킹을 불러오지 못했어요.',
+          error: getFriendlyErrorMessage(loadError, '성우 랭킹을 불러오지 못했어요.'),
         })
       }
     }
@@ -337,7 +339,7 @@ export function VoiceActorRankingSection({
         selected: item,
         item: null,
         isLoading: false,
-        error: loadError instanceof Error ? loadError.message : '성우 상세 작품을 불러오지 못했어요.',
+        error: getFriendlyErrorMessage(loadError, '성우 상세 작품을 불러오지 못했어요.'),
       })
     }
   }
@@ -357,7 +359,9 @@ export function VoiceActorRankingSection({
 
       {rankingState.isLoading && <div className="analysis-empty-state">성우 랭킹을 불러오는 중이에요.</div>}
       {rankingState.error && !rankingState.isLoading && (
-        <div className="analysis-empty-state">{rankingState.error}</div>
+        rankingState.error === SERVER_CONNECTION_ERROR_MESSAGE
+          ? <ConnectionErrorState message={rankingState.error} />
+          : <div className="analysis-empty-state">{rankingState.error}</div>
       )}
 
       {!rankingState.isLoading && !rankingState.error && (
@@ -427,7 +431,9 @@ export function VoiceActorRankingSection({
 
             {detailState.isLoading && <div className="analysis-empty-state">출연 작품을 불러오는 중이에요.</div>}
             {detailState.error && !detailState.isLoading && (
-              <div className="analysis-empty-state">{detailState.error}</div>
+              detailState.error === SERVER_CONNECTION_ERROR_MESSAGE
+                ? <ConnectionErrorState message={detailState.error} />
+                : <div className="analysis-empty-state">{detailState.error}</div>
             )}
             {!detailState.isLoading && !detailState.error && characterAppearances.length === 0 && (
               <div className="analysis-empty-state">표시할 캐릭터 정보가 없어요.</div>

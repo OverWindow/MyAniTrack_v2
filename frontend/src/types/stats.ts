@@ -108,6 +108,38 @@ export type YearlyScoreStatsResponse = {
   item: YearlyScoreStats
 }
 
+export type FormatDistributionItem = {
+  format: string
+  label: string
+  animeCount: number
+  percentage: number
+  ratedAnimeCount: number
+  averageScore: number | null
+  watchedEpisodes: number
+  watchMinutes: number
+  watchHours: number | null
+}
+
+export type FormatDistributionStats = {
+  userId: number
+  status: 'completed' | 'all'
+  minCount: number
+  totalAnimeCount: number
+  totalWatchMinutes: number
+  totalWatchHours: number | null
+  items: FormatDistributionItem[]
+  summary: {
+    formatCount: number
+    topFormat: string | null
+    topFormatLabel: string | null
+  }
+}
+
+export type FormatDistributionResponse = {
+  success: boolean
+  item: FormatDistributionStats
+}
+
 export type VoiceActorRankingSort = 'count' | 'score'
 
 export type VoiceActorPersonName = {

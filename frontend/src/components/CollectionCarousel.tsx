@@ -3,6 +3,7 @@ import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent }
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import type { Location } from 'react-router-dom'
+import { ConnectionErrorState } from './ConnectionErrorState'
 import { SERVER_CONNECTION_ERROR_MESSAGE } from '../lib/errors'
 import type { UserAnimeListItem } from '../types/collection'
 
@@ -347,9 +348,7 @@ function CollectionCarouselContent({
 
       {!state.isLoading && state.error && (
         <div className="perfect-score-carousel perfect-score-carousel-empty">
-          <div className="connection-error-plain">
-            {state.error || SERVER_CONNECTION_ERROR_MESSAGE}
-          </div>
+          <ConnectionErrorState message={state.error || SERVER_CONNECTION_ERROR_MESSAGE} />
         </div>
       )}
 

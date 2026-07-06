@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { ConnectionErrorState } from '../components/ConnectionErrorState'
 import { fetchPopularAnime, getDisplayTitle, getPrimaryPoster } from '../lib/anime'
 import { getFriendlyErrorMessage } from '../lib/errors'
 import type { PopularAnimeItem } from '../types/anime'
@@ -95,7 +96,7 @@ export function HomePage() {
   return (
     <div className="home-page">
       {state.error ? (
-        <div className="connection-error-plain home-connection-error">{state.error}</div>
+        <ConnectionErrorState className="home-connection-error" message={state.error} />
       ) : (
       <section className="home-cinematic-hero" aria-label="인기 애니 쇼케이스">
         {featuredAnime && (

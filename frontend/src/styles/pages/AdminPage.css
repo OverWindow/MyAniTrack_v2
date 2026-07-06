@@ -189,6 +189,59 @@
   gap: 16px;
 }
 
+.admin-sync-tool {
+  display: grid;
+  gap: 16px;
+}
+
+.admin-sync-mode-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.admin-sync-mode {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid rgba(120, 113, 108, 0.14);
+  border-radius: 12px;
+  background: var(--bg-neutral);
+  color: var(--text-primary);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  transition:
+    transform var(--duration-normal) ease,
+    border-color var(--duration-normal) ease,
+    background-color var(--duration-normal) ease;
+}
+
+.admin-sync-mode strong {
+  color: var(--text-primary);
+  font-size: 0.94rem;
+}
+
+.admin-sync-mode small {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  line-height: 1.42;
+}
+
+.admin-sync-mode.is-active,
+.admin-sync-mode:hover,
+.admin-sync-mode:focus-visible {
+  border-color: rgba(245, 158, 11, 0.34);
+  background: var(--point-softest);
+  outline: none;
+}
+
+.admin-sync-mode:hover,
+.admin-sync-mode:focus-visible {
+  transform: translateY(-1px);
+}
+
 .admin-cast-mode-list {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -317,6 +370,7 @@
   .admin-overview-grid,
   .admin-workspace,
   .admin-form-grid,
+  .admin-sync-mode-list,
   .admin-cast-mode-list {
     grid-template-columns: 1fr;
   }

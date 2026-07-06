@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { BadgeSection } from '../components/BadgeSection'
+import { ConnectionErrorState } from '../components/ConnectionErrorState'
 import { getProfileImageSrc, handleProfileImageError } from '../lib/avatar'
 import { fetchPublicUserBadges } from '../lib/badges'
-import { getFriendlyErrorMessage } from '../lib/errors'
+import { SERVER_CONNECTION_ERROR_MESSAGE, getFriendlyErrorMessage } from '../lib/errors'
 import { fetchPublicUserProfile } from '../lib/users'
 import type { UserBadge } from '../types/badges'
 import type { PublicUserProfile } from '../types/users'
@@ -102,7 +103,9 @@ export function UserProfilePage() {
   if (state.error || !state.user) {
     return (
       <section className="user-profile-page">
-        <div className="feedback-card is-error">{state.error ?? '사용자 정보를 찾을 수 없어요.'}</div>
+        {state.error === SERVER_CONNECTION_ERROR_MESSAGE
+          ? <ConnectionErrorState message={state.error} />
+          : <div className="feedback-card is-error">{state.error ?? '사용자 정보를 찾을 수 없어요.'}</div>}
       </section>
     )
   }
@@ -144,11 +147,15 @@ export function UserProfilePage() {
         </div>
       </div>
 
-      <BadgeSection
-        badges={state.badges}
-        error={state.badgesError}
-        emptyMessage="아직 획득한 공개 배지가 없어요."
-      />
+      {state.badgesError === SERVER_CONNECTION_ERROR_MESSAGE ? (
+        <ConnectionErrorState message={state.badgesError} />
+      ) : (
+        <BadgeSection
+          badges={state.badges}
+          error={state.badgesError}
+          emptyMessage="아직 획득한 공개 배지가 없어요."
+        />
+      )}
     </section>
   )
 }

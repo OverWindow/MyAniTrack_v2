@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { BadgeSection } from '../components/BadgeSection'
+import { ConnectionErrorState } from '../components/ConnectionErrorState'
 import { useAuth } from '../contexts/AuthContext'
 import { getProfileImageSrc, handleProfileImageError } from '../lib/avatar'
 import { fetchMyBadges } from '../lib/badges'
-import { getFriendlyErrorMessage } from '../lib/errors'
+import { SERVER_CONNECTION_ERROR_MESSAGE, getFriendlyErrorMessage } from '../lib/errors'
 import type { UserBadge } from '../types/badges'
 import '../styles/pages/ProfilePage.css'
 
@@ -119,14 +120,18 @@ export function ProfilePage() {
         </div>
       </div>
 
-      <BadgeSection
-        badges={badgesState.items.filter((badge) => badge.earned)}
-        isLoading={badgesState.isLoading}
-        error={badgesState.error}
-        newlyEarned={badgesState.newlyEarned}
-        emptyMessage="아직 획득한 배지가 없어요."
-        showProgress
-      />
+      {badgesState.error === SERVER_CONNECTION_ERROR_MESSAGE ? (
+        <ConnectionErrorState message={badgesState.error} />
+      ) : (
+        <BadgeSection
+          badges={badgesState.items.filter((badge) => badge.earned)}
+          isLoading={badgesState.isLoading}
+          error={badgesState.error}
+          newlyEarned={badgesState.newlyEarned}
+          emptyMessage="아직 획득한 배지가 없어요."
+          showProgress
+        />
+      )}
     </section>
   )
 }

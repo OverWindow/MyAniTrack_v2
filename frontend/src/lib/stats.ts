@@ -2,6 +2,7 @@ import { authFetch } from './auth'
 import { genreOptions } from './anime'
 import type {
   AnimeStatsResponse,
+  FormatDistributionResponse,
   GenreBubbleResponse,
   StudioAnimeResponse,
   StudioRankingResponse,
@@ -205,6 +206,13 @@ type YearlyScoreParams = {
   signal?: AbortSignal
 }
 
+type FormatDistributionParams = {
+  userId?: string
+  status?: 'completed' | 'all'
+  minCount?: number
+  signal?: AbortSignal
+}
+
 function createGenreBubbleUrl(params: GenreBubbleParams = {}) {
   const path = params.userId
     ? `/api/users/${params.userId}/anime-stats/genre-bubble`
@@ -230,6 +238,18 @@ function createYearlyScoreUrl(params: YearlyScoreParams = {}) {
 
   url.searchParams.set('status', params.status ?? 'completed')
   url.searchParams.set('minRatedAnimeCount', String(params.minRatedAnimeCount ?? 3))
+
+  return url
+}
+
+function createFormatDistributionUrl(params: FormatDistributionParams = {}) {
+  const path = params.userId
+    ? `/api/users/${params.userId}/anime-stats/format-distribution`
+    : '/api/me/anime-stats/format-distribution'
+  const url = new URL(path, getApiBaseUrl())
+
+  url.searchParams.set('status', params.status ?? 'completed')
+  url.searchParams.set('minCount', String(params.minCount ?? 1))
 
   return url
 }
@@ -266,6 +286,24 @@ export async function fetchYearlyScoreStats(params: YearlyScoreParams = {}) {
   }
 
   const payload = (await response.json()) as YearlyScoreStatsResponse
+
+  return payload.item
+}
+
+export async function fetchFormatDistributionStats(params: FormatDistributionParams = {}) {
+  const response = await authFetch(createFormatDistributionUrl(params).toString(), {
+    signal: params.signal,
+  })
+
+  if (response.status === 401) {
+    throw new Error('로그인이 필요해요.')
+  }
+
+  if (!response.ok) {
+    throw new Error(`포맷별 분석을 불러오지 못했습니다. (${response.status})`)
+  }
+
+  const payload = (await response.json()) as FormatDistributionResponse
 
   return payload.item
 }
