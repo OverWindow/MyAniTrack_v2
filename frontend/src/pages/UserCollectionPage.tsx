@@ -278,7 +278,8 @@ export function UserCollectionPage() {
   }
 
   return (
-    <section className="collection-page user-collection-page">
+    <>
+    <section className="collection-page user-collection-page user-collection-page-header">
       <div className="user-catalog-header">
         <div className="user-catalog-title-group">
           <Link className="detail-back-link" to={`/users/${userId}/profile`}>
@@ -292,13 +293,15 @@ export function UserCollectionPage() {
           <span className="summary-label">편</span>
         </div>
       </div>
+    </section>
 
-      <CollectionCarousel
-        state={carouselState}
-        title={`${user?.username ?? '친구'}님의 최애 애니`}
-        ariaLabel={`${user?.username ?? '친구'}님의 최애 애니`}
-      />
+    <CollectionCarousel
+      state={carouselState}
+      title={`${user?.username ?? '친구'}님의 최애 애니`}
+      ariaLabel={`${user?.username ?? '친구'}님의 최애 애니`}
+    />
 
+    <section className="collection-page user-collection-page user-collection-page-content">
       <div className="explore-toolbar-shell">
         <div className="explore-toolbar">
           <div className="search-group">
@@ -403,5 +406,6 @@ export function UserCollectionPage() {
         </>
       )}
     </section>
+    </>
   )
 }

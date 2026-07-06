@@ -1,9 +1,114 @@
 .home-page {
-  min-height: calc(100svh - 148px);
+  --home-header-height: 128px;
+  min-height: calc(100svh - var(--home-header-height));
+  display: grid;
+  gap: clamp(16px, 2.5vw, 28px);
+}
+
+.home-immersive-hero {
+  position: relative;
+  min-height: calc(100svh - var(--home-header-height));
+  display: grid;
+  align-items: center;
+  overflow: hidden;
+  padding: clamp(26px, 6vw, 78px);
+  border-radius: 0;
+  background: #191512;
+  isolation: isolate;
+  box-shadow: none;
+}
+
+.home-immersive-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: -3;
+  background-position: center top;
+  background-size: cover;
+  filter: saturate(1.06) contrast(1.03);
+  transform: scale(1.01);
+}
+
+.home-immersive-shade {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background:
+    linear-gradient(90deg, rgba(20, 16, 13, 0.9) 0%, rgba(20, 16, 13, 0.68) 36%, rgba(20, 16, 13, 0.18) 72%),
+    linear-gradient(180deg, rgba(20, 16, 13, 0.2) 0%, rgba(20, 16, 13, 0.02) 52%, rgba(20, 16, 13, 0.72) 100%);
+}
+
+.home-immersive-copy {
+  display: grid;
+  gap: 16px;
+  width: min(800px, 100%);
+  color: var(--text-inverse);
+}
+
+.home-immersive-copy .section-kicker {
+  width: fit-content;
+  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
+}
+
+.home-immersive-copy h1 {
+  margin: 0;
+  max-width: 13ch;
+  color: var(--text-inverse);
+  font-size: clamp(2.55rem, 6.5vw, 6.5rem);
+  font-weight: 950;
+  line-height: 0.94;
+}
+
+.home-immersive-copy p {
+  margin: 0;
+  max-width: 48ch;
+  color: rgba(255, 255, 255, 0.84);
+  font-size: clamp(0.98rem, 1.35vw, 1.14rem);
+  font-weight: 650;
+  line-height: 1.75;
+}
+
+.home-immersive-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.home-immersive-actions .secondary-button {
+  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text-inverse);
+  backdrop-filter: blur(10px);
+}
+
+.home-immersive-signals {
+  position: absolute;
+  right: clamp(20px, 5vw, 70px);
+  bottom: clamp(18px, 4vw, 48px);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 14px;
+  max-width: min(620px, calc(100% - 40px));
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 0.82rem;
+  font-weight: 850;
+}
+
+.home-immersive-signals span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.42);
 }
 
 .home-cinematic-hero {
   position: relative;
+  width: min(1280px, calc(100% - 48px));
+  margin: 0 auto;
   min-height: clamp(460px, calc(100svh - 168px), 620px);
   display: grid;
   grid-template-columns: minmax(280px, 0.82fr) minmax(260px, 0.56fr);
@@ -208,7 +313,38 @@
   padding: 12px;
 }
 
+@media (max-width: 1080px) {
+  .home-cinematic-hero {
+    width: min(100%, calc(100% - 32px));
+  }
+}
+
 @media (max-width: 980px) {
+  .home-immersive-hero {
+    min-height: calc(100svh - var(--home-header-height));
+    align-items: end;
+  }
+
+  .home-immersive-backdrop {
+    background-position: 58% top;
+  }
+
+  .home-immersive-shade {
+    background:
+      linear-gradient(180deg, rgba(20, 16, 13, 0.18) 0%, rgba(20, 16, 13, 0.54) 45%, rgba(20, 16, 13, 0.9) 100%),
+      linear-gradient(90deg, rgba(20, 16, 13, 0.6), rgba(20, 16, 13, 0.18));
+  }
+
+  .home-immersive-copy h1 {
+    max-width: 12ch;
+  }
+
+  .home-immersive-signals {
+    left: clamp(20px, 5vw, 48px);
+    right: auto;
+    justify-content: flex-start;
+  }
+
   .home-cinematic-hero {
     grid-template-columns: 1fr;
     min-height: auto;
@@ -223,10 +359,46 @@
 
 @media (max-width: 760px) {
   .home-page {
-    min-height: auto;
+    --home-header-height: 122px;
+    min-height: calc(100svh - var(--home-header-height));
+  }
+
+  .home-immersive-hero {
+    min-height: calc(100svh - var(--home-header-height));
+    padding: 22px;
+  }
+
+  .home-immersive-copy {
+    gap: 12px;
+    padding-bottom: 58px;
+  }
+
+  .home-immersive-copy h1 {
+    max-width: 100%;
+    font-size: clamp(2.25rem, 12vw, 4.1rem);
+  }
+
+  .home-immersive-copy p {
+    font-size: 0.94rem;
+  }
+
+  .home-immersive-actions {
+    flex-direction: column;
+  }
+
+  .home-immersive-actions .primary-button,
+  .home-immersive-actions .secondary-button {
+    width: 100%;
+  }
+
+  .home-immersive-signals {
+    bottom: 22px;
+    gap: 10px;
+    font-size: 0.74rem;
   }
 
   .home-cinematic-hero {
+    width: min(100%, calc(100% - 24px));
     padding: 20px;
     border-radius: 10px;
   }

@@ -38,6 +38,9 @@ function App() {
   const location = useLocation()
   const locationState = location.state as { backgroundLocation?: Location } | null
   const backgroundLocation = locationState?.backgroundLocation
+  const activeRoute = backgroundLocation ?? location
+  const isHomeRoute = activeRoute.pathname === '/'
+  const isUserCollectionRoute = /^\/users\/[^/]+\/anime-list$/.test(activeRoute.pathname)
   const shouldShowFloatingCta = !backgroundLocation && !['/login', '/signup'].includes(location.pathname)
   const [isFriendsOpen, setIsFriendsOpen] = useState(false)
   const floatingPanelRef = useRef<HTMLDivElement | null>(null)
@@ -83,8 +86,12 @@ function App() {
     <div className="site-shell">
       <Header />
       <div id="collection-carousel-root" />
-      <main className="landing-page">
-        <Routes location={backgroundLocation ?? location}>
+      <main className={[
+        'landing-page',
+        isHomeRoute ? 'landing-page-home' : '',
+        isUserCollectionRoute ? 'landing-page-user-collection' : '',
+      ].filter(Boolean).join(' ')}>
+        <Routes location={activeRoute}>
           <Route path="/" element={<HomePage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />

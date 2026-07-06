@@ -407,8 +407,18 @@
 
 .landing-page {
   display: grid;
-  gap: var(--space-8);
+  gap: var(--space-4);
   padding: var(--space-5) 0 var(--space-9);
+}
+
+.landing-page.landing-page-home {
+  width: 100%;
+  gap: 0;
+  padding-top: 0;
+}
+
+.landing-page.landing-page-user-collection {
+  width: 100%;
 }
 
 .route-overlay {

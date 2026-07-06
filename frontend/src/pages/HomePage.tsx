@@ -4,6 +4,7 @@ import { ConnectionErrorState } from '../components/ConnectionErrorState'
 import { fetchPopularAnime, getDisplayTitle, getPrimaryPoster } from '../lib/anime'
 import { getFriendlyErrorMessage } from '../lib/errors'
 import type { PopularAnimeItem } from '../types/anime'
+import landingDashboardImage from '../assets/landing-dashboard.png'
 import '../styles/pages/HomePage.css'
 
 type HomeState = {
@@ -95,6 +96,37 @@ export function HomePage() {
 
   return (
     <div className="home-page">
+      <section className="home-immersive-hero" aria-label="MyAniTrack 소개">
+        <div
+          className="home-immersive-backdrop"
+          style={{ backgroundImage: `url(${landingDashboardImage})` }}
+        />
+        <div className="home-immersive-shade" />
+
+        <div className="home-immersive-copy">
+          <span className="section-kicker">MyAniTrack</span>
+          <h1>애니 취향을 <br/> 기록하고 분석하는 <br/>가장 선명한 창</h1>
+          <p>
+            감상한 작품과 평점, 시청 시간을 모아 장르, 스튜디오, 성우, 포맷 흐름까지 한 화면에서
+            확인하세요.
+          </p>
+          <div className="home-immersive-actions">
+            <Link className="primary-button" to="/explore">
+              작품 둘러보기
+            </Link>
+            <Link className="secondary-button" to="/collection">
+              내 컬렉션 보기
+            </Link>
+          </div>
+        </div>
+
+        <div className="home-immersive-signals" aria-label="주요 기능">
+          <span>컬렉션 기록</span>
+          <span>취향 분석</span>
+          <span>친구 비교</span>
+        </div>
+      </section>
+
       {state.error ? (
         <ConnectionErrorState className="home-connection-error" message={state.error} />
       ) : (
