@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { AGREEMENT_ORDER, AGREEMENT_SECTIONS, type AgreementKey } from '../content/agreements'
 import { useAuth } from '../contexts/AuthContext'
 import { fetchMyAgreements, requestPasswordReset } from '../lib/auth'
@@ -105,7 +105,8 @@ function formatAgreementDate(value: string | null) {
 }
 
 export function SettingsPage() {
-  const { isAuthenticated, user } = useAuth()
+  const { deleteAccount, isAuthenticated, user } = useAuth()
+  const navigate = useNavigate()
   const [selectedCategory, setSelectedCategory] = useState<SettingsCategoryKey>('privacy')
   const [selectedSection, setSelectedSection] = useState<SettingsSectionKey>('profile')
   const [localSettings, setLocalSettings] = useState<LocalSettings>(() => loadLocalSettings())
@@ -116,6 +117,9 @@ export function SettingsPage() {
   const [isSendingResetMail, setIsSendingResetMail] = useState(false)
   const [resetMailFeedback, setResetMailFeedback] = useState<string | null>(null)
   const [resetMailError, setResetMailError] = useState<string | null>(null)
+  const [deleteConfirmation, setDeleteConfirmation] = useState('')
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false)
+  const [deleteAccountError, setDeleteAccountError] = useState<string | null>(null)
 
   const currentCategory = useMemo(
     () => settingsCategories.find((category) => category.key === selectedCategory) ?? settingsCategories[0],
@@ -164,7 +168,11 @@ export function SettingsPage() {
       return
     }
 
-    void loadAgreements()
+    const timer = window.setTimeout(() => {
+      void loadAgreements()
+    }, 0)
+
+    return () => window.clearTimeout(timer)
   }, [isAuthenticated, selectedSection])
 
   const handlePasswordResetRequest = async () => {
@@ -186,6 +194,27 @@ export function SettingsPage() {
       )
     } finally {
       setIsSendingResetMail(false)
+    }
+  }
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmation.trim() !== '계정 삭제') {
+      setDeleteAccountError('계정을 삭제하려면 입력창에 "계정 삭제"를 정확히 입력해주세요.')
+      return
+    }
+
+    setIsDeletingAccount(true)
+    setDeleteAccountError(null)
+
+    try {
+      await deleteAccount()
+      navigate('/', { replace: true })
+    } catch (deleteError) {
+      setDeleteAccountError(
+        deleteError instanceof Error ? deleteError.message : '계정 삭제에 실패했어요.',
+      )
+    } finally {
+      setIsDeletingAccount(false)
     }
   }
 
@@ -249,6 +278,33 @@ export function SettingsPage() {
             </div>
             {resetMailFeedback && <div className="feedback-card">{resetMailFeedback}</div>}
             {resetMailError && <div className="feedback-card is-error">{resetMailError}</div>}
+            <div className="settings-danger-zone">
+              <div>
+                <strong>계정 삭제</strong>
+                <p>계정을 삭제하면 컬렉션, 분석 데이터, 친구 관계, 프로필 정보가 함께 삭제됩니다. 이 작업은 되돌릴 수 없어요.</p>
+              </div>
+              <label className="auth-field settings-delete-confirm-field">
+                <span>삭제 확인 문구</span>
+                <input
+                  type="text"
+                  value={deleteConfirmation}
+                  onChange={(event) => setDeleteConfirmation(event.target.value)}
+                  placeholder="계정 삭제"
+                  disabled={isDeletingAccount}
+                />
+              </label>
+              {deleteAccountError && <div className="feedback-card is-error">{deleteAccountError}</div>}
+              <button
+                className="settings-danger-button"
+                type="button"
+                onClick={() => {
+                  void handleDeleteAccount()
+                }}
+                disabled={isDeletingAccount || deleteConfirmation.trim() !== '계정 삭제'}
+              >
+                {isDeletingAccount ? '삭제 중...' : '내 계정 영구 삭제'}
+              </button>
+            </div>
           </div>
         )
       case 'agreements':

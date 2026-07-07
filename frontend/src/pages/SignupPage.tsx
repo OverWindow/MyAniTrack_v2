@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { AGREEMENT_SECTIONS, AGREEMENT_VERSION, type AgreementKey } from '../content/agreements'
-import { checkUsernameAvailability, savePendingAgreements } from '../lib/auth'
+import { GoogleIcon } from '../components/GoogleIcon'
+import { checkUsernameAvailability, savePendingAgreements, savePendingSupabaseAgreements } from '../lib/auth'
 import { useAuth } from '../contexts/AuthContext'
 import '../styles/pages/AuthPage.css'
 
@@ -18,8 +19,10 @@ type UsernameCheckState = {
 const MIN_PASSWORD_LENGTH = 8
 
 export function SignupPage() {
-  const { signupWithEmail } = useAuth()
+  const { loginWithGoogle, signupWithEmail } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+  const routeMessage = (location.state as { message?: string } | null)?.message
   const [form, setForm] = useState({
     email: '',
     username: '',
@@ -32,6 +35,7 @@ export function SignupPage() {
   })
   const [activeAgreement, setActiveAgreement] = useState<AgreementKey | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false)
   const [isCheckingUsername, setIsCheckingUsername] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [usernameCheck, setUsernameCheck] = useState<UsernameCheckState>({
@@ -176,6 +180,31 @@ export function SignupPage() {
     }
   }
 
+  const handleGoogleSignup = async () => {
+    if (!agreements.termsAgreed || !agreements.privacyAgreed) {
+      setError('Google로 계속하려면 필수 약관에 먼저 동의해주세요.')
+      return
+    }
+
+    setIsGoogleSubmitting(true)
+    setError(null)
+
+    try {
+      savePendingSupabaseAgreements({
+        termsAgreed: true,
+        termsVersion: AGREEMENT_VERSION,
+        privacyAgreed: true,
+        privacyVersion: AGREEMENT_VERSION,
+      })
+      await loginWithGoogle('signup')
+    } catch (submitError) {
+      setError(
+        submitError instanceof Error ? submitError.message : 'Google 회원가입에 실패했어요.',
+      )
+      setIsGoogleSubmitting(false)
+    }
+  }
+
   return (
     <>
       <section className="auth-page">
@@ -185,6 +214,7 @@ export function SignupPage() {
           <p className="auth-description">
             이메일 인증을 완료해야 MyAniTrack에 로그인할 수 있어요.
           </p>
+          {routeMessage && <div className="feedback-card">{routeMessage}</div>}
 
           <form className="auth-form" onSubmit={handleSubmit} autoComplete="on">
             <label className="auth-field">
@@ -320,6 +350,20 @@ export function SignupPage() {
                 </div>
               </div>
             </section>
+
+            <button
+              className="auth-google-button auth-google-button-inline"
+              type="button"
+              onClick={() => {
+                void handleGoogleSignup()
+              }}
+              disabled={isSubmitting || isGoogleSubmitting}
+            >
+              <GoogleIcon />
+              {isGoogleSubmitting ? 'Google로 이동 중...' : 'Google로 계속하기'}
+            </button>
+
+            <div className="auth-divider auth-divider-compact"><span>또는 이메일로 가입</span></div>
 
             {error && <div className="feedback-card is-error">{error}</div>}
 

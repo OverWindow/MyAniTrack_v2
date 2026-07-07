@@ -133,7 +133,7 @@ function AdminActionCard<TPayload extends Record<string, string | number | boole
                     checked={Boolean(rawValue)}
                     onChange={(event) => onChange(field.key, event.target.checked as TPayload[keyof TPayload])}
                   />
-                  <span>{Boolean(rawValue) ? '활성화' : '비활성화'}</span>
+                  <span>{rawValue ? '활성화' : '비활성화'}</span>
                 </label>
               ) : field.type === 'select' ? (
                 <select

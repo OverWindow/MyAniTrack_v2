@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { UserAnimeListItem } from '../types/collection'
 
@@ -23,20 +23,16 @@ export function AnalysisAnimeToast({
   isOpen,
   onClose,
 }: AnalysisAnimeToastProps) {
-  const [page, setPage] = useState(1)
+  const [pageState, setPageState] = useState({ key: '', page: 1 })
+  const pageKey = `${title}:${items.map((item) => item.id).join(',')}`
   const totalPages = Math.max(1, Math.ceil(items.length / ITEMS_PER_PAGE))
+  const page = pageState.key === pageKey
+    ? Math.min(pageState.page, totalPages)
+    : 1
   const visibleItems = useMemo(
     () => items.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE),
     [items, page],
   )
-
-  useEffect(() => {
-    setPage(1)
-  }, [items, title])
-
-  useEffect(() => {
-    setPage((current) => Math.min(current, totalPages))
-  }, [totalPages])
 
   if (!isOpen) {
     return null
@@ -84,7 +80,10 @@ export function AnalysisAnimeToast({
             <div className="analysis-anime-toast-pagination" aria-label="감상 작품 페이지">
               <button
                 type="button"
-                onClick={() => setPage((current) => Math.max(1, current - 1))}
+                onClick={() => setPageState((current) => ({
+                  key: pageKey,
+                  page: Math.max(1, (current.key === pageKey ? current.page : page) - 1),
+                }))}
                 disabled={page === 1}
               >
                 이전
@@ -92,7 +91,10 @@ export function AnalysisAnimeToast({
               <span>{page} / {totalPages}</span>
               <button
                 type="button"
-                onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                onClick={() => setPageState((current) => ({
+                  key: pageKey,
+                  page: Math.min(totalPages, (current.key === pageKey ? current.page : page) + 1),
+                }))}
                 disabled={page === totalPages}
               >
                 다음

@@ -14,9 +14,11 @@ import type {
   VerifyEmailConfirmResponse,
   VerifyEmailResendResponse,
 } from '../types/auth'
+import { isSupabaseConfigured, supabase } from './supabase'
 
 const SESSION_STORAGE_KEY = 'myanitrack.auth.session'
 const PENDING_AGREEMENTS_KEY = 'myanitrack.pending.agreements'
+const PENDING_SUPABASE_AGREEMENTS_KEY = 'myanitrack.pending.supabase.agreements'
 const ACCESS_TOKEN_REFRESH_BUFFER_MS = 60_000
 
 let refreshPromise: Promise<AuthTokens> | null = null
@@ -56,10 +58,15 @@ function getAccessTokenExpiresAt(accessTokenExpiresIn: number) {
 }
 
 function normalizeStoredSession(session: StoredSession) {
+  const authMode = session.authMode === 'supabase' ? 'supabase' : 'legacy'
+
   return {
     user: session.user ?? null,
+    authMode,
     accessTokenExpiresAt:
-      typeof session.accessTokenExpiresAt === 'number' && Number.isFinite(session.accessTokenExpiresAt)
+      authMode === 'legacy' &&
+      typeof session.accessTokenExpiresAt === 'number' &&
+      Number.isFinite(session.accessTokenExpiresAt)
         ? session.accessTokenExpiresAt
         : undefined,
   } satisfies StoredSession
@@ -69,7 +76,17 @@ export function createStoredSession(tokens: AuthTokens, user: AuthUser | null) {
   setMemoryTokens(tokens)
   return {
     user,
+    authMode: 'legacy',
     accessTokenExpiresAt: getAccessTokenExpiresAt(tokens.accessTokenExpiresIn),
+  } satisfies StoredSession
+}
+
+export function createSupabaseStoredSession(user: AuthUser | null) {
+  clearMemoryTokens()
+
+  return {
+    user,
+    authMode: 'supabase',
   } satisfies StoredSession
 }
 
@@ -85,6 +102,27 @@ function clearMemoryTokens() {
 
 function getMemoryAccessToken() {
   return memoryAccessToken
+}
+
+async function getSupabaseAccessToken() {
+  if (!isSupabaseConfigured()) {
+    return null
+  }
+
+  const { data } = await supabase.auth.getSession()
+  return data.session?.access_token ?? null
+}
+
+export async function hasSupabaseSession() {
+  return Boolean(await getSupabaseAccessToken())
+}
+
+export async function logoutSupabaseSession() {
+  if (!isSupabaseConfigured()) {
+    return
+  }
+
+  await supabase.auth.signOut()
 }
 
 export function getStoredSession(): StoredSession | null {
@@ -148,6 +186,10 @@ export function isSessionExpiredError(error: unknown) {
 
 export function isEmailVerificationRequiredError(error: unknown) {
   return Boolean(error && typeof error === 'object' && 'code' in error && (error as AuthApiError).code === 'EMAIL_VERIFICATION_REQUIRED')
+}
+
+export function isAgreementsRequiredError(error: unknown) {
+  return Boolean(error && typeof error === 'object' && 'code' in error && (error as AuthApiError).code === 'AGREEMENTS_REQUIRED')
 }
 
 function getErrorMessage(status: number, fallback: string) {
@@ -238,6 +280,165 @@ export async function login(payload: LoginPayload) {
   }
 
   return parseAuthResponse(response, '로그인에 실패했어요.')
+}
+
+export function savePendingSupabaseAgreements(payload: UpdateAgreementsPayload) {
+  window.localStorage.setItem(PENDING_SUPABASE_AGREEMENTS_KEY, JSON.stringify(payload))
+}
+
+export function consumePendingSupabaseAgreements() {
+  const raw = window.localStorage.getItem(PENDING_SUPABASE_AGREEMENTS_KEY)
+
+  if (!raw) {
+    return null
+  }
+
+  try {
+    window.localStorage.removeItem(PENDING_SUPABASE_AGREEMENTS_KEY)
+    return JSON.parse(raw) as UpdateAgreementsPayload
+  } catch {
+    window.localStorage.removeItem(PENDING_SUPABASE_AGREEMENTS_KEY)
+    return null
+  }
+}
+
+export async function signInWithGoogle(intent: 'login' | 'signup' = 'login') {
+  if (!isSupabaseConfigured()) {
+    throw createAuthError('Google 로그인을 위한 Supabase 환경변수가 설정되지 않았어요.')
+  }
+
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: `${window.location.origin}/auth/callback?intent=${intent}`,
+    },
+  })
+
+  if (error) {
+    throw createAuthError(error.message || 'Google 로그인에 실패했어요.')
+  }
+}
+
+async function getSupabaseSessionAccessToken() {
+  const initialSession = await supabase.auth.getSession()
+  const initialAccessToken = initialSession.data.session?.access_token
+
+  if (initialAccessToken) {
+    return initialAccessToken
+  }
+
+  const authCode = new URL(window.location.href).searchParams.get('code')
+
+  if (!authCode) {
+    if (initialSession.error) {
+      throw createAuthError(initialSession.error.message || 'Google 로그인 세션을 확인하지 못했어요.')
+    }
+
+    return null
+  }
+
+  const exchangedSession = await supabase.auth.exchangeCodeForSession(authCode)
+
+  if (exchangedSession.error) {
+    throw createAuthError(exchangedSession.error.message || 'Google 로그인 세션 교환에 실패했어요.')
+  }
+
+  return exchangedSession.data.session?.access_token ?? null
+}
+
+function getSupabaseAuthErrorMessage(serverMessage?: string | null) {
+  if (serverMessage === 'Invalid Supabase token') {
+    return 'Google 로그인 토큰을 백엔드가 검증하지 못했어요. 프론트 VITE_SUPABASE_URL과 백엔드 SUPABASE_URL이 같은 Supabase 프로젝트인지 확인해주세요.'
+  }
+
+  if (serverMessage === 'Invalid Supabase user') {
+    return 'Google 계정 정보를 확인하지 못했어요. 다른 Google 계정으로 다시 시도해주세요.'
+  }
+
+  if (serverMessage === 'Supabase email verification required') {
+    return 'Google 계정의 이메일 인증이 필요해요.'
+  }
+
+  return serverMessage || null
+}
+
+export async function completeSupabaseLogin(intent: 'login' | 'signup' = 'login') {
+  const accessToken = await getSupabaseSessionAccessToken()
+
+  if (!accessToken) {
+    throw createAuthError('Google 로그인 세션을 확인하지 못했어요.')
+  }
+
+  const response = await fetch(createUrl('/api/auth/supabase'), {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  })
+
+  if (!response.ok) {
+    const data = await parseJsonSafe<{ success?: boolean; message?: string }>(response)
+    const serverMessage = getSupabaseAuthErrorMessage(data?.message)
+    throw createAuthError(serverMessage || getErrorMessage(response.status, 'Google 로그인 연결에 실패했어요.'), response.status)
+  }
+
+  const dataJson = await response.json()
+  const user = extractAuthUser(dataJson)
+
+  if (!user) {
+    throw createAuthError('Google 로그인 사용자 정보를 불러오지 못했어요.')
+  }
+
+  saveStoredSession(createSupabaseStoredSession(user))
+
+  const pendingAgreements = consumePendingSupabaseAgreements()
+
+  if (pendingAgreements) {
+    try {
+      await updateMyAgreements(pendingAgreements)
+    } catch (agreementError) {
+      clearStoredSession()
+      await logoutSupabaseSession().catch(() => {})
+      throw createAuthError(
+        agreementError instanceof Error
+          ? agreementError.message
+          : '약관 동의 저장에 실패했어요.',
+        403,
+        'AGREEMENTS_REQUIRED',
+      )
+    }
+  } else {
+    let agreements: UserAgreements
+
+    try {
+      agreements = await fetchMyAgreements()
+    } catch {
+      clearStoredSession()
+      await logoutSupabaseSession().catch(() => {})
+      throw createAuthError(
+        intent === 'login'
+          ? '처음 사용하는 Google 계정이에요. 필수 약관에 동의한 뒤 회원가입을 완료해주세요.'
+          : '약관 동의 상태를 확인하지 못했어요. 필수 약관에 동의한 뒤 Google로 계속해주세요.',
+        403,
+        'AGREEMENTS_REQUIRED',
+      )
+    }
+
+    if (!agreements.termsAgreed || !agreements.privacyAgreed) {
+      clearStoredSession()
+      await logoutSupabaseSession().catch(() => {})
+      throw createAuthError(
+        intent === 'login'
+          ? '처음 사용하는 Google 계정이에요. 필수 약관에 동의한 뒤 회원가입을 완료해주세요.'
+          : '약관 동의가 필요해요. 필수 약관에 동의한 뒤 Google로 계속해주세요.',
+        403,
+        'AGREEMENTS_REQUIRED',
+      )
+    }
+  }
+
+  return user
 }
 
 export async function resendVerificationEmail(email: string) {
@@ -461,6 +662,21 @@ export async function logoutAllDevices() {
   }
 }
 
+export async function deleteMyAccount() {
+  const response = await authFetch(createUrl('/api/auth/me'), {
+    method: 'DELETE',
+  })
+
+  if (!response.ok) {
+    throw new Error(getErrorMessage(response.status, '계정 삭제에 실패했어요.'))
+  }
+
+  return response.json().catch(() => ({ success: true })) as Promise<{
+    success?: boolean
+    message?: string
+  }>
+}
+
 export async function updateProfile(payload: UpdateProfilePayload) {
   const formData = new FormData()
 
@@ -544,9 +760,14 @@ export function getSessionRefreshDelay(session: StoredSession) {
 export async function authFetch(input: string, init: RequestInit = {}) {
   const headers = new Headers(init.headers)
   const accessToken = getMemoryAccessToken()
+  const supabaseAccessToken = accessToken ? null : await getSupabaseAccessToken()
 
   if (accessToken && !headers.has('Authorization')) {
     headers.set('Authorization', `Bearer ${accessToken}`)
+  }
+
+  if (supabaseAccessToken && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${supabaseAccessToken}`)
   }
 
   let response = await fetch(input, {
@@ -556,6 +777,10 @@ export async function authFetch(input: string, init: RequestInit = {}) {
   })
 
   if (response.status !== 401) {
+    return response
+  }
+
+  if (!accessToken && supabaseAccessToken) {
     return response
   }
 

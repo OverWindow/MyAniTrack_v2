@@ -151,7 +151,7 @@ function createBubbleCompression(values: number[]) {
       displayDomain: [-1, 1] as [number, number],
       transform: (value: number) => value,
       formatTick: (value: number) => value.toFixed(1),
-      isCompressedValue: (_value: number) => false,
+      isCompressedValue: () => false,
     }
   }
 

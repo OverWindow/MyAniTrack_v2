@@ -98,5 +98,6 @@ export type UserAgreements = {
 
 export type StoredSession = {
   user: AuthUser | null
+  authMode?: 'legacy' | 'supabase'
   accessTokenExpiresAt?: number
 }

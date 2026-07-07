@@ -11,15 +11,21 @@ import {
   clearStoredSession,
   consumePendingAgreements,
   createStoredSession,
+  createSupabaseStoredSession,
+  completeSupabaseLogin,
+  deleteMyAccount,
   fetchMe,
   getSessionRefreshDelay,
   getStoredSession,
+  hasSupabaseSession,
   isSessionExpiredError,
   login,
+  logoutSupabaseSession,
   logoutAllDevices,
   logoutCurrentDevice,
   refreshStoredSession,
   saveStoredSession,
+  signInWithGoogle,
   signup,
   updateMyAgreements,
   updateProfile,
@@ -38,9 +44,12 @@ type AuthContextValue = {
   isAuthenticated: boolean
   isBootstrapping: boolean
   loginWithEmail: (payload: LoginPayload) => Promise<void>
+  loginWithGoogle: (intent?: 'login' | 'signup') => Promise<void>
+  completeGoogleLogin: (intent?: 'login' | 'signup') => Promise<void>
   signupWithEmail: (payload: SignupPayload) => Promise<SignupResponse>
   logout: () => Promise<void>
   logoutEverywhere: () => Promise<void>
+  deleteAccount: () => Promise<void>
   refreshMe: () => Promise<void>
   updateMyProfile: (payload: UpdateProfilePayload) => Promise<void>
 }
@@ -66,14 +75,26 @@ function replaceStoredSessionUser(nextUser: AuthUser | null) {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const initialSession = getStoredSession()
-  const [user, setUser] = useState<AuthUser | null>(() => initialSession?.user ?? null)
-  const [isBootstrapping, setIsBootstrapping] = useState(true)
+  const isAuthCallbackRoute = window.location.pathname === '/auth/callback'
+  const [user, setUser] = useState<AuthUser | null>(() => isAuthCallbackRoute ? null : initialSession?.user ?? null)
+  const [isBootstrapping, setIsBootstrapping] = useState(() => !isAuthCallbackRoute)
 
   useEffect(() => {
+    if (isAuthCallbackRoute) {
+      return
+    }
+
     const session = getStoredSession()
 
     const loadMe = async () => {
       try {
+        if (await hasSupabaseSession()) {
+          const me = await fetchMe()
+          setUser(me)
+          saveStoredSession(createSupabaseStoredSession(me))
+          return
+        }
+
         await refreshStoredSession()
         const me = await fetchMe()
         setUser(me)
@@ -91,7 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     void loadMe()
-  }, [])
+  }, [isAuthCallbackRoute])
 
   useEffect(() => {
     if (!user) {
@@ -99,6 +120,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const session = getStoredSession()
+
+    if (session?.authMode === 'supabase') {
+      return
+    }
+
+    if (!session || session.authMode !== 'legacy') {
+      return
+    }
 
     const timeoutId = window.setTimeout(() => {
       const refreshInBackground = async () => {
@@ -141,6 +170,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         }
       },
+      async loginWithGoogle(intent = 'login') {
+        await signInWithGoogle(intent)
+      },
+      async completeGoogleLogin(intent = 'login') {
+        const nextUser = await completeSupabaseLogin(intent)
+        setUser(nextUser)
+      },
       async signupWithEmail(payload) {
         return signup(payload)
       },
@@ -148,6 +184,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
           await logoutCurrentDevice()
         } finally {
+          await logoutSupabaseSession().catch(() => {})
           clearStoredSession()
           setUser(null)
         }
@@ -156,6 +193,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
           await logoutAllDevices()
         } finally {
+          await logoutSupabaseSession().catch(() => {})
+          clearStoredSession()
+          setUser(null)
+        }
+      },
+      async deleteAccount() {
+        try {
+          await deleteMyAccount()
+        } finally {
+          await logoutSupabaseSession().catch(() => {})
           clearStoredSession()
           setUser(null)
         }
@@ -167,7 +214,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         replaceStoredSessionUser(me)
       },
       async updateMyProfile(payload) {
-        if (!user) {
+        if (!getStoredSession()?.user) {
           throw new Error('로그인 후에 프로필을 수정할 수 있어요.')
         }
 

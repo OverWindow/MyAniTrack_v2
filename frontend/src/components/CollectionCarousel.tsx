@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
@@ -93,27 +93,6 @@ function CollectionCarouselContent({
     scrollLeft: 0,
   })
   const suppressClickRef = useRef(false)
-
-  useEffect(() => {
-    setLoadedImageIds((current) => {
-      const visibleIds = new Set(state.items.slice(0, 12).map((item) => item.id))
-      const next = new Set<number>()
-
-      current.forEach((id) => {
-        if (visibleIds.has(id)) {
-          next.add(id)
-        }
-      })
-
-      state.items.slice(0, 12).forEach((item) => {
-        if (!getCoverImageSrc(item)) {
-          next.add(item.id)
-        }
-      })
-
-      return next
-    })
-  }, [state.items])
 
   const markImageLoaded = useCallback((itemId: number) => {
     setLoadedImageIds((current) => {
@@ -367,7 +346,7 @@ function CollectionCarouselContent({
           {state.items.slice(0, 12).map((item, displayIndex, displayItems) => {
             const itemTitle = getDisplayTitle(item)
             const imageSrc = getCoverImageSrc(item)
-            const isImageLoaded = loadedImageIds.has(item.id)
+            const isImageLoaded = !imageSrc || loadedImageIds.has(item.id)
 
             return (
               <Link
@@ -429,15 +408,11 @@ function CollectionCarouselContent({
 }
 
 export function CollectionCarousel({ portalRootId, ...props }: CollectionCarouselProps) {
-  const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null)
-
-  useEffect(() => {
-    setPortalRoot(portalRootId ? document.getElementById(portalRootId) : null)
-  }, [portalRootId])
-
   if (!portalRootId) {
     return <CollectionCarouselContent {...props} />
   }
+
+  const portalRoot = document.getElementById(portalRootId)
 
   return portalRoot ? createPortal(<CollectionCarouselContent {...props} />, portalRoot) : null
 }

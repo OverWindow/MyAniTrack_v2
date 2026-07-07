@@ -80,15 +80,10 @@ export function HomePage() {
     return () => window.clearInterval(timer)
   }, [state.popularAnime.length])
 
-  useEffect(() => {
-    if (featuredIndex < state.popularAnime.length) {
-      return
-    }
-
-    setFeaturedIndex(0)
-  }, [featuredIndex, state.popularAnime.length])
-
-  const featuredAnime = state.popularAnime[featuredIndex] ?? state.popularAnime[0] ?? null
+  const safeFeaturedIndex = state.popularAnime.length > 0
+    ? featuredIndex % state.popularAnime.length
+    : 0
+  const featuredAnime = state.popularAnime[safeFeaturedIndex] ?? null
   const railAnime = useMemo(
     () => state.popularAnime.slice(0, 12),
     [state.popularAnime],

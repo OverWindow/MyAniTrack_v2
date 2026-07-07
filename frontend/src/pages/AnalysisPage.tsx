@@ -336,7 +336,13 @@ export function StudioRankingSection({
   cacheVersion = 0,
 }: StudioRankingSectionProps) {
   const storageOwnerId = cacheOwnerId ?? (apiUserId ? `public:${apiUserId}` : null)
-  const [sort, setSort] = useState<StudioRankingSort>(() => getStoredStudioSort(storageOwnerId) ?? 'count')
+  const [sortState, setSortState] = useState<{ ownerId: string | number | null; sort: StudioRankingSort }>(() => ({
+    ownerId: storageOwnerId,
+    sort: getStoredStudioSort(storageOwnerId) ?? 'count',
+  }))
+  const sort = sortState.ownerId === storageOwnerId
+    ? sortState.sort
+    : getStoredStudioSort(storageOwnerId) ?? 'count'
   const [isStudioAnimeToastOpen, setIsStudioAnimeToastOpen] = useState(false)
   const [studioAnimeToastPage, setStudioAnimeToastPage] = useState(1)
   const [rankingState, setRankingState] = useState<{
@@ -360,10 +366,6 @@ export function StudioRankingSection({
     isLoading: false,
     error: null,
   })
-
-  useEffect(() => {
-    setSort(getStoredStudioSort(storageOwnerId) ?? 'count')
-  }, [storageOwnerId])
 
   useEffect(() => {
     if (storageOwnerId) {
@@ -459,7 +461,6 @@ export function StudioRankingSection({
 
   useEffect(() => {
     if (!selectedStudio || !storageOwnerId) {
-      setAnimeState({ items: [], isLoading: false, error: null })
       return
     }
 
@@ -550,14 +551,23 @@ export function StudioRankingSection({
   }, [apiUserId, cacheVersion, selectedStudio, storageOwnerId])
 
   const visibleStudioItems = rankingState.items
+  const effectiveStudioAnimeState = selectedStudio && storageOwnerId
+    ? animeState
+    : { items: [], isLoading: false, error: null }
   const sortedStudioAnime = useMemo(
-    () => [...animeState.items].sort((left, right) => {
+    () => {
+      if (!selectedStudio || !storageOwnerId) {
+        return []
+      }
+
+      return [...animeState.items].sort((left, right) => {
       const rightPopularity = right.anime.popularity ?? right.anime.averageScore ?? right.userList.score ?? 0
       const leftPopularity = left.anime.popularity ?? left.anime.averageScore ?? left.userList.score ?? 0
 
       return rightPopularity - leftPopularity
-    }),
-    [animeState.items],
+      })
+    },
+    [animeState.items, selectedStudio, storageOwnerId],
   )
   const topStudioAnime = sortedStudioAnime.slice(0, INITIAL_VISIBLE_STUDIO_ANIME_COUNT)
   const representativeStudioAnimeCards = [
@@ -569,14 +579,11 @@ export function StudioRankingSection({
   const hiddenStudioAnimeCount = hiddenStudioAnime.length
   const hasMoreStudioAnime = hiddenStudioAnimeCount > 0
   const studioAnimeToastTotalPages = Math.max(1, Math.ceil(hiddenStudioAnime.length / STUDIO_ANIME_TOAST_PAGE_SIZE))
+  const safeStudioAnimeToastPage = Math.min(studioAnimeToastPage, studioAnimeToastTotalPages)
   const visibleStudioAnimeToastItems = hiddenStudioAnime.slice(
-    (studioAnimeToastPage - 1) * STUDIO_ANIME_TOAST_PAGE_SIZE,
-    studioAnimeToastPage * STUDIO_ANIME_TOAST_PAGE_SIZE,
+    (safeStudioAnimeToastPage - 1) * STUDIO_ANIME_TOAST_PAGE_SIZE,
+    safeStudioAnimeToastPage * STUDIO_ANIME_TOAST_PAGE_SIZE,
   )
-
-  useEffect(() => {
-    setStudioAnimeToastPage((current) => Math.min(current, studioAnimeToastTotalPages))
-  }, [studioAnimeToastTotalPages])
 
   return (
     <section className="analysis-panel studio-ranking-section">
@@ -597,7 +604,7 @@ export function StudioRankingSection({
             type="button"
             role="tab"
             aria-selected={sort === option.value}
-            onClick={() => setSort(option.value)}
+            onClick={() => setSortState({ ownerId: storageOwnerId, sort: option.value })}
           >
             <strong>{option.label}</strong>
             <span>{option.description}</span>
@@ -661,12 +668,12 @@ export function StudioRankingSection({
               )}
             </div>
 
-            {animeState.isLoading && <div className="analysis-empty-state">작품 목록을 불러오는 중이에요.</div>}
-            {animeState.error && !animeState.isLoading && renderEmptyMessage(animeState.error)}
-            {!animeState.isLoading && !animeState.error && animeState.items.length === 0 && (
+            {effectiveStudioAnimeState.isLoading && <div className="analysis-empty-state">작품 목록을 불러오는 중이에요.</div>}
+            {effectiveStudioAnimeState.error && !effectiveStudioAnimeState.isLoading && renderEmptyMessage(effectiveStudioAnimeState.error)}
+            {!effectiveStudioAnimeState.isLoading && !effectiveStudioAnimeState.error && effectiveStudioAnimeState.items.length === 0 && (
               <div className="analysis-empty-state">이 스튜디오의 작품 목록이 아직 없어요.</div>
             )}
-            {!animeState.isLoading && !animeState.error && animeState.items.length > 0 && (
+            {!effectiveStudioAnimeState.isLoading && !effectiveStudioAnimeState.error && effectiveStudioAnimeState.items.length > 0 && (
               <div className="studio-anime-showcase">
                 <div className="studio-anime-carousel" aria-label="인기도 순 대표작">
                   {representativeStudioAnimeCards.map(({ entry, rank, cardPosition }) => {
@@ -758,16 +765,16 @@ export function StudioRankingSection({
             <div className="analysis-anime-toast-pagination" aria-label="스튜디오 작품 페이지">
               <button
                 type="button"
-                onClick={() => setStudioAnimeToastPage((current) => Math.max(1, current - 1))}
-                disabled={studioAnimeToastPage === 1}
+                onClick={() => setStudioAnimeToastPage((current) => Math.max(1, Math.min(current, studioAnimeToastTotalPages) - 1))}
+                disabled={safeStudioAnimeToastPage === 1}
               >
                 이전
               </button>
-              <span>{studioAnimeToastPage} / {studioAnimeToastTotalPages}</span>
+              <span>{safeStudioAnimeToastPage} / {studioAnimeToastTotalPages}</span>
               <button
                 type="button"
-                onClick={() => setStudioAnimeToastPage((current) => Math.min(studioAnimeToastTotalPages, current + 1))}
-                disabled={studioAnimeToastPage === studioAnimeToastTotalPages}
+                onClick={() => setStudioAnimeToastPage((current) => Math.min(studioAnimeToastTotalPages, Math.min(current, studioAnimeToastTotalPages) + 1))}
+                disabled={safeStudioAnimeToastPage === studioAnimeToastTotalPages}
               >
                 다음
               </button>

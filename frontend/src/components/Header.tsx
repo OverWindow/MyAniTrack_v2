@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { getProfileImageSrc, handleProfileImageError } from '../lib/avatar'
@@ -20,14 +20,15 @@ export function Header() {
   const navItems = isAdmin
     ? [...baseNavItems, { label: '관리자', to: '/admin' }]
     : baseNavItems
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false)
+  const [mobileMenuState, setMobileMenuState] = useState({ path: location.pathname, isOpen: false })
+  const [profileMenuState, setProfileMenuState] = useState({ path: location.pathname, isOpen: false })
   const profileMenuRef = useRef<HTMLDivElement | null>(null)
+  const isMobileMenuOpen = mobileMenuState.path === location.pathname && mobileMenuState.isOpen
+  const isProfileMenuOpen = profileMenuState.path === location.pathname && profileMenuState.isOpen
 
-  useEffect(() => {
-    setIsMobileMenuOpen(false)
-    setIsProfileMenuOpen(false)
-  }, [location.pathname])
+  const closeProfileMenu = useCallback(() => {
+    setProfileMenuState({ path: location.pathname, isOpen: false })
+  }, [location.pathname, setProfileMenuState])
 
   useEffect(() => {
     if (!isProfileMenuOpen) {
@@ -39,12 +40,12 @@ export function Header() {
         return
       }
 
-      setIsProfileMenuOpen(false)
+      closeProfileMenu()
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        setIsProfileMenuOpen(false)
+        closeProfileMenu()
       }
     }
 
@@ -55,7 +56,7 @@ export function Header() {
       document.removeEventListener('mousedown', handlePointerDown)
       window.removeEventListener('keydown', handleKeyDown)
     }
-  }, [isProfileMenuOpen])
+  }, [closeProfileMenu, isProfileMenuOpen])
 
   return (
     <header className="site-header">
@@ -79,7 +80,10 @@ export function Header() {
             aria-label="메뉴 열기"
             aria-expanded={isMobileMenuOpen}
             aria-controls="site-mobile-menu"
-            onClick={() => setIsMobileMenuOpen((current) => !current)}
+            onClick={() => setMobileMenuState((current) => ({
+              path: location.pathname,
+              isOpen: current.path === location.pathname ? !current.isOpen : true,
+            }))}
           >
             <span />
             <span />
@@ -112,7 +116,10 @@ export function Header() {
                   type="button"
                   aria-expanded={isProfileMenuOpen}
                   aria-controls="profile-menu-card"
-                  onClick={() => setIsProfileMenuOpen((current) => !current)}
+                  onClick={() => setProfileMenuState((current) => ({
+                    path: location.pathname,
+                    isOpen: current.path === location.pathname ? !current.isOpen : true,
+                  }))}
                 >
                   <img
                     className="avatar avatar-image"
@@ -134,17 +141,17 @@ export function Header() {
                   className={isProfileMenuOpen ? 'profile-dropdown-card is-open' : 'profile-dropdown-card'}
                   id="profile-menu-card"
                 >
-                  <NavLink className="profile-dropdown-link" to="/profile" onClick={() => setIsProfileMenuOpen(false)}>
+                  <NavLink className="profile-dropdown-link" to="/profile" onClick={closeProfileMenu}>
                     프로필
                   </NavLink>
-                  <NavLink className="profile-dropdown-link" to="/settings" onClick={() => setIsProfileMenuOpen(false)}>
+                  <NavLink className="profile-dropdown-link" to="/settings" onClick={closeProfileMenu}>
                     설정
                   </NavLink>
                   <button
                     className="profile-dropdown-link profile-dropdown-button"
                     type="button"
                     onClick={() => {
-                      setIsProfileMenuOpen(false)
+                      closeProfileMenu()
                       void logout()
                       navigate('/')
                     }}
@@ -155,7 +162,7 @@ export function Header() {
                     className="profile-dropdown-link profile-dropdown-button"
                     type="button"
                     onClick={() => {
-                      setIsProfileMenuOpen(false)
+                      closeProfileMenu()
                       void logoutEverywhere()
                       navigate('/')
                     }}

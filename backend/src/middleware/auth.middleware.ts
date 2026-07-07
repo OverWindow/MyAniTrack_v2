@@ -2,6 +2,7 @@ import { NextFunction, Request, Response } from 'express';
 import { RowDataPacket } from 'mysql2/promise';
 import { pool } from '../../config/db';
 import { verifyAccessToken } from '../lib/auth';
+import { findOrCreateUserFromSupabaseToken } from '../services/auth.service';
 
 type UserRole = 'USER' | 'ADMIN';
 
@@ -43,6 +44,18 @@ async function findAuthUserById(userId: number) {
   return rows[0] ?? null;
 }
 
+function getSupabaseAuthFailureStatus(message: string) {
+  if (message === 'Supabase email verification required') {
+    return 403;
+  }
+
+  if (message === 'Invalid Supabase token' || message === 'Invalid Supabase user') {
+    return 401;
+  }
+
+  return 500;
+}
+
 export async function requireAuth(req: Request, res: Response, next: NextFunction) {
   const authorization = req.header('Authorization');
 
@@ -75,12 +88,34 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 
     return next();
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unauthorized';
+    try {
+      const user = await findOrCreateUserFromSupabaseToken(token);
 
-    return res.status(401).json({
-      success: false,
-      message,
-    });
+      req.authUser = {
+        userId: user.id,
+        email: user.email,
+        username: user.username,
+        role: user.role,
+      };
+
+      return next();
+    } catch (supabaseError) {
+      const appTokenMessage = error instanceof Error ? error.message : 'Unauthorized';
+      const supabaseTokenMessage = supabaseError instanceof Error ? supabaseError.message : 'Unauthorized';
+      const message = appTokenMessage === 'Invalid token' ? supabaseTokenMessage : appTokenMessage;
+      const statusCode = appTokenMessage === 'Invalid token'
+        ? getSupabaseAuthFailureStatus(supabaseTokenMessage)
+        : 401;
+
+      if (statusCode === 500) {
+        console.error(supabaseError);
+      }
+
+      return res.status(statusCode).json({
+        success: false,
+        message,
+      });
+    }
   }
 }
 

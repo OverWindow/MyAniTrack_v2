@@ -180,6 +180,54 @@
   margin-top: 4px;
 }
 
+.settings-danger-zone {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid rgba(220, 38, 38, 0.28);
+  border-radius: 18px;
+  background: rgba(254, 242, 242, 0.72);
+}
+
+.settings-danger-zone strong {
+  color: #991b1b;
+}
+
+.settings-danger-zone p {
+  margin: 6px 0 0;
+  color: #7f1d1d;
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
+
+.settings-delete-confirm-field {
+  max-width: 360px;
+}
+
+.settings-danger-button {
+  min-height: 44px;
+  width: fit-content;
+  padding: 0 18px;
+  border: 1px solid rgba(220, 38, 38, 0.42);
+  border-radius: var(--radius-pill);
+  background: #dc2626;
+  color: #fff;
+  font: inherit;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.settings-danger-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.settings-danger-button:not(:disabled):hover,
+.settings-danger-button:not(:disabled):focus-visible {
+  background: #b91c1c;
+  outline: none;
+}
+
 @media (max-width: 1180px) {
   .settings-workspace,
   .settings-info-grid {

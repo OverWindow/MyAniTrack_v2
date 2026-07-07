@@ -264,6 +264,7 @@ export function ExplorePage() {
   const [state, setState] = useState<ExploreState>(() => createInitialExploreState(requestKey))
   const sentinelRef = useRef<HTMLDivElement | null>(null)
   const isLoadingMoreRef = useRef(false)
+  const loadedCursorRef = useRef<Set<string>>(new Set())
   const { animeItems, nextCursor, hasNext, isLoading, isLoadingMore, error } = state
   const isRefreshingQuery = state.requestKey !== requestKey
 
@@ -283,6 +284,7 @@ export function ExplorePage() {
     const loadFirstPage = async () => {
       try {
         isLoadingMoreRef.current = false
+        loadedCursorRef.current = new Set()
 
         const data = isAuthenticated
           ? await searchMyAnime({
@@ -367,6 +369,18 @@ export function ExplorePage() {
           return
         }
 
+        const cursorForRequest = nextCursor
+
+        if (loadedCursorRef.current.has(cursorForRequest)) {
+          setState((current) => (
+            current.requestKey === requestKey
+              ? { ...current, hasNext: false, nextCursor: null, isLoadingMore: false }
+              : current
+          ))
+          return
+        }
+
+        loadedCursorRef.current.add(cursorForRequest)
         isLoadingMoreRef.current = true
         setState((current) => ({ ...current, isLoadingMore: true }))
 
@@ -379,7 +393,7 @@ export function ExplorePage() {
                   genre: selectedGenre,
                   titleLanguage: searchLanguage,
                   limit: 24,
-                  cursor: nextCursor,
+                  cursor: cursorForRequest,
                 })
               : normalizedQuery
                 ? await searchAnime({
@@ -388,13 +402,13 @@ export function ExplorePage() {
                     genre: selectedGenre,
                     titleLanguage: searchLanguage,
                     limit: 24,
-                    cursor: nextCursor,
+                    cursor: cursorForRequest,
                   })
               : await fetchAnimeList({
                   sort,
                   genre: selectedGenre,
                   limit: 24,
-                  cursor: nextCursor,
+                  cursor: cursorForRequest,
                 })
 
             if (isAuthenticated) {
@@ -416,12 +430,17 @@ export function ExplorePage() {
                 seen.add(item.id)
                 return true
               })
+              const responseNextCursor = data.pageInfo.nextCursor
+              const canLoadAnotherPage =
+                data.pageInfo.hasNext &&
+                Boolean(responseNextCursor) &&
+                responseNextCursor !== cursorForRequest
 
               return {
                 ...current,
                 animeItems: deduped,
-                nextCursor: data.pageInfo.nextCursor,
-                hasNext: data.pageInfo.hasNext,
+                nextCursor: canLoadAnotherPage ? responseNextCursor : null,
+                hasNext: canLoadAnotherPage,
                 isLoadingMore: false,
               }
             })

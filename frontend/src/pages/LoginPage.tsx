@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { GoogleIcon } from '../components/GoogleIcon'
 import { useAuth } from '../contexts/AuthContext'
 import { isEmailVerificationRequiredError } from '../lib/auth'
 import '../styles/pages/AuthPage.css'
@@ -9,12 +10,13 @@ function getWebDeviceName() {
 }
 
 export function LoginPage() {
-  const { loginWithEmail } = useAuth()
+  const { loginWithEmail, loginWithGoogle } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const redirectTo = (location.state as { from?: string } | null)?.from ?? '/'
@@ -49,6 +51,20 @@ export function LoginPage() {
     }
   }
 
+  const handleGoogleLogin = async () => {
+    setIsGoogleSubmitting(true)
+    setError(null)
+
+    try {
+      await loginWithGoogle('login')
+    } catch (submitError) {
+      setError(
+        submitError instanceof Error ? submitError.message : 'Google 로그인에 실패했어요.',
+      )
+      setIsGoogleSubmitting(false)
+    }
+  }
+
   return (
     <section className="auth-page">
       <div className="auth-card">
@@ -57,6 +73,20 @@ export function LoginPage() {
         <p className="auth-description">
           내 애니 기록과 친구 비교, 취향 분석을 이어서 확인해보세요.
         </p>
+
+        <button
+          className="auth-google-button"
+          type="button"
+          onClick={() => {
+            void handleGoogleLogin()
+          }}
+          disabled={isSubmitting || isGoogleSubmitting}
+        >
+          <GoogleIcon />
+          {isGoogleSubmitting ? 'Google로 이동 중...' : 'Google로 계속하기'}
+        </button>
+
+        <div className="auth-divider"><span>또는</span></div>
 
         <form className="auth-form" onSubmit={handleSubmit} autoComplete="on">
           <label className="auth-field">

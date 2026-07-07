@@ -9,6 +9,7 @@ import { useFriends } from './contexts/FriendsContext'
 import { AdminPage } from './pages/AdminPage'
 import { AnimeDetailPage } from './pages/AnimeDetailPage'
 import { AnalysisPage } from './pages/AnalysisPage'
+import { AuthCallbackPage } from './pages/AuthCallbackPage'
 import { CollectionPage } from './pages/CollectionPage'
 import { ExplorePage } from './pages/ExplorePage'
 import { FriendsPage } from './pages/FriendsPage'
@@ -95,6 +96,7 @@ function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
+          <Route path="/auth/callback" element={<AuthCallbackPage />} />
           <Route path="/verify-email/pending" element={<VerifyEmailPendingPage />} />
           <Route path="/verify-email/confirm" element={<VerifyEmailConfirmPage />} />
           <Route path="/password-reset" element={<PasswordResetRequestPage />} />

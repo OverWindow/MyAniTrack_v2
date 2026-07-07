@@ -10,7 +10,8 @@ import {
   verifyPassword,
 } from '../lib/auth';
 import { sendPasswordResetEmail, sendVerifyEmail } from '../lib/mail';
-import { normalizeProfileImageUrl } from '../lib/supabase-storage';
+import { deleteSupabaseAuthUser, getSupabaseAuthUser, SupabaseAuthUser } from '../lib/supabase-auth';
+import { deleteProfileImageByUrl, normalizeProfileImageUrl } from '../lib/supabase-storage';
 
 type UserRole = 'USER' | 'ADMIN';
 type EmailTokenPurpose = 'SIGNUP_VERIFY' | 'PASSWORD_RESET';
@@ -37,6 +38,13 @@ interface EmailVerificationTokenRow extends RowDataPacket {
   tokenHash: string;
   expiresAt: string;
   usedAt: string | null;
+}
+
+interface UserDeletionRow extends RowDataPacket {
+  id: number;
+  email: string;
+  profileImageUrl: string | null;
+  supabaseUserId: string | null;
 }
 
 export interface SignUpParams {
@@ -233,6 +241,31 @@ async function findUserByUsername(username: string) {
   return rows[0] ?? null;
 }
 
+async function findUserBySupabaseUserId(supabaseUserId: string) {
+  const [rows] = await pool.query<UserRow[]>(
+    `
+    SELECT
+      id,
+      email,
+      username,
+      role,
+      password_hash AS passwordHash,
+      profile_image_url AS profileImageUrl,
+      bio,
+      email_verified AS emailVerified,
+      email_verified_at AS emailVerifiedAt,
+      created_at AS createdAt,
+      updated_at AS updatedAt
+    FROM users
+    WHERE supabase_user_id = ?
+    LIMIT 1
+    `,
+    [supabaseUserId]
+  );
+
+  return rows[0] ?? null;
+}
+
 async function findUserById(id: number) {
   const [rows] = await pool.query<UserRow[]>(
     `
@@ -248,6 +281,24 @@ async function findUserById(id: number) {
       email_verified_at AS emailVerifiedAt,
       created_at AS createdAt,
       updated_at AS updatedAt
+    FROM users
+    WHERE id = ?
+    LIMIT 1
+    `,
+    [id]
+  );
+
+  return rows[0] ?? null;
+}
+
+async function findUserDeletionTargetById(id: number) {
+  const [rows] = await pool.query<UserDeletionRow[]>(
+    `
+    SELECT
+      id,
+      email,
+      profile_image_url AS profileImageUrl,
+      supabase_user_id AS supabaseUserId
     FROM users
     WHERE id = ?
     LIMIT 1
@@ -293,6 +344,185 @@ function mapUserProfile(user: UserRow) {
     bio: user.bio,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
+  };
+}
+
+function getSupabaseProvider(user: SupabaseAuthUser) {
+  const provider = user.appMetadata.provider;
+
+  return typeof provider === 'string' && provider.trim()
+    ? provider.trim().slice(0, 30)
+    : user.providers[0]
+      ? user.providers[0].slice(0, 30)
+    : 'supabase';
+}
+
+function getSupabaseMetadataText(user: SupabaseAuthUser, keys: string[]) {
+  for (const key of keys) {
+    const value = user.userMetadata[key];
+
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim();
+    }
+  }
+
+  return null;
+}
+
+function buildUsernameBase(user: SupabaseAuthUser) {
+  const metadataName = getSupabaseMetadataText(user, ['user_name', 'preferred_username', 'name', 'full_name']);
+  const rawBase = metadataName || user.email.split('@')[0] || 'user';
+  const normalizedBase = rawBase
+    .replace(/[^a-zA-Z0-9_]/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 16);
+
+  return normalizedBase.length >= 3 ? normalizedBase : `user_${normalizedBase}`.slice(0, 16);
+}
+
+async function createUniqueUsername(user: SupabaseAuthUser) {
+  const base = buildUsernameBase(user);
+  const baseCandidate = base.slice(0, 20);
+
+  if (!await findUserByUsername(baseCandidate)) {
+    return baseCandidate;
+  }
+
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const suffix = crypto.randomBytes(3).toString('hex');
+    const candidate = `${base.slice(0, Math.max(3, 20 - suffix.length - 1))}_${suffix}`;
+
+    if (!await findUserByUsername(candidate)) {
+      return candidate;
+    }
+  }
+
+  throw new Error('Failed to create unique username');
+}
+
+function isSupabaseEmailVerified(user: SupabaseAuthUser) {
+  return Boolean(user.emailConfirmedAt) || user.providers.includes('google');
+}
+
+async function linkExistingUserToSupabase(user: UserRow, supabaseUser: SupabaseAuthUser) {
+  await pool.execute(
+    `
+    UPDATE users
+    SET
+      supabase_user_id = ?,
+      auth_provider = ?,
+      email_verified = TRUE,
+      email_verified_at = COALESCE(email_verified_at, CURRENT_TIMESTAMP),
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+    `,
+    [supabaseUser.id, getSupabaseProvider(supabaseUser), user.id]
+  );
+
+  const linkedUser = await findUserById(user.id);
+
+  if (!linkedUser) {
+    throw new Error('User not found');
+  }
+
+  return linkedUser;
+}
+
+async function createUserFromSupabase(supabaseUser: SupabaseAuthUser) {
+  const username = await createUniqueUsername(supabaseUser);
+  const provider = getSupabaseProvider(supabaseUser);
+  const conn = await pool.getConnection();
+  let createdUserId = 0;
+
+  try {
+    await conn.beginTransaction();
+
+    const [result] = await conn.execute<ResultSetHeader>(
+      `
+      INSERT INTO users (
+        email,
+        username,
+        password_hash,
+        role,
+        email_verified,
+        email_verified_at,
+        supabase_user_id,
+        auth_provider
+      )
+      VALUES (?, ?, ?, 'USER', TRUE, CURRENT_TIMESTAMP, ?, ?)
+      `,
+      [
+        supabaseUser.email,
+        username,
+        `SUPABASE_AUTH:${supabaseUser.id}`,
+        supabaseUser.id,
+        provider,
+      ]
+    );
+
+    createdUserId = result.insertId;
+    await conn.commit();
+  } catch (error) {
+    await conn.rollback();
+
+    if ((error as { code?: string }).code === 'ER_DUP_ENTRY') {
+      const existingUser = await findUserByEmail(supabaseUser.email);
+
+      if (existingUser) {
+        return linkExistingUserToSupabase(existingUser, supabaseUser);
+      }
+    }
+
+    throw error;
+  } finally {
+    conn.release();
+  }
+
+  const createdUser = await findUserById(createdUserId);
+
+  if (!createdUser) {
+    throw new Error('Failed to create user');
+  }
+
+  return createdUser;
+}
+
+export async function findOrCreateUserFromSupabaseToken(accessToken: string) {
+  const supabaseUser = await getSupabaseAuthUser(accessToken);
+
+  if (!isSupabaseEmailVerified(supabaseUser)) {
+    throw new Error('Supabase email verification required');
+  }
+
+  const existingLinkedUser = await findUserBySupabaseUserId(supabaseUser.id);
+
+  if (existingLinkedUser) {
+    return existingLinkedUser;
+  }
+
+  const existingEmailUser = await findUserByEmail(supabaseUser.email);
+
+  if (existingEmailUser) {
+    return linkExistingUserToSupabase(existingEmailUser, supabaseUser);
+  }
+
+  return createUserFromSupabase(supabaseUser);
+}
+
+export async function loginWithSupabaseAccessToken(accessToken: string) {
+  const normalizedToken = normalizeOptionalText(accessToken, 5000);
+
+  if (!normalizedToken) {
+    throw new Error('accessToken is required');
+  }
+
+  const user = await findOrCreateUserFromSupabaseToken(normalizedToken);
+
+  return {
+    tokenType: 'Bearer',
+    authProvider: 'supabase',
+    user: mapUserProfile(user),
   };
 }
 
@@ -935,5 +1165,39 @@ export async function logoutAll(userId: number) {
     `,
     [userId]
   );
+}
+
+export async function deleteMyAccount(userId: number) {
+  const user = await findUserDeletionTargetById(userId);
+
+  if (!user) {
+    throw new Error('User not found');
+  }
+
+  if (user.supabaseUserId) {
+    await deleteSupabaseAuthUser(user.supabaseUserId);
+  }
+
+  const [result] = await pool.execute<ResultSetHeader>(
+    `
+    DELETE FROM users
+    WHERE id = ?
+    `,
+    [user.id]
+  );
+
+  if (result.affectedRows === 0) {
+    throw new Error('User not found');
+  }
+
+  deleteProfileImageByUrl(user.profileImageUrl).catch((error) => {
+    console.error('Failed to delete profile image during account deletion', error);
+  });
+
+  return {
+    deleted: true,
+    userId: user.id,
+    email: user.email,
+  };
 }
 
