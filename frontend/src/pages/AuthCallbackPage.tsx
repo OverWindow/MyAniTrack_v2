@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { isAgreementsRequiredError } from '../lib/auth'
+import { getPendingSupabaseAuthIntent, isAgreementsRequiredError } from '../lib/auth'
 import '../styles/pages/AuthPage.css'
 
 export function AuthCallbackPage() {
@@ -9,7 +9,7 @@ export function AuthCallbackPage() {
   const navigate = useNavigate()
   const [error, setError] = useState<string | null>(null)
   const callbackPromiseRef = useRef<Promise<void> | null>(null)
-  const intent = new URLSearchParams(window.location.search).get('intent') === 'signup' ? 'signup' : 'login'
+  const intent = getPendingSupabaseAuthIntent()
 
   useEffect(() => {
     if (callbackPromiseRef.current) {

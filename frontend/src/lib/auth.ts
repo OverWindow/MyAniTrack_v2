@@ -19,6 +19,7 @@ import { isSupabaseConfigured, supabase } from './supabase'
 const SESSION_STORAGE_KEY = 'myanitrack.auth.session'
 const PENDING_AGREEMENTS_KEY = 'myanitrack.pending.agreements'
 const PENDING_SUPABASE_AGREEMENTS_KEY = 'myanitrack.pending.supabase.agreements'
+const PENDING_SUPABASE_AUTH_INTENT_KEY = 'myanitrack.pending.supabase.intent'
 const ACCESS_TOKEN_REFRESH_BUFFER_MS = 60_000
 
 let refreshPromise: Promise<AuthTokens> | null = null
@@ -51,6 +52,19 @@ function getApiBaseUrl() {
 
 function createUrl(path: string) {
   return new URL(path, getApiBaseUrl()).toString()
+}
+
+function getAuthRedirectOrigin() {
+  const configuredOrigin =
+    (import.meta.env.VITE_AUTH_REDIRECT_ORIGIN as string | undefined) ||
+    (import.meta.env.VITE_APP_URL as string | undefined)
+
+  const origin = (configuredOrigin || window.location.origin).replace(/\/+$/, '')
+  return origin
+}
+
+function getAuthCallbackUrl() {
+  return `${getAuthRedirectOrigin()}/auth/callback`
 }
 
 function getAccessTokenExpiresAt(accessTokenExpiresIn: number) {
@@ -307,16 +321,27 @@ export async function signInWithGoogle(intent: 'login' | 'signup' = 'login') {
     throw createAuthError('Google 로그인을 위한 Supabase 환경변수가 설정되지 않았어요.')
   }
 
+  window.sessionStorage.setItem(PENDING_SUPABASE_AUTH_INTENT_KEY, intent)
+
   const { error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: `${window.location.origin}/auth/callback?intent=${intent}`,
+      redirectTo: getAuthCallbackUrl(),
     },
   })
 
   if (error) {
     throw createAuthError(error.message || 'Google 로그인에 실패했어요.')
   }
+}
+
+export function getPendingSupabaseAuthIntent() {
+  const value = window.sessionStorage.getItem(PENDING_SUPABASE_AUTH_INTENT_KEY)
+  return value === 'signup' ? 'signup' : 'login'
+}
+
+function clearPendingSupabaseAuthIntent() {
+  window.sessionStorage.removeItem(PENDING_SUPABASE_AUTH_INTENT_KEY)
 }
 
 async function getSupabaseSessionAccessToken() {
@@ -363,82 +388,86 @@ function getSupabaseAuthErrorMessage(serverMessage?: string | null) {
 }
 
 export async function completeSupabaseLogin(intent: 'login' | 'signup' = 'login') {
-  const accessToken = await getSupabaseSessionAccessToken()
+  try {
+    const accessToken = await getSupabaseSessionAccessToken()
 
-  if (!accessToken) {
-    throw createAuthError('Google 로그인 세션을 확인하지 못했어요.')
-  }
-
-  const response = await fetch(createUrl('/api/auth/supabase'), {
-    method: 'POST',
-    credentials: 'include',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-  })
-
-  if (!response.ok) {
-    const data = await parseJsonSafe<{ success?: boolean; message?: string }>(response)
-    const serverMessage = getSupabaseAuthErrorMessage(data?.message)
-    throw createAuthError(serverMessage || getErrorMessage(response.status, 'Google 로그인 연결에 실패했어요.'), response.status)
-  }
-
-  const dataJson = await response.json()
-  const user = extractAuthUser(dataJson)
-
-  if (!user) {
-    throw createAuthError('Google 로그인 사용자 정보를 불러오지 못했어요.')
-  }
-
-  saveStoredSession(createSupabaseStoredSession(user))
-
-  const pendingAgreements = consumePendingSupabaseAgreements()
-
-  if (pendingAgreements) {
-    try {
-      await updateMyAgreements(pendingAgreements)
-    } catch (agreementError) {
-      clearStoredSession()
-      await logoutSupabaseSession().catch(() => {})
-      throw createAuthError(
-        agreementError instanceof Error
-          ? agreementError.message
-          : '약관 동의 저장에 실패했어요.',
-        403,
-        'AGREEMENTS_REQUIRED',
-      )
-    }
-  } else {
-    let agreements: UserAgreements
-
-    try {
-      agreements = await fetchMyAgreements()
-    } catch {
-      clearStoredSession()
-      await logoutSupabaseSession().catch(() => {})
-      throw createAuthError(
-        intent === 'login'
-          ? '처음 사용하는 Google 계정이에요. 필수 약관에 동의한 뒤 회원가입을 완료해주세요.'
-          : '약관 동의 상태를 확인하지 못했어요. 필수 약관에 동의한 뒤 Google로 계속해주세요.',
-        403,
-        'AGREEMENTS_REQUIRED',
-      )
+    if (!accessToken) {
+      throw createAuthError('Google 로그인 세션을 확인하지 못했어요.')
     }
 
-    if (!agreements.termsAgreed || !agreements.privacyAgreed) {
-      clearStoredSession()
-      await logoutSupabaseSession().catch(() => {})
-      throw createAuthError(
-        intent === 'login'
-          ? '처음 사용하는 Google 계정이에요. 필수 약관에 동의한 뒤 회원가입을 완료해주세요.'
-          : '약관 동의가 필요해요. 필수 약관에 동의한 뒤 Google로 계속해주세요.',
-        403,
-        'AGREEMENTS_REQUIRED',
-      )
-    }
-  }
+    const response = await fetch(createUrl('/api/auth/supabase'), {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    })
 
-  return user
+    if (!response.ok) {
+      const data = await parseJsonSafe<{ success?: boolean; message?: string }>(response)
+      const serverMessage = getSupabaseAuthErrorMessage(data?.message)
+      throw createAuthError(serverMessage || getErrorMessage(response.status, 'Google 로그인 연결에 실패했어요.'), response.status)
+    }
+
+    const dataJson = await response.json()
+    const user = extractAuthUser(dataJson)
+
+    if (!user) {
+      throw createAuthError('Google 로그인 사용자 정보를 불러오지 못했어요.')
+    }
+
+    saveStoredSession(createSupabaseStoredSession(user))
+
+    const pendingAgreements = consumePendingSupabaseAgreements()
+
+    if (pendingAgreements) {
+      try {
+        await updateMyAgreements(pendingAgreements)
+      } catch (agreementError) {
+        clearStoredSession()
+        await logoutSupabaseSession().catch(() => {})
+        throw createAuthError(
+          agreementError instanceof Error
+            ? agreementError.message
+            : '약관 동의 저장에 실패했어요.',
+          403,
+          'AGREEMENTS_REQUIRED',
+        )
+      }
+    } else {
+      let agreements: UserAgreements
+
+      try {
+        agreements = await fetchMyAgreements()
+      } catch {
+        clearStoredSession()
+        await logoutSupabaseSession().catch(() => {})
+        throw createAuthError(
+          intent === 'login'
+            ? '처음 사용하는 Google 계정이에요. 필수 약관에 동의한 뒤 회원가입을 완료해주세요.'
+            : '약관 동의 상태를 확인하지 못했어요. 필수 약관에 동의한 뒤 Google로 계속해주세요.',
+          403,
+          'AGREEMENTS_REQUIRED',
+        )
+      }
+
+      if (!agreements.termsAgreed || !agreements.privacyAgreed) {
+        clearStoredSession()
+        await logoutSupabaseSession().catch(() => {})
+        throw createAuthError(
+          intent === 'login'
+            ? '처음 사용하는 Google 계정이에요. 필수 약관에 동의한 뒤 회원가입을 완료해주세요.'
+            : '약관 동의가 필요해요. 필수 약관에 동의한 뒤 Google로 계속해주세요.',
+          403,
+          'AGREEMENTS_REQUIRED',
+        )
+      }
+    }
+
+    return user
+  } finally {
+    clearPendingSupabaseAuthIntent()
+  }
 }
 
 export async function resendVerificationEmail(email: string) {
