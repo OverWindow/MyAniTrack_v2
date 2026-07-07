@@ -327,6 +327,9 @@ export async function signInWithGoogle(intent: 'login' | 'signup' = 'login') {
     provider: 'google',
     options: {
       redirectTo: getAuthCallbackUrl(),
+      queryParams: {
+        prompt: 'select_account',
+      },
     },
   })
 
