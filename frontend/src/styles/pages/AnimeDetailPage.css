@@ -174,6 +174,24 @@
   box-shadow: var(--shadow-card);
 }
 
+.guest-detail-cta {
+  display: grid;
+  gap: 10px;
+}
+
+.guest-detail-cta h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.25;
+}
+
+.guest-detail-cta p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
 .detail-overview-card {
   display: grid;
   gap: 20px;

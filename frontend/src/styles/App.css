@@ -405,6 +405,96 @@
   font-size: 0.82rem;
 }
 
+.guest-preview-banner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  overflow: hidden;
+  padding: 20px 22px 20px 24px;
+  border: 1px solid rgba(15, 118, 110, 0.24);
+  border-radius: 12px;
+  background:
+    linear-gradient(135deg, rgba(240, 253, 250, 0.94), rgba(255, 251, 235, 0.86) 54%, rgba(255, 255, 255, 0.9)),
+    var(--bg-card);
+  box-shadow:
+    inset 5px 0 0 rgba(15, 118, 110, 0.72),
+    var(--shadow-soft);
+}
+
+.guest-preview-banner::after {
+  content: "SAMPLE";
+  position: absolute;
+  right: 18px;
+  bottom: -8px;
+  color: rgba(15, 118, 110, 0.08);
+  font-size: clamp(2.6rem, 8vw, 5.4rem);
+  font-weight: 900;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.guest-preview-banner > div:first-child {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.guest-preview-banner strong {
+  color: #134e4a;
+  font-size: clamp(1.06rem, 1.7vw, 1.32rem);
+  line-height: 1.25;
+}
+
+.guest-preview-banner p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.guest-preview-eyebrow,
+.sample-mode-chip,
+.sample-title-badge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  border: 1px solid rgba(15, 118, 110, 0.2);
+  border-radius: 999px;
+  background: rgba(240, 253, 250, 0.86);
+  color: #0f766e;
+  font-size: 0.72rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.guest-preview-eyebrow {
+  padding: 6px 9px;
+  text-transform: uppercase;
+}
+
+.sample-mode-chip {
+  flex-shrink: 0;
+  min-height: 38px;
+  padding: 0 12px;
+}
+
+.sample-title-badge {
+  margin-left: 10px;
+  padding: 7px 9px;
+  vertical-align: middle;
+}
+
+.guest-preview-actions {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
 .landing-page {
   display: grid;
   gap: var(--space-4);
@@ -918,6 +1008,28 @@
 }
 
 @media (max-width: 760px) {
+  .guest-preview-banner,
+  .guest-preview-locked-panel {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .guest-preview-actions {
+    width: 100%;
+  }
+
+  .guest-preview-actions .primary-button,
+  .guest-preview-actions .secondary-button {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .guest-preview-banner::after {
+    right: 10px;
+    bottom: 54px;
+    font-size: 3.2rem;
+  }
+
   .topbar,
   .landing-page {
     width: min(100%, calc(100% - 24px));

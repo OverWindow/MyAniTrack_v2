@@ -227,6 +227,37 @@ Callback 완료 후:
 
 기존 로그인 화면에서 처음 보는 Google 계정으로 로그인하면 내부 유저는 생성되지만, 약관 동의가 없으면 프론트가 회원가입/약관 동의 흐름으로 돌려보낸다.
 
+## 로그인 전 샘플 화면
+
+로그인하지 않은 사용자에게 컬렉션/분석 화면을 미리 보여주기 위해 공개 샘플 API를 제공한다.
+
+대표 API:
+
+```txt
+GET /api/sample/overview
+```
+
+개별 API:
+
+```txt
+GET /api/sample/anime-list
+GET /api/sample/anime-stats
+GET /api/sample/anime-stats/genre-bubble
+GET /api/sample/anime-stats/yearly-scores
+GET /api/sample/anime-stats/format-distribution
+GET /api/sample/anime-stats/studios
+```
+
+특징:
+
+- 인증이 필요 없다.
+- 실제 DB 유저를 만들지 않는다.
+- `user.id`는 샘플 전용 `0`이다.
+- 응답 구조는 실제 `/me/anime-list`, `/me/anime-stats/*` 계열과 비슷하게 맞춰져 있다.
+- 프론트는 로그인 전에는 `/api/sample/*`, 로그인 후에는 `/api/me/*` API로 전환하면 된다.
+
+상세 응답 구조와 쿼리 파라미터는 `docs/backend-api-overview.md`의 `Guest Sample` 섹션을 참고한다.
+
 ## 본인 계정 삭제
 
 API:
@@ -334,4 +365,3 @@ VITE_API_BASE_URL=https://myanitrack.com
 - 노출된 token은 즉시 로그아웃/세션 폐기 처리한다.
 - `SUPABASE_SERVICE_ROLE_KEY`는 서버 전용이다.
 - 프론트에는 `VITE_SUPABASE_ANON_KEY`만 사용한다.
-

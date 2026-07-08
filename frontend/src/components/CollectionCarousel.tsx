@@ -347,13 +347,16 @@ function CollectionCarouselContent({
             const itemTitle = getDisplayTitle(item)
             const imageSrc = getCoverImageSrc(item)
             const isImageLoaded = !imageSrc || loadedImageIds.has(item.id)
+            const linkState = location
+              ? { fromPage: 'collection', backgroundLocation: location }
+              : undefined
 
             return (
               <Link
                 className={isImageLoaded ? 'perfect-score-card' : 'perfect-score-card is-image-loading'}
                 key={item.id}
                 to={`/anime/${item.anime.id}`}
-                state={location ? { fromPage: 'collection', backgroundLocation: location } : undefined}
+                state={linkState}
                 aria-label={`${itemTitle} 상세 페이지로 이동`}
                 title={itemTitle}
                 style={{

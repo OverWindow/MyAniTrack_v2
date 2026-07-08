@@ -59,7 +59,11 @@ export function AnalysisAnimeToast({
         <>
           <div className="analysis-anime-toast-list">
             {visibleItems.map((entry) => (
-              <Link className="analysis-anime-toast-card" key={entry.id} to={`/anime/${entry.anime.id}`}>
+              <Link
+                className="analysis-anime-toast-card"
+                key={entry.id}
+                to={`/anime/${entry.anime.id}`}
+              >
                 <span className="analysis-anime-toast-poster">
                   <img
                     src={entry.anime.coverImageExtraLarge || entry.anime.coverImageLarge}

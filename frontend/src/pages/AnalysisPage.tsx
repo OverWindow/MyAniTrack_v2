@@ -19,6 +19,7 @@ import {
 import { getProfileImageSrc, handleProfileImageError } from '../lib/avatar'
 import { fetchMyCollection } from '../lib/collection'
 import { SERVER_CONNECTION_ERROR_MESSAGE, getFriendlyErrorMessage } from '../lib/errors'
+import { fetchSampleCollection, fetchSampleOverview, fetchSampleStudioRanking } from '../lib/sample'
 import {
   fetchFormatDistributionStats,
   fetchMyAnimeStats,
@@ -328,14 +329,16 @@ type StudioRankingSectionProps = {
   apiUserId?: string
   cacheOwnerId?: number | string | null
   cacheVersion?: number
+  isSample?: boolean
 }
 
 export function StudioRankingSection({
   apiUserId,
   cacheOwnerId,
   cacheVersion = 0,
+  isSample = false,
 }: StudioRankingSectionProps) {
-  const storageOwnerId = cacheOwnerId ?? (apiUserId ? `public:${apiUserId}` : null)
+  const storageOwnerId = isSample ? 'sample' : cacheOwnerId ?? (apiUserId ? `public:${apiUserId}` : null)
   const [sortState, setSortState] = useState<{ ownerId: string | number | null; sort: StudioRankingSort }>(() => ({
     ownerId: storageOwnerId,
     sort: getStoredStudioSort(storageOwnerId) ?? 'count',
@@ -409,13 +412,19 @@ export function StudioRankingSection({
           return
         }
 
-        const response = await fetchStudioRanking({
-          userId: apiUserId,
-          sort,
-          limit: 12,
-          minRatedAnimeCount: sort === 'score' ? 1 : undefined,
-          signal: controller.signal,
-        })
+        const response = isSample
+          ? await fetchSampleStudioRanking({
+            sort,
+            limit: 12,
+            signal: controller.signal,
+          })
+          : await fetchStudioRanking({
+            userId: apiUserId,
+            sort,
+            limit: 12,
+            minRatedAnimeCount: sort === 'score' ? 1 : undefined,
+            signal: controller.signal,
+          })
 
         if (isCancelled || controller.signal.aborted) {
           return
@@ -457,10 +466,10 @@ export function StudioRankingSection({
       isCancelled = true
       controller.abort()
     }
-  }, [apiUserId, cacheVersion, sort, storageOwnerId])
+  }, [apiUserId, cacheVersion, isSample, sort, storageOwnerId])
 
   useEffect(() => {
-    if (!selectedStudio || !storageOwnerId) {
+    if (!selectedStudio || !storageOwnerId || isSample) {
       return
     }
 
@@ -548,7 +557,7 @@ export function StudioRankingSection({
       isCancelled = true
       controller.abort()
     }
-  }, [apiUserId, cacheVersion, selectedStudio, storageOwnerId])
+  }, [apiUserId, cacheVersion, isSample, selectedStudio, storageOwnerId])
 
   const visibleStudioItems = rankingState.items
   const effectiveStudioAnimeState = selectedStudio && storageOwnerId
@@ -591,7 +600,9 @@ export function StudioRankingSection({
         <div>
           <span className="detail-label">Studio ranking</span>
           <h2>스튜디오 분석</h2>
-          <p>내가 본 작품을 제작 스튜디오 기준으로 묶어 작품 수, 평균 점수, 시청 시간을 비교해요.</p>
+              <p>{isSample
+                ? '샘플 컬렉션을 제작 스튜디오 기준으로 묶어 작품 수, 평균 점수, 시청 시간을 비교해요.'
+                : '내가 본 작품을 제작 스튜디오 기준으로 묶어 작품 수, 평균 점수, 시청 시간을 비교해요.'}</p>
         </div>
         <span className="studio-ranking-count">{rankingState.studioCount.toLocaleString()}개 스튜디오</span>
       </div>
@@ -655,6 +666,7 @@ export function StudioRankingSection({
             })}
           </div>
 
+          {!isSample && (
           <div className="studio-anime-panel">
             <div className="studio-anime-heading">
               <div>
@@ -716,6 +728,7 @@ export function StudioRankingSection({
               </div>
             )}
           </div>
+          )}
         </div>
       )}
       {isStudioAnimeToastOpen && selectedStudio && (
@@ -787,7 +800,8 @@ export function StudioRankingSection({
 }
 
 export function AnalysisPage() {
-  const { isAuthenticated, user } = useAuth()
+  const { isAuthenticated, isBootstrapping, user } = useAuth()
+  const isGuestPreview = !isBootstrapping && !isAuthenticated
   const userId = user?.id ?? null
   const [state, setState] = useState<AnalysisState>({
     item: null,
@@ -878,6 +892,72 @@ export function AnalysisPage() {
     userId,
     yearAnimeState.selectedYear,
   ])
+
+  useEffect(() => {
+    if (!isGuestPreview) {
+      return
+    }
+
+    const controller = new AbortController()
+    let isCancelled = false
+
+    const loadSampleOverview = async () => {
+      setState({ item: null, isLoading: true, error: null })
+      setGenreBubbleState((current) => ({ ...current, isLoading: true, error: null }))
+      setYearlyScoreState((current) => ({ ...current, isLoading: true, error: null }))
+      setFormatDistributionState((current) => ({ ...current, isLoading: true, error: null }))
+
+      try {
+        const overview = await fetchSampleOverview(controller.signal)
+
+        if (isCancelled || controller.signal.aborted) {
+          return
+        }
+
+        setState({
+          item: overview.stats,
+          isLoading: false,
+          error: null,
+        })
+        setGenreBubbleState({
+          item: overview.genreBubble,
+          isLoading: false,
+          error: null,
+        })
+        setYearlyScoreState({
+          item: overview.yearlyScores,
+          isLoading: false,
+          error: null,
+        })
+        setFormatDistributionState({
+          item: overview.formatDistribution,
+          isLoading: false,
+          error: null,
+        })
+      } catch (loadError) {
+        if (loadError instanceof DOMException && loadError.name === 'AbortError') {
+          return
+        }
+
+        const message = getFriendlyErrorMessage(loadError, '샘플 분석 정보를 불러오지 못했어요.')
+        setState({
+          item: null,
+          isLoading: false,
+          error: message,
+        })
+        setGenreBubbleState({ item: null, isLoading: false, error: message })
+        setYearlyScoreState({ item: null, isLoading: false, error: message })
+        setFormatDistributionState({ item: null, isLoading: false, error: message })
+      }
+    }
+
+    void loadSampleOverview()
+
+    return () => {
+      isCancelled = true
+      controller.abort()
+    }
+  }, [isGuestPreview])
 
   useEffect(() => {
     if (!userId || !genreAnimeState.selectedGenre || genreAnimeState.isLoading || genreAnimeState.items.length > 0) {
@@ -1258,6 +1338,33 @@ export function AnalysisPage() {
       return
     }
 
+    if (isGuestPreview) {
+      setYearAnimeState({ selectedYear: year, items: [], isLoading: true, error: null })
+
+      try {
+        const response = await fetchSampleCollection({
+          sort: 'score',
+          limit: 50,
+          year: normalizedYear,
+        })
+
+        setYearAnimeState({
+          selectedYear: year,
+          items: response.items,
+          isLoading: false,
+          error: null,
+        })
+      } catch (yearError) {
+        setYearAnimeState({
+          selectedYear: year,
+          items: [],
+          isLoading: false,
+          error: getFriendlyErrorMessage(yearError, '해당 연도 샘플 작품을 불러오지 못했어요.'),
+        })
+      }
+      return
+    }
+
     setYearAnimeState({
       selectedYear: year,
       items: [],
@@ -1307,6 +1414,33 @@ export function AnalysisPage() {
   }
 
   const handleSelectGenre = async (genre: string) => {
+    if (isGuestPreview) {
+      setGenreAnimeState({ selectedGenre: genre, items: [], isLoading: true, error: null })
+
+      try {
+        const response = await fetchSampleCollection({
+          sort: 'score',
+          limit: 50,
+          genre,
+        })
+
+        setGenreAnimeState({
+          selectedGenre: genre,
+          items: response.items,
+          isLoading: false,
+          error: null,
+        })
+      } catch (genreError) {
+        setGenreAnimeState({
+          selectedGenre: genre,
+          items: [],
+          isLoading: false,
+          error: getFriendlyErrorMessage(genreError, '해당 장르 샘플 작품을 불러오지 못했어요.'),
+        })
+      }
+      return
+    }
+
     setGenreAnimeState({
       selectedGenre: genre,
       items: [],
@@ -1365,6 +1499,33 @@ export function AnalysisPage() {
         isLoading: false,
         error: '선택한 평점 형식이 올바르지 않아요.',
       })
+      return
+    }
+
+    if (isGuestPreview) {
+      setScoreAnimeState({ selectedScore: score, items: [], isLoading: true, error: null })
+
+      try {
+        const response = await fetchSampleCollection({
+          sort: 'score',
+          limit: 50,
+          score: normalizedScore,
+        })
+
+        setScoreAnimeState({
+          selectedScore: score,
+          items: response.items,
+          isLoading: false,
+          error: null,
+        })
+      } catch (scoreError) {
+        setScoreAnimeState({
+          selectedScore: score,
+          items: [],
+          isLoading: false,
+          error: getFriendlyErrorMessage(scoreError, '해당 평점 샘플 작품을 불러오지 못했어요.'),
+        })
+      }
       return
     }
 
@@ -1448,18 +1609,7 @@ export function AnalysisPage() {
     }
   }
 
-  if (!isAuthenticated) {
-    return (
-      <section className="analysis-page">
-        <div className="feedback-card">
-          분석 탭은 로그인한 사용자만 볼 수 있어요. <Link to="/login">로그인</Link> 후 다시
-          확인해주세요.
-        </div>
-      </section>
-    )
-  }
-
-  if (state.isLoading) {
+  if (isBootstrapping || (!isGuestPreview && state.isLoading)) {
     return (
       <section className="analysis-page">
         <div className="analysis-summary-grid">
@@ -1487,7 +1637,18 @@ export function AnalysisPage() {
   const item = state.item
   const averageScore = toFiniteNumber(item?.avgScore)
   const averageReleaseYear = toFiniteNumber(item?.avgReleaseYear)
-  const displayName = user?.username?.trim() || user?.email?.split('@')[0] || 'MyAniTrack User'
+  const formatDistributionItem = formatDistributionState.item
+  const formatDistributionIsLoading = formatDistributionState.isLoading
+  const formatDistributionError = formatDistributionState.error
+  const yearlyScoreItem = yearlyScoreState.item
+  const yearlyScoreIsLoading = yearlyScoreState.isLoading
+  const yearlyScoreError = yearlyScoreState.error
+  const genreBubbleItem = genreBubbleState.item
+  const genreBubbleIsLoading = genreBubbleState.isLoading
+  const genreBubbleError = genreBubbleState.error
+  const displayName = isGuestPreview
+    ? '샘플 취향 노트'
+    : user?.username?.trim() || user?.email?.split('@')[0] || 'MyAniTrack User'
 
   if (!item) {
     return (
@@ -1498,24 +1659,43 @@ export function AnalysisPage() {
   }
 
   return (
-    <section className="analysis-page">
+    <section className={isGuestPreview ? 'analysis-page is-sample-preview' : 'analysis-page'}>
+      {isGuestPreview && (
+        <div className="guest-preview-banner">
+          <div>
+            <span className="guest-preview-eyebrow">Sample mode</span>
+            <strong>샘플 분석 리포트를 보고 있어요</strong>
+            <p>이 통계와 차트는 체험용 컬렉션으로 계산된 예시입니다. 로그인하면 내 기록으로 다시 계산됩니다.</p>
+          </div>
+          <div className="guest-preview-actions">
+            <Link className="primary-button" to="/signup">시작하기</Link>
+            <Link className="secondary-button" to="/login">로그인</Link>
+          </div>
+        </div>
+      )}
+
       <div className="analysis-hero-card">
         <div className="analysis-hero-copy">
           <div className="analysis-profile-heading">
             <img
               className="analysis-profile-avatar analysis-profile-avatar-image"
-              src={getProfileImageSrc(user?.profileImageUrl)}
+              src={getProfileImageSrc(isGuestPreview ? null : user?.profileImageUrl)}
               alt={displayName}
               onError={handleProfileImageError}
             />
             <div>
               <span className="section-kicker">Anime analysis</span>
-              <h1>{displayName}</h1>
-              <p>사용자 ID {user?.id ?? '-'}</p>
+              <h1>
+                {displayName}
+                {isGuestPreview && <span className="sample-title-badge">샘플</span>}
+              </h1>
+              <p>{isGuestPreview ? '샘플 사용자' : `사용자 ID ${user?.id ?? '-'}`}</p>
             </div>
           </div>
           <p className="analysis-profile-note">
-            내 컬렉션에 담긴 작품, 평점, 시청 기록을 바탕으로 취향 흐름을 정리했어요.
+            {isGuestPreview
+              ? '샘플 컬렉션에 담긴 작품, 평점, 시청 기록으로 MyAniTrack의 분석 흐름을 미리 보여드려요.'
+              : '내 컬렉션에 담긴 작품, 평점, 시청 기록을 바탕으로 취향 흐름을 정리했어요.'}
           </p>
           <span className="analysis-updated-at">
             마지막 계산 {formatUpdatedAt(item.updatedAt)}
@@ -1523,25 +1703,34 @@ export function AnalysisPage() {
         </div>
 
         <div className="analysis-hero-actions">
-          <button
-            className="primary-button"
-            type="button"
-            onClick={() => {
-              void handleRecalculate()
-            }}
-            disabled={isRecalculating || cooldownLeft > 0}
-          >
-            {isRecalculating
-              ? '계산 중...'
-              : cooldownLeft > 0
-                ? `${cooldownLeft}초 후 다시 계산`
-                : '분석 새로고침'}
-          </button>
-          <span className="analysis-refresh-note">연속 계산은 30초마다 한 번만 가능해요.</span>
+          {isGuestPreview ? (
+            <>
+              <Link className="primary-button" to="/signup">내 기록으로 분석하기</Link>
+              <span className="analysis-refresh-note">샘플 데이터는 고정되어 있어요.</span>
+            </>
+          ) : (
+            <>
+              <button
+                className="primary-button"
+                type="button"
+                onClick={() => {
+                  void handleRecalculate()
+                }}
+                disabled={isRecalculating || cooldownLeft > 0}
+              >
+                {isRecalculating
+                  ? '계산 중...'
+                  : cooldownLeft > 0
+                    ? `${cooldownLeft}초 후 다시 계산`
+                    : '분석 새로고침'}
+              </button>
+              <span className="analysis-refresh-note">연속 계산은 30초마다 한 번만 가능해요.</span>
+            </>
+          )}
         </div>
       </div>
 
-      {state.error && (
+      {!isGuestPreview && state.error && (
         state.error === SERVER_CONNECTION_ERROR_MESSAGE
           ? <ConnectionErrorState message={state.error} />
           : <div className="feedback-card is-error">{state.error}</div>
@@ -1614,45 +1803,45 @@ export function AnalysisPage() {
               <h2>포맷별 감상 분포</h2>
               <p>TV, 영화, OVA 같은 포맷별로 감상 비중과 시청 시간을 비교해요.</p>
             </div>
-            {formatDistributionState.isLoading && (
+            {formatDistributionIsLoading && (
               <div className="analysis-chart-skeleton" />
             )}
-            {formatDistributionState.error && !formatDistributionState.isLoading && (
-              renderEmptyMessage(formatDistributionState.error)
+            {formatDistributionError && !formatDistributionIsLoading && (
+              renderEmptyMessage(formatDistributionError)
             )}
-            {!formatDistributionState.isLoading
-              && !formatDistributionState.error
-              && formatDistributionState.item
-              && formatDistributionState.item.items.length > 0 && (
+            {!formatDistributionIsLoading
+              && !formatDistributionError
+              && formatDistributionItem
+              && formatDistributionItem.items.length > 0 && (
                 <div className="analysis-format-layout">
                   <Suspense fallback={<div className="analysis-chart-skeleton" />}>
-                    <FormatDistributionPieChart data={formatDistributionState.item.items} />
+                    <FormatDistributionPieChart data={formatDistributionItem.items} />
                   </Suspense>
                   <div className="analysis-format-summary">
                     <article>
                       <span>대표 포맷</span>
-                      <strong>{formatDistributionState.item.summary.topFormatLabel ?? '정보 없음'}</strong>
+                      <strong>{formatDistributionItem.summary.topFormatLabel ?? '정보 없음'}</strong>
                     </article>
                     <article>
                       <span>포맷 수</span>
-                      <strong>{formatDistributionState.item.summary.formatCount.toLocaleString()}개</strong>
+                      <strong>{formatDistributionItem.summary.formatCount.toLocaleString()}개</strong>
                     </article>
                     <article>
                       <span>총 작품 수</span>
-                      <strong>{formatDistributionState.item.totalAnimeCount.toLocaleString()}편</strong>
+                      <strong>{formatDistributionItem.totalAnimeCount.toLocaleString()}편</strong>
                     </article>
                     <article>
                       <span>총 시청 시간</span>
-                      <strong>{formatDistributionState.item.totalWatchHours !== null
-                        ? `${formatDistributionState.item.totalWatchHours.toLocaleString(undefined, { maximumFractionDigits: 1 })}시간`
-                        : `${Math.round(formatDistributionState.item.totalWatchMinutes / 60).toLocaleString()}시간`}</strong>
+                      <strong>{formatDistributionItem.totalWatchHours !== null
+                        ? `${formatDistributionItem.totalWatchHours.toLocaleString(undefined, { maximumFractionDigits: 1 })}시간`
+                        : `${Math.round(formatDistributionItem.totalWatchMinutes / 60).toLocaleString()}시간`}</strong>
                     </article>
                   </div>
                 </div>
               )}
-            {!formatDistributionState.isLoading
-              && !formatDistributionState.error
-              && (!formatDistributionState.item || formatDistributionState.item.items.length === 0)
+            {!formatDistributionIsLoading
+              && !formatDistributionError
+              && (!formatDistributionItem || formatDistributionItem.items.length === 0)
               && renderEmptyMessage('아직 포맷별 분석 데이터가 없어요.')}
           </section>
 
@@ -1791,31 +1980,31 @@ export function AnalysisPage() {
                   <h2>연도별 평균 평점</h2>
                   <p>평점이 있는 작품이 3편 이상인 연도만 모아 내 평균과 커뮤니티 평균을 비교해요.</p>
                 </div>
-                {yearlyScoreState.isLoading && <div className="analysis-empty-state">연도별 평점 분석을 불러오는 중이에요.</div>}
-                {yearlyScoreState.error && !yearlyScoreState.isLoading && renderEmptyMessage(yearlyScoreState.error)}
-                {!yearlyScoreState.isLoading && !yearlyScoreState.error && yearlyScoreState.item && yearlyScoreState.item.items.length > 0 && (
+                {yearlyScoreIsLoading && <div className="analysis-empty-state">연도별 평점 분석을 불러오는 중이에요.</div>}
+                {yearlyScoreError && !yearlyScoreIsLoading && renderEmptyMessage(yearlyScoreError)}
+                {!yearlyScoreIsLoading && !yearlyScoreError && yearlyScoreItem && yearlyScoreItem.items.length > 0 && (
                   <>
                     <div className="analysis-year-score-summary">
                       <article>
                         <span>최고 연도</span>
-                        <strong>{yearlyScoreState.item.summary.bestYear ?? '-'}</strong>
+                        <strong>{yearlyScoreItem.summary.bestYear ?? '-'}</strong>
                       </article>
                       <article>
                         <span>최저 연도</span>
-                        <strong>{yearlyScoreState.item.summary.worstYear ?? '-'}</strong>
+                        <strong>{yearlyScoreItem.summary.worstYear ?? '-'}</strong>
                       </article>
                       <article>
                         <span>전체 평균</span>
-                        <strong>{formatAnalysisScore(yearlyScoreState.item.summary.averageScore)}점</strong>
+                        <strong>{formatAnalysisScore(yearlyScoreItem.summary.averageScore)}점</strong>
                       </article>
                       <article>
                         <span>분석 연도</span>
-                        <strong>{yearlyScoreState.item.summary.yearCount.toLocaleString()}개</strong>
+                        <strong>{yearlyScoreItem.summary.yearCount.toLocaleString()}개</strong>
                       </article>
                     </div>
                     <Suspense fallback={<div className="analysis-chart-skeleton analysis-chart-skeleton-wide" />}>
                       <YearlyScoreLineChart
-                        data={yearlyScoreState.item.items}
+                        data={yearlyScoreItem.items}
                         selectedYear={yearAnimeState.selectedYear}
                         onSelectYear={(year) => {
                           void handleSelectReleaseYear(year)
@@ -1824,7 +2013,7 @@ export function AnalysisPage() {
                     </Suspense>
                   </>
                 )}
-                {!yearlyScoreState.isLoading && !yearlyScoreState.error && (!yearlyScoreState.item || yearlyScoreState.item.items.length === 0) && (
+                {!yearlyScoreIsLoading && !yearlyScoreError && (!yearlyScoreItem || yearlyScoreItem.items.length === 0) && (
                   <div className="analysis-empty-state">연도별 평점 분석에 표시할 데이터가 아직 없어요.</div>
                 )}
               </section>
@@ -1911,12 +2100,12 @@ export function AnalysisPage() {
           <h2>장르 취향 버블 차트</h2>
           <p>내 평균과 커뮤니티 평균을 각각의 전체 평균 대비로 정규화해, 취향이 어느 쪽으로 기우는지 볼 수 있어요.</p>
         </div>
-        {genreBubbleState.isLoading && <div className="analysis-empty-state">장르 취향 차트를 불러오는 중이에요.</div>}
-        {genreBubbleState.error && !genreBubbleState.isLoading && renderEmptyMessage(genreBubbleState.error)}
-        {!genreBubbleState.isLoading && !genreBubbleState.error && genreBubbleState.item && genreBubbleState.item.items.length > 0 && (
+        {genreBubbleIsLoading && <div className="analysis-empty-state">장르 취향 차트를 불러오는 중이에요.</div>}
+        {genreBubbleError && !genreBubbleIsLoading && renderEmptyMessage(genreBubbleError)}
+        {!genreBubbleIsLoading && !genreBubbleError && genreBubbleItem && genreBubbleItem.items.length > 0 && (
           <Suspense fallback={<div className="analysis-chart-skeleton analysis-chart-skeleton-wide" />}>
             <GenrePreferenceBubbleChart
-              data={genreBubbleState.item.items}
+              data={genreBubbleItem.items}
               selectedGenre={genreAnimeState.selectedGenre}
               onSelectGenre={(genre) => {
                 setActiveTab('genre')
@@ -1925,14 +2114,20 @@ export function AnalysisPage() {
             />
           </Suspense>
         )}
-        {!genreBubbleState.isLoading && !genreBubbleState.error && (!genreBubbleState.item || genreBubbleState.item.items.length === 0) && (
+        {!genreBubbleIsLoading && !genreBubbleError && (!genreBubbleItem || genreBubbleItem.items.length === 0) && (
           <div className="analysis-empty-state">표시할 장르 취향 데이터가 아직 없어요.</div>
         )}
       </section>
 
-      <StudioRankingSection cacheOwnerId={userId} cacheVersion={cacheVersion} />
+      {isGuestPreview ? (
+        <StudioRankingSection isSample cacheVersion={cacheVersion} />
+      ) : (
+        <>
+          <StudioRankingSection cacheOwnerId={userId} cacheVersion={cacheVersion} />
 
-      <VoiceActorRankingSection cacheOwnerId={userId} cacheVersion={cacheVersion} ownerLabel="내" />
+          <VoiceActorRankingSection cacheOwnerId={userId} cacheVersion={cacheVersion} ownerLabel="내" />
+        </>
+      )}
     </section>
   )
 }

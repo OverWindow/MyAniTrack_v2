@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { fetchMyCollection, getCachedCollectionPage, saveCollectionPageCache } from '../lib/collection'
 import { genreOptions } from '../lib/anime'
 import { SERVER_CONNECTION_ERROR_MESSAGE, getFriendlyErrorMessage } from '../lib/errors'
+import { fetchSampleCollection } from '../lib/sample'
 import type { AnimeGenre } from '../types/anime'
 import type { UserAnimeListItem, UserAnimeListSort } from '../types/collection'
 import '../styles/pages/CatalogPage.css'
@@ -96,6 +97,7 @@ function formatScore(score?: number | null) {
 export function CollectionPage() {
   const location = useLocation()
   const { isAuthenticated, isBootstrapping } = useAuth()
+  const isGuestPreview = !isBootstrapping && !isAuthenticated
   const [sort, setSort] = useState<UserAnimeListSort>('latest')
   const [genre, setGenre] = useState<AnimeGenre | 'all'>('all')
   const [searchTerm, setSearchTerm] = useState('')
@@ -130,7 +132,7 @@ export function CollectionPage() {
   )
 
   useEffect(() => {
-    if (isBootstrapping || !isAuthenticated) {
+    if (isBootstrapping || (!isAuthenticated && !isGuestPreview)) {
       return
     }
 
@@ -138,12 +140,18 @@ export function CollectionPage() {
 
     const loadPerfectScoreAnime = async () => {
       try {
-        const data = await fetchMyCollection({
-          sort: 'score',
-          score: 10,
-          limit: 12,
-          signal: controller.signal,
-        })
+        const data = isGuestPreview
+          ? await fetchSampleCollection({
+            sort: 'score',
+            limit: 12,
+            signal: controller.signal,
+          })
+          : await fetchMyCollection({
+            sort: 'score',
+            score: 10,
+            limit: 12,
+            signal: controller.signal,
+          })
 
         setPerfectScoreState({
           items: data.items,
@@ -167,7 +175,7 @@ export function CollectionPage() {
     void loadPerfectScoreAnime()
 
     return () => controller.abort()
-  }, [isAuthenticated, isBootstrapping, reloadKey])
+  }, [isAuthenticated, isBootstrapping, isGuestPreview, reloadKey])
 
   const fetchFullCollection = useCallback(async (signal?: AbortSignal) => {
     const firstPage = await fetchMyCollection({
@@ -229,7 +237,7 @@ export function CollectionPage() {
   }, [selectedGenre, sort])
 
   useEffect(() => {
-    if (isBootstrapping || !isAuthenticated) {
+    if (isBootstrapping || (!isAuthenticated && !isGuestPreview)) {
       return
     }
 
@@ -240,7 +248,7 @@ export function CollectionPage() {
         isLoadingMoreRef.current = false
         const shouldFetchFromApi = reloadKey !== consumedReloadKeyRef.current
 
-        if (!shouldFetchFromApi) {
+        if (!isGuestPreview && !shouldFetchFromApi) {
           const cachedPage = getCachedCollectionPage({
             sort,
             genre: selectedGenre,
@@ -269,7 +277,14 @@ export function CollectionPage() {
         }))
         consumedReloadKeyRef.current = reloadKey
 
-        const data = await fetchFullCollection(controller.signal)
+        const data = isGuestPreview
+          ? await fetchSampleCollection({
+            sort,
+            genre: selectedGenre,
+            limit: 50,
+            signal: controller.signal,
+          })
+          : await fetchFullCollection(controller.signal)
 
         setState({
           items: data.items,
@@ -301,7 +316,7 @@ export function CollectionPage() {
     void loadFirstPage()
 
     return () => controller.abort()
-  }, [fetchFullCollection, isAuthenticated, isBootstrapping, reloadKey, requestKey, selectedGenre, sort])
+  }, [fetchFullCollection, isAuthenticated, isBootstrapping, isGuestPreview, reloadKey, requestKey, selectedGenre, sort])
 
   useEffect(() => {
     const node = sentinelRef.current
@@ -433,17 +448,6 @@ export function CollectionPage() {
     )
   }
 
-  if (!isAuthenticated) {
-    return (
-      <section className="collection-page">
-        <div className="feedback-card">
-          컬렉션은 로그인한 사용자만 볼 수 있어요. <Link to="/login">로그인</Link> 후
-          다시 확인해주세요.
-        </div>
-      </section>
-    )
-  }
-
   return (
     <>
       <CollectionCarousel
@@ -452,10 +456,25 @@ export function CollectionPage() {
         portalRootId="collection-carousel-root"
       />
 
-      <section className="collection-page">
+      <section className={isGuestPreview ? 'collection-page is-sample-preview' : 'collection-page'}>
+        {isGuestPreview && (
+          <div className="guest-preview-banner">
+            <div>
+              <span className="guest-preview-eyebrow">Sample mode</span>
+              <strong>샘플 컬렉션을 둘러보고 있어요</strong>
+              <p>이 화면의 작품, 평점, 기록은 체험용 데이터입니다. 로그인하면 내 컬렉션으로 즉시 바뀝니다.</p>
+            </div>
+            <div className="guest-preview-actions">
+              <Link className="primary-button" to="/signup">시작하기</Link>
+              <Link className="secondary-button" to="/login">로그인</Link>
+            </div>
+          </div>
+        )}
+
         <div className="explore-toolbar-shell">
         <div className="explore-toolbar">
           <div className="search-group">
+            {isGuestPreview && <span className="sample-mode-chip">샘플 컬렉션</span>}
             <label className="search-field minimalist-search" htmlFor="collection-search">
               <input
                 id="collection-search"
@@ -468,8 +487,9 @@ export function CollectionPage() {
             <button
               className="refresh-button"
               type="button"
-              aria-label="컬렉션 새로고침"
+              aria-label={isGuestPreview ? '샘플 컬렉션은 새로고침할 수 없어요' : '컬렉션 새로고침'}
               onClick={() => setReloadKey((value) => value + 1)}
+              disabled={isGuestPreview}
             >
               ↻
             </button>
@@ -508,13 +528,13 @@ export function CollectionPage() {
         </div>
         </div>
 
-      {error && (
+      {!isGuestPreview && error && (
         error === SERVER_CONNECTION_ERROR_MESSAGE
           ? <ConnectionErrorState message={error} />
           : <div className="feedback-card is-error">{error}</div>
       )}
 
-      {!error && (isLoading || isRefreshingQuery) && (
+      {!isGuestPreview && !error && (isLoading || isRefreshingQuery) && (
         <div className="collection-grid">
           {Array.from({ length: 8 }).map((_, index) => (
             <article className="collection-card skeleton-card" key={`collection-skeleton-${index}`}>
@@ -526,11 +546,13 @@ export function CollectionPage() {
         </div>
       )}
 
-      {!isLoading && !isRefreshingQuery && !error && (
+      {(isGuestPreview || (!isLoading && !isRefreshingQuery && !error)) && (
         <>
           {filteredItems.length === 0 ? (
             <div className="feedback-card">
-              아직 컬렉션에 담긴 작품이 없거나, 검색 결과가 없어요.
+              {isGuestPreview
+                ? '샘플 컬렉션에서 검색 결과가 없어요.'
+                : '아직 컬렉션에 담긴 작품이 없거나, 검색 결과가 없어요.'}
             </div>
           ) : (
             <div className="collection-grid">
@@ -539,7 +561,10 @@ export function CollectionPage() {
                   className="collection-card"
                   key={item.id}
                   to={`/anime/${item.anime.id}`}
-                  state={{ fromPage: 'collection', backgroundLocation: location }}
+                  state={{
+                    fromPage: 'collection',
+                    backgroundLocation: location,
+                  }}
                 >
                   <div className="collection-poster-wrap">
                     <img
@@ -565,12 +590,16 @@ export function CollectionPage() {
 
           <div ref={sentinelRef} className="scroll-sentinel" aria-hidden="true" />
 
-          {isLoadingMore && (
+          {!isGuestPreview && isLoadingMore && (
             <div className="feedback-inline">컬렉션을 더 불러오는 중이에요.</div>
           )}
 
-          {!hasNext && items.length > 0 && (
+          {!isGuestPreview && !hasNext && items.length > 0 && (
             <div className="feedback-inline">컬렉션의 마지막 작품까지 모두 확인했어요.</div>
+          )}
+
+          {isGuestPreview && (
+            <div className="feedback-inline">샘플 컬렉션의 마지막 작품까지 모두 확인했어요.</div>
           )}
         </>
       )}

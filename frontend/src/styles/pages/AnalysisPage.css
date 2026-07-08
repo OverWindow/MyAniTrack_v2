@@ -4,6 +4,38 @@
   width: 100%;
 }
 
+.analysis-page.is-sample-preview .analysis-hero-card {
+  border-color: rgba(15, 118, 110, 0.22);
+  background:
+    linear-gradient(135deg, rgba(240, 253, 250, 0.58), rgba(255, 255, 255, 0.92)),
+    var(--bg-card);
+}
+
+.analysis-page.is-sample-preview .analysis-summary-card,
+.analysis-page.is-sample-preview .analysis-panel {
+  border-color: rgba(15, 118, 110, 0.14);
+}
+
+.analysis-page.is-sample-preview .analysis-panel-heading .detail-label::after {
+  content: "Sample";
+  display: inline-flex;
+  margin-left: 7px;
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: rgba(240, 253, 250, 0.9);
+  color: #0f766e;
+  font-size: 0.68rem;
+  font-weight: 900;
+  text-transform: none;
+}
+
+.guest-preview-locked-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
 .analysis-hero-card {
   display: flex;
   justify-content: space-between;

@@ -35,6 +35,10 @@ function extractStatsItem(payload: unknown) {
     return (payload as AnimeStatsResponse).item
   }
 
+  if (payload && typeof payload === 'object' && 'totalCount' in payload) {
+    return payload as AnimeStatsResponse['item']
+  }
+
   throw new Error('분석 응답 형식이 올바르지 않아요.')
 }
 
@@ -123,7 +127,7 @@ function normalizeTopGenreAnimeItems(value: unknown) {
   })
 }
 
-function normalizeStatsItem(payload: unknown) {
+export function normalizeStatsItem(payload: unknown) {
   const item = extractStatsItem(payload)
 
   return {

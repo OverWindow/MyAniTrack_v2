@@ -77,6 +77,318 @@ Response example:
 }
 ```
 
+## Guest Sample
+
+로그인하지 않은 사용자에게 컬렉션/분석 화면을 미리 보여주기 위한 공개 샘플 API입니다.
+
+특징:
+
+- 인증이 필요 없습니다.
+- DB를 조회하지 않는 정적 샘플 데이터입니다.
+- 실제 `/me/anime-list`, `/me/anime-stats` 계열과 비슷한 응답 구조를 사용합니다.
+- 로그인 전 홈, 랜딩, 온보딩, 데모 카드에서 사용하면 됩니다.
+
+### `GET /sample/overview`
+로그인 전 화면에 필요한 샘플 컬렉션과 분석 데이터를 한 번에 가져옵니다.
+
+Response shape:
+
+```json
+{
+  "success": true,
+  "item": {
+    "user": {
+      "id": 0,
+      "username": "sample_viewer",
+      "profileImageUrl": null,
+      "bio": "Guest sample profile for previewing MyAniTrack collection and analytics.",
+      "createdAt": "2026-07-07T00:00:00.000Z"
+    },
+    "collection": {
+      "user": {},
+      "items": [
+        {
+          "id": 1,
+          "userId": 0,
+          "animeId": 101,
+          "status": "completed",
+          "score": 9.4,
+          "progress": 25,
+          "anime": {
+            "id": 101,
+            "anilistId": 16498,
+            "title": "진격의 거인",
+            "format": "TV",
+            "seasonYear": 2013,
+            "averageScore": 84,
+            "coverImageLarge": null
+          }
+        }
+      ],
+      "pageInfo": {
+        "hasNext": false,
+        "nextCursor": null,
+        "limit": 6,
+        "sort": "latest",
+        "titleLanguage": "ko",
+        "genre": null,
+        "year": null,
+        "score": null
+      }
+    },
+    "stats": {},
+    "genreBubble": {},
+    "yearlyScores": {},
+    "formatDistribution": {},
+    "studios": {}
+  }
+}
+```
+
+주의: 위 예시는 길이를 줄인 축약 예시입니다. 실제 `/api/sample/overview`의 `item.collection.items`에는 샘플 애니가 여러 개 들어갑니다.
+
+Frontend usage:
+
+```ts
+const response = await fetch(`${apiBaseUrl}/api/sample/overview`);
+const data = await response.json();
+```
+
+### `GET /sample/anime-list`
+샘플 컬렉션 목록만 조회합니다. 기존 `/me/anime-list`와 비슷하게 `items`, `pageInfo`를 반환합니다.
+
+Query:
+
+- `sort`: `latest | added | score | scoreAsc`, 기본값 `latest`
+- `titleLanguage`: `ko | en | ja`, 기본값 `ko`
+- `genre`: 선택값
+- `year`: 선택값
+- `score`: 선택값, `1~10`
+- `limit`: `1~50`, 기본값 `20`
+
+Example:
+
+```http
+GET /api/sample/anime-list?sort=score&titleLanguage=ko&limit=6
+```
+
+Response example:
+
+```json
+{
+  "success": true,
+  "user": {
+    "id": 0,
+    "username": "sample_viewer",
+    "profileImageUrl": null
+  },
+  "items": [
+    {
+      "id": 1,
+      "userId": 0,
+      "animeId": 101,
+      "status": "completed",
+      "score": 9.4,
+      "progress": 25,
+      "startedAt": "2024-01-05",
+      "completedAt": "2024-01-28",
+      "notes": "Dense political drama with a memorable final arc.",
+      "anime": {
+        "id": 101,
+        "anilistId": 16498,
+        "title": "진격의 거인",
+        "titles": {
+          "korean": "진격의 거인",
+          "english": "Attack on Titan",
+          "native": "進撃の巨人",
+          "romaji": "Shingeki no Kyojin",
+          "userPreferred": "Attack on Titan"
+        },
+        "episodes": 25,
+        "duration": 24,
+        "season": "SPRING",
+        "seasonYear": 2013,
+        "format": "TV",
+        "status": "FINISHED",
+        "averageScore": 84,
+        "meanScore": 84,
+        "popularity": 860000,
+        "coverImageLarge": null,
+        "isAdult": false
+      }
+    }
+  ],
+  "pageInfo": {
+    "hasNext": false,
+    "nextCursor": null,
+    "limit": 6,
+    "sort": "score",
+    "titleLanguage": "ko",
+    "genre": null,
+    "year": null,
+    "score": null
+  }
+}
+```
+
+### `GET /sample/anime-stats`
+샘플 사용자의 전체 애니 통계를 반환합니다. `/me/anime-stats`의 `item` 구조와 비슷합니다.
+
+```http
+GET /api/sample/anime-stats
+```
+
+Response includes:
+
+- `totalCount`
+- `completedCount`
+- `watchingCount`
+- `totalWatchedEpisodes`
+- `totalWatchMinutes`
+- `avgScore`
+- `favoriteGenre`
+- `genreDistribution`
+- `genreWatchMinutes`
+- `genreAvgScore`
+- `releaseYearDistribution`
+- `scoreDistribution`
+- `topWatchedGenreTopAnime`
+- `topRatedGenreTopAnime`
+
+### `GET /sample/anime-stats/genre-bubble`
+샘플 장르 버블 차트 데이터를 반환합니다.
+
+```http
+GET /api/sample/anime-stats/genre-bubble
+```
+
+Response shape:
+
+```json
+{
+  "success": true,
+  "item": {
+    "userId": 0,
+    "status": "completed",
+    "weighting": "fractional",
+    "communityScore": "average",
+    "minCount": 1,
+    "topLimit": 3,
+    "items": [
+      {
+        "genre": "Drama",
+        "animeCount": 4,
+        "percentage": 22.22,
+        "watchMinutes": 2251,
+        "watchHours": 37.52,
+        "averageScore": 8.98,
+        "communityAverageScore": 8.1,
+        "preferenceScore": 35.9,
+        "topAnime": []
+      }
+    ],
+    "summary": {
+      "genreCount": 8,
+      "topGenre": "Drama",
+      "totalGenreCount": 18
+    }
+  }
+}
+```
+
+### `GET /sample/anime-stats/yearly-scores`
+샘플 연도별 평균 평점 분석을 반환합니다.
+
+Query:
+
+- `status`: `all | completed`, 기본값 `completed`
+- `minRatedAnimeCount`: `1~100`, 기본값 `3`
+
+Example:
+
+```http
+GET /api/sample/anime-stats/yearly-scores?status=completed&minRatedAnimeCount=1
+```
+
+### `GET /sample/anime-stats/format-distribution`
+샘플 포맷별 분포 데이터를 반환합니다. 원그래프/도넛 차트에서 바로 사용할 수 있습니다.
+
+Query:
+
+- `status`: `all | completed`, 기본값 `completed`
+- `minCount`: `1~100`, 기본값 `1`
+
+Example:
+
+```http
+GET /api/sample/anime-stats/format-distribution?status=completed&minCount=1
+```
+
+Response includes:
+
+- `totalAnimeCount`
+- `totalWatchMinutes`
+- `totalWatchHours`
+- `items[].format`
+- `items[].label`
+- `items[].animeCount`
+- `items[].percentage`
+- `items[].averageScore`
+- `items[].watchHours`
+- `summary.topFormat`
+
+### `GET /sample/anime-stats/studios`
+샘플 스튜디오 랭킹 데이터를 반환합니다.
+
+Query:
+
+- `limit`: `1~50`, 기본값 `20`
+
+Example:
+
+```http
+GET /api/sample/anime-stats/studios?limit=10
+```
+
+Response shape:
+
+```json
+{
+  "success": true,
+  "items": [
+    {
+      "studioId": 1,
+      "name": "WIT Studio",
+      "animeCount": 1,
+      "completedCount": 1,
+      "ratedAnimeCount": 1,
+      "averageScore": 9.4,
+      "watchedEpisodes": 25,
+      "watchMinutes": 600,
+      "watchHours": 10,
+      "topAnime": []
+    }
+  ],
+  "pageInfo": {
+    "hasNext": false,
+    "nextCursor": null,
+    "limit": 10,
+    "sort": "averageScore",
+    "status": "all",
+    "mainOnly": true,
+    "minAnimeCount": 1,
+    "minRatedAnimeCount": 1
+  }
+}
+```
+
+Frontend notes:
+
+- 로그인 전에는 `/api/sample/overview` 하나로 홈 프리뷰를 구성하는 것을 추천합니다.
+- 로그인 후에는 기존 `/api/me/anime-list`, `/api/me/anime-stats/*`를 사용하면 됩니다.
+- 샘플 응답의 `user.id`는 `0`이며 실제 DB 유저가 아닙니다.
+- `coverImageLarge`, `bannerImage`는 샘플에서 `null`일 수 있으므로 프론트 fallback 이미지를 준비하세요.
+
 ## Anime
 
 ### `GET /anime`

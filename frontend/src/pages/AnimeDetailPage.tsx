@@ -10,6 +10,7 @@ import {
   getGenreLabel,
   getPrimaryPoster,
 } from '../lib/anime'
+import { createSampleAnimeDetail, fetchSampleCollection } from '../lib/sample'
 import type { AnimeCastCharacter, AnimeDetailItem } from '../types/anime'
 import '../styles/pages/AnimeDetailPage.css'
 
@@ -152,10 +153,22 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
   const { id } = useParams<{ id: string }>()
   const location = useLocation()
   const navigate = useNavigate()
-  const { user } = useAuth()
+  const { isAuthenticated, user } = useAuth()
+  const routeState = location.state as {
+    fromPage?: 'explore' | 'collection'
+    sampleAnimeDetail?: AnimeDetailItem
+  } | null
+  const sampleAnimeDetail = routeState?.sampleAnimeDetail ?? null
   const requestKey = id ?? 'invalid'
   const [state, setState] = useState<DetailState>(() =>
-    createInitialDetailState(requestKey),
+    sampleAnimeDetail
+      ? {
+        item: sampleAnimeDetail,
+        isLoading: false,
+        error: null,
+        requestKey,
+      }
+      : createInitialDetailState(requestKey),
   )
   const [castState, setCastState] = useState<CastState>({
     items: [],
@@ -163,9 +176,10 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
     error: null,
   })
   const { item, isLoading, error } = state
+  const isSampleDetail = Boolean(sampleAnimeDetail || item?.source === 'Sample')
   const isRefreshingDetail = state.requestKey !== requestKey
   const isAdmin = Boolean(user?.isAdmin || user?.role === 'ADMIN')
-  const fromPage = (location.state as { fromPage?: 'explore' | 'collection' } | null)?.fromPage
+  const fromPage = routeState?.fromPage
   const backPath = fromPage === 'collection' ? '/collection' : '/explore'
   const detailPageClassName = isOverlay ? 'detail-page detail-page-overlay' : 'detail-page'
 
@@ -175,6 +189,16 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
 
   useEffect(() => {
     if (!id) {
+      return
+    }
+
+    if (sampleAnimeDetail) {
+      setState({
+        item: sampleAnimeDetail,
+        isLoading: false,
+        error: null,
+        requestKey,
+      })
       return
     }
 
@@ -195,6 +219,29 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
           return
         }
 
+        if (!isAuthenticated) {
+          try {
+            const sampleCollection = await fetchSampleCollection({
+              sort: 'score',
+              limit: 50,
+              signal: controller.signal,
+            })
+            const sampleItem = sampleCollection.items.find((entry) => String(entry.anime.id) === id)
+
+            if (sampleItem) {
+              setState({
+                item: createSampleAnimeDetail(sampleItem),
+                isLoading: false,
+                error: null,
+                requestKey,
+              })
+              return
+            }
+          } catch {
+            // Keep the original detail error below.
+          }
+        }
+
         setState({
           item: null,
           isLoading: false,
@@ -210,10 +257,10 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
     void loadDetail()
 
     return () => controller.abort()
-  }, [id, requestKey])
+  }, [id, isAuthenticated, requestKey, sampleAnimeDetail])
 
   useEffect(() => {
-    if (!item?.id) {
+    if (isSampleDetail || !item?.id) {
       const resetTimer = window.setTimeout(() => {
         setCastState({
           items: [],
@@ -269,7 +316,7 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
       window.clearTimeout(loadingTimer)
       controller.abort()
     }
-  }, [item?.id])
+  }, [isSampleDetail, item?.id])
 
   const handleAdminTitleUpdated = (updatedTitle: {
     title: string
@@ -481,16 +528,28 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
             <AdminTitleEditor key={item.id} item={item} onTitleUpdated={handleAdminTitleUpdated} />
           )}
 
-          <CollectionEditor
-            key={item.id}
-            animeId={item.id}
-            maxProgress={item.episodes}
-            targetAnime={{
-              title: item.title,
-              coverImageLarge: item.coverImageLarge,
-              coverImageExtraLarge: item.coverImageExtraLarge,
-            }}
-          />
+          {isSampleDetail ? (
+            <section className="detail-section guest-detail-cta">
+              <span className="detail-label">Sample detail</span>
+              <h2>내 컬렉션에 담아 분석해볼까요?</h2>
+              <p>로그인하면 감상 상태, 평점, 진행 화수를 직접 기록할 수 있어요.</p>
+              <div className="guest-preview-actions">
+                <Link className="primary-button" to="/signup">시작하기</Link>
+                <Link className="secondary-button" to="/login">로그인</Link>
+              </div>
+            </section>
+          ) : (
+            <CollectionEditor
+              key={item.id}
+              animeId={item.id}
+              maxProgress={item.episodes}
+              targetAnime={{
+                title: item.title,
+                coverImageLarge: item.coverImageLarge,
+                coverImageExtraLarge: item.coverImageExtraLarge,
+              }}
+            />
+          )}
 
           {koreanTitles.length > 0 && (
             <section className="detail-section">
