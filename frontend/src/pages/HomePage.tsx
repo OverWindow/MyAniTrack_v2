@@ -15,6 +15,34 @@ type HomeState = {
 
 const FEATURE_ROTATION_MS = 6000
 
+const LANDING_REVIEWS = [
+  {
+    name: 'minji.log',
+    role: '시즌 애니 기록 중',
+    comment: '봤던 작품이 쌓일수록 내 취향이 숫자로 보이는 게 좋아요.',
+  },
+  {
+    name: 'junho_97',
+    role: '완결작 위주 감상',
+    comment: '별점만 남기는 앱보다 훨씬 정리된 느낌이에요.',
+  },
+  {
+    name: 'yuna.archive',
+    role: '평점 남기는 편',
+    comment: '내가 어떤 작품을 자주 보는지 한눈에 들어와요.',
+  },
+  {
+    name: 'seungwoo.k',
+    role: '극장판 챙겨봄',
+    comment: '컬렉션에서 예전에 본 작품 찾기가 편해서 계속 쓰게 돼요.',
+  },
+  {
+    name: 'nari_watch',
+    role: '장르별로 정리 중',
+    comment: '분석 탭 보는 맛이 있어요. 취향이 생각보다 뚜렷하더라고요.',
+  },
+]
+
 function getPopularityLabel(value?: number | null) {
   if (!value) {
     return '인기 집계 중'
@@ -125,83 +153,111 @@ export function HomePage() {
       {state.error ? (
         <ConnectionErrorState className="home-connection-error" message={state.error} />
       ) : (
-      <section className="home-cinematic-hero" aria-label="인기 애니 쇼케이스">
-        {featuredAnime && (
-          <div
-            className="home-cinematic-backdrop"
-            style={{
-              backgroundImage: `linear-gradient(90deg, rgba(35, 29, 25, 0.95) 0%, rgba(35, 29, 25, 0.8) 42%, rgba(35, 29, 25, 0.26) 100%), url(${getPrimaryPoster(featuredAnime)})`,
-            }}
-          />
-        )}
+        <section className="home-cinematic-hero" aria-label="인기 애니 쇼케이스">
+          {featuredAnime && (
+            <div
+              className="home-cinematic-backdrop"
+              style={{
+                backgroundImage: `linear-gradient(90deg, rgba(35, 29, 25, 0.95) 0%, rgba(35, 29, 25, 0.8) 42%, rgba(35, 29, 25, 0.26) 100%), url(${getPrimaryPoster(featuredAnime)})`,
+              }}
+            />
+          )}
 
-        <div className="home-cinematic-copy">
-          <span className="section-kicker">MyAniTrack spotlight</span>
-          <h1>{featuredAnime ? getDisplayTitle(featuredAnime) : '지금 많이 찾는 애니'}</h1>
-          <div className="home-feature-meta">
-            <span>Anime</span>
-            <span>Collection</span>
-            <span>{featuredAnime ? getPopularityLabel(featuredAnime.popularity) : 'Trending'}</span>
-          </div>
-          <p>
-            오늘의 인기 작품을 둘러보고, 마음에 드는 애니를 컬렉션에 담아 취향 분석까지 이어가세요.
-          </p>
+          <div className="home-cinematic-copy">
+            <span className="section-kicker">MyAniTrack spotlight</span>
+            <h1>{featuredAnime ? getDisplayTitle(featuredAnime) : '지금 많이 찾는 애니'}</h1>
+            <div className="home-feature-meta">
+              <span>Anime</span>
+              <span>Collection</span>
+              <span>{featuredAnime ? getPopularityLabel(featuredAnime.popularity) : 'Trending'}</span>
+            </div>
+            <p>
+              오늘의 인기 작품을 둘러보고, 마음에 드는 애니를 컬렉션에 담아 취향 분석까지 이어가세요.
+            </p>
 
-          <div className="home-cinematic-actions">
-            <Link className="primary-button" to="/explore">
-              탐색 시작하기
-            </Link>
-            {featuredAnime && (
-              <Link className="secondary-button" to={`/anime/${featuredAnime.id}`} state={{ fromPage: 'explore' }}>
-                대표 작품 보기
+            <div className="home-cinematic-actions">
+              <Link className="primary-button" to="/explore">
+                탐색 시작하기
               </Link>
+              {featuredAnime && (
+                <Link className="secondary-button" to={`/anime/${featuredAnime.id}`} state={{ fromPage: 'explore' }}>
+                  대표 작품 보기
+                </Link>
+              )}
+            </div>
+          </div>
+
+          <div className="home-feature-poster-wrap" aria-hidden={!featuredAnime}>
+            {featuredAnime ? (
+              <img
+                className="home-feature-poster"
+                src={getPrimaryPoster(featuredAnime)}
+                alt={getDisplayTitle(featuredAnime)}
+              />
+            ) : (
+              <div className="home-feature-poster-placeholder" />
             )}
           </div>
+
+          <div className="home-poster-rail" aria-label="인기 애니 목록">
+            {state.isLoading && (
+              Array.from({ length: 6 }).map((_, index) => (
+                <div className="home-rail-card skeleton-card" key={`home-rail-loading-${index}`}>
+                  <div className="skeleton-line long" />
+                </div>
+              ))
+            )}
+
+            {!state.isLoading && railAnime.length > 0 && railAnime.map((anime, index) => (
+              <button
+                className={featuredAnime?.id === anime.id ? 'home-rail-card is-active' : 'home-rail-card'}
+                key={anime.id}
+                type="button"
+                onClick={() => setFeaturedIndex(index)}
+                aria-label={`${getDisplayTitle(anime)} 대표로 보기`}
+              >
+                <img
+                  src={getPrimaryPoster(anime)}
+                  alt={getDisplayTitle(anime)}
+                  loading={index < 4 ? 'eager' : 'lazy'}
+                />
+              </button>
+            ))}
+
+            {!state.isLoading && railAnime.length === 0 && !state.error && (
+              <div className="feedback-card">인기 애니 정보를 아직 보여드릴 수 없어요.</div>
+            )}
+          </div>
+        </section>
+      )}
+
+      <section className="home-review-section" aria-labelledby="home-review-title">
+        <div className="home-review-heading">
+          <h2 id="home-review-title">먼저 써본 사람들의 한마디</h2>
         </div>
 
-        <div className="home-feature-poster-wrap" aria-hidden={!featuredAnime}>
-          {featuredAnime ? (
-            <img
-              className="home-feature-poster"
-              src={getPrimaryPoster(featuredAnime)}
-              alt={getDisplayTitle(featuredAnime)}
-            />
-          ) : (
-            <div className="home-feature-poster-placeholder" />
-          )}
-        </div>
-
-        <div className="home-poster-rail" aria-label="인기 애니 목록">
-          {state.isLoading && (
-            Array.from({ length: 6 }).map((_, index) => (
-              <div className="home-rail-card skeleton-card" key={`home-rail-loading-${index}`}>
-                <div className="skeleton-line long" />
+        <div className="home-review-track" aria-label="사용자 리뷰">
+          {LANDING_REVIEWS.map((review) => (
+            <article className="home-review-card" key={review.name}>
+              <div className="home-review-stars" aria-label="5점 만점">
+                <span>★</span>
+                <span>★</span>
+                <span>★</span>
+                <span>★</span>
+                <span>★</span>
               </div>
-            ))
-          )}
-
-          {!state.isLoading && railAnime.length > 0 && railAnime.map((anime, index) => (
-            <button
-              className={featuredAnime?.id === anime.id ? 'home-rail-card is-active' : 'home-rail-card'}
-              key={anime.id}
-              type="button"
-              onClick={() => setFeaturedIndex(index)}
-              aria-label={`${getDisplayTitle(anime)} 대표로 보기`}
-            >
-              <img
-                src={getPrimaryPoster(anime)}
-                alt={getDisplayTitle(anime)}
-                loading={index < 4 ? 'eager' : 'lazy'}
-              />
-            </button>
+              <blockquote className="home-review-comment">“{review.comment}”</blockquote>
+              <div className="home-review-author">
+                <span className="home-review-avatar">{review.name.slice(0, 1)}</span>
+                <div>
+                  <strong>{review.name}</strong>
+                  <span>{review.role}</span>
+                </div>
+              </div>
+            </article>
           ))}
-
-          {!state.isLoading && railAnime.length === 0 && !state.error && (
-            <div className="feedback-card">인기 애니 정보를 아직 보여드릴 수 없어요.</div>
-          )}
         </div>
       </section>
-      )}
     </div>
   )
 }
