@@ -538,7 +538,6 @@ export function SettingsPage() {
           >
             <div className="agreement-modal-header">
               <div>
-                <span className="section-kicker">Agreement</span>
                 <h2 id="settings-agreement-modal-title">{activeAgreementContent.title}</h2>
               </div>
               <button className="secondary-button agreement-close-button" type="button" onClick={() => setActiveAgreement(null)}>

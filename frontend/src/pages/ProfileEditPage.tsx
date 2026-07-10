@@ -163,7 +163,6 @@ export function ProfileEditPage() {
   return (
     <section className="auth-page profile-edit-page">
       <div className="auth-card auth-card-wide profile-edit-card">
-        <span className="section-kicker">Edit profile</span>
         <h1 className="auth-title">프로필 수정</h1>
         <p className="auth-description">
           사용자명, bio, 프로필 이미지를 바꾸면 즉시 헤더와 프로필 페이지에 반영돼요.

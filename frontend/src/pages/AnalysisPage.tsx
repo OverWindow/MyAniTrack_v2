@@ -1684,7 +1684,6 @@ export function AnalysisPage() {
               onError={handleProfileImageError}
             />
             <div>
-              <span className="section-kicker">Anime analysis</span>
               <h1>
                 {displayName}
                 {isGuestPreview && <span className="sample-title-badge">샘플</span>}

@@ -94,7 +94,6 @@ export function ProfilePage() {
           />
 
           <div className="profile-hero-copy">
-            <span className="section-kicker">My profile</span>
             <h1 className="profile-hero-title">{displayName}</h1>
             <p className="profile-hero-bio">
               {user.bio || '좋아하는 장르와 감상 스타일을 천천히 채워가는 중이에요.'}

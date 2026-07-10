@@ -725,7 +725,6 @@ export function AdminPage() {
     <section className="admin-page">
       <div className="admin-hero-card">
         <div className="admin-hero-copy">
-          <span className="section-kicker">Admin console</span>
           <h1>총 관리 페이지</h1>
           <p>애니 동기화와 한국어 제목 번역 배치를 실행하는 관리자 전용 공간입니다. 상단 수치는 공개 플랫폼 통계 API와 연동됩니다.</p>
           <span className="admin-hero-meta">현재 접속 계정: {greeting}</span>

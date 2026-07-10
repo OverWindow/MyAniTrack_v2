@@ -26,6 +26,7 @@ import { UserCollectionPage } from './pages/UserCollectionPage'
 import { UserProfilePage } from './pages/UserProfilePage'
 import { VerifyEmailConfirmPage } from './pages/VerifyEmailConfirmPage'
 import { VerifyEmailPendingPage } from './pages/VerifyEmailPendingPage'
+import { VoiceActorDetailPage } from './pages/VoiceActorDetailPage'
 import './styles/App.css'
 
 function App() {
@@ -105,6 +106,7 @@ function App() {
           <Route path="/analysis" element={<AnalysisPage />} />
           <Route path="/admin" element={<AdminPage />} />
           <Route path="/anime/:id" element={<AnimeDetailPage />} />
+          <Route path="/voice-actors/:voiceActorId" element={<VoiceActorDetailPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/profile/edit" element={<ProfileEditPage />} />
           <Route path="/collection" element={<CollectionPage />} />

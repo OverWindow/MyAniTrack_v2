@@ -1635,6 +1635,120 @@ Frontend notes:
 
 분석 결과는 `user_voice_actor_stats` 스냅샷 테이블에 저장됩니다. 유저의 애니 컬렉션이 추가/수정/삭제되면 dirty 처리되고, 다음 랭킹 조회 시 자동 재계산됩니다.
 
+### `GET /voice-actors/:voiceActorId`
+성우 상세 페이지용 공개 API입니다. 성우 ID를 넘기면 성우 정보와 해당 성우가 맡은 캐릭터, 그리고 그 캐릭터가 등장한 작품을 함께 반환합니다.
+
+인증이 필요 없습니다.
+
+Query:
+
+- `titleLanguage`: `ko | en | ja`, 기본값 `ko`
+- `limit`: `1~50`, 기본값 `20`
+- `cursor`: 다음 페이지 cursor
+
+Example request:
+
+```http
+GET /api/voice-actors/12?titleLanguage=ko&limit=20
+```
+
+Response example:
+
+```json
+{
+  "success": true,
+  "item": {
+    "voiceActor": {
+      "id": 12,
+      "anilistId": 95001,
+      "name": {
+        "full": "Kana Hanazawa",
+        "native": "花澤香菜",
+        "userPreferred": "Kana Hanazawa"
+      },
+      "image": {
+        "large": "https://...",
+        "medium": "https://..."
+      },
+      "languageV2": "Japanese",
+      "description": "...",
+      "siteUrl": "https://anilist.co/staff/..."
+    },
+    "summary": {
+      "animeCount": 42,
+      "characterCount": 45,
+      "creditCount": 48
+    },
+    "items": [
+      {
+        "character": {
+          "id": 77,
+          "anilistId": 1001,
+          "role": "MAIN",
+          "edgeName": null,
+          "sortOrder": 1,
+          "name": {
+            "full": "Character Name",
+            "native": "キャラクター",
+            "userPreferred": "Character Name"
+          },
+          "image": {
+            "large": "https://...",
+            "medium": "https://..."
+          },
+          "gender": "Female",
+          "age": null,
+          "description": "...",
+          "siteUrl": "https://anilist.co/character/..."
+        },
+        "anime": {
+          "id": 123,
+          "anilistId": 456,
+          "title": "장송의 프리렌",
+          "titles": {
+            "korean": "장송의 프리렌",
+            "english": "Frieren: Beyond Journey's End",
+            "native": "葬送のフリーレン",
+            "romaji": "Sousou no Frieren",
+            "userPreferred": "Frieren: Beyond Journey's End"
+          },
+          "coverImageLarge": "https://...",
+          "coverImageExtraLarge": "https://...",
+          "bannerImage": "https://...",
+          "season": "FALL",
+          "seasonYear": 2023,
+          "format": "TV",
+          "status": "FINISHED",
+          "averageScore": 88,
+          "meanScore": 88,
+          "popularity": 250000,
+          "favourites": 20000,
+          "siteUrl": "https://anilist.co/anime/456",
+          "isAdult": false
+        },
+        "voiceActing": {
+          "languageV2": "Japanese",
+          "sortOrder": 1
+        }
+      }
+    ],
+    "pageInfo": {
+      "limit": 20,
+      "titleLanguage": "ko",
+      "hasNext": true,
+      "nextCursor": "..."
+    }
+  }
+}
+```
+
+Frontend usage:
+
+- 성우 상세 상단에는 `item.voiceActor`와 `item.summary`를 사용합니다.
+- 캐릭터/작품 리스트는 `item.items`를 사용합니다.
+- `pageInfo.hasNext`와 `pageInfo.nextCursor`로 더보기 처리합니다.
+- 이미지 필드는 nullable이므로 fallback UI가 필요합니다.
+
 ### `GET /me/voice-actors/ranking`
 내가 많이 본 성우 또는 평점 기준으로 좋아하는 성우 랭킹을 조회합니다.
 

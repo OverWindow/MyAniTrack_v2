@@ -1,0 +1,264 @@
+.voice-actor-detail-page {
+  display: grid;
+  gap: 22px;
+}
+
+.voice-actor-hero {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 28px;
+  align-items: end;
+  padding: 30px;
+  border: 1px solid rgba(68, 64, 60, 0.18);
+  border-radius: 2px;
+  background:
+    linear-gradient(135deg, rgba(41, 37, 36, 0.98), rgba(68, 64, 60, 0.92)),
+    radial-gradient(circle at 78% 24%, rgba(245, 158, 11, 0.18), transparent 34%);
+  box-shadow: var(--shadow-card);
+}
+
+.voice-actor-hero-image-wrap {
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 24px 60px rgba(28, 25, 23, 0.28);
+}
+
+.voice-actor-hero-image {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+}
+
+.voice-actor-hero-copy {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.voice-actor-hero-copy h1 {
+  max-width: 14ch;
+  color: var(--text-inverse);
+  font-size: clamp(2.4rem, 5.4vw, 5.2rem);
+  line-height: 0.96;
+}
+
+.voice-actor-hero-copy p {
+  display: -webkit-box;
+  max-width: 72ch;
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 0.98rem;
+  font-weight: 650;
+  line-height: 1.72;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
+}
+
+.voice-actor-hero-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.voice-actor-hero-meta span,
+.voice-actor-hero-meta a {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 0.78rem;
+  font-weight: 850;
+  text-decoration: none;
+}
+
+.voice-actor-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.voice-actor-summary-grid div,
+.voice-actor-credit-section,
+.voice-actor-detail-loading {
+  border: 1px solid rgba(120, 113, 108, 0.16);
+  border-radius: 2px;
+  background: var(--bg-card);
+  box-shadow: var(--shadow-card);
+}
+
+.voice-actor-summary-grid div {
+  display: grid;
+  gap: 8px;
+  padding: 20px;
+}
+
+.voice-actor-summary-grid span {
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.voice-actor-summary-grid strong {
+  color: var(--text-primary);
+  font-size: 1.42rem;
+  line-height: 1;
+}
+
+.voice-actor-credit-section {
+  display: grid;
+  gap: 18px;
+  padding: 24px;
+}
+
+.voice-actor-credit-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.voice-actor-credit-heading div {
+  display: grid;
+  gap: 6px;
+}
+
+.voice-actor-credit-heading p {
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+  font-weight: 650;
+}
+
+.voice-actor-credit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.voice-actor-credit-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid rgba(120, 113, 108, 0.14);
+  border-radius: 2px;
+  background: rgba(250, 247, 241, 0.62);
+}
+
+.voice-actor-character-block,
+.voice-actor-anime-block {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.voice-actor-anime-block {
+  color: inherit;
+  text-decoration: none;
+}
+
+.voice-actor-anime-block:hover strong,
+.voice-actor-anime-block:focus-visible strong {
+  color: var(--point-hover);
+}
+
+.voice-actor-character-block img,
+.voice-actor-anime-block img {
+  width: 72px;
+  height: 92px;
+  border-radius: 2px;
+  object-fit: cover;
+  background: var(--bg-neutral);
+}
+
+.voice-actor-character-block div,
+.voice-actor-anime-block span {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.voice-actor-character-block span,
+.voice-actor-anime-block small {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.voice-actor-character-block strong,
+.voice-actor-character-block small,
+.voice-actor-anime-block strong,
+.voice-actor-anime-block em {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.voice-actor-character-block strong,
+.voice-actor-anime-block strong {
+  color: var(--text-primary);
+  line-height: 1.25;
+}
+
+.voice-actor-character-block small,
+.voice-actor-anime-block em {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  font-style: normal;
+  white-space: nowrap;
+}
+
+.voice-actor-load-more {
+  justify-self: center;
+}
+
+.voice-actor-detail-loading {
+  display: grid;
+  gap: 14px;
+  padding: 28px;
+}
+
+@media (max-width: 980px) {
+  .voice-actor-hero,
+  .voice-actor-credit-card {
+    grid-template-columns: 1fr;
+  }
+
+  .voice-actor-hero-image-wrap {
+    width: min(220px, 62vw);
+  }
+
+  .voice-actor-credit-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .voice-actor-hero,
+  .voice-actor-credit-section {
+    padding: 20px;
+  }
+
+  .voice-actor-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .voice-actor-character-block,
+  .voice-actor-anime-block {
+    grid-template-columns: 62px minmax(0, 1fr);
+  }
+
+  .voice-actor-character-block img,
+  .voice-actor-anime-block img {
+    width: 62px;
+    height: 80px;
+  }
+}

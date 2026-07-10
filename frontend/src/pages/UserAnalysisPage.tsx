@@ -519,7 +519,6 @@ export function UserAnalysisPage() {
               </div>
             )}
             <div>
-              <span className="section-kicker">Friend analysis</span>
               <h1>{user.username}</h1>
               <p>사용자 ID {user.id}</p>
             </div>

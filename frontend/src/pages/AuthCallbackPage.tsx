@@ -46,7 +46,6 @@ export function AuthCallbackPage() {
   return (
     <section className="auth-page">
       <div className="auth-card auth-callback-card">
-        <span className="section-kicker">Google sign in</span>
         <h1 className="auth-title">로그인 처리 중</h1>
         {error ? (
           <>

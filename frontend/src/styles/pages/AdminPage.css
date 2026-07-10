@@ -27,12 +27,6 @@
   max-width: 72ch;
 }
 
-.admin-hero-copy .section-kicker {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.18);
-  color: rgba(255, 255, 255, 0.92);
-}
-
 .admin-hero-copy h1,
 .admin-hero-copy p,
 .admin-hero-meta {

@@ -97,12 +97,6 @@
   align-content: end;
 }
 
-.detail-copy .section-kicker {
-  background: rgba(254, 243, 199, 0.14);
-  border-color: rgba(251, 191, 36, 0.28);
-  color: #fde68a;
-}
-
 .detail-title,
 .detail-subtitle {
   color: var(--text-inverse);
@@ -261,6 +255,16 @@
   align-items: center;
   gap: 12px;
   min-width: 0;
+}
+
+.detail-cast-person-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.detail-cast-person-link:hover strong,
+.detail-cast-person-link:focus-visible strong {
+  color: var(--point-hover);
 }
 
 .detail-cast-person img {

@@ -425,7 +425,6 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
           </div>
 
           <div className="detail-copy">
-            <span className="section-kicker">Anime detail</span>
             <h1 className="detail-title">{item.title}</h1>
             <p className="detail-subtitle">
               {item.titles.native || item.titles.romaji || item.titles.english}
@@ -618,7 +617,7 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
                     </div>
 
                     {voiceActor && (
-                      <div className="detail-cast-person">
+                      <Link className="detail-cast-person detail-cast-person-link" to={`/voice-actors/${voiceActor.id}`}>
                         <img
                           src={voiceActor.image.large || voiceActor.image.medium || ''}
                           alt={getCastDisplayName(voiceActor.name)}
@@ -629,7 +628,7 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
                           <strong>{getCastDisplayName(voiceActor.name)}</strong>
                           {voiceActor.name.native && <small>{voiceActor.name.native}</small>}
                         </div>
-                      </div>
+                      </Link>
                     )}
                   </article>
                 )

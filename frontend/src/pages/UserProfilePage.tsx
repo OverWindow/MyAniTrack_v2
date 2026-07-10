@@ -128,7 +128,6 @@ export function UserProfilePage() {
           />
 
           <div className="profile-hero-copy">
-            <span className="section-kicker">Friend profile</span>
             <h1 className="profile-hero-title">{user.username}</h1>
             <p className="profile-hero-bio">{user.bio || '아직 소개가 등록되지 않았어요.'}</p>
             <div className="user-profile-meta-row">

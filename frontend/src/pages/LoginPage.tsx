@@ -68,7 +68,6 @@ export function LoginPage() {
   return (
     <section className="auth-page">
       <div className="auth-card">
-        <span className="section-kicker">Welcome back</span>
         <h1 className="auth-title">로그인</h1>
         <p className="auth-description">
           내 애니 기록과 친구 비교, 취향 분석을 이어서 확인해보세요.

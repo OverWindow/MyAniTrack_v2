@@ -209,7 +209,6 @@ export function SignupPage() {
     <>
       <section className="auth-page">
         <div className="auth-card auth-card-wide auth-card-signup">
-          <span className="section-kicker">Create account</span>
           <h1 className="auth-title">회원가입</h1>
           <p className="auth-description">
             이메일 인증을 완료해야 MyAniTrack에 로그인할 수 있어요.
@@ -389,7 +388,6 @@ export function SignupPage() {
           >
             <div className="agreement-modal-header">
               <div>
-                <span className="section-kicker">Agreement</span>
                 <h2 id="agreement-modal-title">{activeAgreementContent.title}</h2>
               </div>
               <button className="secondary-button agreement-close-button" type="button" onClick={() => setActiveAgreement(null)}>

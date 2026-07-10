@@ -27,7 +27,6 @@ export function PasswordResetRequestPage() {
   return (
     <section className="auth-page">
       <div className="auth-card">
-        <span className="section-kicker">Password reset</span>
         <h1 className="auth-title">비밀번호 찾기</h1>
         <p className="auth-description">
           가입한 이메일 주소를 입력하면 비밀번호를 다시 설정할 수 있는 메일을 보내드릴게요.

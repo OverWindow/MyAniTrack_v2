@@ -49,7 +49,6 @@ export function VerifyEmailConfirmPage() {
   return (
     <section className="auth-page">
       <div className="auth-card">
-        <span className="section-kicker">Email verification</span>
         <h1 className="auth-title">이메일 인증 확인</h1>
         <p className="auth-description">
           메일에서 연 링크를 확인하고 있어요. 잠시만 기다려주세요.

@@ -52,7 +52,6 @@ export function PasswordResetConfirmPage() {
   return (
     <section className="auth-page">
       <div className="auth-card">
-        <span className="section-kicker">New password</span>
         <h1 className="auth-title">새 비밀번호 설정</h1>
         <p className="auth-description">
           메일에서 연 링크가 맞다면 새 비밀번호를 입력하고 바로 로그인할 수 있어요.

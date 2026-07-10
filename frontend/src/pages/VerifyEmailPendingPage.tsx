@@ -34,7 +34,6 @@ export function VerifyEmailPendingPage() {
   return (
     <section className="auth-page">
       <div className="auth-card">
-        <span className="section-kicker">Verify email</span>
         <h1 className="auth-title">이메일 인증이 필요해요</h1>
         <p className="auth-description">
           회원가입은 완료됐지만 아직 로그인할 수는 없어요. 받은 편지함에서 인증 메일을 열고 링크를 눌러주세요.

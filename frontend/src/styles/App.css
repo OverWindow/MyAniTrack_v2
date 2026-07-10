@@ -567,7 +567,6 @@
 }
 
 .eyebrow,
-.section-kicker,
 .summary-kicker,
 .panel-label,
 .comparison-label,
@@ -582,7 +581,6 @@
 }
 
 .eyebrow,
-.section-kicker,
 .detail-label {
   background: var(--point-soft);
   border: 1px solid var(--point-border);

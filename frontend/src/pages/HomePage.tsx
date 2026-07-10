@@ -127,7 +127,6 @@ export function HomePage() {
         <div className="home-immersive-shade" />
 
         <div className="home-immersive-copy">
-          <span className="section-kicker">MyAniTrack</span>
           <h1>애니 취향을 <br/> 기록하고 분석하는 <br/>가장 선명한 창</h1>
           <p>
             감상한 작품과 평점, 시청 시간을 모아 장르, 스튜디오, 성우, 포맷 흐름까지 한 화면에서
@@ -164,7 +163,6 @@ export function HomePage() {
           )}
 
           <div className="home-cinematic-copy">
-            <span className="section-kicker">MyAniTrack spotlight</span>
             <h1>{featuredAnime ? getDisplayTitle(featuredAnime) : '지금 많이 찾는 애니'}</h1>
             <div className="home-feature-meta">
               <span>Anime</span>

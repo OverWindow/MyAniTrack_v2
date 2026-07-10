@@ -1,0 +1,48 @@
+import 'anime_entry.dart';
+
+const sampleEntries = [
+  AnimeEntry(
+    id: 1,
+    title: '장송의 프리렌',
+    status: 'completed',
+    score: 9.6,
+    progress: 28,
+    totalEpisodes: 28,
+    year: 2023,
+    format: 'TV',
+    genre: 'Fantasy',
+  ),
+  AnimeEntry(
+    id: 2,
+    title: '봇치 더 록!',
+    status: 'completed',
+    score: 9.1,
+    progress: 12,
+    totalEpisodes: 12,
+    year: 2022,
+    format: 'TV',
+    genre: 'Music',
+  ),
+  AnimeEntry(
+    id: 3,
+    title: '스킵과 로퍼',
+    status: 'watching',
+    score: 8.7,
+    progress: 8,
+    totalEpisodes: 12,
+    year: 2023,
+    format: 'TV',
+    genre: 'Slice of Life',
+  ),
+  AnimeEntry(
+    id: 4,
+    title: '바이올렛 에버가든',
+    status: 'completed',
+    score: 9.3,
+    progress: 13,
+    totalEpisodes: 13,
+    year: 2018,
+    format: 'TV',
+    genre: 'Drama',
+  ),
+];
