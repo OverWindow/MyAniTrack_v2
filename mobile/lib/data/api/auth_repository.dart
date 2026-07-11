@@ -1,3 +1,4 @@
+import '../models/auth_user_info.dart';
 import 'api_client.dart';
 
 class AuthRepository {
@@ -13,8 +14,21 @@ class AuthRepository {
     return _apiClient.getJson('/auth/me', authenticated: true);
   }
 
+  Future<AuthUserInfo> fetchMeInfo() async {
+    final json = await fetchMe();
+    return AuthUserInfo.fromJson(json);
+  }
+
   Future<Map<String, dynamic>> fetchAgreements() {
     return _apiClient.getJson('/me/agreements', authenticated: true);
+  }
+
+  Future<Map<String, dynamic>> logout() {
+    return _apiClient.postJson('/auth/logout', authenticated: true);
+  }
+
+  Future<Map<String, dynamic>> logoutAll() {
+    return _apiClient.postJson('/auth/logout-all', authenticated: true);
   }
 
   Future<Map<String, dynamic>> acceptRequiredAgreements({

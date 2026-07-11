@@ -1,4 +1,5 @@
 import '../api/api_client.dart';
+import '../api/api_exception.dart';
 import '../api/stats_repository.dart';
 import '../api/voice_actor_repository.dart';
 import '../models/analysis_models.dart';
@@ -34,7 +35,11 @@ class AnalysisDataService {
         voiceActors: voiceActors,
         isSample: false,
       );
-    } on Object {
+    } on Object catch (error) {
+      if (error is ApiException &&
+          (error.statusCode == 401 || error.statusCode == 403)) {
+        rethrow;
+      }
       return sample;
     }
   }

@@ -5,12 +5,14 @@ import '../../../core/widgets/app_badge.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_state_message.dart';
 import '../../../core/widgets/anime_poster.dart';
+import '../../../data/api/api_access_issue.dart';
 import '../../../data/api/api_client.dart';
 import '../../../data/api/collection_repository.dart';
 import '../../../data/auth/auth_session_service.dart';
 import '../../../data/models/anime_entry.dart';
 import '../../../data/models/collection_status.dart';
 import '../../../data/models/sample_data.dart';
+import '../../profile/presentation/agreements_page.dart';
 import '../../anime_search/presentation/anime_search_page.dart';
 import '../../anime_detail/anime_detail_page.dart';
 
@@ -51,12 +53,14 @@ class _CollectionPageState extends State<CollectionPage> {
   late Future<List<AnimeEntry>> _entriesFuture = _loadEntries();
   List<AnimeEntry>? _cachedEntries;
   String? _nextCursor;
+  ApiAccessIssue? _accessIssue;
   bool _hasNext = false;
   bool _loadingMore = false;
 
   Future<List<AnimeEntry>> _loadEntries() async {
     _nextCursor = null;
     _hasNext = false;
+    _accessIssue = null;
 
     if (!_authSessionService.isSignedIn) {
       _cachedEntries = sampleEntries;
@@ -70,7 +74,8 @@ class _CollectionPageState extends State<CollectionPage> {
       _hasNext = page.pageInfo.hasNext && _nextCursor != null;
       _cachedEntries = entries;
       return entries;
-    } on Object {
+    } on Object catch (error) {
+      _accessIssue = ApiAccessIssue.from(error);
       _cachedEntries = sampleEntries;
       return sampleEntries;
     }
@@ -151,6 +156,13 @@ class _CollectionPageState extends State<CollectionPage> {
                       const LinearProgressIndicator(minHeight: 3),
                     ],
                     const SizedBox(height: 14),
+                    if (_accessIssue != null) ...[
+                      _AccessIssueMessage(
+                        issue: _accessIssue!,
+                        onAgreementsTap: _openAgreements,
+                      ),
+                      const SizedBox(height: 14),
+                    ],
                     _SearchToolbar(
                       onChanged: (value) => setState(() => _query = value),
                       onSearchTap: _openAnimeSearch,
@@ -197,6 +209,16 @@ class _CollectionPageState extends State<CollectionPage> {
         );
       },
     );
+  }
+
+  void _openAgreements() {
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: (context) => const AgreementsPage()))
+        .then((_) {
+      if (mounted) {
+        _reloadEntries();
+      }
+    });
   }
 
   void _openAnimeSearch() {
@@ -353,6 +375,34 @@ class _CollectionControls extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+class _AccessIssueMessage extends StatelessWidget {
+  const _AccessIssueMessage({
+    required this.issue,
+    required this.onAgreementsTap,
+  });
+
+  final ApiAccessIssue issue;
+  final VoidCallback onAgreementsTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppStateMessage(
+      icon: issue.needsAgreements
+          ? Icons.assignment_turned_in_outlined
+          : Icons.login_rounded,
+      title: issue.title,
+      body: issue.message,
+      action: issue.needsAgreements
+          ? FilledButton.icon(
+              onPressed: onAgreementsTap,
+              icon: const Icon(Icons.assignment_turned_in_outlined),
+              label: const Text('약관 동의하기'),
+            )
+          : null,
     );
   }
 }

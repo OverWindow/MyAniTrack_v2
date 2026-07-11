@@ -231,6 +231,10 @@ export async function sendFriendRequest(userId: number, input: SendFriendRequest
     throw new Error('receiverId must be a positive integer');
   }
 
+  if (hasUsername && !/^[a-zA-Z0-9_]{3,20}$/.test(normalizedUsername)) {
+    throw new Error('username must be 3-20 characters using only letters, numbers, and underscore');
+  }
+
   let receiver: FriendUserRow | null = null;
 
   if (hasReceiverId) {

@@ -32,6 +32,10 @@ function getErrorStatus(message: string) {
     return 404;
   }
 
+  if (message === 'Admin access required') {
+    return 403;
+  }
+
   return 500;
 }
 
@@ -45,8 +49,36 @@ function parsePositiveInteger(value: unknown, fieldName: string) {
   return parsedValue;
 }
 
+function ensureAdmin(req: Request, res: Response) {
+  const authUser = req.authUser;
+
+  if (!authUser) {
+    res.status(401).json({
+      success: false,
+      message: 'Unauthorized',
+    });
+
+    return null;
+  }
+
+  if (authUser.role !== 'ADMIN') {
+    res.status(403).json({
+      success: false,
+      message: 'Admin access required',
+    });
+
+    return null;
+  }
+
+  return authUser;
+}
+
 export async function syncAnimePageController(req: Request, res: Response) {
   try {
+    if (!ensureAdmin(req, res)) {
+      return;
+    }
+
     const page = Number(req.body.page || 1);
     const perPage = Number(req.body.perPage || 50);
 
@@ -64,6 +96,10 @@ export async function syncAnimePageController(req: Request, res: Response) {
 
 export async function syncAllAnimeController(req: Request, res: Response) {
   try {
+    if (!ensureAdmin(req, res)) {
+      return;
+    }
+
     const startPage = Number(req.body.startPage || 1);
     const perPage = Number(req.body.perPage || 50);
     const maxPages = req.body.maxPages ? Number(req.body.maxPages) : undefined;
@@ -82,6 +118,10 @@ export async function syncAllAnimeController(req: Request, res: Response) {
 
 export async function syncAnimeInChunksController(req: Request, res: Response) {
   try {
+    if (!ensureAdmin(req, res)) {
+      return;
+    }
+
     const startPage = Number(req.body.startPage || 1);
     const perPage = Number(req.body.perPage || 50);
     const pagesPerChunk = Number(req.body.pagesPerChunk || 10);
@@ -108,6 +148,10 @@ export async function syncAnimeInChunksController(req: Request, res: Response) {
 
 export async function syncSeasonAnimeController(req: Request, res: Response) {
   try {
+    if (!ensureAdmin(req, res)) {
+      return;
+    }
+
     const season = req.body.season as 'WINTER' | 'SPRING' | 'SUMMER' | 'FALL' | undefined;
     const seasonYear = req.body.seasonYear ? Number(req.body.seasonYear) : undefined;
     const startPage = Number(req.body.startPage || 1);
@@ -134,6 +178,10 @@ export async function syncSeasonAnimeController(req: Request, res: Response) {
 
 export async function syncMissingAnimeStudiosController(req: Request, res: Response) {
   try {
+    if (!ensureAdmin(req, res)) {
+      return;
+    }
+
     const result = await syncMissingAnimeStudios({
       limit: req.body.limit,
       batchSize: req.body.batchSize,
@@ -153,6 +201,10 @@ export async function syncMissingAnimeStudiosController(req: Request, res: Respo
 
 export async function translateAnimeKoreanTitlesController(req: Request, res: Response) {
   try {
+    if (!ensureAdmin(req, res)) {
+      return;
+    }
+
     const batchSize = Number(req.body.batchSize || 100);
     const maxBatches = Number(req.body.maxBatches || 1);
 
@@ -170,13 +222,10 @@ export async function translateAnimeKoreanTitlesController(req: Request, res: Re
 
 export async function updateAnimeKoreanTitleController(req: Request, res: Response) {
   try {
-    const authUser = req.authUser;
+    const authUser = ensureAdmin(req, res);
 
     if (!authUser) {
-      return res.status(401).json({
-        success: false,
-        message: 'Unauthorized',
-      });
+      return;
     }
 
     const animeId = parsePositiveInteger(req.params.animeId, 'animeId');
@@ -197,6 +246,10 @@ export async function updateAnimeKoreanTitleController(req: Request, res: Respon
 
 export async function syncAnimeCastController(req: Request, res: Response) {
   try {
+    if (!ensureAdmin(req, res)) {
+      return;
+    }
+
     const animeId = parsePositiveInteger(req.params.animeId, 'animeId');
     const result = await syncAnimeCastByAnimeId(animeId, {
       perPage: req.body.perPage,
@@ -215,6 +268,10 @@ export async function syncAnimeCastController(req: Request, res: Response) {
 
 export async function syncAnimeCastBatchController(req: Request, res: Response) {
   try {
+    if (!ensureAdmin(req, res)) {
+      return;
+    }
+
     const result = await syncAnimeCastBatch({
       limit: req.body.limit,
       perPage: req.body.perPage,
@@ -236,6 +293,10 @@ export async function syncAnimeCastBatchController(req: Request, res: Response) 
 
 export async function syncAnimeCastInChunksController(req: Request, res: Response) {
   try {
+    if (!ensureAdmin(req, res)) {
+      return;
+    }
+
     const result = await syncAnimeCastInChunks({
       totalLimit: req.body.totalLimit,
       chunkSize: req.body.chunkSize,
@@ -260,6 +321,10 @@ export async function syncAnimeCastInChunksController(req: Request, res: Respons
 
 export async function getAnimeCastSyncStateController(req: Request, res: Response) {
   try {
+    if (!ensureAdmin(req, res)) {
+      return;
+    }
+
     const animeId = parsePositiveInteger(req.params.animeId, 'animeId');
     const item = await getAnimeCastSyncState(animeId);
 

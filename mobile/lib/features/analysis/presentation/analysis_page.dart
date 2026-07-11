@@ -5,8 +5,10 @@ import '../../../core/widgets/app_badge.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_state_message.dart';
 import '../../../data/analysis/analysis_data_service.dart';
+import '../../../data/api/api_access_issue.dart';
 import '../../../data/auth/auth_session_service.dart';
 import '../../../data/models/analysis_models.dart';
+import '../../profile/presentation/agreements_page.dart';
 
 class AnalysisPage extends StatefulWidget {
   const AnalysisPage({super.key});
@@ -19,13 +21,20 @@ class _AnalysisPageState extends State<AnalysisPage> {
   static const _authSessionService = AuthSessionService();
 
   late Future<AnalysisData> _analysisFuture = _loadAnalysis();
+  ApiAccessIssue? _accessIssue;
 
   Future<AnalysisData> _loadAnalysis() async {
+    _accessIssue = null;
     if (!_authSessionService.isSignedIn) {
       return AnalysisData.sample();
     }
 
-    return AnalysisDataService().fetchMyAnalysis();
+    try {
+      return await AnalysisDataService().fetchMyAnalysis();
+    } on Object catch (error) {
+      _accessIssue = ApiAccessIssue.from(error);
+      return AnalysisData.sample();
+    }
   }
 
   @override
@@ -65,6 +74,13 @@ class _AnalysisPageState extends State<AnalysisPage> {
                       const LinearProgressIndicator(minHeight: 3),
                     ],
                     const SizedBox(height: 16),
+                    if (_accessIssue != null) ...[
+                      _AnalysisAccessIssueMessage(
+                        issue: _accessIssue!,
+                        onAgreementsTap: _openAgreements,
+                      ),
+                      const SizedBox(height: 18),
+                    ],
                     GridView(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
@@ -119,6 +135,46 @@ class _AnalysisPageState extends State<AnalysisPage> {
       _analysisFuture = _loadAnalysis();
     });
     await _analysisFuture;
+  }
+
+  void _openAgreements() {
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: (context) => const AgreementsPage()))
+        .then((_) {
+      if (mounted) {
+        setState(() {
+          _analysisFuture = _loadAnalysis();
+        });
+      }
+    });
+  }
+}
+
+class _AnalysisAccessIssueMessage extends StatelessWidget {
+  const _AnalysisAccessIssueMessage({
+    required this.issue,
+    required this.onAgreementsTap,
+  });
+
+  final ApiAccessIssue issue;
+  final VoidCallback onAgreementsTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppStateMessage(
+      icon: issue.needsAgreements
+          ? Icons.assignment_turned_in_outlined
+          : Icons.login_rounded,
+      title: issue.title,
+      body: issue.message,
+      action: issue.needsAgreements
+          ? FilledButton.icon(
+              onPressed: onAgreementsTap,
+              icon: const Icon(Icons.assignment_turned_in_outlined),
+              label: const Text('약관 동의하기'),
+            )
+          : null,
+    );
   }
 }
 

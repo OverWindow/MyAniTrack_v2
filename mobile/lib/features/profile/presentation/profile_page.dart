@@ -6,8 +6,11 @@ import '../../../core/widgets/app_badge.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_state_message.dart';
 import '../../../core/widgets/sample_banner.dart';
+import '../../../data/api/api_client.dart';
+import '../../../data/api/auth_repository.dart';
 import '../../../data/auth/auth_onboarding_service.dart';
 import '../../../data/auth/auth_session_service.dart';
+import '../../../data/models/auth_user_info.dart';
 import 'agreements_page.dart';
 import 'profile_settings_page.dart';
 import 'public_profile_page.dart';
@@ -22,6 +25,13 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> {
   static const _authSessionService = AuthSessionService();
   bool _connectingBackend = false;
+  Future<AuthUserInfo?>? _backendUserFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _backendUserFuture = _buildBackendUserFuture();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -78,10 +88,21 @@ class _ProfilePageState extends State<ProfilePage> {
                     ),
                     const SizedBox(height: 18),
                     if (isSignedIn)
-                      OutlinedButton.icon(
-                        onPressed: () => _signOut(context),
-                        icon: const Icon(Icons.logout_rounded),
-                        label: const Text('로그아웃'),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          OutlinedButton.icon(
+                            onPressed: () => _signOut(context),
+                            icon: const Icon(Icons.logout_rounded),
+                            label: const Text('로그아웃'),
+                          ),
+                          const SizedBox(height: 10),
+                          TextButton.icon(
+                            onPressed: () => _signOutAll(context),
+                            icon: const Icon(Icons.devices_other_outlined),
+                            label: const Text('모든 백엔드 세션 로그아웃'),
+                          ),
+                        ],
                       )
                     else
                       FilledButton.icon(
@@ -93,6 +114,10 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
               ),
               const SizedBox(height: 16),
+              if (isSignedIn) ...[
+                _BackendUserCard(future: _backendUserFuture),
+                const SizedBox(height: 16),
+              ],
               if (!AppConfig.hasSupabaseConfig) ...[
                 const AppStateMessage(
                   icon: Icons.key_off_outlined,
@@ -239,7 +264,9 @@ class _ProfilePageState extends State<ProfilePage> {
         redirectTo: AppConfig.authRedirectUrl,
       );
       if (context.mounted) {
-        setState(() {});
+        setState(() {
+          _backendUserFuture = _buildBackendUserFuture();
+        });
       }
     } on Object {
       if (!context.mounted) {
@@ -256,11 +283,16 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<void> _signOut(BuildContext context) async {
     try {
+      try {
+        await AuthRepository(ApiClient()).logout();
+      } on Object {
+        // Supabase session cleanup should still proceed.
+      }
       await _authSessionService.signOut();
       if (!context.mounted) {
         return;
       }
-      setState(() {});
+      setState(() => _backendUserFuture = null);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('로그아웃되었습니다.')),
       );
@@ -274,6 +306,31 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
+  Future<void> _signOutAll(BuildContext context) async {
+    try {
+      try {
+        await AuthRepository(ApiClient()).logoutAll();
+      } on Object {
+        // Supabase sign-out below is the user-visible session boundary.
+      }
+      await _authSessionService.signOut();
+      if (!context.mounted) {
+        return;
+      }
+      setState(() => _backendUserFuture = null);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('모든 백엔드 세션 로그아웃을 요청했습니다.')),
+      );
+    } on Object {
+      if (!context.mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('전체 로그아웃 중 문제가 발생했습니다.')),
+      );
+    }
+  }
+
   Future<void> _connectBackendAccount() async {
     setState(() => _connectingBackend = true);
 
@@ -283,6 +340,9 @@ class _ProfilePageState extends State<ProfilePage> {
         return;
       }
       if (result.needsAgreements) {
+        setState(() {
+          _backendUserFuture = _buildBackendUserFuture();
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('백엔드 계정을 연결했습니다. 약관 동의가 필요합니다.')),
         );
@@ -290,6 +350,9 @@ class _ProfilePageState extends State<ProfilePage> {
           MaterialPageRoute(builder: (context) => const AgreementsPage()),
         );
       } else {
+        setState(() {
+          _backendUserFuture = _buildBackendUserFuture();
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('백엔드 계정과 약관 상태를 확인했습니다.')),
         );
@@ -306,6 +369,94 @@ class _ProfilePageState extends State<ProfilePage> {
         setState(() => _connectingBackend = false);
       }
     }
+  }
+
+  Future<AuthUserInfo?>? _buildBackendUserFuture() {
+    if (!_authSessionService.isSignedIn) {
+      return null;
+    }
+    return AuthRepository(ApiClient()).fetchMeInfo();
+  }
+}
+
+class _BackendUserCard extends StatelessWidget {
+  const _BackendUserCard({required this.future});
+
+  final Future<AuthUserInfo?>? future;
+
+  @override
+  Widget build(BuildContext context) {
+    final value = future;
+    if (value == null) {
+      return const SizedBox.shrink();
+    }
+
+    return FutureBuilder<AuthUserInfo?>(
+      future: value,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AppBadge(label: 'Auth / Me', icon: Icons.verified_user_outlined),
+                SizedBox(height: 12),
+                LinearProgressIndicator(minHeight: 3),
+              ],
+            ),
+          );
+        }
+
+        final user = snapshot.data;
+        if (user == null || snapshot.hasError) {
+          return const AppStateMessage(
+            icon: Icons.link_off_rounded,
+            title: '백엔드 사용자 확인이 필요합니다.',
+            body: '백엔드 계정 연결을 실행하면 내부 user id와 권한을 확인합니다.',
+          );
+        }
+
+        return AppCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const AppBadge(
+                    label: 'Auth / Me',
+                    icon: Icons.verified_user_outlined,
+                  ),
+                  const Spacer(),
+                  AppBadge(label: user.role),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                user.username.isEmpty ? user.email : user.username,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  AppBadge(label: 'user #${user.id}'),
+                  AppBadge(
+                    label: user.emailVerified ? 'email verified' : 'email pending',
+                    icon: Icons.mark_email_read_outlined,
+                  ),
+                  if (user.isAdmin)
+                    const AppBadge(
+                      label: 'admin',
+                      icon: Icons.admin_panel_settings_outlined,
+                    ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 }
 
