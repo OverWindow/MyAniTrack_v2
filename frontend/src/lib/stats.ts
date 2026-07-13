@@ -323,7 +323,8 @@ type VoiceActorRankingParams = {
 type VoiceActorAnimeParams = {
   userId?: string
   voiceActorId: number
-  titleLanguage?: 'ko' | 'en' | 'romaji'
+  titleLanguage?: 'ko' | 'en' | 'ja'
+  status?: 'all' | 'completed'
   limit?: number
   cursor?: string | null
   signal?: AbortSignal
@@ -375,6 +376,7 @@ function createVoiceActorAnimeUrl(params: VoiceActorAnimeParams) {
   const url = new URL(path, getApiBaseUrl())
 
   url.searchParams.set('titleLanguage', params.titleLanguage ?? 'ko')
+  url.searchParams.set('status', params.status ?? 'all')
   url.searchParams.set('limit', String(params.limit ?? 20))
 
   if (params.cursor) {

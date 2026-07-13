@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { AdminUserManager } from '../components/AdminUserManager'
 import { useAuth } from '../contexts/AuthContext'
 import {
   fetchAnimeCastSyncStatus,
@@ -49,6 +50,7 @@ type AdminActionCardProps<TPayload> = {
 }
 
 type AdminActionKey =
+  | 'users'
   | 'sync-tools'
   | 'translate-korean'
   | 'studio-sync-missing'
@@ -238,7 +240,7 @@ export function AdminPage() {
     delayMs: 2500,
   })
 
-  const [selectedAction, setSelectedAction] = useState<AdminActionKey>('sync-tools')
+  const [selectedAction, setSelectedAction] = useState<AdminActionKey>('users')
   const [selectedSyncAction, setSelectedSyncAction] = useState<AdminSyncActionKey>('sync-page')
   const [selectedCastAction, setSelectedCastAction] = useState<AdminCastActionKey>('cast-sync-anime')
   const [activeAction, setActiveAction] = useState<string | null>(null)
@@ -668,6 +670,13 @@ export function AdminPage() {
   const studioActionItem = syncActionItems.find((item) => item.key === 'studio-sync-missing')
   const castActionItem = syncActionItems.find((item) => item.key === 'cast-sync')
   const actionItems = [
+    {
+      key: 'users' as const,
+      group: '사용자',
+      label: '사용자 검색',
+      description: '이메일·사용자명과 권한으로 계정을 검색하고 컬렉션 통계를 확인합니다.',
+      content: <AdminUserManager />,
+    },
     {
       key: 'sync-tools' as const,
       group: '동기화',

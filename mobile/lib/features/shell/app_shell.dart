@@ -41,43 +41,54 @@ class _AppShellState extends State<AppShell> {
 
   @override
   Widget build(BuildContext context) {
-    final pages = [
+    final isSignedIn = _authSessionService.isSignedIn;
+    final pages = isSignedIn
+        ? [
       HomePage(key: ValueKey('home-$_authVersion')),
       CollectionPage(key: ValueKey('collection-$_authVersion')),
       AnalysisPage(key: ValueKey('analysis-$_authVersion')),
       ProfilePage(key: ValueKey('profile-$_authVersion')),
-    ];
+          ]
+        : [
+            HomePage(key: ValueKey('home-$_authVersion')),
+          ];
+
+    if (_index >= pages.length) {
+      _index = 0;
+    }
 
     return AppBackground(
       child: Scaffold(
         backgroundColor: Colors.transparent,
         body: SafeArea(child: pages[_index]),
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: _index,
-          onDestinationSelected: (value) => setState(() => _index = value),
-          destinations: const [
-            NavigationDestination(
-              icon: Icon(Icons.home_outlined),
-              selectedIcon: Icon(Icons.home),
-              label: '홈',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.grid_view_outlined),
-              selectedIcon: Icon(Icons.grid_view_rounded),
-              label: '컬렉션',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.analytics_outlined),
-              selectedIcon: Icon(Icons.analytics),
-              label: '분석',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.person_outline),
-              selectedIcon: Icon(Icons.person),
-              label: '프로필',
-            ),
-          ],
-        ),
+        bottomNavigationBar: isSignedIn
+            ? NavigationBar(
+                selectedIndex: _index,
+                onDestinationSelected: (value) => setState(() => _index = value),
+                destinations: const [
+                  NavigationDestination(
+                    icon: Icon(Icons.home_outlined),
+                    selectedIcon: Icon(Icons.home),
+                    label: '탐색',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.grid_view_outlined),
+                    selectedIcon: Icon(Icons.grid_view_rounded),
+                    label: '컬렉션',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.analytics_outlined),
+                    selectedIcon: Icon(Icons.analytics),
+                    label: '분석',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.person_outline),
+                    selectedIcon: Icon(Icons.person),
+                    label: '프로필',
+                  ),
+                ],
+              )
+            : null,
       ),
     );
   }

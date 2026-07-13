@@ -14,6 +14,9 @@ import type {
   AdminTranslateKoreanTitlesPayload,
   AdminUpdateKoreanTitlePayload,
   AdminUpdateKoreanTitleResponse,
+  AdminUserDetailResponse,
+  AdminUserListResponse,
+  AdminUserRoleFilter,
   PlatformStats,
 } from '../types/admin'
 
@@ -100,6 +103,45 @@ export async function fetchPlatformStats() {
   }
 
   return data.item
+}
+
+export async function fetchAdminUsers(params: {
+  page?: number
+  limit?: number
+  search?: string
+  role?: AdminUserRoleFilter
+  signal?: AbortSignal
+} = {}) {
+  const url = new URL('/admin/users', getApiBaseUrl())
+  url.searchParams.set('page', String(params.page ?? 1))
+  url.searchParams.set('limit', String(params.limit ?? 20))
+  url.searchParams.set('role', params.role ?? 'ALL')
+
+  if (params.search?.trim()) {
+    url.searchParams.set('search', params.search.trim())
+  }
+
+  const response = await authFetch(url.toString(), { signal: params.signal })
+
+  if (!response.ok) {
+    throw new Error(getAdminErrorMessage(response.status, '사용자 목록을 불러오지 못했어요.'))
+  }
+
+  return (await response.json()) as AdminUserListResponse
+}
+
+export async function fetchAdminUserDetail(userId: number, signal?: AbortSignal) {
+  const response = await authFetch(createAdminUrl(`/admin/users/${userId}`), { signal })
+
+  if (response.status === 404) {
+    throw new Error('해당 사용자를 찾을 수 없어요.')
+  }
+
+  if (!response.ok) {
+    throw new Error(getAdminErrorMessage(response.status, '사용자 상세 정보를 불러오지 못했어요.'))
+  }
+
+  return ((await response.json()) as AdminUserDetailResponse).item
 }
 
 export function syncAnimePage(payload: AdminSyncPagePayload) {

@@ -1266,6 +1266,222 @@
   outline: none;
 }
 
+.voice-actor-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(28, 25, 23, 0.68);
+  backdrop-filter: blur(8px);
+}
+
+.voice-actor-modal {
+  width: min(1080px, 100%);
+  max-height: min(820px, calc(100vh - 48px));
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid rgba(120, 113, 108, 0.18);
+  border-radius: 14px;
+  background: var(--bg-card);
+  box-shadow: 0 28px 90px rgba(28, 25, 23, 0.32);
+}
+
+.voice-actor-modal-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 22px;
+  border-bottom: 1px solid rgba(120, 113, 108, 0.14);
+  background:
+    radial-gradient(circle at 12% 20%, rgba(245, 158, 11, 0.13), transparent 32%),
+    var(--bg-card);
+}
+
+.voice-actor-modal-profile-link {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  margin: -6px;
+  padding: 6px 14px 6px 6px;
+  border-radius: 2px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.voice-actor-modal-profile-link > img {
+  width: 72px;
+  height: 72px;
+  border-radius: 2px;
+  object-fit: cover;
+  background: var(--bg-soft-beige);
+}
+
+.voice-actor-modal-profile-link:hover,
+.voice-actor-modal-profile-link:focus-visible {
+  background: var(--point-softest);
+  outline: 2px solid var(--point-border);
+  outline-offset: 2px;
+}
+
+.voice-actor-modal-profile-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.voice-actor-modal-header h3 {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 1.45rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.voice-actor-modal-header p {
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  font-weight: 650;
+}
+
+.voice-actor-modal-close {
+  width: 40px;
+  height: 40px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid rgba(120, 113, 108, 0.16);
+  border-radius: 2px;
+  background: var(--bg-neutral);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 1.4rem;
+  cursor: pointer;
+}
+
+.voice-actor-modal-close:hover,
+.voice-actor-modal-close:focus-visible {
+  border-color: var(--point-border);
+  background: var(--point-softest);
+  outline: none;
+}
+
+.voice-actor-modal-body {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 20px 22px 24px;
+}
+
+.voice-actor-modal-work-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.voice-actor-modal-work {
+  display: grid;
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+  gap: 12px;
+  align-content: start;
+  padding: 14px;
+  border-radius: 2px;
+  background: rgba(250, 247, 241, 0.72);
+}
+
+.voice-actor-modal-anime {
+  display: grid;
+  grid-template-columns: 82px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.voice-actor-modal-anime > img {
+  width: 82px;
+  height: 114px;
+  border-radius: 2px;
+  object-fit: cover;
+  background: var(--bg-soft-beige);
+}
+
+.voice-actor-modal-anime > span,
+.voice-actor-modal-character > span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.voice-actor-modal-anime small,
+.voice-actor-modal-anime em,
+.voice-actor-modal-character small {
+  color: var(--text-secondary);
+  font-size: 0.76rem;
+  font-style: normal;
+  font-weight: 750;
+}
+
+.voice-actor-modal-anime strong,
+.voice-actor-modal-character strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.voice-actor-modal-anime:hover strong,
+.voice-actor-modal-anime:focus-visible strong {
+  color: var(--point-hover);
+}
+
+.voice-actor-modal-characters {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: center;
+  gap: 1px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: rgba(120, 113, 108, 0.13);
+}
+
+.voice-actor-modal-characters.is-multiple {
+  grid-template-rows: repeat(2, minmax(0, auto));
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+}
+
+.voice-actor-modal-character {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px;
+  background: var(--bg-card);
+}
+
+.voice-actor-modal-character > img {
+  width: 46px;
+  height: 58px;
+  border-radius: 2px;
+  object-fit: cover;
+  background: var(--bg-soft-beige);
+}
+
+.voice-actor-modal-character strong {
+  font-size: 0.84rem;
+}
+
+.voice-actor-modal-more {
+  display: flex;
+  margin: 16px auto 0;
+}
+
 .analysis-year-chart-shell {
   height: 320px;
   margin-top: 10px;
@@ -1774,6 +1990,47 @@
 @media (max-width: 760px) {
   .analysis-page {
     gap: 12px;
+  }
+
+  .voice-actor-modal-backdrop {
+    align-items: end;
+    padding: 0;
+  }
+
+  .voice-actor-modal {
+    width: 100%;
+    max-height: 92vh;
+    border-radius: 16px 16px 0 0;
+  }
+
+  .voice-actor-modal-header {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
+    padding: 16px;
+  }
+
+  .voice-actor-modal-profile-link {
+    grid-template-columns: 54px minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .voice-actor-modal-profile-link > img {
+    width: 54px;
+    height: 54px;
+    border-radius: 9px;
+  }
+
+  .voice-actor-modal-body {
+    padding: 14px 16px 22px;
+  }
+
+  .voice-actor-modal-work {
+    grid-template-columns: 1fr;
+    padding: 12px;
+  }
+
+  .voice-actor-modal-work-list {
+    grid-template-columns: 1fr;
   }
 
   .analysis-anime-toast-list {

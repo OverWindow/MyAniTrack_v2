@@ -1,18 +1,32 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ConnectionErrorState } from '../components/ConnectionErrorState'
+import { useAuth } from '../contexts/AuthContext'
 import { getProfileImageSrc, handleProfileImageError } from '../lib/avatar'
 import { getFriendlyErrorMessage, SERVER_CONNECTION_ERROR_MESSAGE } from '../lib/errors'
+import { fetchVoiceActorAnime } from '../lib/stats'
 import {
   fetchVoiceActorDetail,
   getVoiceActorDisplayName,
   getVoiceActorImage,
 } from '../lib/voiceActors'
 import type { VoiceActorDetailItem, VoiceActorDetailPayload } from '../types/voiceActor'
+import type { VoiceActorAnimeItem, VoiceActorAnimeResponse } from '../types/stats'
 import '../styles/pages/VoiceActorDetailPage.css'
 
 type VoiceActorDetailState = {
   item: VoiceActorDetailPayload | null
+  isLoading: boolean
+  isLoadingMore: boolean
+  error: string | null
+  moreError: string | null
+}
+
+type CreditFilter = 'all' | 'completed'
+
+type WatchedCreditState = {
+  items: VoiceActorAnimeItem[]
+  pageInfo: VoiceActorAnimeResponse['pageInfo'] | null
   isLoading: boolean
   isLoadingMore: boolean
   error: string | null
@@ -55,12 +69,32 @@ function getCharacterMeta(item: VoiceActorDetailItem) {
   ].filter(Boolean).join(' · ')
 }
 
+function getWatchedAnimeMeta(item: VoiceActorAnimeItem) {
+  return [
+    item.anime.seasonYear ? String(item.anime.seasonYear) : null,
+    item.anime.format,
+    item.userList?.score !== null && item.userList?.score !== undefined
+      ? `내 평점 ${item.userList.score}점`
+      : null,
+  ].filter(Boolean).join(' · ')
+}
+
 export function VoiceActorDetailPage() {
   const { voiceActorId } = useParams()
   const navigate = useNavigate()
+  const { isAuthenticated, isBootstrapping } = useAuth()
+  const [creditFilter, setCreditFilter] = useState<CreditFilter>('all')
   const [state, setState] = useState<VoiceActorDetailState>({
     item: null,
     isLoading: true,
+    isLoadingMore: false,
+    error: null,
+    moreError: null,
+  })
+  const [watchedState, setWatchedState] = useState<WatchedCreditState>({
+    items: [],
+    pageInfo: null,
+    isLoading: false,
     isLoadingMore: false,
     error: null,
     moreError: null,
@@ -128,6 +162,65 @@ export function VoiceActorDetailPage() {
     return () => controller.abort()
   }, [voiceActorId])
 
+  useEffect(() => {
+    if (creditFilter !== 'completed' || !isAuthenticated || !voiceActorId) {
+      return
+    }
+
+    const controller = new AbortController()
+
+    const loadWatchedCredits = async () => {
+      setWatchedState({
+        items: [],
+        pageInfo: null,
+        isLoading: true,
+        isLoadingMore: false,
+        error: null,
+        moreError: null,
+      })
+
+      try {
+        const result = await fetchVoiceActorAnime({
+          voiceActorId: Number(voiceActorId),
+          titleLanguage: 'ko',
+          status: 'completed',
+          limit: DETAIL_LIMIT,
+          signal: controller.signal,
+        })
+
+        if (controller.signal.aborted) {
+          return
+        }
+
+        setWatchedState({
+          items: result.items,
+          pageInfo: result.pageInfo,
+          isLoading: false,
+          isLoadingMore: false,
+          error: null,
+          moreError: null,
+        })
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          return
+        }
+
+        setWatchedState({
+          items: [],
+          pageInfo: null,
+          isLoading: false,
+          isLoadingMore: false,
+          error: getFriendlyErrorMessage(error, '내가 본 작품을 불러오지 못했어요.'),
+          moreError: null,
+        })
+      }
+    }
+
+    void loadWatchedCredits()
+
+    return () => controller.abort()
+  }, [creditFilter, isAuthenticated, voiceActorId])
+
   const handleLoadMore = async () => {
     if (!voiceActorId || !state.item?.pageInfo.hasNext || !state.item.pageInfo.nextCursor || state.isLoadingMore) {
       return
@@ -174,6 +267,44 @@ export function VoiceActorDetailPage() {
     }
   }
 
+  const handleLoadMoreWatched = async () => {
+    if (
+      !voiceActorId
+      || !watchedState.pageInfo?.hasNext
+      || !watchedState.pageInfo.nextCursor
+      || watchedState.isLoadingMore
+    ) {
+      return
+    }
+
+    setWatchedState((current) => ({ ...current, isLoadingMore: true, moreError: null }))
+
+    try {
+      const result = await fetchVoiceActorAnime({
+        voiceActorId: Number(voiceActorId),
+        titleLanguage: 'ko',
+        status: 'completed',
+        limit: watchedState.pageInfo.limit || DETAIL_LIMIT,
+        cursor: watchedState.pageInfo.nextCursor,
+      })
+
+      setWatchedState((current) => ({
+        items: [...current.items, ...result.items],
+        pageInfo: result.pageInfo,
+        isLoading: false,
+        isLoadingMore: false,
+        error: null,
+        moreError: null,
+      }))
+    } catch (error) {
+      setWatchedState((current) => ({
+        ...current,
+        isLoadingMore: false,
+        moreError: getFriendlyErrorMessage(error, '내가 본 작품을 더 불러오지 못했어요.'),
+      }))
+    }
+  }
+
   if (state.isLoading) {
     return (
       <section className="voice-actor-detail-page">
@@ -198,6 +329,10 @@ export function VoiceActorDetailPage() {
   const voiceActor = state.item.voiceActor
   const displayName = getVoiceActorDisplayName(voiceActor.name)
   const description = stripHtml(voiceActor.description)
+  const watchedCharacterCount = watchedState.items.reduce(
+    (count, item) => count + item.characters.length,
+    0,
+  )
 
   return (
     <section className="voice-actor-detail-page">
@@ -249,11 +384,92 @@ export function VoiceActorDetailPage() {
         <div className="voice-actor-credit-heading">
           <div>
             <h2>출연 캐릭터와 작품</h2>
-            <p>{state.item.items.length.toLocaleString()}개 항목을 표시 중이에요.</p>
+            <p>
+              {creditFilter === 'completed'
+                ? `${watchedState.items.length.toLocaleString()}편 · 캐릭터 ${watchedCharacterCount.toLocaleString()}명을 표시 중이에요.`
+                : `${state.item.items.length.toLocaleString()}개 항목을 표시 중이에요.`}
+            </p>
+          </div>
+          <div className="voice-actor-credit-filters" role="group" aria-label="출연작 필터">
+            <button
+              className={creditFilter === 'all' ? 'is-active' : ''}
+              type="button"
+              aria-pressed={creditFilter === 'all'}
+              onClick={() => setCreditFilter('all')}
+            >
+              전체 출연작
+            </button>
+            <button
+              className={creditFilter === 'completed' ? 'is-active' : ''}
+              type="button"
+              aria-pressed={creditFilter === 'completed'}
+              disabled={isBootstrapping || !isAuthenticated}
+              title={!isBootstrapping && !isAuthenticated ? '로그인 후 이용할 수 있어요.' : undefined}
+              onClick={() => setCreditFilter('completed')}
+            >
+              내가 본 작품
+            </button>
           </div>
         </div>
 
-        {state.item.items.length === 0 ? (
+        {creditFilter === 'completed' && watchedState.isLoading && (
+          <div className="feedback-card">내가 본 작품을 불러오는 중이에요.</div>
+        )}
+
+        {creditFilter === 'completed' && watchedState.error && !watchedState.isLoading && (
+          watchedState.error === SERVER_CONNECTION_ERROR_MESSAGE
+            ? <ConnectionErrorState message={watchedState.error} />
+            : <div className="feedback-card">{watchedState.error}</div>
+        )}
+
+        {creditFilter === 'completed' && !watchedState.isLoading && !watchedState.error && watchedState.items.length === 0 && (
+          <div className="feedback-card">이 성우가 출연한 완주 작품이 아직 없어요.</div>
+        )}
+
+        {creditFilter === 'completed' && !watchedState.isLoading && !watchedState.error && watchedState.items.length > 0 && (
+          <div className="voice-actor-credit-grid">
+            {watchedState.items.flatMap((animeItem) => animeItem.characters.map((character) => {
+              const characterName = getVoiceActorDisplayName(character.name)
+              const characterMeta = character.role || null
+              const animeMeta = getWatchedAnimeMeta(animeItem)
+
+              return (
+                <article className="voice-actor-credit-card" key={`${animeItem.anime.id}-${character.id}`}>
+                  <div className="voice-actor-character-block">
+                    <img
+                      src={getProfileImageSrc(getVoiceActorImage(character.image))}
+                      alt={characterName}
+                      loading="lazy"
+                      onError={handleProfileImageError}
+                    />
+                    <div>
+                      <span>Character</span>
+                      <strong>{characterName}</strong>
+                      {character.name.native && <small>{character.name.native}</small>}
+                      {characterMeta && <small>{characterMeta}</small>}
+                    </div>
+                  </div>
+
+                  <Link className="voice-actor-anime-block" to={`/anime/${animeItem.anime.id}`}>
+                    <img
+                      src={getProfileImageSrc(animeItem.anime.coverImageExtraLarge || animeItem.anime.coverImageLarge || null)}
+                      alt={animeItem.anime.title}
+                      loading="lazy"
+                      onError={handleProfileImageError}
+                    />
+                    <span>
+                      <small>Completed</small>
+                      <strong>{animeItem.anime.title}</strong>
+                      {animeMeta && <em>{animeMeta}</em>}
+                    </span>
+                  </Link>
+                </article>
+              )
+            }))}
+          </div>
+        )}
+
+        {creditFilter === 'all' && (state.item.items.length === 0 ? (
           <div className="feedback-card">표시할 출연 정보가 없어요.</div>
         ) : (
           <div className="voice-actor-credit-grid">
@@ -296,15 +512,15 @@ export function VoiceActorDetailPage() {
               )
             })}
           </div>
-        )}
+        ))}
 
-        {state.moreError && (
+        {creditFilter === 'all' && state.moreError && (
           state.moreError === SERVER_CONNECTION_ERROR_MESSAGE
             ? <ConnectionErrorState message={state.moreError} />
             : <div className="feedback-card">{state.moreError}</div>
         )}
 
-        {state.item.pageInfo.hasNext && (
+        {creditFilter === 'all' && state.item.pageInfo.hasNext && (
           <button
             className="secondary-button voice-actor-load-more"
             type="button"
@@ -312,6 +528,23 @@ export function VoiceActorDetailPage() {
             onClick={() => { void handleLoadMore() }}
           >
             {state.isLoadingMore ? '불러오는 중...' : '더 보기'}
+          </button>
+        )}
+
+        {creditFilter === 'completed' && watchedState.moreError && (
+          watchedState.moreError === SERVER_CONNECTION_ERROR_MESSAGE
+            ? <ConnectionErrorState message={watchedState.moreError} />
+            : <div className="feedback-card">{watchedState.moreError}</div>
+        )}
+
+        {creditFilter === 'completed' && watchedState.pageInfo?.hasNext && (
+          <button
+            className="secondary-button voice-actor-load-more"
+            type="button"
+            disabled={watchedState.isLoadingMore}
+            onClick={() => { void handleLoadMoreWatched() }}
+          >
+            {watchedState.isLoadingMore ? '불러오는 중...' : '더 보기'}
           </button>
         )}
       </section>

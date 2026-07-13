@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/assets/app_assets.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_badge.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/anime_poster.dart';
-import '../../../core/widgets/sample_banner.dart';
 import '../../../data/api/api_client.dart';
 import '../../../data/api/platform_repository.dart';
 import '../../../data/api/sample_repository.dart';
@@ -23,6 +23,8 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  static const _authSessionService = AuthSessionService();
+
   late Future<StatsOverview> _sampleOverviewFuture =
       SampleRepository(ApiClient()).fetchSampleOverviewStats();
   late Future<List<AnimeEntry>> _sampleEntriesFuture =
@@ -56,6 +58,7 @@ class _HomePageState extends State<HomePage> {
     return FutureBuilder<List<AnimeEntry>>(
       future: _sampleEntriesFuture,
       builder: (context, snapshot) {
+        final isSignedIn = _authSessionService.isSignedIn;
         final entries = snapshot.data == null || snapshot.data!.isEmpty
             ? sampleEntries
             : snapshot.data!;
@@ -71,17 +74,19 @@ class _HomePageState extends State<HomePage> {
                   children: [
                     const _HomeHeader(),
                     const SizedBox(height: 18),
-                    const SampleBanner(),
+                    const _ExploreOnlyBanner(),
                     const SizedBox(height: 18),
                     _HeroPanel(
                       overviewFuture: _sampleOverviewFuture,
                       fallbackOverview: fallbackOverview,
                       collectionLoading:
                           snapshot.connectionState == ConnectionState.waiting,
+                      isSignedIn: isSignedIn,
+                      onStart: _startOrLogin,
                     ),
                     const SizedBox(height: 18),
                     Text(
-                      '최근 샘플 기록',
+                      '탐색 추천',
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     const SizedBox(height: 12),
@@ -105,6 +110,29 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  Future<void> _startOrLogin() async {
+    if (_authSessionService.isSignedIn) {
+      await Navigator.of(context).push(
+        MaterialPageRoute(builder: (context) => const AnimeSearchPage()),
+      );
+      return;
+    }
+
+    try {
+      await _authSessionService.signInWithGoogle(
+        redirectTo: AppConfig.authRedirectUrl,
+      );
+    } on Object {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Supabase 설정 후 Google 로그인을 사용할 수 있습니다.'),
+        ),
+      );
+    }
+  }
 }
 
 class _PopularAnimePanel extends StatelessWidget {
@@ -371,6 +399,37 @@ class _RecentAnimeCard extends StatelessWidget {
   }
 }
 
+class _ExploreOnlyBanner extends StatelessWidget {
+  const _ExploreOnlyBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      borderColor: AppColors.sample.withOpacity(0.2),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const AppBadge(
+            label: '탐색',
+            sample: true,
+            icon: Icons.travel_explore_rounded,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              '로그인 전에는 공개 통계와 추천 작품만 볼 수 있습니다. 컬렉션 기록과 분석은 로그인 후 사용할 수 있습니다.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.sampleDark,
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _HomeHeader extends StatelessWidget {
   const _HomeHeader();
 
@@ -378,6 +437,16 @@ class _HomeHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(14),
+          child: Image.asset(
+            AppAssets.logo,
+            width: 44,
+            height: 44,
+            fit: BoxFit.contain,
+          ),
+        ),
+        const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -430,11 +499,15 @@ class _HeroPanel extends StatelessWidget {
     required this.overviewFuture,
     required this.fallbackOverview,
     required this.collectionLoading,
+    required this.isSignedIn,
+    required this.onStart,
   });
 
   final Future<StatsOverview> overviewFuture;
   final StatsOverview fallbackOverview;
   final bool collectionLoading;
+  final bool isSignedIn;
+  final VoidCallback onStart;
 
   @override
   Widget build(BuildContext context) {
@@ -461,8 +534,8 @@ class _HeroPanel extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const AppBadge(
-                label: '샘플 컬렉션',
+              AppBadge(
+                label: isSignedIn ? '내 탐색' : '로그인 전 탐색',
                 sample: true,
                 icon: Icons.visibility_outlined,
               ),
@@ -482,6 +555,17 @@ class _HeroPanel extends StatelessWidget {
                       fontSize: 22,
                       height: 1.3,
                     ),
+              ),
+              const SizedBox(height: 18),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(18),
+                child: AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: Image.asset(
+                    AppAssets.landingDashboard,
+                    fit: BoxFit.cover,
+                  ),
+                ),
               ),
               const SizedBox(height: 20),
               Row(
@@ -504,15 +588,9 @@ class _HeroPanel extends StatelessWidget {
               ),
               const SizedBox(height: 18),
               FilledButton.icon(
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => const AnimeSearchPage(),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.add_rounded),
-                label: const Text('내 기록으로 시작하기'),
+                onPressed: onStart,
+                icon: Icon(isSignedIn ? Icons.add_rounded : Icons.login_rounded),
+                label: Text(isSignedIn ? '내 기록으로 시작하기' : '로그인하고 기록하기'),
               ),
             ],
           ),

@@ -19,14 +19,23 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
 
   final _usernameController = TextEditingController();
   final _bioController = TextEditingController();
+  final _profileImageUrlController = TextEditingController();
   bool _isPublic = true;
+  bool _loadingProfile = false;
   bool _saving = false;
   bool _deleting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCurrentProfile();
+  }
 
   @override
   void dispose() {
     _usernameController.dispose();
     _bioController.dispose();
+    _profileImageUrlController.dispose();
     super.dispose();
   }
 
@@ -48,6 +57,10 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('공개 프로필', style: Theme.of(context).textTheme.titleMedium),
+                if (_loadingProfile) ...[
+                  const SizedBox(height: 12),
+                  const LinearProgressIndicator(minHeight: 3),
+                ],
                 const SizedBox(height: 14),
                 TextField(
                   controller: _usernameController,
@@ -63,6 +76,15 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
                   maxLines: 5,
                   decoration: const InputDecoration(
                     labelText: '소개',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _profileImageUrlController,
+                  keyboardType: TextInputType.url,
+                  decoration: const InputDecoration(
+                    labelText: '프로필 이미지 URL',
                     border: OutlineInputBorder(),
                   ),
                 ),
@@ -133,6 +155,38 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
     );
   }
 
+  Future<void> _loadCurrentProfile() async {
+    if (!_authSessionService.isSignedIn) {
+      return;
+    }
+
+    setState(() => _loadingProfile = true);
+
+    try {
+      final user = await AuthRepository(ApiClient()).fetchMeInfo();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _usernameController.text = user.username;
+        _bioController.text = user.bio ?? '';
+        _profileImageUrlController.text = user.profileImageUrl ?? '';
+        _isPublic = user.isPublic;
+      });
+    } on Object {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('현재 프로필을 불러오지 못했습니다.')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _loadingProfile = false);
+      }
+    }
+  }
+
   Future<void> _saveProfile() async {
     setState(() => _saving = true);
 
@@ -142,6 +196,9 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
             ? null
             : _usernameController.text.trim(),
         bio: _bioController.text.trim().isEmpty ? null : _bioController.text.trim(),
+        profileImageUrl: _profileImageUrlController.text.trim().isEmpty
+            ? null
+            : _profileImageUrlController.text.trim(),
         isPublic: _isPublic,
       );
       if (!mounted) {

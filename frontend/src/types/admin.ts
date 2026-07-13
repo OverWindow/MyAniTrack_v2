@@ -133,3 +133,62 @@ export type PlatformStats = {
   characterCount: number
   voiceActorCount: number
 }
+
+export type AdminUserRole = 'USER' | 'ADMIN'
+export type AdminUserRoleFilter = 'ALL' | AdminUserRole
+
+export type AdminUserListItem = {
+  id: number
+  email: string
+  username: string
+  role: AdminUserRole
+  profileImageUrl: string | null
+  emailVerified: boolean
+  emailVerifiedAt: string | null
+  supabaseLinked: boolean
+  animeListCount: number
+  completedCount: number
+  activeSessionCount: number
+  createdAt: string
+  updatedAt: string
+}
+
+export type AdminUserListResponse = {
+  success: boolean
+  items: AdminUserListItem[]
+  pageInfo: {
+    page: number
+    limit: number
+    totalItems: number
+    totalPages: number
+    hasPrevious: boolean
+    hasNext: boolean
+  }
+  filters: {
+    search: string
+    role: AdminUserRoleFilter
+  }
+}
+
+export type AdminUserDetail = AdminUserListItem & {
+  bio: string | null
+  collection: {
+    totalCount: number
+    plannedCount: number
+    watchingCount: number
+    completedCount: number
+    pausedCount: number
+    droppedCount: number
+    totalWatchedEpisodes: number
+    totalWatchMinutes: number
+    averageScore: number | null
+    favoriteGenre: string | null
+    favoriteReleasePeriod: string | null
+    statsUpdatedAt: string | null
+  }
+}
+
+export type AdminUserDetailResponse = {
+  success: boolean
+  item: AdminUserDetail
+}

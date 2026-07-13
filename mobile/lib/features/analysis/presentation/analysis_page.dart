@@ -26,14 +26,14 @@ class _AnalysisPageState extends State<AnalysisPage> {
   Future<AnalysisData> _loadAnalysis() async {
     _accessIssue = null;
     if (!_authSessionService.isSignedIn) {
-      return AnalysisData.sample();
+      return AnalysisData.empty();
     }
 
     try {
       return await AnalysisDataService().fetchMyAnalysis();
     } on Object catch (error) {
       _accessIssue = ApiAccessIssue.from(error);
-      return AnalysisData.sample();
+      return AnalysisData.empty();
     }
   }
 
@@ -42,10 +42,9 @@ class _AnalysisPageState extends State<AnalysisPage> {
     return FutureBuilder<AnalysisData>(
       future: _analysisFuture,
       builder: (context, snapshot) {
-        final analysis = snapshot.data ?? AnalysisData.sample();
+        final analysis = snapshot.data ?? AnalysisData.empty();
         final overview = analysis.overview;
-        final isSampleMode = analysis.isSample ||
-            snapshot.connectionState == ConnectionState.waiting;
+        final isSignedIn = _authSessionService.isSignedIn;
 
         return RefreshIndicator(
           onRefresh: _refreshAnalysis,
@@ -64,8 +63,7 @@ class _AnalysisPageState extends State<AnalysisPage> {
                           ),
                         ),
                         AppBadge(
-                          label: isSampleMode ? '샘플 분석' : '내 분석',
-                          sample: isSampleMode,
+                          label: '내 분석',
                         ),
                       ],
                     ),
@@ -78,6 +76,14 @@ class _AnalysisPageState extends State<AnalysisPage> {
                       _AnalysisAccessIssueMessage(
                         issue: _accessIssue!,
                         onAgreementsTap: _openAgreements,
+                      ),
+                      const SizedBox(height: 18),
+                    ],
+                    if (!isSignedIn) ...[
+                      const AppStateMessage(
+                        icon: Icons.lock_outline_rounded,
+                        title: '로그인 후 분석을 사용할 수 있습니다.',
+                        body: '비로그인 상태에서는 탐색 페이지만 볼 수 있습니다.',
                       ),
                       const SizedBox(height: 18),
                     ],

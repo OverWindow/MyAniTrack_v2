@@ -12,6 +12,18 @@ import {
 
 const TITLE_LANGUAGE_OPTIONS: AnimeTitleLanguage[] = ['ko', 'en', 'ja'];
 
+export type VoiceActorAnimeStatus = 'all' | 'completed';
+
+export function validateVoiceActorAnimeStatus(value: unknown): VoiceActorAnimeStatus {
+  const status = typeof value === 'string' ? value : 'all';
+
+  if (status !== 'all' && status !== 'completed') {
+    throw new Error('status must be one of all, completed');
+  }
+
+  return status;
+}
+
 function sendError(res: Response, error: unknown) {
   const message = error instanceof Error ? error.message : 'Unknown error';
   const statusCode = message.includes('must be')
@@ -80,6 +92,7 @@ async function getVoiceActorRankingForUser(req: Request, res: Response, userId: 
 async function getVoiceActorAnimeForUser(req: Request, res: Response, userId: number) {
   const voiceActorId = validateVoiceActorId(req.params.voiceActorId);
   const titleLanguage = parseTitleLanguage(req.query.titleLanguage);
+  const status = validateVoiceActorAnimeStatus(req.query.status);
   const limit = validateVoiceActorStatsLimit(req.query.limit);
   const cursor = typeof req.query.cursor === 'string' ? req.query.cursor : undefined;
 
@@ -89,6 +102,7 @@ async function getVoiceActorAnimeForUser(req: Request, res: Response, userId: nu
     userId,
     voiceActorId,
     titleLanguage,
+    status,
     limit,
     cursor,
   });

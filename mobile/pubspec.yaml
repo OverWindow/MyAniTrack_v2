@@ -19,3 +19,7 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/images/transparent_version.png
+    - assets/images/default-profile.jpeg
+    - assets/images/landing-dashboard.png

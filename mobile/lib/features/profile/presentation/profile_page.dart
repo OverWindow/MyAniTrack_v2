@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/assets/app_assets.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_badge.dart';
@@ -61,7 +62,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           radius: 28,
                           backgroundColor: AppColors.pointSoft,
                           foregroundColor: AppColors.textOnPointSoft,
-                          child: Icon(Icons.person_outline, size: 30),
+                          backgroundImage: AssetImage(AppAssets.defaultProfile),
                         ),
                         const SizedBox(width: 14),
                         Expanded(

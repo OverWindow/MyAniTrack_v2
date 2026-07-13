@@ -11,7 +11,6 @@ import '../../../data/api/collection_repository.dart';
 import '../../../data/auth/auth_session_service.dart';
 import '../../../data/models/anime_entry.dart';
 import '../../../data/models/collection_status.dart';
-import '../../../data/models/sample_data.dart';
 import '../../profile/presentation/agreements_page.dart';
 import '../../anime_search/presentation/anime_search_page.dart';
 import '../../anime_detail/anime_detail_page.dart';
@@ -63,21 +62,21 @@ class _CollectionPageState extends State<CollectionPage> {
     _accessIssue = null;
 
     if (!_authSessionService.isSignedIn) {
-      _cachedEntries = sampleEntries;
-      return sampleEntries;
+      _cachedEntries = const [];
+      return const [];
     }
 
     try {
       final page = await CollectionRepository(ApiClient()).fetchMyAnimeListPage();
-      final entries = page.items.isEmpty ? sampleEntries : page.items;
+      final entries = page.items;
       _nextCursor = page.pageInfo.nextCursor;
       _hasNext = page.pageInfo.hasNext && _nextCursor != null;
       _cachedEntries = entries;
       return entries;
     } on Object catch (error) {
       _accessIssue = ApiAccessIssue.from(error);
-      _cachedEntries = sampleEntries;
-      return sampleEntries;
+      _cachedEntries = const [];
+      return const [];
     }
   }
 
@@ -116,12 +115,9 @@ class _CollectionPageState extends State<CollectionPage> {
       future: _entriesFuture,
       builder: (context, snapshot) {
         final sourceEntries = _cachedEntries ?? snapshot.data;
-        final entries = sourceEntries == null || sourceEntries.isEmpty
-            ? sampleEntries
-            : sourceEntries;
+        final entries = sourceEntries ?? const <AnimeEntry>[];
         final visibleEntries = _visibleEntries(entries);
-        final isSampleMode =
-            !_authSessionService.isSignedIn || identical(entries, sampleEntries);
+        final isSignedIn = _authSessionService.isSignedIn;
 
         return RefreshIndicator(
           onRefresh: _refreshEntries,
@@ -146,8 +142,7 @@ class _CollectionPageState extends State<CollectionPage> {
                         ),
                         const SizedBox(width: 8),
                         AppBadge(
-                          label: isSampleMode ? '샘플 컬렉션' : '내 컬렉션',
-                          sample: isSampleMode,
+                          label: '내 컬렉션',
                         ),
                       ],
                     ),
@@ -175,7 +170,9 @@ class _CollectionPageState extends State<CollectionPage> {
                       onSortChanged: (value) => setState(() => _sort = value),
                     ),
                     const SizedBox(height: 18),
-                    if (visibleEntries.isEmpty)
+                    if (!isSignedIn)
+                      const _LockedCollectionMessage()
+                    else if (visibleEntries.isEmpty)
                       const _EmptyCollectionMessage()
                     else
                       ...visibleEntries.map(
@@ -183,12 +180,12 @@ class _CollectionPageState extends State<CollectionPage> {
                           padding: const EdgeInsets.only(bottom: 14),
                           child: AnimeCollectionCard(
                             entry: entry,
-                            sample: isSampleMode,
+                            sample: false,
                             onChanged: _reloadEntries,
                           ),
                         ),
                       ),
-                    if (!isSampleMode && _hasNext) ...[
+                    if (isSignedIn && _hasNext) ...[
                       const SizedBox(height: 4),
                       OutlinedButton.icon(
                         onPressed: _loadingMore ? null : _loadMoreEntries,
@@ -375,6 +372,19 @@ class _CollectionControls extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+class _LockedCollectionMessage extends StatelessWidget {
+  const _LockedCollectionMessage();
+
+  @override
+  Widget build(BuildContext context) {
+    return const AppStateMessage(
+      icon: Icons.lock_outline_rounded,
+      title: '로그인 후 컬렉션을 사용할 수 있습니다.',
+      body: '비로그인 상태에서는 탐색 페이지만 볼 수 있습니다.',
     );
   }
 }

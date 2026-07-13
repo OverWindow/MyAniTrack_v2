@@ -41,6 +41,25 @@ class AnalysisData {
     );
   }
 
+  factory AnalysisData.empty() {
+    return const AnalysisData(
+      overview: StatsOverview(
+        totalCount: 0,
+        completedCount: 0,
+        watchingCount: 0,
+        totalWatchedEpisodes: 0,
+        avgScore: 0,
+        favoriteGenre: '-',
+      ),
+      genres: [],
+      formats: [],
+      yearlyScores: [],
+      studios: [],
+      voiceActors: [],
+      isSample: false,
+    );
+  }
+
   AnalysisData copyWith({
     StatsOverview? overview,
     List<GenreStatItem>? genres,

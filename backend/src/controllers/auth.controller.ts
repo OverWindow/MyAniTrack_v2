@@ -289,7 +289,7 @@ export async function refreshUserSession(req: Request, res: Response) {
 
 export async function requestPasswordResetEmail(req: Request, res: Response) {
   try {
-    const result = await requestPasswordReset({
+    await requestPasswordReset({
       email: typeof req.body.email === 'string' ? req.body.email : '',
       userAgent: req.get('user-agent') ?? null,
       ipAddress: req.ip ?? null,
@@ -297,8 +297,7 @@ export async function requestPasswordResetEmail(req: Request, res: Response) {
 
     return res.json({
       success: true,
-      message: 'Password reset email sent successfully',
-      ...result,
+      message: 'If the account exists, a password reset email will be sent.',
     });
   } catch (error) {
     return sendError(res, error);

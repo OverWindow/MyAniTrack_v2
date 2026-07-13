@@ -8,6 +8,118 @@
 - 성공 응답 기본 형식: `{ "success": true, ... }`
 - 실패 응답 기본 형식: `{ "success": false, "message": "..." }`
 
+## Users
+
+### `GET /admin/users`
+
+관리자 권한으로 사용자 목록을 조회합니다. 비밀번호 해시와 Supabase 내부 사용자 ID는 응답하지 않습니다.
+
+Query parameter:
+
+- `page`: 페이지 번호, 기본 `1`
+- `limit`: 페이지당 사용자 수, 기본 `20`, 최대 `100`
+- `search`: 이메일 또는 사용자명 부분 검색, 최대 100자
+- `role`: `ALL`, `USER`, `ADMIN`, 기본 `ALL` (소문자 입력도 허용)
+
+호출 예시:
+
+```http
+GET /admin/users?page=1&limit=20&search=kim&role=USER
+Authorization: Bearer <admin accessToken>
+```
+
+Response 예시:
+
+```json
+{
+  "success": true,
+  "items": [
+    {
+      "id": 42,
+      "email": "user@example.com",
+      "username": "anime_user",
+      "role": "USER",
+      "profileImageUrl": "https://...",
+      "emailVerified": true,
+      "emailVerifiedAt": "2026-07-01 12:00:00",
+      "supabaseLinked": false,
+      "animeListCount": 85,
+      "completedCount": 40,
+      "activeSessionCount": 2,
+      "createdAt": "2026-06-01 10:00:00",
+      "updatedAt": "2026-07-10 09:00:00"
+    }
+  ],
+  "pageInfo": {
+    "page": 1,
+    "limit": 20,
+    "totalItems": 1,
+    "totalPages": 1,
+    "hasPrevious": false,
+    "hasNext": false
+  },
+  "filters": {
+    "search": "kim",
+    "role": "USER"
+  }
+}
+```
+
+사용자는 `id` 내림차순으로 반환됩니다.
+
+### `GET /admin/users/:userId`
+
+관리자 권한으로 특정 사용자의 계정 정보와 컬렉션 통계를 조회합니다.
+
+`userId`는 양의 정수인 내부 `users.id`입니다.
+
+호출 예시:
+
+```http
+GET /admin/users/42
+Authorization: Bearer <admin accessToken>
+```
+
+Response 예시:
+
+```json
+{
+  "success": true,
+  "item": {
+    "id": 42,
+    "email": "user@example.com",
+    "username": "anime_user",
+    "role": "USER",
+    "profileImageUrl": "https://...",
+    "emailVerified": true,
+    "emailVerifiedAt": "2026-07-01 12:00:00",
+    "supabaseLinked": false,
+    "animeListCount": 85,
+    "completedCount": 40,
+    "activeSessionCount": 2,
+    "createdAt": "2026-06-01 10:00:00",
+    "updatedAt": "2026-07-10 09:00:00",
+    "bio": "애니메이션을 좋아합니다.",
+    "collection": {
+      "totalCount": 85,
+      "plannedCount": 15,
+      "watchingCount": 10,
+      "completedCount": 40,
+      "pausedCount": 5,
+      "droppedCount": 15,
+      "totalWatchedEpisodes": 620,
+      "totalWatchMinutes": 14880,
+      "averageScore": 8.25,
+      "favoriteGenre": "Action",
+      "favoriteReleasePeriod": "2020s",
+      "statsUpdatedAt": "2026-07-10 09:00:00"
+    }
+  }
+}
+```
+
+존재하지 않는 사용자이면 HTTP `404`와 `User not found`를 반환합니다.
+
 ## Platform Stats
 
 ### `GET /api/stats/platform`

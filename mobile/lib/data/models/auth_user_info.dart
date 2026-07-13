@@ -6,6 +6,9 @@ class AuthUserInfo {
     required this.role,
     required this.isAdmin,
     required this.emailVerified,
+    this.bio,
+    this.profileImageUrl,
+    this.isPublic = true,
   });
 
   final int id;
@@ -14,6 +17,9 @@ class AuthUserInfo {
   final String role;
   final bool isAdmin;
   final bool emailVerified;
+  final String? bio;
+  final String? profileImageUrl;
+  final bool isPublic;
 
   factory AuthUserInfo.fromJson(Map<String, dynamic> json) {
     final data = json['data'];
@@ -31,6 +37,9 @@ class AuthUserInfo {
       emailVerified: user['emailVerified'] is bool
           ? user['emailVerified'] as bool
           : false,
+      bio: user['bio']?.toString(),
+      profileImageUrl: user['profileImageUrl']?.toString(),
+      isPublic: user['isPublic'] is bool ? user['isPublic'] as bool : true,
     );
   }
 }

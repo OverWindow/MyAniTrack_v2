@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { createPortal } from 'react-dom'
 import { ConnectionErrorState } from './ConnectionErrorState'
 import {
   getAnalysisCache,
@@ -8,8 +9,9 @@ import {
 } from '../lib/analysisCache'
 import { getProfileImageSrc, handleProfileImageError } from '../lib/avatar'
 import { SERVER_CONNECTION_ERROR_MESSAGE, getFriendlyErrorMessage } from '../lib/errors'
-import { fetchVoiceActorRanking } from '../lib/stats'
+import { fetchVoiceActorAnime, fetchVoiceActorRanking } from '../lib/stats'
 import type {
+  VoiceActorAnimeResponse,
   VoiceActorPersonName,
   VoiceActorRankingItem,
   VoiceActorRankingSort,
@@ -29,6 +31,14 @@ type RankingState = {
   error: string | null
 }
 
+type VoiceActorAnimeState = {
+  data: VoiceActorAnimeResponse | null
+  isLoading: boolean
+  isLoadingMore: boolean
+  error: string | null
+  moreError: string | null
+}
+
 function getPersonName(name?: VoiceActorPersonName | null) {
   return name?.userPreferred || name?.full || name?.native || '이름 정보 없음'
 }
@@ -45,12 +55,24 @@ function getRankingMeta(item: VoiceActorRankingItem, sort: VoiceActorRankingSort
   return `${item.animeCount}편 · 캐릭터 ${item.characterCount}명`
 }
 
+function getCharacterImage(character: VoiceActorAnimeResponse['items'][number]['characters'][number]) {
+  return character.image.large || character.image.medium || null
+}
+
+function getAnimeImage(item: VoiceActorAnimeResponse['items'][number]) {
+  return item.anime.coverImageExtraLarge || item.anime.coverImageLarge || null
+}
+
 function VoiceActorRankingList({
   items,
   sort,
+  selectedVoiceActorId,
+  onSelect,
 }: {
   items: VoiceActorRankingItem[]
   sort: VoiceActorRankingSort
+  selectedVoiceActorId?: number | null
+  onSelect: (item: VoiceActorRankingItem) => void
 }) {
   if (items.length === 0) {
     return <div className="analysis-empty-state">아직 표시할 성우 랭킹이 없어요.</div>
@@ -62,12 +84,16 @@ function VoiceActorRankingList({
         const name = getPersonName(item.voiceActor.name)
         const rank = index + 1
         const rankClassName = rank <= 3 ? ` is-top-rank is-rank-${rank}` : ''
+        const activeClassName = selectedVoiceActorId === item.voiceActor.id ? ' is-active' : ''
 
         return (
-          <Link
-            className={`voice-actor-ranking-card${rankClassName}`}
+          <button
+            className={`voice-actor-ranking-card${rankClassName}${activeClassName}`}
             key={`${sort}-${item.voiceActor.id}`}
-            to={`/voice-actors/${item.voiceActor.id}`}
+            type="button"
+            aria-haspopup="dialog"
+            aria-label={`${name} 내가 본 작품 보기`}
+            onClick={() => onSelect(item)}
           >
             <span className="voice-actor-rank">{rank}위</span>
             <img
@@ -81,7 +107,7 @@ function VoiceActorRankingList({
               <strong>{name}</strong>
               <small>{getRankingMeta(item, sort)}</small>
             </span>
-          </Link>
+          </button>
         )
       })}
     </div>
@@ -99,6 +125,14 @@ export function VoiceActorRankingSection({
     score: [],
     isLoading: true,
     error: null,
+  })
+  const [selectedVoiceActor, setSelectedVoiceActor] = useState<VoiceActorRankingItem['voiceActor'] | null>(null)
+  const [animeState, setAnimeState] = useState<VoiceActorAnimeState>({
+    data: null,
+    isLoading: false,
+    isLoadingMore: false,
+    error: null,
+    moreError: null,
   })
 
   useEffect(() => {
@@ -174,6 +208,171 @@ export function VoiceActorRankingSection({
     }
   }, [cacheOwnerId, cacheVersion, userId])
 
+  useEffect(() => {
+    if (!selectedVoiceActor) {
+      return
+    }
+
+    const controller = new AbortController()
+    let isCancelled = false
+
+    const loadAnime = async () => {
+      setAnimeState({
+        data: null,
+        isLoading: true,
+        isLoadingMore: false,
+        error: null,
+        moreError: null,
+      })
+
+      const cacheKey = cacheOwnerId
+        ? getAnalysisCacheKey(cacheOwnerId, 'voiceActorAnime', `${selectedVoiceActor.id}:completed`)
+        : null
+
+      try {
+        const cached = cacheKey
+          ? await getAnalysisCache<VoiceActorAnimeResponse>(cacheKey)
+          : null
+
+        if (isCancelled || controller.signal.aborted) {
+          return
+        }
+
+        if (cached) {
+          setAnimeState({
+            data: cached,
+            isLoading: false,
+            isLoadingMore: false,
+            error: null,
+            moreError: null,
+          })
+          return
+        }
+
+        const data = await fetchVoiceActorAnime({
+          userId,
+          voiceActorId: selectedVoiceActor.id,
+          titleLanguage: 'ko',
+          status: 'completed',
+          limit: 20,
+          signal: controller.signal,
+        })
+
+        if (isCancelled || controller.signal.aborted) {
+          return
+        }
+
+        if (cacheKey) {
+          await setAnalysisCache(cacheKey, data)
+        }
+
+        setAnimeState({
+          data,
+          isLoading: false,
+          isLoadingMore: false,
+          error: null,
+          moreError: null,
+        })
+      } catch (loadError) {
+        if (loadError instanceof DOMException && loadError.name === 'AbortError') {
+          return
+        }
+
+        setAnimeState({
+          data: null,
+          isLoading: false,
+          isLoadingMore: false,
+          error: getFriendlyErrorMessage(loadError, '성우의 작품 목록을 불러오지 못했어요.'),
+          moreError: null,
+        })
+      }
+    }
+
+    void loadAnime()
+
+    return () => {
+      isCancelled = true
+      controller.abort()
+    }
+  }, [cacheOwnerId, cacheVersion, selectedVoiceActor, userId])
+
+  useEffect(() => {
+    if (!selectedVoiceActor) {
+      return
+    }
+
+    const previousOverflow = document.body.style.overflow
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setSelectedVoiceActor(null)
+      }
+    }
+
+    document.body.style.overflow = 'hidden'
+    window.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [selectedVoiceActor])
+
+  const handleLoadMore = async () => {
+    if (
+      !selectedVoiceActor
+      || !animeState.data?.pageInfo.hasNext
+      || !animeState.data.pageInfo.nextCursor
+      || animeState.isLoadingMore
+    ) {
+      return
+    }
+
+    setAnimeState((current) => ({ ...current, isLoadingMore: true, moreError: null }))
+
+    try {
+      const nextData = await fetchVoiceActorAnime({
+        userId,
+        voiceActorId: selectedVoiceActor.id,
+        titleLanguage: animeState.data.pageInfo.titleLanguage,
+        status: 'completed',
+        limit: animeState.data.pageInfo.limit,
+        cursor: animeState.data.pageInfo.nextCursor,
+      })
+
+      const mergedData: VoiceActorAnimeResponse = {
+        ...nextData,
+        items: [...animeState.data.items, ...nextData.items],
+      }
+
+      if (cacheOwnerId) {
+        await setAnalysisCache(
+          getAnalysisCacheKey(cacheOwnerId, 'voiceActorAnime', `${selectedVoiceActor.id}:completed`),
+          mergedData,
+        )
+      }
+
+      setAnimeState({
+        data: mergedData,
+        isLoading: false,
+        isLoadingMore: false,
+        error: null,
+        moreError: null,
+      })
+    } catch (loadError) {
+      setAnimeState((current) => ({
+        ...current,
+        isLoadingMore: false,
+        moreError: getFriendlyErrorMessage(loadError, '작품을 더 불러오지 못했어요.'),
+      }))
+    }
+  }
+
+  const selectedVoiceActorName = getPersonName(selectedVoiceActor?.name)
+  const selectedCharacterCount = animeState.data?.items.reduce(
+    (count, item) => count + item.characters.length,
+    0,
+  ) ?? 0
+
   return (
     <section className="analysis-panel voice-actor-section">
       <div className="analysis-panel-heading">
@@ -199,6 +398,8 @@ export function VoiceActorRankingSection({
             <VoiceActorRankingList
               items={rankingState.count}
               sort="count"
+              selectedVoiceActorId={selectedVoiceActor?.id}
+              onSelect={(item) => setSelectedVoiceActor(item.voiceActor)}
             />
           </div>
 
@@ -210,9 +411,145 @@ export function VoiceActorRankingSection({
             <VoiceActorRankingList
               items={rankingState.score}
               sort="score"
+              selectedVoiceActorId={selectedVoiceActor?.id}
+              onSelect={(item) => setSelectedVoiceActor(item.voiceActor)}
             />
           </div>
         </div>
+      )}
+
+      {selectedVoiceActor && createPortal(
+        <div
+          className="voice-actor-modal-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setSelectedVoiceActor(null)
+            }
+          }}
+        >
+          <section
+            className="voice-actor-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="voice-actor-modal-title"
+          >
+            <header className="voice-actor-modal-header">
+              <Link
+                className="voice-actor-modal-profile-link"
+                to={`/voice-actors/${selectedVoiceActor.id}`}
+                aria-label={`${selectedVoiceActorName} 성우 상세 페이지로 이동`}
+                onClick={() => setSelectedVoiceActor(null)}
+              >
+                <img
+                  src={getProfileImageSrc(selectedVoiceActor.image.large || selectedVoiceActor.image.medium || null)}
+                  alt={selectedVoiceActorName}
+                  onError={handleProfileImageError}
+                />
+                <div className="voice-actor-modal-profile-copy">
+                  <span className="detail-label">Completed works</span>
+                  <h3 id="voice-actor-modal-title">{selectedVoiceActorName}</h3>
+                  <p>
+                    {animeState.data
+                      ? `${ownerLabel}가 본 작품 ${animeState.data.items.length.toLocaleString()}편 · 캐릭터 ${selectedCharacterCount.toLocaleString()}명`
+                      : `${ownerLabel}가 본 작품에서 맡은 캐릭터를 모아봐요.`}
+                  </p>
+                </div>
+              </Link>
+              <button
+                className="voice-actor-modal-close"
+                type="button"
+                aria-label="성우 작품 모달 닫기"
+                autoFocus
+                onClick={() => setSelectedVoiceActor(null)}
+              >
+                ×
+              </button>
+            </header>
+
+            <div className="voice-actor-modal-body">
+              {animeState.isLoading && (
+                <div className="analysis-empty-state">내가 본 작품을 불러오는 중이에요.</div>
+              )}
+
+              {animeState.error && !animeState.isLoading && (
+                animeState.error === SERVER_CONNECTION_ERROR_MESSAGE
+                  ? <ConnectionErrorState message={animeState.error} />
+                  : <div className="analysis-empty-state">{animeState.error}</div>
+              )}
+
+              {!animeState.isLoading && !animeState.error && animeState.data?.items.length === 0 && (
+                <div className="analysis-empty-state">이 성우가 출연한 완주 작품이 아직 없어요.</div>
+              )}
+
+              {!animeState.isLoading && !animeState.error && animeState.data && animeState.data.items.length > 0 && (
+                <div className="voice-actor-modal-work-list">
+                  {animeState.data.items.map((item) => (
+                    <article className="voice-actor-modal-work" key={item.anime.id}>
+                      <Link
+                        className="voice-actor-modal-anime"
+                        to={`/anime/${item.anime.id}`}
+                        onClick={() => setSelectedVoiceActor(null)}
+                      >
+                        <img
+                          src={getProfileImageSrc(getAnimeImage(item))}
+                          alt={item.anime.title}
+                          loading="lazy"
+                          onError={handleProfileImageError}
+                        />
+                        <span>
+                          <small>완주 작품</small>
+                          <strong>{item.anime.title}</strong>
+                          <em>
+                            {item.userList?.score !== null && item.userList?.score !== undefined
+                              ? `내 평점 ${item.userList.score}점`
+                              : '평점 없음'}
+                          </em>
+                        </span>
+                      </Link>
+
+                      <div
+                        className={`voice-actor-modal-characters${item.characters.length > 1 ? ' is-multiple' : ''}`}
+                        aria-label={`${item.anime.title} 캐릭터`}
+                      >
+                        {item.characters.map((character) => (
+                          <div className="voice-actor-modal-character" key={character.id}>
+                            <img
+                              src={getProfileImageSrc(getCharacterImage(character))}
+                              alt=""
+                              loading="lazy"
+                              onError={handleProfileImageError}
+                            />
+                            <span>
+                              <strong>{getPersonName(character.name)}</strong>
+                              <small>{character.role || '역할 정보 없음'}</small>
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+
+              {animeState.moreError && (
+                <div className="analysis-empty-state">{animeState.moreError}</div>
+              )}
+
+              {animeState.data?.pageInfo.hasNext && (
+                <button
+                  className="voice-actor-more-button voice-actor-modal-more"
+                  type="button"
+                  disabled={animeState.isLoadingMore}
+                  onClick={() => { void handleLoadMore() }}
+                >
+                  {animeState.isLoadingMore ? '불러오는 중...' : '작품 더 보기'}
+                </button>
+              )}
+            </div>
+          </section>
+        </div>,
+        document.body,
       )}
     </section>
   )

@@ -8,6 +8,7 @@ import {
 } from '../../sync/anime-cast.sync.service';
 import { translateAnimeKoreanTitlesInBatches } from '../../translations/anime.korean-title.service';
 import { updateAnimeKoreanTitleByAdmin } from '../services/admin-korean-title.service';
+import { getAdminUserById, getAdminUsers } from '../services/admin-user.service';
 
 function sendError(res: Response, error: unknown) {
   const message = error instanceof Error ? error.message : 'Unknown error';
@@ -28,7 +29,7 @@ function getErrorStatus(message: string) {
     return 400;
   }
 
-  if (message === 'Anime not found' || message === 'Korean title not found') {
+  if (message === 'Anime not found' || message === 'Korean title not found' || message === 'User not found') {
     return 404;
   }
 
@@ -37,6 +38,46 @@ function getErrorStatus(message: string) {
   }
 
   return 500;
+}
+
+export async function getAdminUsersController(req: Request, res: Response) {
+  try {
+    if (!ensureAdmin(req, res)) {
+      return;
+    }
+
+    const result = await getAdminUsers({
+      page: req.query.page,
+      limit: req.query.limit,
+      search: req.query.search,
+      role: req.query.role,
+    });
+
+    return res.json({
+      success: true,
+      ...result,
+    });
+  } catch (error) {
+    return sendError(res, error);
+  }
+}
+
+export async function getAdminUserController(req: Request, res: Response) {
+  try {
+    if (!ensureAdmin(req, res)) {
+      return;
+    }
+
+    const userId = parsePositiveInteger(req.params.userId, 'userId');
+    const item = await getAdminUserById(userId);
+
+    return res.json({
+      success: true,
+      item,
+    });
+  } catch (error) {
+    return sendError(res, error);
+  }
 }
 
 function parsePositiveInteger(value: unknown, fieldName: string) {

@@ -5,9 +5,10 @@ Flutter client for MyAniTrack, an app for recording Japanese anime watch history
 ## Current Scope
 
 - Warm ivory/amber visual system based on `MYANITRACK_FLUTTER_DESIGN_GUIDE.md`
-- Guest sample mode UI with clear teal sample badges
+- Shared visual assets copied from `frontend/public`
+- Signed-out exploration-only mode with login required for collection, analysis, and profile features
 - Bottom-tab app shell: Home, Collection, Analysis, Profile
-- Home sample overview, sample collection, platform stats, and popular anime panels
+- Exploration home with public/sample overview, platform stats, and popular anime panels
 - Collection list with search, filter, sort, pagination, add, edit, and delete flows
 - Analysis panels for overview, genres, formats, yearly scores, studios, and voice actors
 - Profile flows for Google OAuth, backend account linking, agreements, profile editing, sign out, and account deletion

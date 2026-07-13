@@ -106,6 +106,7 @@ interface RankingCursorPayload {
 interface AnimeCursorPayload {
   voiceActorId: number;
   animeId: number;
+  status?: 'all' | 'completed';
 }
 
 function encodeCursor(payload: RankingCursorPayload | AnimeCursorPayload) {
@@ -600,6 +601,7 @@ export async function getUserVoiceActorAnime(params: {
   userId: number;
   voiceActorId: number;
   titleLanguage: AnimeTitleLanguage;
+  status: 'all' | 'completed';
   limit: number;
   cursor?: string;
 }) {
@@ -632,8 +634,10 @@ export async function getUserVoiceActorAnime(params: {
   let cursorWhere = '';
 
   if (cursor) {
-    if (cursor.voiceActorId !== params.voiceActorId) {
-      throw new Error('Cursor does not match voice actor');
+    const cursorStatus = cursor.status ?? 'all';
+
+    if (cursor.voiceActorId !== params.voiceActorId || cursorStatus !== params.status) {
+      throw new Error('Cursor does not match request filters');
     }
 
     cursorWhere = 'AND a.id < ?';
@@ -641,6 +645,9 @@ export async function getUserVoiceActorAnime(params: {
   }
 
   queryParams.push(params.limit + 1);
+  const statusWhere = params.status === 'completed'
+    ? "AND ual.status = 'completed'"
+    : '';
 
   const [animeRows] = await pool.query<VoiceActorAnimeRow[]>(
     `
@@ -676,6 +683,7 @@ export async function getUserVoiceActorAnime(params: {
         WHERE acva.anime_id = a.id
           AND acva.voice_actor_id = ?
       )
+      ${statusWhere}
       ${cursorWhere}
     ORDER BY a.id DESC
     LIMIT ?
@@ -787,11 +795,13 @@ export async function getUserVoiceActorAnime(params: {
     pageInfo: {
       limit: params.limit,
       titleLanguage: params.titleLanguage,
+      status: params.status,
       hasNext,
       nextCursor: hasNext && lastRow
         ? encodeCursor({
           voiceActorId: params.voiceActorId,
           animeId: lastRow.animeId,
+          status: params.status,
         })
         : null,
     },

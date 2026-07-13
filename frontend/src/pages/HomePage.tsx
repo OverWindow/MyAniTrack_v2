@@ -1,19 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ConnectionErrorState } from '../components/ConnectionErrorState'
-import { fetchPopularAnime, getDisplayTitle, getPrimaryPoster } from '../lib/anime'
-import { getFriendlyErrorMessage } from '../lib/errors'
-import type { PopularAnimeItem } from '../types/anime'
 import landingDashboardImage from '../assets/landing-dashboard.png'
 import '../styles/pages/HomePage.css'
-
-type HomeState = {
-  popularAnime: PopularAnimeItem[]
-  isLoading: boolean
-  error: string | null
-}
-
-const FEATURE_ROTATION_MS = 6000
 
 const LANDING_REVIEWS = [
   {
@@ -43,80 +30,42 @@ const LANDING_REVIEWS = [
   },
 ]
 
-function getPopularityLabel(value?: number | null) {
-  if (!value) {
-    return '인기 집계 중'
-  }
-
-  return `인기도 ${value.toLocaleString()}`
-}
+const HOW_TO_STEPS = [
+  {
+    number: '01',
+    label: 'Start',
+    title: '로그인하기',
+    description: '내 감상 기록과 분석 결과를 안전하게 저장할 계정으로 시작해요.',
+    href: '/login',
+    action: '로그인하기',
+  },
+  {
+    number: '02',
+    label: 'Explore',
+    title: '애니 탐색하기',
+    description: '탐색 탭에서 제목과 장르로 지금까지 본 작품을 찾아보세요.',
+    href: '/explore',
+    action: '작품 찾기',
+  },
+  {
+    number: '03',
+    label: 'Collect',
+    title: '컬렉션에 기록하기',
+    description: '작품을 추가하고 감상 상태, 진행도와 내 평점을 함께 남겨요.',
+    href: '/collection',
+    action: '컬렉션 보기',
+  },
+  {
+    number: '04',
+    label: 'Analyze',
+    title: '자동 분석 확인하기',
+    description: '쌓인 기록을 바탕으로 장르, 연도, 포맷, 스튜디오와 성우 취향을 자동으로 분석해요.',
+    href: '/analysis',
+    action: '내 분석 보기',
+  },
+]
 
 export function HomePage() {
-  const [state, setState] = useState<HomeState>({
-    popularAnime: [],
-    isLoading: true,
-    error: null,
-  })
-  const [featuredIndex, setFeaturedIndex] = useState(0)
-
-  useEffect(() => {
-    const controller = new AbortController()
-
-    const loadPopularAnime = async () => {
-      try {
-        const popularAnime = await fetchPopularAnime({
-          limit: 18,
-          signal: controller.signal,
-        })
-
-        if (controller.signal.aborted) {
-          return
-        }
-
-        setState({
-          popularAnime: popularAnime.slice(0, 18),
-          isLoading: false,
-          error: null,
-        })
-      } catch (error) {
-        if (controller.signal.aborted) {
-          return
-        }
-
-        setState({
-          popularAnime: [],
-          isLoading: false,
-          error: getFriendlyErrorMessage(error, '홈 정보를 불러오지 못했어요.'),
-        })
-      }
-    }
-
-    void loadPopularAnime()
-
-    return () => controller.abort()
-  }, [])
-
-  useEffect(() => {
-    if (state.popularAnime.length <= 1) {
-      return
-    }
-
-    const timer = window.setInterval(() => {
-      setFeaturedIndex((current) => (current + 1) % state.popularAnime.length)
-    }, FEATURE_ROTATION_MS)
-
-    return () => window.clearInterval(timer)
-  }, [state.popularAnime.length])
-
-  const safeFeaturedIndex = state.popularAnime.length > 0
-    ? featuredIndex % state.popularAnime.length
-    : 0
-  const featuredAnime = state.popularAnime[safeFeaturedIndex] ?? null
-  const railAnime = useMemo(
-    () => state.popularAnime.slice(0, 12),
-    [state.popularAnime],
-  )
-
   return (
     <div className="home-page">
       <section className="home-immersive-hero" aria-label="MyAniTrack 소개">
@@ -149,85 +98,59 @@ export function HomePage() {
         </div>
       </section>
 
-      {state.error ? (
-        <ConnectionErrorState className="home-connection-error" message={state.error} />
-      ) : (
-        <section className="home-cinematic-hero" aria-label="인기 애니 쇼케이스">
-          {featuredAnime && (
-            <div
-              className="home-cinematic-backdrop"
-              style={{
-                backgroundImage: `linear-gradient(90deg, rgba(35, 29, 25, 0.95) 0%, rgba(35, 29, 25, 0.8) 42%, rgba(35, 29, 25, 0.26) 100%), url(${getPrimaryPoster(featuredAnime)})`,
-              }}
-            />
-          )}
+      <section className="home-guide-section" aria-labelledby="home-guide-title">
+        <div className="home-guide-heading">
+          <div>
+            <span className="detail-label">How it works</span>
+            <h2 id="home-guide-title">기록을 시작하면<br />취향이 보이기 시작해요</h2>
+          </div>
+          <p>
+            작품을 일일이 정리할 필요 없이 본 애니를 컬렉션에 추가하세요.
+            기록이 쌓일수록 MyAniTrack이 나만의 감상 패턴을 자동으로 정리해줘요.
+          </p>
+        </div>
 
-          <div className="home-cinematic-copy">
-            <h1>{featuredAnime ? getDisplayTitle(featuredAnime) : '지금 많이 찾는 애니'}</h1>
-            <div className="home-feature-meta">
-              <span>Anime</span>
-              <span>Collection</span>
-              <span>{featuredAnime ? getPopularityLabel(featuredAnime.popularity) : 'Trending'}</span>
-            </div>
+        <ol className="home-guide-steps">
+          {HOW_TO_STEPS.map((step) => (
+            <li className="home-guide-step" key={step.number}>
+              <div className="home-guide-step-marker">
+                <span>{step.number}</span>
+                <small>{step.label}</small>
+              </div>
+              <div className="home-guide-step-copy">
+                <h3>{step.title}</h3>
+                <p>{step.description}</p>
+              </div>
+              <Link to={step.href}>{step.action}<span aria-hidden="true"> →</span></Link>
+            </li>
+          ))}
+        </ol>
+
+        <div className="home-guide-social">
+          <div className="home-guide-social-index" aria-hidden="true">
+            <strong>05</strong>
+            <span>Together</span>
+          </div>
+          <div className="home-guide-social-copy">
+            <span className="detail-label">한 걸음 더</span>
+            <h3>친구의 취향까지 함께 발견하세요</h3>
             <p>
-              오늘의 인기 작품을 둘러보고, 마음에 드는 애니를 컬렉션에 담아 취향 분석까지 이어가세요.
+              친구 요청을 보내고 연결되면 친구가 기록한 애니 컬렉션과 자동 분석 결과를 바로 둘러볼 수 있어요.
+              서로 어떤 작품을 좋아하는지 비교하며 다음 작품도 발견해보세요.
             </p>
-
-            <div className="home-cinematic-actions">
-              <Link className="primary-button" to="/explore">
-                탐색 시작하기
-              </Link>
-              {featuredAnime && (
-                <Link className="secondary-button" to={`/anime/${featuredAnime.id}`} state={{ fromPage: 'explore' }}>
-                  대표 작품 보기
-                </Link>
-              )}
-            </div>
           </div>
-
-          <div className="home-feature-poster-wrap" aria-hidden={!featuredAnime}>
-            {featuredAnime ? (
-              <img
-                className="home-feature-poster"
-                src={getPrimaryPoster(featuredAnime)}
-                alt={getDisplayTitle(featuredAnime)}
-              />
-            ) : (
-              <div className="home-feature-poster-placeholder" />
-            )}
+          <div className="home-guide-social-flow" aria-label="친구 기능 이용 순서">
+            <span>친구 추가</span>
+            <i aria-hidden="true">→</i>
+            <span>컬렉션 보기</span>
+            <i aria-hidden="true">→</i>
+            <span>분석 보기</span>
           </div>
-
-          <div className="home-poster-rail" aria-label="인기 애니 목록">
-            {state.isLoading && (
-              Array.from({ length: 6 }).map((_, index) => (
-                <div className="home-rail-card skeleton-card" key={`home-rail-loading-${index}`}>
-                  <div className="skeleton-line long" />
-                </div>
-              ))
-            )}
-
-            {!state.isLoading && railAnime.length > 0 && railAnime.map((anime, index) => (
-              <button
-                className={featuredAnime?.id === anime.id ? 'home-rail-card is-active' : 'home-rail-card'}
-                key={anime.id}
-                type="button"
-                onClick={() => setFeaturedIndex(index)}
-                aria-label={`${getDisplayTitle(anime)} 대표로 보기`}
-              >
-                <img
-                  src={getPrimaryPoster(anime)}
-                  alt={getDisplayTitle(anime)}
-                  loading={index < 4 ? 'eager' : 'lazy'}
-                />
-              </button>
-            ))}
-
-            {!state.isLoading && railAnime.length === 0 && !state.error && (
-              <div className="feedback-card">인기 애니 정보를 아직 보여드릴 수 없어요.</div>
-            )}
-          </div>
-        </section>
-      )}
+          <Link className="primary-button home-guide-friends-link" to="/friends">
+            친구 찾아보기
+          </Link>
+        </div>
+      </section>
 
       <section className="home-review-section" aria-labelledby="home-review-title">
         <div className="home-review-heading">

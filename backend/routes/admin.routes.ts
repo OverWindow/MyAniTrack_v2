@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { requireAdmin } from '../src/middleware/auth.middleware';
 import {
+  getAdminUserController,
+  getAdminUsersController,
   syncAllAnimeController,
   syncAnimeCastBatchController,
   syncAnimeCastController,
@@ -18,6 +20,8 @@ const router = Router();
 
 router.use('/admin', requireAdmin);
 
+router.get('/admin/users', getAdminUsersController);
+router.get('/admin/users/:userId', getAdminUserController);
 router.post('/admin/anime/sync/page', requireAdmin, syncAnimePageController);
 router.post('/admin/anime/sync/all', requireAdmin, syncAllAnimeController);
 router.post('/admin/anime/sync/chunked', requireAdmin, syncAnimeInChunksController);

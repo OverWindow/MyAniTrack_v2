@@ -177,6 +177,9 @@ export type VoiceActorAnimeItem = {
     title: string
     coverImageLarge?: string | null
     coverImageExtraLarge?: string | null
+    seasonYear?: number | null
+    format?: string | null
+    averageScore?: number | null
   }
   userList: {
     status?: string | null
@@ -199,9 +202,12 @@ export type VoiceActorAnimeResponse = {
     image: VoiceActorImage
   }
   items: VoiceActorAnimeItem[]
-  pageInfo?: {
-    hasNext?: boolean
-    nextCursor?: string | null
+  pageInfo: {
+    limit: number
+    titleLanguage: 'ko' | 'en' | 'ja'
+    status: 'all' | 'completed'
+    hasNext: boolean
+    nextCursor: string | null
   }
 }
 

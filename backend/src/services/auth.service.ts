@@ -40,6 +40,12 @@ interface EmailVerificationTokenRow extends RowDataPacket {
   usedAt: string | null;
 }
 
+interface PasswordResetRateRow extends RowDataPacket {
+  lastMinute: number | string;
+  lastHour: number | string;
+  lastDay: number | string;
+}
+
 interface UserDeletionRow extends RowDataPacket {
   id: number;
   email: string;
@@ -929,28 +935,78 @@ export async function verifySignupEmail(token: string) {
 
 export async function requestPasswordReset(params: RequestPasswordResetParams) {
   const email = validateEmail(params.email);
+
+  // Do not await account lookup, token creation, or mail delivery. The public
+  // response must be the same for existing and non-existing accounts, including
+  // when the mail provider is unavailable.
+  void processPasswordResetRequest(email, params).catch((error) => {
+    console.error('Password reset email processing failed', error);
+  });
+}
+
+async function processPasswordResetRequest(
+  email: string,
+  params: RequestPasswordResetParams
+) {
   const user = await findUserByEmail(email);
 
   if (!user || !user.emailVerified) {
-    return {
-      email,
-      sent: true,
-    };
+    return;
   }
 
   const conn = await pool.getConnection();
   let token = '';
+  let shouldSend = false;
 
   try {
     await conn.beginTransaction();
-    token = await createEmailTokenRecord(conn, {
-      userId: user.id,
-      email: user.email,
-      purpose: 'PASSWORD_RESET',
-      expiresAt: getPasswordResetExpiresAt(),
-      ipAddress: params.ipAddress,
-      userAgent: params.userAgent,
-    });
+
+    // Serialize requests for the same account so concurrent calls cannot all
+    // pass the quota check before any of them inserts a token.
+    await conn.query('SELECT id FROM users WHERE id = ? FOR UPDATE', [user.id]);
+
+    const [rateRows] = await conn.query<PasswordResetRateRow[]>(
+      `
+      SELECT
+        SUM(created_at >= DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 1 MINUTE)) AS lastMinute,
+        SUM(created_at >= DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 1 HOUR)) AS lastHour,
+        SUM(created_at >= DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 1 DAY)) AS lastDay
+      FROM email_verification_tokens
+      WHERE user_id = ?
+        AND purpose = 'PASSWORD_RESET'
+      `,
+      [user.id]
+    );
+
+    const rate = rateRows[0];
+    const lastMinute = Number(rate?.lastMinute || 0);
+    const lastHour = Number(rate?.lastHour || 0);
+    const lastDay = Number(rate?.lastDay || 0);
+
+    if (lastMinute < 1 && lastHour < 3 && lastDay < 5) {
+      // Only the most recently issued password reset link remains valid.
+      await conn.execute(
+        `
+        UPDATE email_verification_tokens
+        SET used_at = CURRENT_TIMESTAMP
+        WHERE user_id = ?
+          AND purpose = 'PASSWORD_RESET'
+          AND used_at IS NULL
+        `,
+        [user.id]
+      );
+
+      token = await createEmailTokenRecord(conn, {
+        userId: user.id,
+        email: user.email,
+        purpose: 'PASSWORD_RESET',
+        expiresAt: getPasswordResetExpiresAt(),
+        ipAddress: params.ipAddress,
+        userAgent: params.userAgent,
+      });
+      shouldSend = true;
+    }
+
     await conn.commit();
   } catch (error) {
     await conn.rollback();
@@ -959,16 +1015,13 @@ export async function requestPasswordReset(params: RequestPasswordResetParams) {
     conn.release();
   }
 
-  await sendPasswordResetEmail({
-    to: user.email,
-    token,
-    email: user.email,
-  });
-
-  return {
-    email,
-    sent: true,
-  };
+  if (shouldSend) {
+    await sendPasswordResetEmail({
+      to: user.email,
+      token,
+      email: user.email,
+    });
+  }
 }
 
 export async function resetPasswordWithEmailToken(token: string, newPassword: string) {
@@ -1010,6 +1063,24 @@ export async function resetPasswordWithEmailToken(token: string, newPassword: st
   try {
     await conn.beginTransaction();
 
+    // Serialize reset confirmation with new reset-email issuance for this user.
+    await conn.query('SELECT id FROM users WHERE id = ? FOR UPDATE', [user.id]);
+
+    const [claimResult] = await conn.execute<ResultSetHeader>(
+      `
+      UPDATE email_verification_tokens
+      SET used_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+        AND used_at IS NULL
+        AND expires_at > CURRENT_TIMESTAMP
+      `,
+      [resetToken.id]
+    );
+
+    if (claimResult.affectedRows !== 1) {
+      throw new Error('Invalid password reset token');
+    }
+
     await conn.execute(
       `
       UPDATE users
@@ -1019,15 +1090,6 @@ export async function resetPasswordWithEmailToken(token: string, newPassword: st
       WHERE id = ?
       `,
       [passwordHash, user.id]
-    );
-
-    await conn.execute(
-      `
-      UPDATE email_verification_tokens
-      SET used_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-      `,
-      [resetToken.id]
     );
 
     await conn.execute(

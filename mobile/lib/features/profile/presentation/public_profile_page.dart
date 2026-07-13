@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/assets/app_assets.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/anime_poster.dart';
 import '../../../core/widgets/app_badge.dart';
@@ -225,9 +226,10 @@ class _PublicProfileHeader extends StatelessWidget {
             radius: 30,
             backgroundColor: AppColors.pointSoft,
             foregroundColor: AppColors.textOnPointSoft,
-            backgroundImage: _imageProvider(profile.profileImageUrl),
+            backgroundImage: _imageProvider(profile.profileImageUrl) ??
+                const AssetImage(AppAssets.defaultProfile),
             child: profile.profileImageUrl == null
-                ? const Icon(Icons.person_outline, size: 30)
+                ? null
                 : null,
           ),
           const SizedBox(width: 14),
