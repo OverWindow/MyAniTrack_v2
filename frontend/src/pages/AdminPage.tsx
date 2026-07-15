@@ -10,7 +10,9 @@ import {
   syncAnimeCastBatch,
   syncAnimeCastChunked,
   syncAnimeChunked,
+  syncAnimeFull,
   syncAnimePage,
+  syncAnimeRelations,
   syncAnimeSeason,
   syncMissingAnimeStudios,
   translateKoreanTitles,
@@ -22,6 +24,9 @@ import type {
   AdminCastSyncBatchPayload,
   AdminCastSyncChunkedPayload,
   AdminCastSyncStatusPayload,
+  AdminFullSyncPayload,
+  AdminRelationSyncMode,
+  AdminRelationSyncPayload,
   AdminSeason,
   AdminStudioSyncMissingPayload,
   AdminSyncAllPayload,
@@ -52,13 +57,14 @@ type AdminActionCardProps<TPayload> = {
 type AdminActionKey =
   | 'users'
   | 'sync-tools'
+  | 'special-sync'
   | 'translate-korean'
-  | 'studio-sync-missing'
-  | 'cast-sync'
 
 type AdminSyncActionKey =
   | 'sync-page'
   | 'sync-all'
+  | 'sync-full'
+  | 'sync-relations'
   | 'sync-chunked'
   | 'sync-season'
   | 'studio-sync-missing'
@@ -70,9 +76,21 @@ type AdminCastActionKey =
   | 'cast-sync-chunked'
   | 'cast-sync-status'
 
+type AdminSpecialSyncActionKey =
+  | 'studio-sync-missing'
+  | 'cast-sync'
+  | 'sync-relations'
+
 const seasonOptions: AdminSeason[] = ['WINTER', 'SPRING', 'SUMMER', 'FALL']
 const castLanguageOptions: AdminCastLanguage[] = ['JAPANESE', 'ENGLISH', 'KOREAN']
 const RESPONSE_PREVIEW_LENGTH = 360
+
+type AdminFullSyncFormValues = Omit<AdminFullSyncPayload, 'maxPages'> & {
+  maxPages: number
+  syncAllPages: boolean
+}
+
+type AdminRelationSyncFormValues = Required<AdminRelationSyncPayload>
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat('ko-KR').format(value)
@@ -188,6 +206,13 @@ export function AdminPage() {
     perPage: 50,
     maxPages: 10,
   })
+  const [relationSyncValues, setRelationSyncValues] = useState<AdminRelationSyncFormValues>({
+    mode: 'missing',
+    limit: 500,
+    batchSize: 50,
+    retryFailed: true,
+    afterAnimeId: 0,
+  })
   const [chunkedValues, setChunkedValues] = useState<AdminSyncChunkedPayload>({
     startPage: 1,
     perPage: 50,
@@ -195,12 +220,25 @@ export function AdminPage() {
     chunkDelayMs: 10000,
     maxChunks: 5,
   })
-  const [seasonValues, setSeasonValues] = useState<AdminSyncSeasonPayload>({
-    season: 'SPRING',
-    seasonYear: 2025,
+  const [fullSyncValues, setFullSyncValues] = useState<AdminFullSyncFormValues>({
     startPage: 1,
     perPage: 50,
-    maxPages: 5,
+    maxPages: 1,
+    language: 'JAPANESE',
+    castPerPage: 25,
+    animeDelayMs: 2500,
+    syncAllPages: false,
+  })
+  const [seasonValues, setSeasonValues] = useState<AdminSyncSeasonPayload>({
+    season: 'SPRING',
+    seasonYear: 2026,
+    startPage: 1,
+    perPage: 50,
+    maxPages: 1,
+    syncCast: true,
+    language: 'JAPANESE',
+    castPerPage: 25,
+    animeDelayMs: 2500,
   })
   const [translateValues, setTranslateValues] = useState<AdminTranslateKoreanTitlesPayload>({
     batchSize: 100,
@@ -242,6 +280,7 @@ export function AdminPage() {
 
   const [selectedAction, setSelectedAction] = useState<AdminActionKey>('users')
   const [selectedSyncAction, setSelectedSyncAction] = useState<AdminSyncActionKey>('sync-page')
+  const [selectedSpecialSyncAction, setSelectedSpecialSyncAction] = useState<AdminSpecialSyncActionKey>('studio-sync-missing')
   const [selectedCastAction, setSelectedCastAction] = useState<AdminCastActionKey>('cast-sync-anime')
   const [activeAction, setActiveAction] = useState<string | null>(null)
   const [responseMap, setResponseMap] = useState<Record<string, AdminActionResponse | null>>({})
@@ -262,6 +301,7 @@ export function AdminPage() {
         { label: '번역 진행률', value: '-', hint: '플랫폼 통계 불러오기 전' },
         { label: '캐스트 동기화율', value: '-', hint: '플랫폼 통계 불러오기 전' },
         { label: '스튜디오 동기화율', value: '-', hint: '플랫폼 통계 불러오기 전' },
+        { label: '연관 작품 동기화율', value: '-', hint: '플랫폼 통계 불러오기 전' },
         { label: '캐릭터 / 성우', value: '-', hint: '플랫폼 통계 불러오기 전' },
       ]
     }
@@ -282,6 +322,15 @@ export function AdminPage() {
     const castSyncRate = platformStats.castSyncProgressRate
       ?? (storedAnimeCount > 0
         ? (platformStats.castSyncedAnimeCount / storedAnimeCount) * 100
+        : 0)
+    const relationSyncedAnimeCount = platformStats.relationSyncedAnimeCount ?? 0
+    const relationPendingAnimeCount = platformStats.relationPendingAnimeCount
+      ?? Math.max(0, storedAnimeCount - relationSyncedAnimeCount)
+    const relationSyncingAnimeCount = platformStats.relationSyncingAnimeCount ?? 0
+    const relationFailedAnimeCount = platformStats.relationFailedAnimeCount ?? 0
+    const relationSyncRate = platformStats.relationSyncProgressRate
+      ?? (storedAnimeCount > 0
+        ? (relationSyncedAnimeCount / storedAnimeCount) * 100
         : 0)
     return [
       {
@@ -313,6 +362,17 @@ export function AdminPage() {
           `${formatNumber(studioPendingAnimeCount)} 대기`,
           `${formatNumber(studioFailedAnimeCount)} 실패`,
           `스튜디오 ${formatNumber(platformStats.studioCount ?? 0)}개`,
+        ].join(' · '),
+      },
+      {
+        label: '연관 작품 동기화율',
+        value: formatPercent(relationSyncRate),
+        hint: [
+          `${formatNumber(relationSyncedAnimeCount)} 성공`,
+          `${formatNumber(relationPendingAnimeCount)} 대기`,
+          `${formatNumber(relationSyncingAnimeCount)} 진행`,
+          `${formatNumber(relationFailedAnimeCount)} 실패`,
+          `관계 ${formatNumber(platformStats.animeRelationCount ?? 0)}개`,
         ].join(' · '),
       },
       {
@@ -484,6 +544,88 @@ export function AdminPage() {
 
   const syncActionItems = [
     {
+      key: 'sync-full' as const,
+      group: '통합 동기화',
+      label: '전체 통합 동기화',
+      description: '애니·스튜디오·캐릭터·성우·연관 작품을 한 번에 동기화합니다.',
+      content: (
+        <AdminActionCard
+          title="전체 작품 통합 동기화"
+          description="작품 기본 정보와 스튜디오, 캐릭터, 성우, 연관 작품 및 각 동기화 상태를 함께 처리합니다. 운영 환경에서는 최대 페이지 수를 1로 두고 응답의 nextPage를 다음 시작 페이지로 이어서 실행하는 방식을 권장합니다."
+          fields={[
+            { key: 'startPage', label: '시작 페이지', type: 'number' },
+            { key: 'perPage', label: '페이지당 작품 수', type: 'number' },
+            { key: 'maxPages', label: '최대 페이지 수', type: 'number' },
+            { key: 'language', label: '성우 언어', type: 'select', options: castLanguageOptions },
+            { key: 'castPerPage', label: '캐스트 페이지당 수', type: 'number' },
+            { key: 'animeDelayMs', label: '작품 간 지연(ms)', type: 'number' },
+            { key: 'syncAllPages', label: 'maxPages 생략 후 전체 실행', type: 'checkbox' },
+          ]}
+          values={fullSyncValues}
+          isRunning={activeAction === 'sync-full'}
+          onChange={(key, value) => setFullSyncValues((current) => ({ ...current, [key]: value }))}
+          onSubmit={() => {
+            void runAction('sync-full', async () => {
+              const { syncAllPages, maxPages, ...basePayload } = fullSyncValues
+              const response = await syncAnimeFull({
+                ...basePayload,
+                ...(!syncAllPages ? { maxPages } : {}),
+              })
+              const nextPage = Number(response.result.nextPage)
+
+              if (Number.isInteger(nextPage) && nextPage > 0) {
+                setFullSyncValues((current) => ({ ...current, startPage: nextPage }))
+              }
+
+              return response
+            })
+          }}
+          response={responseMap['sync-full'] ?? null}
+        />
+      ),
+    },
+    {
+      key: 'sync-relations' as const,
+      group: '특수 동기화',
+      label: '관계 동기화',
+      description: '미동기화 처리 또는 전체 재동기화 방식을 선택합니다.',
+      content: (
+        <AdminActionCard
+          title="애니 연관 작품 동기화"
+          description={relationSyncValues.mode === 'missing'
+            ? '상태가 없거나 pending인 작품부터 처리합니다. 실패 항목 재시도 여부도 선택할 수 있어요.'
+            : '동기화 성공 여부와 관계없이 전체 작품을 내부 애니 ID 순으로 처음부터 재동기화합니다.'}
+          fields={[
+            { key: 'mode', label: '동기화 방식', type: 'select', options: ['missing', 'all'] as AdminRelationSyncMode[] },
+            { key: 'limit', label: '최 처리 작품 수 (1~5000)', type: 'number' },
+            { key: 'batchSize', label: '배치 크기', type: 'number' },
+            ...(relationSyncValues.mode === 'missing'
+              ? [{ key: 'retryFailed' as const, label: '실패 항목 재시도', type: 'checkbox' as const }]
+              : [{ key: 'afterAnimeId' as const, label: '이어서 처리할 anime.id', type: 'number' as const }]),
+          ]}
+          values={relationSyncValues}
+          isRunning={activeAction === 'sync-relations'}
+          onChange={(key, value) => setRelationSyncValues((current) => ({ ...current, [key]: value }))}
+          onSubmit={() => {
+            void runAction('sync-relations', async () => {
+              const { mode, limit, batchSize, retryFailed, afterAnimeId } = relationSyncValues
+              const response = await syncAnimeRelations(mode === 'missing'
+                ? { mode, limit, batchSize, retryFailed }
+                : { mode, limit, batchSize, afterAnimeId })
+              const nextAfterAnimeId = Number(response.result.nextAfterAnimeId)
+
+              if (Number.isInteger(nextAfterAnimeId) && nextAfterAnimeId > 0) {
+                setRelationSyncValues((current) => ({ ...current, afterAnimeId: nextAfterAnimeId }))
+              }
+
+              return response
+            })
+          }}
+          response={responseMap['sync-relations'] ?? null}
+        />
+      ),
+    },
+    {
       key: 'sync-page' as const,
       group: '동기화',
       label: '한 페이지 동기화',
@@ -508,11 +650,11 @@ export function AdminPage() {
       key: 'sync-all' as const,
       group: '동기화',
       label: '연속 페이지 동기화',
-      description: '여러 페이지를 순차적으로 동기화합니다.',
+      description: '여러 페이지의 작품과 연관 작품을 순차적으로 동기화합니다.',
       content: (
         <AdminActionCard
           title="여러 페이지 연속 동기화"
-          description="시작 페이지부터 maxPages 수만큼 순차적으로 동기화합니다."
+          description="시작 페이지부터 maxPages 수만큼 작품 기본 정보와 ANIME 유형의 연관 작품을 순차적으로 동기화합니다."
           fields={[
             { key: 'startPage', label: '시작 페이지', type: 'number' },
             { key: 'perPage', label: '페이지당 수', type: 'number' },
@@ -554,22 +696,37 @@ export function AdminPage() {
       key: 'sync-season' as const,
       group: '동기화',
       label: '시즌 동기화',
-      description: '특정 시즌과 연도만 골라서 동기화합니다.',
+      description: '특정 시즌의 작품과 연관 작품을 통합 동기화합니다.',
       content: (
         <AdminActionCard
           title="특정 시즌 동기화"
-          description="특정 시즌과 연도만 대상으로 애니를 동기화합니다. 최신 시즌 보강에 유용해요."
+          description="특정 시즌의 애니, 스튜디오, 연관 작품을 동기화하며, 기본적으로 캐릭터와 성우까지 함께 처리합니다. 캐스트 동기화를 끄더라도 연관 작품은 저장됩니다."
           fields={[
             { key: 'season', label: '시즌', type: 'select', options: seasonOptions },
             { key: 'seasonYear', label: '연도', type: 'number' },
             { key: 'startPage', label: '시작 페이지', type: 'number' },
             { key: 'perPage', label: '페이지당 수', type: 'number' },
             { key: 'maxPages', label: '최대 페이지 수', type: 'number' },
+            { key: 'syncCast', label: '캐릭터·성우까지 통합 동기화', type: 'checkbox' },
+            { key: 'language', label: '성우 언어', type: 'select', options: castLanguageOptions },
+            { key: 'castPerPage', label: '캐스트 페이지당 수', type: 'number' },
+            { key: 'animeDelayMs', label: '작품 간 지연(ms)', type: 'number' },
           ]}
           values={seasonValues}
           isRunning={activeAction === 'sync-season'}
           onChange={(key, value) => setSeasonValues((current) => ({ ...current, [key]: value }))}
-          onSubmit={() => { void runAction('sync-season', () => syncAnimeSeason(seasonValues)) }}
+          onSubmit={() => {
+            void runAction('sync-season', async () => {
+              const response = await syncAnimeSeason(seasonValues)
+              const nextPage = Number(response.result.nextPage)
+
+              if (Number.isInteger(nextPage) && nextPage > 0) {
+                setSeasonValues((current) => ({ ...current, startPage: nextPage }))
+              }
+
+              return response
+            })
+          }}
           response={responseMap['sync-season'] ?? null}
         />
       ),
@@ -597,7 +754,7 @@ export function AdminPage() {
     },
     {
       key: 'studio-sync-missing' as const,
-      group: '스튜디오',
+      group: '특수 동기화',
       label: '스튜디오 미동기화 백필',
       description: '스튜디오 상태가 없거나 대기 중인 애니를 채웁니다.',
       content: (
@@ -633,7 +790,7 @@ export function AdminPage() {
     },
     {
       key: 'cast-sync' as const,
-      group: '캐릭터/성우',
+      group: '특수 동기화',
       label: '캐릭터/성우 동기화',
       description: '단건, 배치, 청크, 상태 조회를 한 곳에서 실행합니다.',
       content: (
@@ -664,11 +821,16 @@ export function AdminPage() {
     item.key !== 'translate-korean'
     && item.key !== 'studio-sync-missing'
     && item.key !== 'cast-sync'
+    && item.key !== 'sync-relations'
   ))
   const selectedSyncItem = syncToolItems.find((item) => item.key === selectedSyncAction) ?? syncToolItems[0]
   const translateActionItem = syncActionItems.find((item) => item.key === 'translate-korean')
   const studioActionItem = syncActionItems.find((item) => item.key === 'studio-sync-missing')
   const castActionItem = syncActionItems.find((item) => item.key === 'cast-sync')
+  const relationActionItem = syncActionItems.find((item) => item.key === 'sync-relations')
+  const specialSyncItems = [studioActionItem, castActionItem, relationActionItem].filter((item) => item !== undefined)
+  const selectedSpecialSyncItem = specialSyncItems.find((item) => item.key === selectedSpecialSyncAction)
+    ?? specialSyncItems[0]
   const actionItems = [
     {
       key: 'users' as const,
@@ -705,8 +867,34 @@ export function AdminPage() {
         </div>
       ),
     },
-    ...(studioActionItem ? [studioActionItem] : []),
-    ...(castActionItem ? [castActionItem] : []),
+    {
+      key: 'special-sync' as const,
+      group: '특수 동기화',
+      label: '특수 동기화',
+      description: '스튜디오, 캐릭터/성우, 연관 작품 동기화를 모아서 실행합니다.',
+      content: (
+        <div className="admin-sync-tool">
+          <div className="admin-sync-mode-list" role="tablist" aria-label="특수 동기화 작업 유형">
+            {specialSyncItems.map((item) => (
+              <button
+                className={selectedSpecialSyncAction === item.key ? 'admin-sync-mode is-active' : 'admin-sync-mode'}
+                key={item.key}
+                type="button"
+                role="tab"
+                aria-selected={selectedSpecialSyncAction === item.key}
+                onClick={() => setSelectedSpecialSyncAction(item.key as AdminSpecialSyncActionKey)}
+              >
+                <span className="admin-sidebar-group">{item.group}</span>
+                <strong>{item.label}</strong>
+                <small>{item.description}</small>
+              </button>
+            ))}
+          </div>
+
+          {selectedSpecialSyncItem?.content}
+        </div>
+      ),
+    },
     ...(translateActionItem ? [translateActionItem] : []),
   ]
 

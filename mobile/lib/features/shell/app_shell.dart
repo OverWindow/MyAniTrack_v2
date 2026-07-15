@@ -28,7 +28,12 @@ class _AppShellState extends State<AppShell> {
     super.initState();
     _authSubscription = _authSessionService.authStateChanges.listen((event) {
       if (mounted) {
-        setState(() => _authVersion += 1);
+        setState(() {
+          _authVersion += 1;
+          if (!_authSessionService.isSignedIn) {
+            _index = 0;
+          }
+        });
       }
     });
   }
@@ -44,26 +49,23 @@ class _AppShellState extends State<AppShell> {
     final isSignedIn = _authSessionService.isSignedIn;
     final pages = isSignedIn
         ? [
-      HomePage(key: ValueKey('home-$_authVersion')),
-      CollectionPage(key: ValueKey('collection-$_authVersion')),
-      AnalysisPage(key: ValueKey('analysis-$_authVersion')),
-      ProfilePage(key: ValueKey('profile-$_authVersion')),
+            HomePage(key: ValueKey('home-$_authVersion')),
+            CollectionPage(key: ValueKey('collection-$_authVersion')),
+            AnalysisPage(key: ValueKey('analysis-$_authVersion')),
+            ProfilePage(key: ValueKey('profile-$_authVersion')),
           ]
         : [
             HomePage(key: ValueKey('home-$_authVersion')),
           ];
-
-    if (_index >= pages.length) {
-      _index = 0;
-    }
+    final selectedIndex = _index >= pages.length ? 0 : _index;
 
     return AppBackground(
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        body: SafeArea(child: pages[_index]),
+        body: SafeArea(child: pages[selectedIndex]),
         bottomNavigationBar: isSignedIn
             ? NavigationBar(
-                selectedIndex: _index,
+                selectedIndex: selectedIndex,
                 onDestinationSelected: (value) => setState(() => _index = value),
                 destinations: const [
                   NavigationDestination(

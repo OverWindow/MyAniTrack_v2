@@ -9,9 +9,10 @@ import {
   getDetailMetaTitle,
   getGenreLabel,
   getPrimaryPoster,
+  searchAnimeWithRelations,
 } from '../lib/anime'
 import { createSampleAnimeDetail, fetchSampleCollection } from '../lib/sample'
-import type { AnimeCastCharacter, AnimeDetailItem } from '../types/anime'
+import type { AnimeCastCharacter, AnimeDetailItem, AnimeRelationItem, AnimeRelationType } from '../types/anime'
 import '../styles/pages/AnimeDetailPage.css'
 
 type DetailState = {
@@ -29,6 +30,28 @@ type CastState = {
   items: AnimeCastCharacter[]
   isLoading: boolean
   error: string | null
+}
+
+type RelationState = {
+  items: AnimeRelationItem[]
+  isLoading: boolean
+  error: string | null
+}
+
+const relationTypeLabels: Record<AnimeRelationType, string> = {
+  PREQUEL: '이전 이야기',
+  SEQUEL: '후속작',
+  PARENT: '본편',
+  SIDE_STORY: '외전',
+  SPIN_OFF: '스핀오프',
+  ADAPTATION: '각색작',
+  SOURCE: '원작',
+  SUMMARY: '총집편',
+  ALTERNATIVE: '다른 버전',
+  CHARACTER: '캐릭터 연관',
+  COMPILATION: '모음집',
+  CONTAINS: '포함 작품',
+  OTHER: '기타 관계',
 }
 
 const createInitialDetailState = (requestKey: string): DetailState => ({
@@ -175,6 +198,11 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
     isLoading: false,
     error: null,
   })
+  const [relationState, setRelationState] = useState<RelationState>({
+    items: [],
+    isLoading: false,
+    error: null,
+  })
   const { item, isLoading, error } = state
   const isSampleDetail = Boolean(sampleAnimeDetail || item?.source === 'Sample')
   const isRefreshingDetail = state.requestKey !== requestKey
@@ -182,6 +210,7 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
   const fromPage = routeState?.fromPage
   const backPath = fromPage === 'collection' ? '/collection' : '/explore'
   const detailPageClassName = isOverlay ? 'detail-page detail-page-overlay' : 'detail-page'
+  const relationSearchQuery = item ? (getDetailMetaTitle(item).trim() || item.title) : ''
 
   const handleOverlayClose = () => {
     navigate(-1)
@@ -193,13 +222,15 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
     }
 
     if (sampleAnimeDetail) {
-      setState({
-        item: sampleAnimeDetail,
-        isLoading: false,
-        error: null,
-        requestKey,
+      const sampleTimer = window.setTimeout(() => {
+        setState({
+          item: sampleAnimeDetail,
+          isLoading: false,
+          error: null,
+          requestKey,
+        })
       })
-      return
+      return () => window.clearTimeout(sampleTimer)
     }
 
     const controller = new AbortController()
@@ -317,6 +348,62 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
       controller.abort()
     }
   }, [isSampleDetail, item?.id])
+
+  useEffect(() => {
+    if (isSampleDetail || !item?.id) {
+      const resetTimer = window.setTimeout(() => {
+        setRelationState({ items: [], isLoading: false, error: null })
+      })
+      return () => window.clearTimeout(resetTimer)
+    }
+
+    const controller = new AbortController()
+    const animeId = item.id
+    const anilistId = item.anilistId
+    const loadingTimer = window.setTimeout(() => {
+      setRelationState({ items: [], isLoading: true, error: null })
+    })
+
+    const loadRelations = async () => {
+      try {
+        const response = await searchAnimeWithRelations({
+          query: relationSearchQuery,
+          titleLanguage: 'ko',
+          sort: 'popularity',
+          limit: 20,
+          signal: controller.signal,
+        })
+        const matchedAnime = response.items.find((entry) => entry.id === animeId)
+          ?? response.items.find((entry) => entry.anilistId === anilistId)
+        const uniqueRelations = Array.from(
+          new Map(
+            (matchedAnime?.relations ?? [])
+              .filter((relation) => relation.anime?.id !== animeId)
+              .map((relation) => [relation.targetAnilistId, relation]),
+          ).values(),
+        )
+
+        setRelationState({ items: uniqueRelations, isLoading: false, error: null })
+      } catch (relationError) {
+        if (relationError instanceof DOMException && relationError.name === 'AbortError') {
+          return
+        }
+
+        setRelationState({
+          items: [],
+          isLoading: false,
+          error: relationError instanceof Error ? relationError.message : '연관 작품을 불러오지 못했어요.',
+        })
+      }
+    }
+
+    void loadRelations()
+
+    return () => {
+      window.clearTimeout(loadingTimer)
+      controller.abort()
+    }
+  }, [isSampleDetail, item?.anilistId, item?.id, relationSearchQuery])
 
   const handleAdminTitleUpdated = (updatedTitle: {
     title: string
@@ -577,6 +664,64 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
           )}
         </aside>
       </div>
+
+      {(relationState.isLoading || (!relationState.error && relationState.items.length > 0)) && (
+        <section className="detail-section detail-relations-section">
+          <div className="detail-cast-heading">
+            <div>
+              <span className="detail-label">Related anime</span>
+              <h2>이 작품과 연관된 애니</h2>
+            </div>
+          </div>
+
+          {relationState.isLoading ? (
+            <div className="detail-relations-grid" aria-label="연관 작품을 불러오는 중">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <article className="detail-relation-card skeleton-card" key={`relation-skeleton-${index}`}>
+                  <div className="detail-relation-poster" />
+                  <div className="detail-relation-copy">
+                    <div className="skeleton-line short" />
+                    <div className="skeleton-line long" />
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className="detail-relations-grid">
+              {relationState.items.map((relation) => {
+                const relatedAnime = relation.anime
+                const poster = relatedAnime?.coverImageExtraLarge || relatedAnime?.coverImageLarge
+                const content = (
+                  <>
+                    {poster ? (
+                      <img className="detail-relation-poster" src={poster} alt="" loading="lazy" />
+                    ) : (
+                      <div className="detail-relation-poster detail-relation-poster-placeholder" aria-hidden="true">
+                        {relation.targetAnilistId}
+                      </div>
+                    )}
+                    <div className="detail-relation-copy">
+                      <span>{relationTypeLabels[relation.relationType] ?? relation.relationType}</span>
+                      <strong>{relatedAnime?.title || `AniList #${relation.targetAnilistId}`}</strong>
+                      <small>{relation.resolved && relatedAnime ? '상세 보기' : '동기화 대기'}</small>
+                    </div>
+                  </>
+                )
+
+                return relation.resolved && relatedAnime ? (
+                  <Link className="detail-relation-card" to={`/anime/${relatedAnime.id}`} key={relation.targetAnilistId}>
+                    {content}
+                  </Link>
+                ) : (
+                  <article className="detail-relation-card is-unresolved" key={relation.targetAnilistId}>
+                    {content}
+                  </article>
+                )
+              })}
+            </div>
+          )}
+        </section>
+      )}
 
       {(castState.isLoading || (!castState.error && castState.items.length > 0)) && (
         <section className="detail-section detail-cast-section">

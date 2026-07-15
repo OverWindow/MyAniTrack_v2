@@ -9,6 +9,7 @@ import '../../../core/widgets/app_state_message.dart';
 import '../../../data/api/api_client.dart';
 import '../../../data/api/profile_repository.dart';
 import '../../../data/api/voice_actor_repository.dart';
+import '../../../data/auth/auth_session_service.dart';
 import '../../../data/models/analysis_models.dart';
 import '../../../data/models/anime_entry.dart';
 import '../../../data/models/public_badge_info.dart';
@@ -22,6 +23,8 @@ class PublicProfilePage extends StatefulWidget {
 }
 
 class _PublicProfilePageState extends State<PublicProfilePage> {
+  static const _authSessionService = AuthSessionService();
+
   final _userIdController = TextEditingController();
   PublicProfileSnapshot? _snapshot;
   bool _loading = false;
@@ -34,68 +37,82 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
 
   @override
   Widget build(BuildContext context) {
+    final isSignedIn = _authSessionService.isSignedIn;
+
     return Scaffold(
       backgroundColor: AppColors.bgPage,
       appBar: AppBar(
         title: const Text('공개 프로필'),
         backgroundColor: AppColors.bgPage,
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-        children: [
-          AppCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      body: isSignedIn
+          ? ListView(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
               children: [
-                Text('사용자 조회', style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _userIdController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: '공개 user id',
-                    hintText: '예: 1',
+                AppCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '사용자 조회',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _userIdController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: '공개 user id',
+                          hintText: '예: 1',
+                        ),
+                        onSubmitted: (_) => _loadPublicProfile(),
+                      ),
+                      const SizedBox(height: 12),
+                      FilledButton.icon(
+                        onPressed: _loading ? null : _loadPublicProfile,
+                        icon: _loading
+                            ? const SizedBox.square(
+                                dimension: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.travel_explore_rounded),
+                        label: Text(_loading ? '조회 중' : '공개 프로필 보기'),
+                      ),
+                    ],
                   ),
-                  onSubmitted: (_) => _loadPublicProfile(),
                 ),
-                const SizedBox(height: 12),
-                FilledButton.icon(
-                  onPressed: _loading ? null : _loadPublicProfile,
-                  icon: _loading
-                      ? const SizedBox.square(
-                          dimension: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.travel_explore_rounded),
-                  label: Text(_loading ? '조회 중' : '공개 프로필 보기'),
-                ),
+                const SizedBox(height: 16),
+                if (_snapshot == null)
+                  const AppStateMessage(
+                    icon: Icons.public_rounded,
+                    title: '공개 컬렉션을 찾아보세요.',
+                    body: '공개 user id를 입력하면 프로필, 컬렉션, 통계, 성우 랭킹을 확인합니다.',
+                  )
+                else ...[
+                  _PublicProfileHeader(snapshot: _snapshot!),
+                  const SizedBox(height: 16),
+                  _PublicStatsCard(overview: _snapshot!.overview),
+                  const SizedBox(height: 16),
+                  _PublicAnimeListCard(entries: _snapshot!.animeList),
+                  const SizedBox(height: 16),
+                  _PublicRankingCard(
+                    title: '공개 성우 랭킹',
+                    icon: Icons.record_voice_over_outlined,
+                    items: _snapshot!.voiceActors,
+                  ),
+                  const SizedBox(height: 16),
+                  _PublicBadgesCard(badges: _snapshot!.badges),
+                ],
               ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          if (_snapshot == null)
-            const AppStateMessage(
-              icon: Icons.public_rounded,
-              title: '공개 컬렉션을 찾아보세요.',
-              body: '공개 user id를 입력하면 프로필, 컬렉션, 통계, 성우 랭킹을 확인합니다.',
             )
-          else ...[
-            _PublicProfileHeader(snapshot: _snapshot!),
-            const SizedBox(height: 16),
-            _PublicStatsCard(overview: _snapshot!.overview),
-            const SizedBox(height: 16),
-            _PublicAnimeListCard(entries: _snapshot!.animeList),
-            const SizedBox(height: 16),
-            _PublicRankingCard(
-              title: '공개 성우 랭킹',
-              icon: Icons.record_voice_over_outlined,
-              items: _snapshot!.voiceActors,
+          : const Padding(
+              padding: EdgeInsets.all(16),
+              child: AppStateMessage(
+                icon: Icons.lock_outline_rounded,
+                title: '로그인 후 공개 프로필을 탐색할 수 있습니다.',
+                body: '비로그인 상태에서는 탐색 페이지만 볼 수 있습니다.',
+              ),
             ),
-            const SizedBox(height: 16),
-            _PublicBadgesCard(badges: _snapshot!.badges),
-          ],
-        ],
-      ),
     );
   }
 

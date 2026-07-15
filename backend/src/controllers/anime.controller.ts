@@ -2,17 +2,35 @@ import { Request, Response } from 'express';
 import {
   AnimeCharacterRole,
   AnimeGenre,
+  AnimeRelationType,
   AnimeSortOption,
   AnimeTitleLanguage,
   getAnimeCastByRole,
   getAnimeDetailById,
   getAnimeList,
   getAnimeListWithUserCollection,
+  getAnimeRelations,
+  searchAnimeWithRelations,
 } from '../services/anime.service';
 
 const SORT_OPTIONS: AnimeSortOption[] = ['latest', 'score', 'season', 'popularity'];
 const TITLE_LANGUAGE_OPTIONS: AnimeTitleLanguage[] = ['ko', 'en', 'ja'];
 const CHARACTER_ROLE_OPTIONS: AnimeCharacterRole[] = ['MAIN', 'SUPPORT', 'BACKGROUND'];
+const RELATION_TYPE_OPTIONS: AnimeRelationType[] = [
+  'ADAPTATION',
+  'PREQUEL',
+  'SEQUEL',
+  'PARENT',
+  'SIDE_STORY',
+  'CHARACTER',
+  'SUMMARY',
+  'ALTERNATIVE',
+  'SPIN_OFF',
+  'OTHER',
+  'SOURCE',
+  'COMPILATION',
+  'CONTAINS',
+];
 const GENRE_OPTIONS: AnimeGenre[] = [
   'Action',
   'Adventure',
@@ -136,6 +154,20 @@ function parseVoiceLanguage(value: unknown): string | undefined {
   }
 
   return value.trim() || undefined;
+}
+
+function parseRelationType(value: unknown): AnimeRelationType | undefined {
+  if (value === undefined || value === null || value === '') {
+    return undefined;
+  }
+
+  const relationType = typeof value === 'string' ? value.toUpperCase() : '';
+
+  if (!RELATION_TYPE_OPTIONS.includes(relationType as AnimeRelationType)) {
+    throw new Error(`relationType must be one of ${RELATION_TYPE_OPTIONS.join(', ')}`);
+  }
+
+  return relationType as AnimeRelationType;
 }
 
 function sendError(res: Response, error: unknown, extraBadRequestChecks: string[] = []) {
@@ -301,5 +333,56 @@ export async function getAnimeCast(req: Request, res: Response) {
     });
   } catch (error) {
     return sendError(res, error, ['voiceLanguage must be']);
+  }
+}
+
+export async function searchAnimeWithRelationsController(req: Request, res: Response) {
+  try {
+    const sort = parseSort(req.query.sort);
+    const titleLanguage = parseTitleLanguage(req.query.titleLanguage);
+    const genre = parseGenre(req.query.genre);
+    const limit = parseLimit(req.query.limit);
+    const query = parseSearchQuery(req.query.query);
+    const relationType = parseRelationType(req.query.relationType);
+    const cursor = typeof req.query.cursor === 'string' ? req.query.cursor : undefined;
+
+    const result = await searchAnimeWithRelations({
+      sort,
+      titleLanguage,
+      query,
+      genre,
+      limit,
+      cursor,
+      relationType,
+    });
+
+    return res.json({
+      success: true,
+      ...result,
+    });
+  } catch (error) {
+    return sendError(res, error, ['Cursor query', 'Cursor genre', 'query is required']);
+  }
+}
+
+export async function getAnimeRelationsController(req: Request, res: Response) {
+  try {
+    const animeIdParam = typeof req.params.id === 'string' ? req.params.id : '';
+    const animeId = parseAnimeId(animeIdParam);
+    const titleLanguage = parseTitleLanguage(req.query.titleLanguage);
+    const relationType = parseRelationType(req.query.relationType);
+    const result = await getAnimeRelations({
+      animeId,
+      titleLanguage,
+      relationType,
+    });
+
+    return res.json({
+      success: true,
+      animeId,
+      ...result,
+    });
+  } catch (error) {
+    return sendError(res, error);
   }
 }

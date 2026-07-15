@@ -5,6 +5,8 @@ import type {
   AdminCastSyncBatchPayload,
   AdminCastSyncChunkedPayload,
   AdminCastSyncStatusPayload,
+  AdminFullSyncPayload,
+  AdminRelationSyncPayload,
   AdminStudioSyncMissingPayload,
   AdminStudioSyncMissingResult,
   AdminSyncAllPayload,
@@ -48,7 +50,7 @@ function getAdminErrorMessage(status: number, fallback: string) {
   }
 
   if (status === 404) {
-    return '해당 애니를 찾을 수 없어요.'
+    return fallback
   }
 
   if (status >= 500) {
@@ -152,8 +154,34 @@ export function syncAllAnimePages(payload: AdminSyncAllPayload) {
   return postAdminAction('/admin/anime/sync/all', payload, '연속 페이지 동기화에 실패했어요.')
 }
 
+export async function syncAnimeRelations(payload: AdminRelationSyncPayload) {
+  const data = await postAdminRaw<AdminRelationSyncPayload, Record<string, unknown>>(
+    '/admin/anime/sync/relations',
+    payload,
+    '애니 연관 작품 동기화에 실패했어요.',
+  )
+  const nestedResult = data.result
+  const result = nestedResult && typeof nestedResult === 'object' && !Array.isArray(nestedResult)
+    ? nestedResult as Record<string, unknown>
+    : data
+
+  return {
+    success: typeof data.success === 'boolean' ? data.success : true,
+    message: typeof data.message === 'string'
+      ? data.message
+      : payload.mode === 'missing'
+        ? '미동기화 연관 작품을 처리했어요.'
+        : '연관 작품 전체 재동기화를 처리했어요.',
+    result,
+  } satisfies AdminActionResponse
+}
+
 export function syncAnimeChunked(payload: AdminSyncChunkedPayload) {
   return postAdminAction('/admin/anime/sync/chunked', payload, '청크 동기화에 실패했어요.')
+}
+
+export function syncAnimeFull(payload: AdminFullSyncPayload) {
+  return postAdminAction('/admin/anime/sync/full', payload, '전체 통합 동기화에 실패했어요.')
 }
 
 export function syncAnimeSeason(payload: AdminSyncSeasonPayload) {

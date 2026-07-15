@@ -1,0 +1,220 @@
+.voice-character-work-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid rgba(120, 113, 108, 0.14);
+  border-radius: 2px;
+  background: rgba(250, 247, 241, 0.68);
+}
+
+.voice-character-work-card.is-expanded {
+  z-index: 2;
+  border-color: var(--point-border);
+}
+
+.voice-character-work-person,
+.voice-character-primary-work {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.voice-character-primary-work {
+  color: inherit;
+  text-decoration: none;
+}
+
+.voice-character-work-person > img,
+.voice-character-primary-work > img {
+  width: 72px;
+  height: 92px;
+  border-radius: 2px;
+  object-fit: cover;
+  background: var(--bg-neutral);
+}
+
+.voice-character-work-person > span,
+.voice-character-primary-work > span {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.voice-character-work-person small,
+.voice-character-primary-work small {
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.voice-character-work-person strong,
+.voice-character-primary-work strong,
+.voice-character-work-person em,
+.voice-character-primary-work em {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.voice-character-work-person strong,
+.voice-character-primary-work strong {
+  color: var(--text-primary);
+  line-height: 1.25;
+}
+
+.voice-character-work-person em,
+.voice-character-primary-work em {
+  color: var(--text-secondary);
+  font-size: 0.76rem;
+  font-style: normal;
+  white-space: nowrap;
+}
+
+.voice-character-primary-work:hover strong,
+.voice-character-primary-work:focus-visible strong {
+  color: var(--point-hover);
+}
+
+.voice-character-work-actions {
+  align-self: start;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+}
+
+.voice-character-work-actions > span {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.voice-character-work-kebab {
+  width: 34px;
+  height: 38px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid rgba(120, 113, 108, 0.16);
+  border-radius: 999px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 1.35rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.voice-character-work-kebab:hover,
+.voice-character-work-kebab:focus-visible,
+.voice-character-work-kebab[aria-expanded='true'] {
+  border-color: var(--point-border);
+  background: var(--point-softest);
+  color: var(--point-hover);
+  outline: none;
+}
+
+.voice-character-more-works {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(120, 113, 108, 0.14);
+}
+
+.voice-character-more-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.voice-character-more-heading strong {
+  color: var(--text-primary);
+  font-size: 0.86rem;
+}
+
+.voice-character-more-heading span {
+  color: var(--text-secondary);
+  font-size: 0.74rem;
+}
+
+.voice-character-more-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.voice-character-more-list > a {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  padding: 7px;
+  background: var(--bg-card);
+  color: inherit;
+  text-decoration: none;
+}
+
+.voice-character-more-list img {
+  width: 42px;
+  height: 56px;
+  border-radius: 2px;
+  object-fit: cover;
+  background: var(--bg-neutral);
+}
+
+.voice-character-more-list span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.voice-character-more-list strong,
+.voice-character-more-list small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.voice-character-more-list strong {
+  color: var(--text-primary);
+  font-size: 0.8rem;
+}
+
+.voice-character-more-list small {
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+}
+
+.voice-character-work-card.is-modal .voice-character-work-person,
+.voice-character-work-card.is-modal .voice-character-primary-work {
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.voice-character-work-card.is-modal .voice-character-work-person > img,
+.voice-character-work-card.is-modal .voice-character-primary-work > img {
+  width: 64px;
+  height: 88px;
+}
+
+@media (max-width: 760px) {
+  .voice-character-work-card {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .voice-character-primary-work {
+    grid-column: 1 / -1;
+  }
+
+  .voice-character-more-list {
+    grid-template-columns: 1fr;
+  }
+}

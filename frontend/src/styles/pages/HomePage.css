@@ -430,6 +430,91 @@
   font-weight: 700;
 }
 
+.home-footer {
+  display: grid;
+  gap: 36px;
+  padding: clamp(42px, 6vw, 72px) max(24px, calc((100% - 1180px) / 2));
+  background: #1c1917;
+  color: var(--text-inverse);
+}
+
+.home-footer-inner {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) auto;
+  gap: clamp(40px, 10vw, 140px);
+  align-items: start;
+}
+
+.home-footer-brand {
+  display: grid;
+  gap: 12px;
+  max-width: 460px;
+}
+
+.home-footer-brand > a {
+  width: fit-content;
+  color: var(--text-inverse);
+  font-size: clamp(1.65rem, 3vw, 2.4rem);
+  font-weight: 950;
+  letter-spacing: -0.04em;
+  text-decoration: none;
+}
+
+.home-footer-brand p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 0.9rem;
+  line-height: 1.7;
+}
+
+.home-footer-nav {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(120px, 1fr));
+  gap: clamp(30px, 6vw, 76px);
+}
+
+.home-footer-nav > div {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+}
+
+.home-footer-nav strong {
+  margin-bottom: 4px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.home-footer-nav a {
+  width: fit-content;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.86rem;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.home-footer-brand > a:hover,
+.home-footer-brand > a:focus-visible,
+.home-footer-nav a:hover,
+.home-footer-nav a:focus-visible {
+  color: #fbbf24;
+  outline: none;
+}
+
+.home-footer-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding-top: 22px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 0.74rem;
+  font-weight: 650;
+}
+
 @media (max-width: 1080px) {
   .home-guide-section,
   .home-review-heading,
@@ -627,5 +712,25 @@
   .home-review-card {
     flex-basis: 86%;
     padding: 18px;
+  }
+
+  .home-footer {
+    gap: 30px;
+    padding: 40px 24px 32px;
+  }
+
+  .home-footer-inner {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+
+  .home-footer-nav {
+    gap: 28px;
+  }
+
+  .home-footer-bottom {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
   }
 }

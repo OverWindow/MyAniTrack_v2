@@ -86,46 +86,47 @@ class _AnalysisPageState extends State<AnalysisPage> {
                         body: '비로그인 상태에서는 탐색 페이지만 볼 수 있습니다.',
                       ),
                       const SizedBox(height: 18),
-                    ],
-                    GridView(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        crossAxisSpacing: 12,
-                        mainAxisSpacing: 12,
-                        childAspectRatio: 1.28,
+                    ] else ...[
+                      GridView(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          crossAxisSpacing: 12,
+                          mainAxisSpacing: 12,
+                          childAspectRatio: 1.28,
+                        ),
+                        children: [
+                          _MetricCard(
+                            label: '기록 작품',
+                            value: '${overview.totalCount}',
+                          ),
+                          _MetricCard(
+                            label: '시청 에피소드',
+                            value: '${overview.totalWatchedEpisodes}',
+                          ),
+                          _MetricCard(
+                            label: '평균 평점',
+                            value: overview.avgScore.toStringAsFixed(1),
+                          ),
+                          _MetricCard(
+                            label: '선호 장르',
+                            value: overview.favoriteGenre,
+                          ),
+                        ],
                       ),
-                      children: [
-                        _MetricCard(
-                          label: '기록 작품',
-                          value: '${overview.totalCount}',
-                        ),
-                        _MetricCard(
-                          label: '시청 에피소드',
-                          value: '${overview.totalWatchedEpisodes}',
-                        ),
-                        _MetricCard(
-                          label: '평균 평점',
-                          value: overview.avgScore.toStringAsFixed(1),
-                        ),
-                        _MetricCard(
-                          label: '선호 장르',
-                          value: overview.favoriteGenre,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 18),
-                    _GenrePanel(items: analysis.genres),
-                    const SizedBox(height: 18),
-                    _FormatPanel(items: analysis.formats),
-                    const SizedBox(height: 18),
-                    _YearlyScorePanel(items: analysis.yearlyScores),
-                    const SizedBox(height: 18),
-                    _StudioPanel(items: analysis.studios),
-                    const SizedBox(height: 18),
-                    _VoiceActorPanel(items: analysis.voiceActors),
+                      const SizedBox(height: 18),
+                      _GenrePanel(items: analysis.genres),
+                      const SizedBox(height: 18),
+                      _FormatPanel(items: analysis.formats),
+                      const SizedBox(height: 18),
+                      _YearlyScorePanel(items: analysis.yearlyScores),
+                      const SizedBox(height: 18),
+                      _StudioPanel(items: analysis.studios),
+                      const SizedBox(height: 18),
+                      _VoiceActorPanel(items: analysis.voiceActors),
+                    ],
                   ],
                 ),
               ),
@@ -192,14 +193,6 @@ class _MetricCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (items.isEmpty) {
-      return const AppStateMessage(
-        icon: Icons.bar_chart_rounded,
-        title: '장르 데이터가 없습니다.',
-        body: '컬렉션에 작품을 추가하면 장르 분포가 표시됩니다.',
-      );
-    }
-
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -231,9 +224,9 @@ class _GenrePanel extends StatelessWidget {
   Widget build(BuildContext context) {
     if (items.isEmpty) {
       return const AppStateMessage(
-        icon: Icons.stacked_bar_chart_rounded,
-        title: '연도별 평점 데이터가 없습니다.',
-        body: '평점을 저장한 작품이 생기면 연도별 추이가 표시됩니다.',
+        icon: Icons.bar_chart_rounded,
+        title: '장르 데이터가 없습니다.',
+        body: '컬렉션에 작품을 추가하면 장르 분포가 표시됩니다.',
       );
     }
 
@@ -354,9 +347,9 @@ class _YearlyScorePanel extends StatelessWidget {
   Widget build(BuildContext context) {
     if (items.isEmpty) {
       return const AppStateMessage(
-        icon: Icons.apartment_rounded,
-        title: '스튜디오 랭킹 데이터가 없습니다.',
-        body: '컬렉션이 쌓이면 자주 본 제작사가 표시됩니다.',
+        icon: Icons.stacked_bar_chart_rounded,
+        title: '연도별 평점 데이터가 없습니다.',
+        body: '평점을 저장한 작품이 생기면 연도별 추이가 표시됩니다.',
       );
     }
 
@@ -419,9 +412,9 @@ class _StudioPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     if (items.isEmpty) {
       return const AppStateMessage(
-        icon: Icons.record_voice_over_outlined,
-        title: '성우 랭킹 데이터가 없습니다.',
-        body: '작품과 성우 정보가 연결되면 선호 성우가 표시됩니다.',
+        icon: Icons.apartment_rounded,
+        title: '스튜디오 랭킹 데이터가 없습니다.',
+        body: '컬렉션이 쌓이면 자주 본 제작사가 표시됩니다.',
       );
     }
 
@@ -458,6 +451,14 @@ class _VoiceActorPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (items.isEmpty) {
+      return const AppStateMessage(
+        icon: Icons.record_voice_over_outlined,
+        title: '성우 랭킹 데이터가 없습니다.',
+        body: '작품과 성우 정보가 연결되면 선호 성우가 표시됩니다.',
+      );
+    }
+
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

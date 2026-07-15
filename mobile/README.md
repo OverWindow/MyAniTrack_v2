@@ -8,14 +8,14 @@ Flutter client for MyAniTrack, an app for recording Japanese anime watch history
 - Shared visual assets copied from `frontend/public`
 - Signed-out exploration-only mode with login required for collection, analysis, and profile features
 - Bottom-tab app shell: Home, Collection, Analysis, Profile
-- Exploration home with public/sample overview, platform stats, and popular anime panels
+- Exploration home with public overview, platform stats, and popular anime panels
 - Collection list with search, filter, sort, pagination, add, edit, and delete flows
 - Analysis panels for overview, genres, formats, yearly scores, studios, and voice actors
 - Profile flows for Google OAuth, backend account linking, agreements, profile editing, sign out, and account deletion
 - Auth profile card for `GET /auth/me` backend user id, role, and email verification state
 - Backend logout and logout-all calls paired with Supabase sign-out
 - 401/403 protected API guidance with direct agreement flow entry when required
-- Public profile lookup screen for user profile, public collection, stats, badges, and voice actor ranking
+- Logged-in public profile lookup screen for user profile, public collection, stats, badges, and voice actor ranking
 - API client/repository layer based on `flutter-app-api-handoff.md`
 - Supabase token injection path for authenticated backend calls
 
@@ -47,7 +47,9 @@ The app is wired for these handoff endpoints:
 - `GET /me/anime-stats/yearly-scores`
 - `GET /me/anime-stats/format-distribution`
 - `GET /me/anime-stats/studios`
+- `GET /me/anime-stats/studios/:studioId/anime`
 - `GET /me/voice-actors/ranking`
+- `GET /me/voice-actors/:voiceActorId/anime`
 - `GET /users/:userId/profile`
 - `GET /users/:userId/anime-list`
 - `GET /users/:userId/anime-stats`
@@ -55,6 +57,7 @@ The app is wired for these handoff endpoints:
 - `GET /users/:userId/anime-stats/yearly-scores`
 - `GET /users/:userId/anime-stats/format-distribution`
 - `GET /users/:userId/anime-stats/studios`
+- `GET /users/:userId/anime-stats/studios/:studioId/anime`
 - `GET /users/:userId/badges`
 - `GET /users/:userId/voice-actors/ranking`
 - `GET /users/:userId/voice-actors/:voiceActorId/anime`
@@ -74,7 +77,7 @@ Only the Supabase anon key belongs in the app. Never ship a service role key.
 
 ## Notes
 
-This workspace currently contains the Flutter source and a minimal web target. Android/iOS platform folders should be generated with Flutter tooling when the local CLI is responsive:
+This workspace is focused on the Flutter mobile app. Android/iOS platform folders should be generated with Flutter tooling when the local CLI is responsive:
 
 ```sh
 flutter create --platforms=android,ios .

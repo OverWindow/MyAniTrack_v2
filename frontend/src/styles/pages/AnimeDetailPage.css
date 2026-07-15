@@ -221,6 +221,88 @@
   gap: 18px;
 }
 
+.detail-relations-section {
+  display: grid;
+  gap: 18px;
+}
+
+.detail-relations-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.detail-relation-card {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 14px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid rgba(120, 113, 108, 0.14);
+  border-radius: 2px;
+  background: rgba(250, 247, 241, 0.62);
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+}
+
+.detail-relation-card[href]:hover,
+.detail-relation-card[href]:focus-visible {
+  border-color: var(--point-border);
+  box-shadow: var(--shadow-soft);
+  transform: translateY(-2px);
+}
+
+.detail-relation-card.is-unresolved {
+  opacity: 0.72;
+}
+
+.detail-relation-poster {
+  width: 92px;
+  aspect-ratio: 3 / 4.2;
+  border-radius: 2px;
+  object-fit: cover;
+  background: var(--bg-neutral);
+}
+
+.detail-relation-poster-placeholder {
+  display: grid;
+  place-items: center;
+  padding: 8px;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.detail-relation-copy {
+  display: grid;
+  align-content: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.detail-relation-copy span {
+  color: var(--point-hover);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.detail-relation-copy strong {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--text-primary);
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.detail-relation-copy small {
+  color: var(--text-secondary);
+  font-size: 0.76rem;
+}
+
 .detail-cast-heading {
   display: flex;
   align-items: flex-start;
@@ -405,6 +487,7 @@
   .detail-hero-content,
   .detail-layout,
   .detail-meta-grid,
+  .detail-relations-grid,
   .detail-cast-grid {
     grid-template-columns: 1fr;
   }
@@ -440,5 +523,13 @@
 
   .detail-cast-heading {
     flex-direction: column;
+  }
+
+  .detail-relation-card {
+    grid-template-columns: 80px minmax(0, 1fr);
+  }
+
+  .detail-relation-poster {
+    width: 80px;
   }
 }

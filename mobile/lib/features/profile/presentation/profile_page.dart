@@ -6,7 +6,6 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_badge.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_state_message.dart';
-import '../../../core/widgets/sample_banner.dart';
 import '../../../data/api/api_client.dart';
 import '../../../data/api/auth_repository.dart';
 import '../../../data/auth/auth_onboarding_service.dart';
@@ -39,6 +38,44 @@ class _ProfilePageState extends State<ProfilePage> {
     final user = _authSessionService.currentUser;
     final isSignedIn = user != null;
 
+    if (!isSignedIn) {
+      return CustomScrollView(
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+            sliver: SliverList.list(
+              children: [
+                Text(
+                  '프로필',
+                  style: Theme.of(context).textTheme.headlineLarge,
+                ),
+                const SizedBox(height: 16),
+                AppStateMessage(
+                  icon: Icons.lock_outline_rounded,
+                  title: '로그인 후 프로필을 사용할 수 있습니다.',
+                  body: '비로그인 상태에서는 탐색 페이지만 볼 수 있습니다.',
+                  action: FilledButton.icon(
+                    onPressed: () => _startGoogleLogin(context),
+                    icon: const Icon(Icons.login_rounded),
+                    label: const Text('Google로 시작하기'),
+                  ),
+                ),
+                if (!AppConfig.hasSupabaseConfig) ...[
+                  const SizedBox(height: 16),
+                  const AppStateMessage(
+                    icon: Icons.key_off_outlined,
+                    title: 'Supabase 설정이 필요합니다.',
+                    body:
+                        'SUPABASE_URL과 SUPABASE_ANON_KEY를 dart-define으로 넘기면 Google 로그인을 사용할 수 있습니다.',
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      );
+    }
+
     return CustomScrollView(
       slivers: [
         SliverPadding(
@@ -49,8 +86,6 @@ class _ProfilePageState extends State<ProfilePage> {
                 '프로필',
                 style: Theme.of(context).textTheme.headlineLarge,
               ),
-              const SizedBox(height: 16),
-              const SampleBanner(),
               const SizedBox(height: 16),
               AppCard(
                 child: Column(
@@ -72,7 +107,7 @@ class _ProfilePageState extends State<ProfilePage> {
                               Text(
                                 isSignedIn
                                     ? user.email ?? '로그인 사용자'
-                                    : '샘플 사용자',
+                                    : '로그인 필요',
                                 style: Theme.of(context).textTheme.titleMedium,
                               ),
                               const SizedBox(height: 4),

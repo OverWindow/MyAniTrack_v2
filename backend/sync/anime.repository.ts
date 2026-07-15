@@ -201,6 +201,116 @@ async function markAnimeStudioSyncState(
   );
 }
 
+async function markAnimeRelationSyncState(
+  conn: PoolConnection,
+  animeId: number,
+  status: 'syncing' | 'success' | 'failed',
+  sourceUpdatedAt?: number | null,
+  errorMessage?: string | null
+) {
+  await conn.execute(
+    `
+    INSERT INTO anime_relation_sync_state (
+      anime_id,
+      status,
+      last_synced_at,
+      source_updated_at,
+      error_message
+    )
+    VALUES (?, ?, ?, ?, ?)
+    ON DUPLICATE KEY UPDATE
+      status = VALUES(status),
+      last_synced_at = VALUES(last_synced_at),
+      source_updated_at = VALUES(source_updated_at),
+      error_message = VALUES(error_message),
+      updated_at = CURRENT_TIMESTAMP
+    `,
+    [
+      animeId,
+      status,
+      status === 'success' || status === 'failed'
+        ? new Date().toISOString().slice(0, 19).replace('T', ' ')
+        : null,
+      fromUnixTimestampToMySQLDateTime(sourceUpdatedAt),
+      errorMessage?.slice(0, 1000) ?? null,
+    ]
+  );
+}
+
+async function replaceAnimeRelations(
+  conn: PoolConnection,
+  sourceAnimeId: number,
+  anime: AniListAnime
+) {
+  if (anime.relations === undefined) {
+    return;
+  }
+
+  await markAnimeRelationSyncState(conn, sourceAnimeId, 'syncing');
+  await conn.execute('DELETE FROM anime_relations WHERE source_anime_id = ?', [sourceAnimeId]);
+
+  const uniqueRelations = new Map<string, {
+    targetAnilistId: number;
+    relationType: string;
+  }>();
+
+  for (const edge of anime.relations?.edges ?? []) {
+    const targetAnilistId = edge.node?.id;
+    const relationType = edge.relationType?.trim();
+
+    if (!targetAnilistId || edge.node?.type !== 'ANIME' || !relationType) {
+      continue;
+    }
+
+    uniqueRelations.set(`${targetAnilistId}:${relationType}`, {
+      targetAnilistId,
+      relationType,
+    });
+  }
+
+  const relations = Array.from(uniqueRelations.values());
+
+  if (relations.length > 0) {
+    const targetAnilistIds = Array.from(new Set(relations.map((relation) => relation.targetAnilistId)));
+    const [targetRows] = await conn.query<StudioIdRow[]>(
+      `
+      SELECT id, anilist_id AS anilistId
+      FROM anime
+      WHERE anilist_id IN (?)
+      `,
+      [targetAnilistIds]
+    );
+    const targetIdByAnilistId = new Map(targetRows.map((row) => [row.anilistId, row.id]));
+
+    await conn.query(
+      `
+      INSERT INTO anime_relations (
+        source_anime_id,
+        target_anime_id,
+        target_anilist_id,
+        relation_type,
+        synced_at
+      )
+      VALUES ?
+      `,
+      [relations.map((relation) => [
+        sourceAnimeId,
+        targetIdByAnilistId.get(relation.targetAnilistId) ?? null,
+        relation.targetAnilistId,
+        relation.relationType,
+        new Date().toISOString().slice(0, 19).replace('T', ' '),
+      ])]
+    );
+  }
+
+  await markAnimeRelationSyncState(
+    conn,
+    sourceAnimeId,
+    'success',
+    anime.updatedAt
+  );
+}
+
 export async function upsertAnimeStudiosOnly(anime: Pick<AniListAnime, 'id' | 'studios' | 'updatedAt'>): Promise<void> {
   const conn = await pool.getConnection();
 
@@ -243,7 +353,50 @@ export async function markAnimeStudioSyncFailedByAnilistId(anilistId: number, er
   }
 }
 
-export async function upsertAnimeFull(anime: AniListAnime): Promise<void> {
+export async function upsertAnimeRelationsOnly(
+  anime: Pick<AniListAnime, 'id' | 'relations' | 'updatedAt'>
+): Promise<void> {
+  const conn = await pool.getConnection();
+
+  try {
+    await conn.beginTransaction();
+    const animeId = await findInternalAnimeId(conn, anime.id);
+
+    if (!animeId) {
+      throw new Error('Anime not found');
+    }
+
+    await replaceAnimeRelations(conn, animeId, anime as AniListAnime);
+    await conn.commit();
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
+  }
+}
+
+export async function markAnimeRelationSyncFailedByAnilistId(
+  anilistId: number,
+  error: unknown
+): Promise<void> {
+  const conn = await pool.getConnection();
+
+  try {
+    const animeId = await findInternalAnimeId(conn, anilistId);
+
+    if (!animeId) {
+      return;
+    }
+
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    await markAnimeRelationSyncState(conn, animeId, 'failed', null, message);
+  } finally {
+    conn.release();
+  }
+}
+
+export async function upsertAnimeFull(anime: AniListAnime): Promise<number> {
   const conn = await pool.getConnection();
 
   try {
@@ -340,6 +493,17 @@ export async function upsertAnimeFull(anime: AniListAnime): Promise<void> {
 
     const animeId = rows[0].id;
 
+    // 이전 페이지에서 AniList ID만 저장했던 관계를 현재 내부 ID와 연결합니다.
+    await conn.execute(
+      `
+      UPDATE anime_relations
+      SET target_anime_id = ?
+      WHERE target_anilist_id = ?
+        AND target_anime_id IS NULL
+      `,
+      [animeId, anime.id]
+    );
+
     // ==========================
     // 3️⃣ GENRES
     // ==========================
@@ -386,7 +550,13 @@ export async function upsertAnimeFull(anime: AniListAnime): Promise<void> {
     await markAnimeStudioSyncState(conn, animeId, 'success', anime.updatedAt);
 
     // ==========================
-    // 6️⃣ SYNONYMS
+    // 6️⃣ RELATED ANIME
+    // ==========================
+
+    await replaceAnimeRelations(conn, animeId, anime);
+
+    // ==========================
+    // 7️⃣ SYNONYMS
     // ==========================
 
     // await conn.execute(`DELETE FROM anime_synonyms WHERE anime_id = ?`, [animeId]);
@@ -402,8 +572,29 @@ export async function upsertAnimeFull(anime: AniListAnime): Promise<void> {
 
     await conn.commit();
 
+    return animeId;
+
   } catch (error) {
     await conn.rollback();
+
+    if (anime.relations !== undefined) {
+      try {
+        const animeId = await findInternalAnimeId(conn, anime.id);
+
+        if (animeId) {
+          await markAnimeRelationSyncState(
+            conn,
+            animeId,
+            'failed',
+            anime.updatedAt,
+            error instanceof Error ? error.message : 'Unknown error'
+          );
+        }
+      } catch (stateError) {
+        console.error('Failed to save anime relation sync state', stateError);
+      }
+    }
+
     throw error;
   } finally {
     conn.release();

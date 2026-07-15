@@ -11,6 +11,11 @@ interface PlatformStatsRow extends RowDataPacket {
   studioPendingAnimeCount: number;
   studioFailedAnimeCount: number;
   castSyncedAnimeCount: number;
+  relationSyncedAnimeCount: number;
+  relationPendingAnimeCount: number;
+  relationSyncingAnimeCount: number;
+  relationFailedAnimeCount: number;
+  animeRelationCount: number;
   characterCount: number;
   voiceActorCount: number;
 }
@@ -71,6 +76,30 @@ export async function getPlatformStats() {
         FROM anime_cast_sync_state
         WHERE status = 'success'
       ) AS castSyncedAnimeCount,
+      (
+        SELECT COUNT(*)
+        FROM anime_relation_sync_state
+        WHERE status = 'success'
+      ) AS relationSyncedAnimeCount,
+      (
+        SELECT COUNT(*)
+        FROM anime a
+        LEFT JOIN anime_relation_sync_state arss
+          ON arss.anime_id = a.id
+        WHERE arss.anime_id IS NULL
+          OR arss.status = 'pending'
+      ) AS relationPendingAnimeCount,
+      (
+        SELECT COUNT(*)
+        FROM anime_relation_sync_state
+        WHERE status = 'syncing'
+      ) AS relationSyncingAnimeCount,
+      (
+        SELECT COUNT(*)
+        FROM anime_relation_sync_state
+        WHERE status = 'failed'
+      ) AS relationFailedAnimeCount,
+      (SELECT COUNT(*) FROM anime_relations) AS animeRelationCount,
       (SELECT COUNT(*) FROM characters) AS characterCount,
       (SELECT COUNT(*) FROM voice_actors) AS voiceActorCount
     `
@@ -81,6 +110,7 @@ export async function getPlatformStats() {
   const translatedKoreanTitleCount = stats?.translatedKoreanTitleCount ?? 0;
   const studioSyncedAnimeCount = stats?.studioSyncedAnimeCount ?? 0;
   const castSyncedAnimeCount = stats?.castSyncedAnimeCount ?? 0;
+  const relationSyncedAnimeCount = stats?.relationSyncedAnimeCount ?? 0;
 
   return {
     registeredUserCount: stats?.registeredUserCount ?? 0,
@@ -100,6 +130,14 @@ export async function getPlatformStats() {
     castSyncedAnimeCount,
     castSyncProgressRate: storedAnimeCount > 0
       ? Number(((castSyncedAnimeCount / storedAnimeCount) * 100).toFixed(2))
+      : 0,
+    relationSyncedAnimeCount,
+    relationPendingAnimeCount: stats?.relationPendingAnimeCount ?? 0,
+    relationSyncingAnimeCount: stats?.relationSyncingAnimeCount ?? 0,
+    relationFailedAnimeCount: stats?.relationFailedAnimeCount ?? 0,
+    animeRelationCount: stats?.animeRelationCount ?? 0,
+    relationSyncProgressRate: storedAnimeCount > 0
+      ? Number(((relationSyncedAnimeCount / storedAnimeCount) * 100).toFixed(2))
       : 0,
     characterCount: stats?.characterCount ?? 0,
     voiceActorCount: stats?.voiceActorCount ?? 0,

@@ -4,6 +4,20 @@ import { RowDataPacket } from 'mysql2/promise';
 export type AnimeSortOption = 'latest' | 'score' | 'season' | 'popularity';
 export type AnimeTitleLanguage = 'ko' | 'en' | 'ja';
 export type AnimeCharacterRole = 'MAIN' | 'SUPPORT' | 'BACKGROUND';
+export type AnimeRelationType =
+  | 'ADAPTATION'
+  | 'PREQUEL'
+  | 'SEQUEL'
+  | 'PARENT'
+  | 'SIDE_STORY'
+  | 'CHARACTER'
+  | 'SUMMARY'
+  | 'ALTERNATIVE'
+  | 'SPIN_OFF'
+  | 'OTHER'
+  | 'SOURCE'
+  | 'COMPILATION'
+  | 'CONTAINS';
 export type AnimeGenre =
   | 'Action'
   | 'Adventure'
@@ -112,6 +126,32 @@ interface AnimeDetailRow extends RowDataPacket {
   sourceUpdatedAt: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+interface AnimeRelationRow extends RowDataPacket {
+  sourceAnimeId: number;
+  relationType: AnimeRelationType;
+  targetAnilistId: number;
+  targetAnimeId: number | null;
+  titleRomaji: string | null;
+  titleEnglish: string | null;
+  titleNative: string | null;
+  titleUserPreferred: string | null;
+  titleKorean: string | null;
+  format: string | null;
+  status: string | null;
+  season: string | null;
+  seasonYear: number | null;
+  coverImageLarge: string | null;
+  coverImageExtraLarge: string | null;
+  isAdult: number | boolean | null;
+}
+
+interface AnimeRelationSyncStateRow extends RowDataPacket {
+  animeId: number;
+  status: string;
+  lastSyncedAt: string | null;
+  sourceUpdatedAt: string | null;
 }
 
 interface UserAnimeRelationRow extends RowDataPacket {
@@ -684,6 +724,212 @@ export async function getAnimeDetailById(id: number, titleLanguage: AnimeTitleLa
       isSpoiler: normalizeBoolean(row.isSpoiler),
     })),
     synonyms: synonymRows[0].map((row) => row.synonym),
+  };
+}
+
+function pickRelationTitle(row: AnimeRelationRow, titleLanguage: AnimeTitleLanguage) {
+  if (titleLanguage === 'ko') {
+    return row.titleKorean
+      ?? row.titleEnglish
+      ?? row.titleRomaji
+      ?? row.titleUserPreferred
+      ?? row.titleNative;
+  }
+
+  if (titleLanguage === 'en') {
+    return row.titleEnglish
+      ?? row.titleKorean
+      ?? row.titleRomaji
+      ?? row.titleUserPreferred
+      ?? row.titleNative;
+  }
+
+  return row.titleNative
+    ?? row.titleRomaji
+    ?? row.titleUserPreferred
+    ?? row.titleEnglish
+    ?? row.titleKorean;
+}
+
+function mapAnimeRelation(row: AnimeRelationRow, titleLanguage: AnimeTitleLanguage) {
+  return {
+    relationType: row.relationType,
+    targetAnilistId: row.targetAnilistId,
+    resolved: row.targetAnimeId !== null,
+    anime: row.targetAnimeId === null
+      ? null
+      : {
+        id: row.targetAnimeId,
+        anilistId: row.targetAnilistId,
+        title: pickRelationTitle(row, titleLanguage),
+        titles: {
+          korean: row.titleKorean,
+          english: row.titleEnglish,
+          native: row.titleNative,
+          romaji: row.titleRomaji,
+          userPreferred: row.titleUserPreferred,
+        },
+        format: row.format,
+        status: row.status,
+        season: row.season,
+        seasonYear: row.seasonYear,
+        coverImageLarge: row.coverImageLarge,
+        coverImageExtraLarge: row.coverImageExtraLarge,
+        isAdult: Boolean(row.isAdult),
+      },
+  };
+}
+
+function mapAnimeRelationSyncState(syncState?: AnimeRelationSyncStateRow) {
+  return {
+    status: syncState?.status ?? 'pending',
+    lastSyncedAt: syncState?.lastSyncedAt ?? null,
+    sourceUpdatedAt: syncState?.sourceUpdatedAt ?? null,
+  };
+}
+
+async function findAnimeRelations(
+  animeIds: number[],
+  relationType?: AnimeRelationType
+) {
+  if (animeIds.length === 0) {
+    return [];
+  }
+
+  const queryParams: Array<number[] | string> = [animeIds];
+  const relationTypeWhere = relationType
+    ? 'AND ar.relation_type = ?'
+    : '';
+
+  if (relationType) {
+    queryParams.push(relationType);
+  }
+
+  const [rows] = await pool.query<AnimeRelationRow[]>(
+    `
+    SELECT
+      ar.source_anime_id AS sourceAnimeId,
+      ar.relation_type AS relationType,
+      ar.target_anilist_id AS targetAnilistId,
+      target.id AS targetAnimeId,
+      target.title_romaji AS titleRomaji,
+      target.title_english AS titleEnglish,
+      target.title_native AS titleNative,
+      target.title_user_preferred AS titleUserPreferred,
+      akt.full_title AS titleKorean,
+      target.format,
+      target.status,
+      target.season,
+      target.season_year AS seasonYear,
+      target.cover_image_large AS coverImageLarge,
+      target.cover_image_extra_large AS coverImageExtraLarge,
+      target.is_adult AS isAdult
+    FROM anime_relations ar
+    LEFT JOIN anime target
+      ON target.anilist_id = ar.target_anilist_id
+    LEFT JOIN anime_korean_titles akt
+      ON akt.anime_id = target.id
+      AND akt.is_primary = TRUE
+    WHERE ar.source_anime_id IN (?)
+      ${relationTypeWhere}
+    ORDER BY
+      ar.source_anime_id ASC,
+      CASE ar.relation_type
+        WHEN 'PREQUEL' THEN 1
+        WHEN 'SEQUEL' THEN 2
+        WHEN 'PARENT' THEN 3
+        WHEN 'SIDE_STORY' THEN 4
+        WHEN 'SPIN_OFF' THEN 5
+        WHEN 'ALTERNATIVE' THEN 6
+        WHEN 'SUMMARY' THEN 7
+        ELSE 8
+      END,
+      target.season_year ASC,
+      ar.target_anilist_id ASC
+    `,
+    queryParams
+  );
+
+  return rows;
+}
+
+async function findAnimeRelationSyncStates(animeIds: number[]) {
+  if (animeIds.length === 0) {
+    return [];
+  }
+
+  const [rows] = await pool.query<AnimeRelationSyncStateRow[]>(
+    `
+    SELECT
+      anime_id AS animeId,
+      status,
+      last_synced_at AS lastSyncedAt,
+      source_updated_at AS sourceUpdatedAt
+    FROM anime_relation_sync_state
+    WHERE anime_id IN (?)
+    `,
+    [animeIds]
+  );
+
+  return rows;
+}
+
+export async function getAnimeRelations(params: {
+  animeId: number;
+  titleLanguage: AnimeTitleLanguage;
+  relationType?: AnimeRelationType;
+}) {
+  const [animeRows] = await pool.query<IdRow[]>(
+    'SELECT id FROM anime WHERE id = ? LIMIT 1',
+    [params.animeId]
+  );
+
+  if (!animeRows[0]) {
+    throw new Error('Anime not found');
+  }
+
+  const [relationRows, syncStateRows] = await Promise.all([
+    findAnimeRelations([params.animeId], params.relationType),
+    findAnimeRelationSyncStates([params.animeId]),
+  ]);
+
+  const syncState = syncStateRows[0];
+
+  return {
+    items: relationRows.map((row) => mapAnimeRelation(row, params.titleLanguage)),
+    relationType: params.relationType ?? null,
+    sync: mapAnimeRelationSyncState(syncState),
+  };
+}
+
+export async function searchAnimeWithRelations(
+  params: AnimeListParams & { relationType?: AnimeRelationType }
+) {
+  const result = await getAnimeList(params);
+  const animeIds = result.items.map((item) => item.id);
+  const [relationRows, syncStateRows] = await Promise.all([
+    findAnimeRelations(animeIds, params.relationType),
+    findAnimeRelationSyncStates(animeIds),
+  ]);
+  const relationsByAnimeId = new Map<number, ReturnType<typeof mapAnimeRelation>[]>();
+  const syncStateByAnimeId = new Map(
+    syncStateRows.map((row) => [row.animeId, row] as const)
+  );
+
+  for (const row of relationRows) {
+    const relations = relationsByAnimeId.get(row.sourceAnimeId) ?? [];
+    relations.push(mapAnimeRelation(row, params.titleLanguage));
+    relationsByAnimeId.set(row.sourceAnimeId, relations);
+  }
+
+  return {
+    items: result.items.map((item) => ({
+      ...item,
+      relations: relationsByAnimeId.get(item.id) ?? [],
+      relationSync: mapAnimeRelationSyncState(syncStateByAnimeId.get(item.id)),
+    })),
+    pageInfo: result.pageInfo,
+    relationType: params.relationType ?? null,
   };
 }
 

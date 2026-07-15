@@ -14,7 +14,7 @@ const LANDING_REVIEWS = [
     comment: '별점만 남기는 앱보다 훨씬 정리된 느낌이에요.',
   },
   {
-    name: 'yuna.archive',
+    name: 'hemin',
     role: '평점 남기는 편',
     comment: '내가 어떤 작품을 자주 보는지 한눈에 들어와요.',
   },
@@ -179,6 +179,35 @@ export function HomePage() {
           ))}
         </div>
       </section>
+
+      <footer className="home-footer">
+        <div className="home-footer-inner">
+          <div className="home-footer-brand">
+            <Link to="/" aria-label="MyAniTrack 홈">MyAniTrack</Link>
+            <p>본 애니를 기록하고, 나만의 취향과 친구의 컬렉션을 함께 발견하세요.</p>
+          </div>
+
+          <nav className="home-footer-nav" aria-label="서비스 바로가기">
+            <div>
+              <strong>서비스</strong>
+              <Link to="/explore">애니 탐색</Link>
+              <Link to="/collection">내 컬렉션</Link>
+              <Link to="/analysis">취향 분석</Link>
+            </div>
+            <div>
+              <strong>함께하기</strong>
+              <Link to="/friends">친구</Link>
+              <Link to="/login">로그인</Link>
+              <Link to="/signup">회원가입</Link>
+            </div>
+          </nav>
+        </div>
+
+        <div className="home-footer-bottom">
+          <span>© {new Date().getFullYear()} MyAniTrack</span>
+          <span>Anime collection &amp; taste analytics</span>
+        </div>
+      </footer>
     </div>
   )
 }

@@ -1,5 +1,4 @@
 import 'anime_entry.dart';
-import 'sample_data.dart';
 import 'stats_overview.dart';
 
 class AnalysisData {
@@ -10,7 +9,6 @@ class AnalysisData {
     required this.yearlyScores,
     required this.studios,
     required this.voiceActors,
-    required this.isSample,
   });
 
   final StatsOverview overview;
@@ -19,27 +17,6 @@ class AnalysisData {
   final List<YearlyScoreItem> yearlyScores;
   final List<RankingItem> studios;
   final List<RankingItem> voiceActors;
-  final bool isSample;
-
-  factory AnalysisData.sample() {
-    return AnalysisData(
-      overview: StatsOverview.fromEntries(sampleEntries),
-      genres: GenreStatItem.fromEntries(sampleEntries),
-      formats: FormatStatItem.fromEntries(sampleEntries),
-      yearlyScores: YearlyScoreItem.fromEntries(sampleEntries),
-      studios: const [
-        RankingItem(label: 'Kyoto Animation', detail: '2작품 · 평균 9.3'),
-        RankingItem(label: 'Madhouse', detail: '1작품 · 평균 9.6'),
-        RankingItem(label: 'CloverWorks', detail: '1작품 · 평균 9.1'),
-      ],
-      voiceActors: const [
-        RankingItem(label: 'Atsumi Tanezaki', detail: '3작품 · 평균 9.4'),
-        RankingItem(label: 'Aoi Yuuki', detail: '2작품 · 평균 9.0'),
-        RankingItem(label: 'Saori Hayami', detail: '2작품 · 평균 8.9'),
-      ],
-      isSample: true,
-    );
-  }
 
   factory AnalysisData.empty() {
     return const AnalysisData(
@@ -56,7 +33,6 @@ class AnalysisData {
       yearlyScores: [],
       studios: [],
       voiceActors: [],
-      isSample: false,
     );
   }
 
@@ -67,7 +43,6 @@ class AnalysisData {
     List<YearlyScoreItem>? yearlyScores,
     List<RankingItem>? studios,
     List<RankingItem>? voiceActors,
-    bool? isSample,
   }) {
     return AnalysisData(
       overview: overview ?? this.overview,
@@ -76,7 +51,6 @@ class AnalysisData {
       yearlyScores: yearlyScores ?? this.yearlyScores,
       studios: studios ?? this.studios,
       voiceActors: voiceActors ?? this.voiceActors,
-      isSample: isSample ?? this.isSample,
     );
   }
 }

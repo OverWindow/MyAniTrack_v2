@@ -37,6 +37,15 @@ export const ANILIST_ANIME_PAGE_QUERY = `
             }
           }
         }
+        relations {
+          edges {
+            relationType(version: 2)
+            node {
+              id
+              type
+            }
+          }
+        }
         averageScore
         meanScore
         popularity
@@ -103,6 +112,15 @@ export const ANILIST_SEASON_ANIME_PAGE_QUERY = `
             }
           }
         }
+        relations {
+          edges {
+            relationType(version: 2)
+            node {
+              id
+              type
+            }
+          }
+        }
         averageScore
         meanScore
         popularity
@@ -139,6 +157,32 @@ export const ANILIST_ANIME_STUDIOS_BY_IDS_QUERY = `
               name
               isAnimationStudio
               siteUrl
+            }
+          }
+        }
+      }
+    }
+  }
+`;
+
+export const ANILIST_ANIME_RELATIONS_BY_IDS_QUERY = `
+  query ($ids: [Int]) {
+    Page(page: 1, perPage: 50) {
+      media(type: ANIME, id_in: $ids, sort: ID) {
+        id
+        title {
+          romaji
+          english
+          native
+          userPreferred
+        }
+        updatedAt
+        relations {
+          edges {
+            relationType(version: 2)
+            node {
+              id
+              type
             }
           }
         }

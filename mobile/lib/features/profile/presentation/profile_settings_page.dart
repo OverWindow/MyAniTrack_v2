@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_card.dart';
+import '../../../core/widgets/app_state_message.dart';
 import '../../../data/api/api_client.dart';
 import '../../../data/api/auth_repository.dart';
 import '../../../data/api/profile_repository.dart';
@@ -49,109 +50,114 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
         title: const Text('프로필 설정'),
         backgroundColor: AppColors.bgPage,
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          AppCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      body: isSignedIn
+          ? ListView(
+              padding: const EdgeInsets.all(16),
               children: [
-                Text('공개 프로필', style: Theme.of(context).textTheme.titleMedium),
-                if (_loadingProfile) ...[
-                  const SizedBox(height: 12),
-                  const LinearProgressIndicator(minHeight: 3),
-                ],
-                const SizedBox(height: 14),
-                TextField(
-                  controller: _usernameController,
-                  decoration: const InputDecoration(
-                    labelText: '사용자명',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _bioController,
-                  minLines: 3,
-                  maxLines: 5,
-                  decoration: const InputDecoration(
-                    labelText: '소개',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _profileImageUrlController,
-                  keyboardType: TextInputType.url,
-                  decoration: const InputDecoration(
-                    labelText: '프로필 이미지 URL',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  value: _isPublic,
-                  onChanged: (value) => setState(() => _isPublic = value),
-                  title: const Text('공개 프로필 사용'),
-                ),
-                const SizedBox(height: 12),
-                FilledButton.icon(
-                  onPressed: isSignedIn && !_saving ? _saveProfile : null,
-                  icon: _saving
-                      ? const SizedBox.square(
-                          dimension: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.save_outlined),
-                  label: Text(_saving ? '저장 중' : '프로필 저장'),
-                ),
-                if (!isSignedIn) ...[
-                  const SizedBox(height: 10),
-                  Text(
-                    '로그인 후 프로필을 저장할 수 있습니다.',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          AppCard(
-            borderColor: AppColors.error.withOpacity(0.28),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '위험 구역',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: AppColors.error,
+                AppCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '공개 프로필',
+                        style: Theme.of(context).textTheme.titleMedium,
                       ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '계정 삭제는 내부 사용자, 컬렉션, 분석 데이터 삭제를 요청합니다.',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 14),
-                FilledButton.icon(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.error,
+                      if (_loadingProfile) ...[
+                        const SizedBox(height: 12),
+                        const LinearProgressIndicator(minHeight: 3),
+                      ],
+                      const SizedBox(height: 14),
+                      TextField(
+                        controller: _usernameController,
+                        decoration: const InputDecoration(
+                          labelText: '사용자명',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _bioController,
+                        minLines: 3,
+                        maxLines: 5,
+                        decoration: const InputDecoration(
+                          labelText: '소개',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _profileImageUrlController,
+                        keyboardType: TextInputType.url,
+                        decoration: const InputDecoration(
+                          labelText: '프로필 이미지 URL',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        value: _isPublic,
+                        onChanged: (value) => setState(() => _isPublic = value),
+                        title: const Text('공개 프로필 사용'),
+                      ),
+                      const SizedBox(height: 12),
+                      FilledButton.icon(
+                        onPressed: _saving ? null : _saveProfile,
+                        icon: _saving
+                            ? const SizedBox.square(
+                                dimension: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.save_outlined),
+                        label: Text(_saving ? '저장 중' : '프로필 저장'),
+                      ),
+                    ],
                   ),
-                  onPressed: isSignedIn && !_deleting ? _confirmDelete : null,
-                  icon: _deleting
-                      ? const SizedBox.square(
-                          dimension: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.delete_outline),
-                  label: Text(_deleting ? '삭제 중' : '계정 삭제'),
+                ),
+                const SizedBox(height: 16),
+                AppCard(
+                  borderColor: AppColors.error.withOpacity(0.28),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '위험 구역',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              color: AppColors.error,
+                            ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '계정 삭제는 내부 사용자, 컬렉션, 분석 데이터 삭제를 요청합니다.',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: 14),
+                      FilledButton.icon(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppColors.error,
+                        ),
+                        onPressed: _deleting ? null : _confirmDelete,
+                        icon: _deleting
+                            ? const SizedBox.square(
+                                dimension: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.delete_outline),
+                        label: Text(_deleting ? '삭제 중' : '계정 삭제'),
+                      ),
+                    ],
+                  ),
                 ),
               ],
+            )
+          : const Padding(
+              padding: EdgeInsets.all(16),
+              child: AppStateMessage(
+                icon: Icons.lock_outline_rounded,
+                title: '로그인 후 프로필 설정을 사용할 수 있습니다.',
+                body: '비로그인 상태에서는 탐색 페이지만 볼 수 있습니다.',
+              ),
             ),
-          ),
-        ],
-      ),
     );
   }
 

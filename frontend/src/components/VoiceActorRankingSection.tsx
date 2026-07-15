@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { createPortal } from 'react-dom'
 import { ConnectionErrorState } from './ConnectionErrorState'
+import { VoiceActorCharacterWorks } from './VoiceActorCharacterWorks'
 import {
   getAnalysisCache,
   getAnalysisCacheKey,
@@ -10,6 +11,7 @@ import {
 import { getProfileImageSrc, handleProfileImageError } from '../lib/avatar'
 import { SERVER_CONNECTION_ERROR_MESSAGE, getFriendlyErrorMessage } from '../lib/errors'
 import { fetchVoiceActorAnime, fetchVoiceActorRanking } from '../lib/stats'
+import { groupVoiceActorCharacterWorks } from '../lib/voiceActorCharacterWorks'
 import type {
   VoiceActorAnimeResponse,
   VoiceActorPersonName,
@@ -61,6 +63,16 @@ function getCharacterImage(character: VoiceActorAnimeResponse['items'][number]['
 
 function getAnimeImage(item: VoiceActorAnimeResponse['items'][number]) {
   return item.anime.coverImageExtraLarge || item.anime.coverImageLarge || null
+}
+
+function getAnimeMeta(item: VoiceActorAnimeResponse['items'][number]) {
+  return [
+    item.anime.seasonYear ? String(item.anime.seasonYear) : null,
+    item.anime.format,
+    item.userList?.score !== null && item.userList?.score !== undefined
+      ? `내 평점 ${item.userList.score}점`
+      : '평점 없음',
+  ].filter(Boolean).join(' · ')
 }
 
 function VoiceActorRankingList({
@@ -368,10 +380,25 @@ export function VoiceActorRankingSection({
   }
 
   const selectedVoiceActorName = getPersonName(selectedVoiceActor?.name)
-  const selectedCharacterCount = animeState.data?.items.reduce(
-    (count, item) => count + item.characters.length,
-    0,
-  ) ?? 0
+  const selectedCharacterGroups = groupVoiceActorCharacterWorks(animeState.data?.items.flatMap((item) => (
+    item.characters.map((character) => ({
+      character: {
+        id: character.id,
+        name: getPersonName(character.name),
+        nativeName: character.name.native,
+        image: getCharacterImage(character),
+        meta: character.role || null,
+      },
+      work: {
+        id: item.anime.id,
+        title: item.anime.title,
+        image: getAnimeImage(item),
+        label: 'Completed',
+        meta: getAnimeMeta(item),
+      },
+    }))
+  )) ?? [])
+  const selectedCharacterCount = selectedCharacterGroups.length
 
   return (
     <section className="analysis-panel voice-actor-section">
@@ -478,57 +505,18 @@ export function VoiceActorRankingSection({
                   : <div className="analysis-empty-state">{animeState.error}</div>
               )}
 
-              {!animeState.isLoading && !animeState.error && animeState.data?.items.length === 0 && (
+              {!animeState.isLoading && !animeState.error && selectedCharacterGroups.length === 0 && (
                 <div className="analysis-empty-state">이 성우가 출연한 완주 작품이 아직 없어요.</div>
               )}
 
-              {!animeState.isLoading && !animeState.error && animeState.data && animeState.data.items.length > 0 && (
+              {!animeState.isLoading && !animeState.error && selectedCharacterGroups.length > 0 && (
                 <div className="voice-actor-modal-work-list">
-                  {animeState.data.items.map((item) => (
-                    <article className="voice-actor-modal-work" key={item.anime.id}>
-                      <Link
-                        className="voice-actor-modal-anime"
-                        to={`/anime/${item.anime.id}`}
-                        onClick={() => setSelectedVoiceActor(null)}
-                      >
-                        <img
-                          src={getProfileImageSrc(getAnimeImage(item))}
-                          alt={item.anime.title}
-                          loading="lazy"
-                          onError={handleProfileImageError}
-                        />
-                        <span>
-                          <small>완주 작품</small>
-                          <strong>{item.anime.title}</strong>
-                          <em>
-                            {item.userList?.score !== null && item.userList?.score !== undefined
-                              ? `내 평점 ${item.userList.score}점`
-                              : '평점 없음'}
-                          </em>
-                        </span>
-                      </Link>
-
-                      <div
-                        className={`voice-actor-modal-characters${item.characters.length > 1 ? ' is-multiple' : ''}`}
-                        aria-label={`${item.anime.title} 캐릭터`}
-                      >
-                        {item.characters.map((character) => (
-                          <div className="voice-actor-modal-character" key={character.id}>
-                            <img
-                              src={getProfileImageSrc(getCharacterImage(character))}
-                              alt=""
-                              loading="lazy"
-                              onError={handleProfileImageError}
-                            />
-                            <span>
-                              <strong>{getPersonName(character.name)}</strong>
-                              <small>{character.role || '역할 정보 없음'}</small>
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </article>
-                  ))}
+                  <VoiceActorCharacterWorks
+                    key={selectedVoiceActor.id}
+                    groups={selectedCharacterGroups}
+                    variant="modal"
+                    onNavigate={() => setSelectedVoiceActor(null)}
+                  />
                 </div>
               )}
 

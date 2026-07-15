@@ -1,3 +1,4 @@
+import '../models/anime_entry.dart';
 import '../models/stats_overview.dart';
 import 'api_client.dart';
 
@@ -85,6 +86,46 @@ class StatsRepository {
     );
   }
 
+  Future<Map<String, dynamic>> fetchStudioAnime(
+    int studioId, {
+    String titleLanguage = 'ko',
+    int limit = 20,
+    String? cursor,
+  }) {
+    return _apiClient.getJson(
+      '/me/anime-stats/studios/$studioId/anime',
+      authenticated: true,
+      query: {
+        'titleLanguage': titleLanguage,
+        'limit': '$limit',
+        if (cursor != null) 'cursor': cursor,
+      },
+    );
+  }
+
+  Future<List<AnimeEntry>> fetchStudioAnimeItems(
+    int studioId, {
+    String titleLanguage = 'ko',
+    int limit = 20,
+    String? cursor,
+  }) async {
+    final json = await fetchStudioAnime(
+      studioId,
+      titleLanguage: titleLanguage,
+      limit: limit,
+      cursor: cursor,
+    );
+    final items = _readItems(json);
+    if (items is! List) {
+      return const [];
+    }
+
+    return items
+        .whereType<Map<String, dynamic>>()
+        .map(AnimeEntry.fromJson)
+        .toList();
+  }
+
   Future<Map<String, dynamic>> fetchVoiceActorRanking({
     String sort = 'count',
     int limit = 20,
@@ -99,5 +140,14 @@ class StatsRepository {
         if (cursor != null) 'cursor': cursor,
       },
     );
+  }
+
+  Object? _readItems(Map<String, dynamic> json) {
+    final data = json['data'];
+    if (data is Map<String, dynamic>) {
+      return _readItems(data);
+    }
+
+    return json['items'] ?? json['animeList'] ?? json['results'] ?? data;
   }
 }

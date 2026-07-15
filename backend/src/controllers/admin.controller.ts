@@ -1,5 +1,13 @@
 import { Request, Response } from 'express';
-import { syncAnimePage, syncAllAnime, syncAnimeInChunks, syncMissingAnimeStudios, syncSeasonAnime } from '../../sync/anime.sync.service';
+import {
+  syncAllAnime,
+  syncAllAnimeIntegrated,
+  syncAnimeInChunks,
+  syncAnimePage,
+  syncAnimeRelations,
+  syncMissingAnimeStudios,
+  syncSeasonAnime,
+} from '../../sync/anime.sync.service';
 import {
   getAnimeCastSyncState,
   syncAnimeCastBatch,
@@ -29,7 +37,11 @@ function getErrorStatus(message: string) {
     return 400;
   }
 
-  if (message === 'Anime not found' || message === 'Korean title not found' || message === 'User not found') {
+  if (
+    message === 'Anime not found'
+    || message === 'Korean title not found'
+    || message === 'User not found'
+  ) {
     return 404;
   }
 
@@ -38,6 +50,56 @@ function getErrorStatus(message: string) {
   }
 
   return 500;
+}
+
+export async function syncAllAnimeIntegratedController(req: Request, res: Response) {
+  try {
+    if (!ensureAdmin(req, res)) {
+      return;
+    }
+
+    const result = await syncAllAnimeIntegrated({
+      startPage: req.body?.startPage,
+      perPage: req.body?.perPage,
+      maxPages: req.body?.maxPages,
+      castPerPage: req.body?.castPerPage,
+      language: req.body?.language,
+      animeDelayMs: req.body?.animeDelayMs,
+    });
+
+    return res.json({
+      success: true,
+      message: 'Full anime, studio, character, and voice actor sync completed',
+      result,
+    });
+  } catch (error) {
+    return sendError(res, error);
+  }
+}
+
+export async function syncAnimeRelationsController(req: Request, res: Response) {
+  try {
+    if (!ensureAdmin(req, res)) {
+      return;
+    }
+
+    const result = await syncAnimeRelations({
+      mode: req.body?.mode,
+      limit: req.body?.limit,
+      batchSize: req.body?.batchSize,
+      retryFailed: req.body?.retryFailed,
+      afterAnimeId: req.body?.afterAnimeId,
+      delayMs: req.body?.delayMs,
+    });
+
+    return res.json({
+      success: true,
+      message: 'Anime relations sync completed',
+      result,
+    });
+  } catch (error) {
+    return sendError(res, error);
+  }
 }
 
 export async function getAdminUsersController(req: Request, res: Response) {
@@ -204,7 +266,13 @@ export async function syncSeasonAnimeController(req: Request, res: Response) {
       seasonYear,
       startPage,
       perPage,
-      maxPages
+      maxPages,
+      {
+        syncCast: req.body.syncCast,
+        castPerPage: req.body.castPerPage,
+        language: req.body.language,
+        animeDelayMs: req.body.animeDelayMs,
+      }
     );
 
     return res.json({

@@ -12,7 +12,6 @@ import '../../../data/auth/auth_session_service.dart';
 import '../../../data/models/anime_search_result.dart';
 import '../../../data/models/anime_entry.dart';
 import '../../../data/models/collection_status.dart';
-import '../../../data/models/sample_data.dart';
 
 class AnimeSearchPage extends StatefulWidget {
   const AnimeSearchPage({super.key});
@@ -34,17 +33,7 @@ class _AnimeSearchPageState extends State<AnimeSearchPage> {
       return apiResults.map((result) => result.anime).toList();
     }
 
-    final normalizedQuery = _query.trim().toLowerCase();
-    if (normalizedQuery.isEmpty) {
-      return sampleEntries;
-    }
-
-    return sampleEntries.where((entry) {
-      return entry.title.toLowerCase().contains(normalizedQuery) ||
-          entry.genre.toLowerCase().contains(normalizedQuery) ||
-          entry.format.toLowerCase().contains(normalizedQuery) ||
-          '${entry.year}'.contains(normalizedQuery);
-    }).toList();
+    return const [];
   }
 
   @override
@@ -58,57 +47,62 @@ class _AnimeSearchPageState extends State<AnimeSearchPage> {
         title: const Text('애니 검색'),
         backgroundColor: AppColors.bgPage,
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-        children: [
-          _SearchField(
-            onChanged: (value) {
-              setState(() {
-                _query = value;
-                _apiResults = null;
-              });
-            },
-            onSubmitted: (_) => _search(),
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              AppBadge(
-                label: _apiResults == null
-                    ? '샘플 검색'
-                    : isSignedIn
-                        ? '내 컬렉션 포함 검색'
-                        : '공개 검색',
-                sample: _apiResults == null,
-                icon: Icons.search_rounded,
-              ),
-              const Spacer(),
-              FilledButton.tonalIcon(
-                onPressed: _loading ? null : _search,
-                icon: _loading
-                    ? const SizedBox.square(
-                        dimension: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.cloud_sync_outlined),
-                label: Text(_loading ? '검색 중' : 'API 검색'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          if (results.isEmpty)
-            const _EmptySearchMessage()
-          else
-            for (final entry in results)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: _SearchResultCard(
-                  entry: entry,
-                  collectionStatus: _collectionStatusFor(entry.id),
+      body: isSignedIn
+          ? ListView(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+              children: [
+                _SearchField(
+                  onChanged: (value) {
+                    setState(() {
+                      _query = value;
+                      _apiResults = null;
+                    });
+                  },
+                  onSubmitted: (_) => _search(),
                 ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    AppBadge(
+                      label:
+                          _apiResults == null ? 'API 검색' : '내 컬렉션 포함 검색',
+                      icon: Icons.search_rounded,
+                    ),
+                    const Spacer(),
+                    FilledButton.tonalIcon(
+                      onPressed: _loading ? null : _search,
+                      icon: _loading
+                          ? const SizedBox.square(
+                              dimension: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.cloud_sync_outlined),
+                      label: Text(_loading ? '검색 중' : 'API 검색'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                if (results.isEmpty)
+                  const _EmptySearchMessage()
+                else
+                  for (final entry in results)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _SearchResultCard(
+                        entry: entry,
+                        collectionStatus: _collectionStatusFor(entry.id),
+                      ),
+                    ),
+              ],
+            )
+          : const Padding(
+              padding: EdgeInsets.all(16),
+              child: AppStateMessage(
+                icon: Icons.lock_outline_rounded,
+                title: '로그인 후 검색할 수 있습니다.',
+                body: '애니 검색과 컬렉션 추가는 로그인 후 사용할 수 있습니다.',
               ),
-        ],
-      ),
+            ),
     );
   }
 
@@ -129,6 +123,9 @@ class _AnimeSearchPageState extends State<AnimeSearchPage> {
 
   Future<void> _search() async {
     final query = _query.trim();
+    if (!_authSessionService.isSignedIn) {
+      return;
+    }
     if (query.isEmpty) {
       setState(() => _apiResults = null);
       return;
@@ -138,9 +135,7 @@ class _AnimeSearchPageState extends State<AnimeSearchPage> {
 
     try {
       final repository = AnimeRepository(ApiClient());
-      final results = _authSessionService.isSignedIn
-          ? await repository.searchMyAnimeItems(query)
-          : await repository.searchAnimeItems(query);
+      final results = await repository.searchMyAnimeItems(query);
 
       if (!mounted) {
         return;
@@ -154,7 +149,7 @@ class _AnimeSearchPageState extends State<AnimeSearchPage> {
 
       setState(() => _apiResults = null);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('API 검색에 실패해 샘플 검색을 유지합니다.')),
+        const SnackBar(content: Text('API 검색에 실패했습니다.')),
       );
     } finally {
       if (mounted) {

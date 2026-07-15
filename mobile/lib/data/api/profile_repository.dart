@@ -145,6 +145,48 @@ class ProfileRepository {
     );
   }
 
+  Future<Map<String, dynamic>> fetchPublicStudioAnime(
+    int userId,
+    int studioId, {
+    String titleLanguage = 'ko',
+    int limit = 20,
+    String? cursor,
+  }) {
+    return _apiClient.getJson(
+      '/users/$userId/anime-stats/studios/$studioId/anime',
+      query: {
+        'titleLanguage': titleLanguage,
+        'limit': '$limit',
+        if (cursor != null) 'cursor': cursor,
+      },
+    );
+  }
+
+  Future<List<AnimeEntry>> fetchPublicStudioAnimeItems(
+    int userId,
+    int studioId, {
+    String titleLanguage = 'ko',
+    int limit = 20,
+    String? cursor,
+  }) async {
+    final json = await fetchPublicStudioAnime(
+      userId,
+      studioId,
+      titleLanguage: titleLanguage,
+      limit: limit,
+      cursor: cursor,
+    );
+    final items = _readItems(json);
+    if (items is! List) {
+      return const [];
+    }
+
+    return items
+        .whereType<Map<String, dynamic>>()
+        .map(AnimeEntry.fromJson)
+        .toList();
+  }
+
   Future<Map<String, dynamic>> fetchPublicBadges(int userId) {
     return _apiClient.getJson('/users/$userId/badges');
   }

@@ -7,6 +7,8 @@ import type {
   AnimeGenre,
   AnimeListItem,
   AnimeListResponse,
+  AnimeRelationType,
+  AnimeSearchWithRelationsResponse,
   AnimeSort,
   PopularAnimeItem,
   PopularAnimeResponse,
@@ -209,6 +211,43 @@ export async function searchAnime(params: {
     ...data,
     items: data.items.filter((item) => item.coverImageExtraLarge || item.coverImageLarge),
   }
+}
+
+export async function searchAnimeWithRelations(params: {
+  query: string
+  relationType?: AnimeRelationType | null
+  titleLanguage?: 'ko' | 'en' | 'ja'
+  sort?: AnimeSort
+  genre?: AnimeGenre | null
+  limit?: number
+  cursor?: string | null
+  signal?: AbortSignal
+}) {
+  const url = new URL('/api/anime/search-with-relations', getApiBaseUrl())
+  url.searchParams.set('query', params.query)
+  url.searchParams.set('titleLanguage', params.titleLanguage ?? 'ko')
+  url.searchParams.set('sort', params.sort ?? 'popularity')
+  url.searchParams.set('limit', String(params.limit ?? 20))
+
+  if (params.relationType) {
+    url.searchParams.set('relationType', params.relationType)
+  }
+
+  if (params.genre) {
+    url.searchParams.set('genre', params.genre)
+  }
+
+  if (params.cursor) {
+    url.searchParams.set('cursor', params.cursor)
+  }
+
+  const response = await authFetch(url.toString(), { signal: params.signal })
+
+  if (!response.ok) {
+    throw new Error(`연관 작품을 불러오지 못했습니다. (${response.status})`)
+  }
+
+  return (await response.json()) as AnimeSearchWithRelationsResponse
 }
 
 export async function searchMyAnime(params: {

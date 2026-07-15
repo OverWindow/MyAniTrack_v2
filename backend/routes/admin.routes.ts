@@ -4,11 +4,13 @@ import {
   getAdminUserController,
   getAdminUsersController,
   syncAllAnimeController,
+  syncAllAnimeIntegratedController,
   syncAnimeCastBatchController,
   syncAnimeCastController,
   syncAnimeCastInChunksController,
   syncAnimeInChunksController,
   syncAnimePageController,
+  syncAnimeRelationsController,
   syncMissingAnimeStudiosController,
   syncSeasonAnimeController,
   getAnimeCastSyncStateController,
@@ -22,6 +24,8 @@ router.use('/admin', requireAdmin);
 
 router.get('/admin/users', getAdminUsersController);
 router.get('/admin/users/:userId', getAdminUserController);
+router.post('/admin/anime/sync/full', requireAdmin, syncAllAnimeIntegratedController);
+router.post('/admin/anime/sync/relations', requireAdmin, syncAnimeRelationsController);
 router.post('/admin/anime/sync/page', requireAdmin, syncAnimePageController);
 router.post('/admin/anime/sync/all', requireAdmin, syncAllAnimeController);
 router.post('/admin/anime/sync/chunked', requireAdmin, syncAnimeInChunksController);

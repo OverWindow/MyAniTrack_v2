@@ -84,6 +84,40 @@ export type AnimeListResponse = {
   }
 }
 
+export type AnimeRelationType =
+  | 'PREQUEL'
+  | 'SEQUEL'
+  | 'PARENT'
+  | 'SIDE_STORY'
+  | 'SPIN_OFF'
+  | 'ADAPTATION'
+  | 'SOURCE'
+  | 'SUMMARY'
+  | 'ALTERNATIVE'
+  | 'CHARACTER'
+  | 'COMPILATION'
+  | 'CONTAINS'
+  | 'OTHER'
+
+export type AnimeRelationItem = {
+  relationType: AnimeRelationType
+  targetAnilistId: number
+  resolved: boolean
+  anime: (Partial<AnimeListItem> & Pick<AnimeListItem, 'id' | 'title'>) | null
+}
+
+export type AnimeSearchWithRelationsItem = AnimeListItem & {
+  relations: AnimeRelationItem[]
+  relationSync: {
+    status: 'pending' | 'syncing' | 'success' | 'failed' | string
+    lastSyncedAt: string | null
+  } | null
+}
+
+export type AnimeSearchWithRelationsResponse = Omit<AnimeListResponse, 'items'> & {
+  items: AnimeSearchWithRelationsItem[]
+}
+
 export type PopularAnimeResponse = {
   success: boolean
   items: PopularAnimeItem[]

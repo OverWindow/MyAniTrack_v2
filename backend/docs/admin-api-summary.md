@@ -127,6 +127,8 @@ Response 예시:
 
 현재 라우트는 공개 API지만, 프론트에서는 관리자 페이지에서만 주요 운영 지표로 사용합니다.
 
+`relationSyncProgressRate`는 관계가 실제로 존재하는 작품 수가 아니라, 관계가 0개인 작품을 포함해 AniList 관계 조회가 정상 완료된 작품 수를 전체 저장 작품 수로 나눈 비율입니다.
+
 Response 예시:
 
 ```json
@@ -139,6 +141,12 @@ Response 예시:
     "translationProgressRate": 62.72,
     "castSyncedAnimeCount": 2100,
     "castSyncProgressRate": 24.85,
+    "relationSyncedAnimeCount": 2000,
+    "relationPendingAnimeCount": 6400,
+    "relationSyncingAnimeCount": 0,
+    "relationFailedAnimeCount": 50,
+    "animeRelationCount": 7200,
+    "relationSyncProgressRate": 23.67,
     "characterCount": 18340,
     "voiceActorCount": 4120
   }
@@ -146,6 +154,146 @@ Response 예시:
 ```
 
 ## Anime Sync
+
+### `POST /admin/anime/sync/full`
+
+AniList의 전체 애니를 순서대로 조회하여 애니 기본 정보, 스튜디오, 캐릭터, 성우, 연관 작품을 통합 동기화합니다.
+
+최초 실행 전에 `sql_scripts/anime_relations.sql`을 DB에 적용해야 합니다.
+
+Body 예시:
+
+```json
+{
+  "startPage": 1,
+  "perPage": 50,
+  "maxPages": 1,
+  "language": "JAPANESE",
+  "castPerPage": 25,
+  "animeDelayMs": 2500
+}
+```
+
+옵션:
+
+- `startPage`: 시작 AniList 페이지, 기본 `1`
+- `perPage`: 페이지당 애니 수, 기본 `50`, 최대 `50`
+- `maxPages`: 이번 요청에서 처리할 최대 페이지 수. 생략하면 AniList 마지막 페이지까지 처리
+- `language`: 성우 언어 `JAPANESE`, `ENGLISH`, `KOREAN`, 기본 `JAPANESE`
+- `castPerPage`: 캐릭터 조회 페이지 크기, 기본 `25`, 최대 `50`
+- `animeDelayMs`: 작품 사이 AniList 요청 대기 시간, 기본 `2500`, 최대 `60000`
+
+동기화 항목:
+
+- 애니 기본 정보, 제목, 장르, 태그 및 이미지
+- 스튜디오와 애니-스튜디오 연결
+- 캐릭터와 애니-캐릭터 연결
+- 성우와 캐릭터-성우 연결
+- 애니 간 PREQUEL, SEQUEL, SIDE_STORY 등의 방향성 관계
+- 스튜디오 및 cast 동기화 상태
+- 연관 작품 동기화 상태
+
+한 작품의 애니 또는 cast 동기화가 실패해도 다음 작품을 계속 처리하며 `failures`에 실패 단계와 메시지를 반환합니다.
+
+전체 데이터는 장시간이 걸리므로 운영 환경에서는 `maxPages: 1`로 실행한 후 응답의 `nextPage`를 다음 요청의 `startPage`로 사용하는 것을 권장합니다. `maxPages`를 생략하면 한 요청에서 전체 페이지를 처리합니다.
+
+Response 주요 필드:
+
+```json
+{
+  "success": true,
+  "message": "Full anime, studio, character, and voice actor sync completed",
+  "result": {
+    "startPage": 1,
+    "perPage": 50,
+    "maxPages": 1,
+    "processedPages": 1,
+    "selectedAnimeCount": 50,
+    "animeSyncedCount": 50,
+    "castSyncedCount": 49,
+    "failedAnimeCount": 1,
+    "nextPage": 2,
+    "finished": false,
+    "language": "JAPANESE",
+    "castPerPage": 25,
+    "animeDelayMs": 2500,
+    "failures": [
+      {
+        "anilistId": 12345,
+        "animeId": 321,
+        "stage": "cast",
+        "message": "AniList request failed"
+      }
+    ]
+  }
+}
+```
+
+### `POST /admin/anime/sync/relations`
+
+로컬에 저장된 애니의 연관 작품만 AniList에서 다시 가져옵니다. 요청의 `mode`로 미동기화 작품부터 처리할지, 전체 작품을 처음부터 처리할지 선택할 수 있습니다.
+
+Body 예시 — 미동기화 작품부터 처리:
+
+```json
+{
+  "mode": "missing",
+  "limit": 500,
+  "batchSize": 50,
+  "retryFailed": true,
+  "afterAnimeId": 0,
+  "delayMs": 2500
+}
+```
+
+Body 예시 — 전체 작품을 처음부터 재동기화:
+
+```json
+{
+  "mode": "all",
+  "limit": 500,
+  "batchSize": 50,
+  "afterAnimeId": 0,
+  "delayMs": 2500
+}
+```
+
+옵션:
+
+- `mode`: `missing | all`, 기본값 `missing`
+  - `missing`: 동기화 상태가 없거나 `pending`인 작품을 처리하며, `retryFailed: true`이면 `failed`도 포함
+  - `all`: 상태와 관계없이 모든 로컬 애니를 내부 `anime.id` 순서로 처리
+- `limit`: 한 요청에서 처리할 최대 작품 수, 기본값 `500`, 최대 `5000`
+- `batchSize`: AniList 한 요청에 묶을 작품 수, 기본값 `50`, 최대 `50`
+- `retryFailed`: 실패 작품 포함 여부, 기본값 `true`; `missing` 모드에만 적용
+- `afterAnimeId`: 이 내부 `anime.id`보다 큰 작품부터 처리, 기본값 `0`
+- `delayMs`: AniList 묶음 요청 사이 대기 시간, 기본값 `2500`, 최대 `60000`
+
+Response 예시:
+
+```json
+{
+  "success": true,
+  "message": "Anime relations sync completed",
+  "result": {
+    "mode": "missing",
+    "retryFailed": true,
+    "afterAnimeId": 0,
+    "nextAfterAnimeId": 820,
+    "limit": 500,
+    "batchSize": 50,
+    "delayMs": 2500,
+    "selectedAnimeCount": 500,
+    "processedAnimeCount": 500,
+    "syncedAnimeCount": 497,
+    "failedAnimeCount": 3,
+    "hasMore": true,
+    "failures": []
+  }
+}
+```
+
+`hasMore`가 `true`이면 다음 요청의 `afterAnimeId`에 `nextAfterAnimeId`를 전달합니다. 전체 구간 처리 후 실패 건을 다시 시도하려면 `mode: missing`, `afterAnimeId: 0`, `retryFailed: true`로 호출합니다.
 
 ### `POST /admin/anime/sync/page`
 AniList 애니 데이터를 한 페이지 동기화합니다.
@@ -175,7 +323,7 @@ Response 예시:
 ```
 
 ### `POST /admin/anime/sync/all`
-여러 페이지를 연속 동기화합니다.
+여러 페이지의 애니 기본 정보와 스튜디오를 연속 동기화합니다. 캐릭터·성우까지 함께 동기화하려면 `/admin/anime/sync/full`을 사용합니다.
 
 Body 예시:
 
@@ -202,7 +350,7 @@ Body 예시:
 ```
 
 ### `POST /admin/anime/sync/season`
-특정 시즌 애니를 동기화합니다.
+특정 시즌 애니의 기본 정보, 스튜디오, 캐릭터, 성우, 연관 작품을 통합 동기화합니다. `syncCast`의 기본값은 `true`이며, 연관 작품은 `syncCast` 값과 관계없이 항상 동기화됩니다.
 
 Body 예시:
 
@@ -210,9 +358,17 @@ Body 예시:
 {
   "season": "SPRING",
   "seasonYear": 2026,
-  "perPage": 50
+  "startPage": 1,
+  "perPage": 50,
+  "maxPages": 1,
+  "syncCast": true,
+  "language": "JAPANESE",
+  "castPerPage": 25,
+  "animeDelayMs": 2500
 }
 ```
+
+`syncCast: false`로 호출하면 캐릭터·성우를 제외하고 기존처럼 애니와 스튜디오만 동기화합니다. 응답에는 `animeSyncedCount`, `castSyncedCount`, `failedAnimeCount`, `failures`, `nextPage`가 포함됩니다.
 
 ### `POST /admin/anime/:animeId/sync/cast`
 특정 애니의 캐릭터/성우 정보를 AniList에서 가져와 동기화합니다.

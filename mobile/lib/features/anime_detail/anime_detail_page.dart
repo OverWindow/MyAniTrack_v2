@@ -38,18 +38,38 @@ class _AnimeDetailPageState extends State<AnimeDetailPage> {
     _status = widget.entry.collectionStatus;
     _score = widget.entry.score;
     _progress = widget.entry.progress;
-    _castFuture = AnimeRepository(ApiClient()).fetchAnimeCastItems(
-      widget.entry.id,
-      role: 'MAIN',
-      voiceLanguage: 'Japanese',
-      limit: 12,
-    );
+    _castFuture = _authSessionService.isSignedIn
+        ? AnimeRepository(ApiClient()).fetchAnimeCastItems(
+            widget.entry.id,
+            role: 'MAIN',
+            voiceLanguage: 'Japanese',
+            limit: 12,
+          )
+        : Future.value(const <AnimeCastMember>[]);
   }
 
   @override
   Widget build(BuildContext context) {
     final entry = widget.entry;
     final totalEpisodes = entry.totalEpisodes <= 0 ? 1 : entry.totalEpisodes;
+
+    if (!_authSessionService.isSignedIn) {
+      return Scaffold(
+        backgroundColor: AppColors.bgPage,
+        appBar: AppBar(
+          title: Text(entry.title),
+          backgroundColor: AppColors.bgPage,
+        ),
+        body: const Padding(
+          padding: EdgeInsets.all(16),
+          child: AppStateMessage(
+            icon: Icons.lock_outline_rounded,
+            title: '로그인 후 기록 상세를 사용할 수 있습니다.',
+            body: '비로그인 상태에서는 탐색 페이지만 볼 수 있습니다.',
+          ),
+        ),
+      );
+    }
 
     return WillPopScope(
       onWillPop: () async {
@@ -80,10 +100,9 @@ class _AnimeDetailPageState extends State<AnimeDetailPage> {
                 children: [
                   Row(
                     children: [
-                      AppBadge(
-                        label: _authSessionService.isSignedIn ? '내 기록' : '샘플',
-                        sample: !_authSessionService.isSignedIn,
-                      ),
+                    AppBadge(
+                      label: _authSessionService.isSignedIn ? '내 기록' : '로그인 필요',
+                    ),
                       const SizedBox(width: 8),
                       AppBadge(label: _status.label),
                     ],

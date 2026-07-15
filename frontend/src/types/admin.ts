@@ -9,12 +9,31 @@ export type AdminSyncAllPayload = {
   maxPages: number
 }
 
+export type AdminRelationSyncMode = 'missing' | 'all'
+
+export type AdminRelationSyncPayload = {
+  mode: AdminRelationSyncMode
+  limit: number
+  batchSize: number
+  retryFailed?: boolean
+  afterAnimeId?: number
+}
+
 export type AdminSyncChunkedPayload = {
   startPage: number
   perPage: number
   pagesPerChunk: number
   chunkDelayMs: number
   maxChunks: number
+}
+
+export type AdminFullSyncPayload = {
+  startPage: number
+  perPage: number
+  maxPages?: number
+  language: AdminCastLanguage
+  castPerPage: number
+  animeDelayMs: number
 }
 
 export type AdminSeason = 'WINTER' | 'SPRING' | 'SUMMER' | 'FALL'
@@ -25,6 +44,10 @@ export type AdminSyncSeasonPayload = {
   startPage: number
   perPage: number
   maxPages: number
+  syncCast: boolean
+  language: AdminCastLanguage
+  castPerPage: number
+  animeDelayMs: number
 }
 
 export type AdminTranslateKoreanTitlesPayload = {
@@ -130,6 +153,12 @@ export type PlatformStats = {
   studioPendingAnimeCount: number
   studioFailedAnimeCount: number
   studioSyncProgressRate: number
+  relationSyncedAnimeCount?: number
+  relationPendingAnimeCount?: number
+  relationSyncingAnimeCount?: number
+  relationFailedAnimeCount?: number
+  animeRelationCount?: number
+  relationSyncProgressRate?: number
   characterCount: number
   voiceActorCount: number
 }

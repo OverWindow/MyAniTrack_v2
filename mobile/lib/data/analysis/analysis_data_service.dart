@@ -16,31 +16,30 @@ class AnalysisDataService {
   final VoiceActorRepository _voiceActorRepository;
 
   Future<AnalysisData> fetchMyAnalysis() async {
-    final sample = AnalysisData.sample();
+    final empty = AnalysisData.empty();
 
     try {
       final overview = await _statsRepository.fetchOverviewModel();
-      final genres = await _fetchGenres(sample.genres);
-      final formats = await _fetchFormats(sample.formats);
-      final yearlyScores = await _fetchYearlyScores(sample.yearlyScores);
-      final studios = await _fetchStudios(sample.studios);
-      final voiceActors = await _fetchVoiceActors(sample.voiceActors);
+      final genres = await _fetchGenres(empty.genres);
+      final formats = await _fetchFormats(empty.formats);
+      final yearlyScores = await _fetchYearlyScores(empty.yearlyScores);
+      final studios = await _fetchStudios(empty.studios);
+      final voiceActors = await _fetchVoiceActors(empty.voiceActors);
 
-      return sample.copyWith(
+      return empty.copyWith(
         overview: overview,
         genres: genres,
         formats: formats,
         yearlyScores: yearlyScores,
         studios: studios,
         voiceActors: voiceActors,
-        isSample: false,
       );
     } on Object catch (error) {
       if (error is ApiException &&
           (error.statusCode == 401 || error.statusCode == 403)) {
         rethrow;
       }
-      return sample;
+      return empty;
     }
   }
 

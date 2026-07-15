@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { ConnectionErrorState } from '../components/ConnectionErrorState'
+import { VoiceActorCharacterWorks } from '../components/VoiceActorCharacterWorks'
 import { useAuth } from '../contexts/AuthContext'
 import { getProfileImageSrc, handleProfileImageError } from '../lib/avatar'
 import { getFriendlyErrorMessage, SERVER_CONNECTION_ERROR_MESSAGE } from '../lib/errors'
 import { fetchVoiceActorAnime } from '../lib/stats'
+import { groupVoiceActorCharacterWorks } from '../lib/voiceActorCharacterWorks'
 import {
   fetchVoiceActorDetail,
   getVoiceActorDisplayName,
@@ -329,10 +331,43 @@ export function VoiceActorDetailPage() {
   const voiceActor = state.item.voiceActor
   const displayName = getVoiceActorDisplayName(voiceActor.name)
   const description = stripHtml(voiceActor.description)
-  const watchedCharacterCount = watchedState.items.reduce(
-    (count, item) => count + item.characters.length,
-    0,
-  )
+  const allCharacterGroups = groupVoiceActorCharacterWorks(state.item.items.map((item) => ({
+    character: {
+      id: item.character.id,
+      name: getVoiceActorDisplayName(item.character.name),
+      nativeName: item.character.name.native,
+      image: getVoiceActorImage(item.character.image),
+      meta: getCharacterMeta(item),
+    },
+    work: {
+      id: item.anime.id,
+      title: item.anime.title,
+      image: getAnimeImage(item),
+      label: 'Anime',
+      meta: getAnimeMeta(item),
+    },
+  })))
+  const watchedCharacterGroups = groupVoiceActorCharacterWorks(watchedState.items.flatMap((animeItem) => (
+    animeItem.characters.map((character) => ({
+      character: {
+        id: character.id,
+        name: getVoiceActorDisplayName(character.name),
+        nativeName: character.name.native,
+        image: getVoiceActorImage(character.image),
+        meta: character.role || null,
+      },
+      work: {
+        id: animeItem.anime.id,
+        title: animeItem.anime.title,
+        image: animeItem.anime.coverImageExtraLarge || animeItem.anime.coverImageLarge || null,
+        label: 'Completed',
+        meta: getWatchedAnimeMeta(animeItem),
+      },
+    }))
+  )))
+  const visibleCharacterGroups = creditFilter === 'completed'
+    ? watchedCharacterGroups
+    : allCharacterGroups
 
   return (
     <section className="voice-actor-detail-page">
@@ -386,8 +421,8 @@ export function VoiceActorDetailPage() {
             <h2>출연 캐릭터와 작품</h2>
             <p>
               {creditFilter === 'completed'
-                ? `${watchedState.items.length.toLocaleString()}편 · 캐릭터 ${watchedCharacterCount.toLocaleString()}명을 표시 중이에요.`
-                : `${state.item.items.length.toLocaleString()}개 항목을 표시 중이에요.`}
+                ? `${watchedState.items.length.toLocaleString()}편 · 캐릭터 ${watchedCharacterGroups.length.toLocaleString()}명을 표시 중이에요.`
+                : `캐릭터 ${allCharacterGroups.length.toLocaleString()}명을 표시 중이에요.`}
             </p>
           </div>
           <div className="voice-actor-credit-filters" role="group" aria-label="출연작 필터">
@@ -422,95 +457,21 @@ export function VoiceActorDetailPage() {
             : <div className="feedback-card">{watchedState.error}</div>
         )}
 
-        {creditFilter === 'completed' && !watchedState.isLoading && !watchedState.error && watchedState.items.length === 0 && (
+        {creditFilter === 'completed' && !watchedState.isLoading && !watchedState.error && watchedCharacterGroups.length === 0 && (
           <div className="feedback-card">이 성우가 출연한 완주 작품이 아직 없어요.</div>
         )}
 
-        {creditFilter === 'completed' && !watchedState.isLoading && !watchedState.error && watchedState.items.length > 0 && (
+        {creditFilter === 'completed' && !watchedState.isLoading && !watchedState.error && watchedCharacterGroups.length > 0 && (
           <div className="voice-actor-credit-grid">
-            {watchedState.items.flatMap((animeItem) => animeItem.characters.map((character) => {
-              const characterName = getVoiceActorDisplayName(character.name)
-              const characterMeta = character.role || null
-              const animeMeta = getWatchedAnimeMeta(animeItem)
-
-              return (
-                <article className="voice-actor-credit-card" key={`${animeItem.anime.id}-${character.id}`}>
-                  <div className="voice-actor-character-block">
-                    <img
-                      src={getProfileImageSrc(getVoiceActorImage(character.image))}
-                      alt={characterName}
-                      loading="lazy"
-                      onError={handleProfileImageError}
-                    />
-                    <div>
-                      <span>Character</span>
-                      <strong>{characterName}</strong>
-                      {character.name.native && <small>{character.name.native}</small>}
-                      {characterMeta && <small>{characterMeta}</small>}
-                    </div>
-                  </div>
-
-                  <Link className="voice-actor-anime-block" to={`/anime/${animeItem.anime.id}`}>
-                    <img
-                      src={getProfileImageSrc(animeItem.anime.coverImageExtraLarge || animeItem.anime.coverImageLarge || null)}
-                      alt={animeItem.anime.title}
-                      loading="lazy"
-                      onError={handleProfileImageError}
-                    />
-                    <span>
-                      <small>Completed</small>
-                      <strong>{animeItem.anime.title}</strong>
-                      {animeMeta && <em>{animeMeta}</em>}
-                    </span>
-                  </Link>
-                </article>
-              )
-            }))}
+            <VoiceActorCharacterWorks key="completed" groups={watchedCharacterGroups} variant="detail" />
           </div>
         )}
 
-        {creditFilter === 'all' && (state.item.items.length === 0 ? (
+        {creditFilter === 'all' && (visibleCharacterGroups.length === 0 ? (
           <div className="feedback-card">표시할 출연 정보가 없어요.</div>
         ) : (
           <div className="voice-actor-credit-grid">
-            {state.item.items.map((item) => {
-              const characterName = getVoiceActorDisplayName(item.character.name)
-              const characterMeta = getCharacterMeta(item)
-              const animeMeta = getAnimeMeta(item)
-
-              return (
-                <article className="voice-actor-credit-card" key={`${item.character.id}-${item.anime.id}-${item.voiceActing.sortOrder ?? 0}`}>
-                  <div className="voice-actor-character-block">
-                    <img
-                      src={getProfileImageSrc(getVoiceActorImage(item.character.image))}
-                      alt={characterName}
-                      loading="lazy"
-                      onError={handleProfileImageError}
-                    />
-                    <div>
-                      <span>Character</span>
-                      <strong>{characterName}</strong>
-                      {item.character.name.native && <small>{item.character.name.native}</small>}
-                      {characterMeta && <small>{characterMeta}</small>}
-                    </div>
-                  </div>
-
-                  <Link className="voice-actor-anime-block" to={`/anime/${item.anime.id}`}>
-                    <img
-                      src={getProfileImageSrc(getAnimeImage(item))}
-                      alt={item.anime.title}
-                      loading="lazy"
-                      onError={handleProfileImageError}
-                    />
-                    <span>
-                      <small>Anime</small>
-                      <strong>{item.anime.title}</strong>
-                      {animeMeta && <em>{animeMeta}</em>}
-                    </span>
-                  </Link>
-                </article>
-              )
-            })}
+            <VoiceActorCharacterWorks key="all" groups={allCharacterGroups} variant="detail" />
           </div>
         ))}
 

@@ -72,9 +72,11 @@ class _HomePageState extends State<HomePage> {
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                 sliver: SliverList.list(
                   children: [
-                    const _HomeHeader(),
-                    const SizedBox(height: 18),
-                    const _ExploreOnlyBanner(),
+                    _HomeHeader(isSignedIn: isSignedIn),
+                    if (!isSignedIn) ...[
+                      const SizedBox(height: 18),
+                      const _ExploreOnlyBanner(),
+                    ],
                     const SizedBox(height: 18),
                     _HeroPanel(
                       overviewFuture: _sampleOverviewFuture,
@@ -431,7 +433,9 @@ class _ExploreOnlyBanner extends StatelessWidget {
 }
 
 class _HomeHeader extends StatelessWidget {
-  const _HomeHeader();
+  const _HomeHeader({required this.isSignedIn});
+
+  final bool isSignedIn;
 
   @override
   Widget build(BuildContext context) {
@@ -466,11 +470,12 @@ class _HomeHeader extends StatelessWidget {
             ],
           ),
         ),
-        IconButton.filled(
-          onPressed: () => _startGoogleLogin(context),
-          icon: const Icon(Icons.person_outline),
-          tooltip: '로그인',
-        ),
+        if (!isSignedIn)
+          IconButton.filled(
+            onPressed: () => _startGoogleLogin(context),
+            icon: const Icon(Icons.person_outline),
+            tooltip: '로그인',
+          ),
       ],
     );
   }

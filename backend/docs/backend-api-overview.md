@@ -479,6 +479,72 @@ Response example:
 }
 ```
 
+### `GET /anime/search-with-relations`
+
+애니 제목을 검색하고, 검색된 각 작품에 로컬 DB에 동기화된 연관 작품을 함께 반환합니다. 검색과 relation 조회는 페이지 단위의 묶음 쿼리로 처리됩니다.
+
+Query:
+
+- `query`: 필수
+- `sort`: `latest | score | season | popularity`, 기본값 `latest`
+- `titleLanguage`: `ko | en | ja`, 기본값 `ko`
+- `genre`: 선택값
+- `relationType`: 선택값. `PREQUEL`, `SEQUEL`, `PARENT`, `SIDE_STORY`, `SPIN_OFF`, `ADAPTATION`, `SOURCE`, `SUMMARY`, `ALTERNATIVE`, `CHARACTER`, `COMPILATION`, `CONTAINS`, `OTHER`
+- `limit`: `1~50`, 기본값 `20`
+- `cursor`: 이전 응답의 `pageInfo.nextCursor`
+
+Example request:
+
+```http
+GET /api/anime/search-with-relations?query=프리렌&relationType=SEQUEL&titleLanguage=ko&limit=20
+```
+
+Response example:
+
+```json
+{
+  "success": true,
+  "items": [
+    {
+      "id": 123,
+      "anilistId": 154587,
+      "title": "장송의 프리렌",
+      "coverImageLarge": "https://...",
+      "relations": [
+        {
+          "relationType": "SEQUEL",
+          "targetAnilistId": 171627,
+          "resolved": true,
+          "anime": {
+            "id": 456,
+            "anilistId": 171627,
+            "title": "장송의 프리렌 2기",
+            "format": "TV",
+            "seasonYear": 2026,
+            "coverImageLarge": "https://..."
+          }
+        }
+      ],
+      "relationSync": {
+        "status": "success",
+        "lastSyncedAt": "2026-07-15 12:00:00",
+        "sourceUpdatedAt": "2026-07-14 18:30:00"
+      }
+    }
+  ],
+  "relationType": "SEQUEL",
+  "pageInfo": {
+    "hasNext": false,
+    "nextCursor": null,
+    "limit": 20,
+    "sort": "latest",
+    "titleLanguage": "ko"
+  }
+}
+```
+
+`relationType`을 생략하면 모든 관계 유형을 반환합니다. 관계 대상 작품이 로컬 DB에 없으면 `resolved`는 `false`, `anime`는 `null`입니다. relation 동기화 상태가 아직 없으면 `relationSync.status`는 `pending`입니다.
+
 ### `GET /me/anime/search`
 내 컬렉션 정보가 포함된 애니 목록/검색입니다. 로그인 필요입니다.
 
@@ -673,6 +739,53 @@ Response example:
   ]
 }
 ```
+
+### `GET /anime/:id/relations`
+
+로컬 DB에 동기화된 애니 간 관계를 조회합니다. `id`는 내부 `anime.id`입니다.
+
+Query:
+
+- `titleLanguage`: `ko | en | ja`, 기본값 `ko`
+- `relationType`: 선택값. `PREQUEL`, `SEQUEL`, `PARENT`, `SIDE_STORY`, `SPIN_OFF`, `ADAPTATION`, `SOURCE`, `SUMMARY`, `ALTERNATIVE`, `CHARACTER`, `COMPILATION`, `CONTAINS`, `OTHER`
+
+Example request:
+
+```http
+GET /api/anime/123/relations?relationType=SEQUEL&titleLanguage=ko
+```
+
+Response example:
+
+```json
+{
+  "success": true,
+  "animeId": 123,
+  "items": [
+    {
+      "relationType": "SEQUEL",
+      "targetAnilistId": 171627,
+      "resolved": true,
+      "anime": {
+        "id": 456,
+        "anilistId": 171627,
+        "title": "후속작 제목",
+        "format": "TV",
+        "seasonYear": 2026,
+        "coverImageLarge": "https://..."
+      }
+    }
+  ],
+  "relationType": "SEQUEL",
+  "sync": {
+    "status": "success",
+    "lastSyncedAt": "2026-07-15 12:00:00",
+    "sourceUpdatedAt": "2026-07-14 18:30:00"
+  }
+}
+```
+
+관계 대상 작품이 아직 로컬에 저장되지 않았으면 `resolved`는 `false`, `anime`는 `null`입니다.
 
 ## Auth
 
@@ -2305,6 +2418,8 @@ Response example:
 ### `GET /stats/platform`
 공개 플랫폼 통계 조회입니다.
 
+`relationSyncProgressRate`는 AniList 관계 동기화가 성공한 작품 수를 전체 로컬 작품 수로 나눈 값입니다. 관계가 0개인 작품도 정상 조회를 완료했다면 성공 건수에 포함됩니다.
+
 Response example:
 
 ```json
@@ -2317,6 +2432,12 @@ Response example:
     "translationProgressRate": 62.72,
     "castSyncedAnimeCount": 2100,
     "castSyncProgressRate": 24.85,
+    "relationSyncedAnimeCount": 2000,
+    "relationPendingAnimeCount": 6400,
+    "relationSyncingAnimeCount": 0,
+    "relationFailedAnimeCount": 50,
+    "animeRelationCount": 7200,
+    "relationSyncProgressRate": 23.67,
     "characterCount": 18340,
     "voiceActorCount": 4120
   }

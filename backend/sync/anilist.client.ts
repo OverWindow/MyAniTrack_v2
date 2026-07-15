@@ -1,6 +1,7 @@
 import {
   ANILIST_ANIME_CAST_QUERY,
   ANILIST_ANIME_PAGE_QUERY,
+  ANILIST_ANIME_RELATIONS_BY_IDS_QUERY,
   ANILIST_ANIME_STUDIOS_BY_IDS_QUERY,
   ANILIST_SEASON_ANIME_PAGE_QUERY,
 } from './anilist.queries';
@@ -25,6 +26,14 @@ export interface AniListStudioEdge {
   node?: AniListStudio | null;
 }
 
+export interface AniListMediaRelationEdge {
+  relationType?: string | null;
+  node?: {
+    id: number;
+    type?: string | null;
+  } | null;
+}
+
 export interface AniListAnime {
   id: number;
   title: {
@@ -46,6 +55,9 @@ export interface AniListAnime {
   genres?: string[] | null;
   studios?: {
     edges?: AniListStudioEdge[] | null;
+  } | null;
+  relations?: {
+    edges?: AniListMediaRelationEdge[] | null;
   } | null;
   averageScore?: number | null;
   meanScore?: number | null;
@@ -244,6 +256,36 @@ export async function fetchAnimeStudiosByAnilistIds(anilistIds: number[]): Promi
 
   if (!response.ok) {
     throw new Error(`AniList studios request failed: ${response.status} ${response.statusText}`);
+  }
+
+  const json = (await response.json()) as AniListPageResponse;
+
+  if (json.errors?.length) {
+    throw new Error(`AniList GraphQL error: ${json.errors.map(e => e.message).join(', ')}`);
+  }
+
+  return json.data?.Page?.media ?? [];
+}
+
+export async function fetchAnimeRelationsByAnilistIds(anilistIds: number[]): Promise<AniListAnime[]> {
+  if (anilistIds.length === 0) {
+    return [];
+  }
+
+  const response = await fetch(ANILIST_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
+    body: JSON.stringify({
+      query: ANILIST_ANIME_RELATIONS_BY_IDS_QUERY,
+      variables: { ids: anilistIds },
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`AniList relations request failed: ${response.status} ${response.statusText}`);
   }
 
   const json = (await response.json()) as AniListPageResponse;

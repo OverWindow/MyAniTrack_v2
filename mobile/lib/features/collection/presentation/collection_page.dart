@@ -135,12 +135,14 @@ class _CollectionPageState extends State<CollectionPage> {
                             style: Theme.of(context).textTheme.headlineLarge,
                           ),
                         ),
-                        IconButton.filled(
-                          onPressed: _openAnimeSearch,
-                          icon: const Icon(Icons.add_rounded),
-                          tooltip: '애니 추가',
-                        ),
-                        const SizedBox(width: 8),
+                        if (isSignedIn) ...[
+                          IconButton.filled(
+                            onPressed: _openAnimeSearch,
+                            icon: const Icon(Icons.add_rounded),
+                            tooltip: '애니 추가',
+                          ),
+                          const SizedBox(width: 8),
+                        ],
                         AppBadge(
                           label: '내 컬렉션',
                         ),
@@ -158,33 +160,35 @@ class _CollectionPageState extends State<CollectionPage> {
                       ),
                       const SizedBox(height: 14),
                     ],
-                    _SearchToolbar(
-                      onChanged: (value) => setState(() => _query = value),
-                      onSearchTap: _openAnimeSearch,
-                    ),
-                    const SizedBox(height: 16),
-                    _CollectionControls(
-                      filter: _filter,
-                      sort: _sort,
-                      onFilterChanged: (value) => setState(() => _filter = value),
-                      onSortChanged: (value) => setState(() => _sort = value),
-                    ),
-                    const SizedBox(height: 18),
                     if (!isSignedIn)
                       const _LockedCollectionMessage()
-                    else if (visibleEntries.isEmpty)
-                      const _EmptyCollectionMessage()
-                    else
-                      ...visibleEntries.map(
-                        (entry) => Padding(
-                          padding: const EdgeInsets.only(bottom: 14),
-                          child: AnimeCollectionCard(
-                            entry: entry,
-                            sample: false,
-                            onChanged: _reloadEntries,
+                    else ...[
+                      _SearchToolbar(
+                        onChanged: (value) => setState(() => _query = value),
+                        onSearchTap: _openAnimeSearch,
+                      ),
+                      const SizedBox(height: 16),
+                      _CollectionControls(
+                        filter: _filter,
+                        sort: _sort,
+                        onFilterChanged: (value) =>
+                            setState(() => _filter = value),
+                        onSortChanged: (value) => setState(() => _sort = value),
+                      ),
+                      const SizedBox(height: 18),
+                      if (visibleEntries.isEmpty)
+                        const _EmptyCollectionMessage()
+                      else
+                        ...visibleEntries.map(
+                          (entry) => Padding(
+                            padding: const EdgeInsets.only(bottom: 14),
+                            child: AnimeCollectionCard(
+                              entry: entry,
+                              onChanged: _reloadEntries,
+                            ),
                           ),
                         ),
-                      ),
+                    ],
                     if (isSignedIn && _hasNext) ...[
                       const SizedBox(height: 4),
                       OutlinedButton.icon(
@@ -433,13 +437,11 @@ class _EmptyCollectionMessage extends StatelessWidget {
 class AnimeCollectionCard extends StatelessWidget {
   const AnimeCollectionCard({
     required this.entry,
-    this.sample = true,
     this.onChanged,
     super.key,
   });
 
   final AnimeEntry entry;
-  final bool sample;
   final VoidCallback? onChanged;
 
   @override
@@ -486,7 +488,6 @@ class AnimeCollectionCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      if (sample) const AppBadge(label: '샘플', sample: true),
                     ],
                   ),
                   const SizedBox(height: 8),
