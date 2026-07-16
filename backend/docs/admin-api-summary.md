@@ -295,6 +295,53 @@ Response 예시:
 
 `hasMore`가 `true`이면 다음 요청의 `afterAnimeId`에 `nextAfterAnimeId`를 전달합니다. 전체 구간 처리 후 실패 건을 다시 시도하려면 `mode: missing`, `afterAnimeId: 0`, `retryFailed: true`로 호출합니다.
 
+### `POST /admin/anime/series/rebuild`
+
+동기화된 `anime_relations`를 기준으로 시리즈 그룹과 멤버를 다시 계산합니다. 관리자 권한이 필요합니다.
+
+Body:
+
+```json
+{
+  "scope": "all"
+}
+```
+
+- `scope`: `mainline | franchise | all`, 기본값 `all`
+  - `mainline`: `PREQUEL`, `SEQUEL` 관계만 재계산
+  - `franchise`: 외전, 스핀오프, 총집편 등을 포함해 재계산
+  - `all`: `mainline`과 `franchise`를 순서대로 모두 재계산
+
+Response example:
+
+```json
+{
+  "success": true,
+  "message": "Anime series rebuild completed",
+  "result": {
+    "scope": "all",
+    "rebuiltScopes": ["mainline", "franchise"],
+    "durationMs": 842,
+    "summaries": [
+      {
+        "scope": "mainline",
+        "seriesCount": 410,
+        "memberCount": 1030,
+        "updatedAt": "2026-07-16 12:30:00"
+      },
+      {
+        "scope": "franchise",
+        "seriesCount": 350,
+        "memberCount": 1410,
+        "updatedAt": "2026-07-16 12:30:01"
+      }
+    ]
+  }
+}
+```
+
+동시에 다른 시리즈 재계산이 실행 중이면 HTTP `409`와 `Anime series rebuild is already running`을 반환합니다. relation 동기화를 여러 청크로 실행할 때는 마지막 청크가 끝난 후 한 번 호출하는 것을 권장합니다.
+
 ### `POST /admin/anime/sync/page`
 AniList 애니 데이터를 한 페이지 동기화합니다.
 

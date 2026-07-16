@@ -1216,6 +1216,83 @@ Response example:
 }
 ```
 
+### `GET /me/anime-list/series`
+
+내 컬렉션에 포함된 작품을 시리즈 단위로 조회하고 검색합니다. 각 시리즈는 사용자가 보유한 작품뿐 아니라 시리즈 전체 구성 작품과 각 작품의 `userList` 상태를 함께 반환합니다. 로그인 필요입니다.
+
+Query:
+
+- `scope`: `mainline | franchise`, 기본값 `mainline`
+- `status`: `all | started | watched | completed`, 기본값 `all`
+  - `all`: 컬렉션 작품이 하나 이상 있는 시리즈
+  - `started`: `planned`가 아닌 작품이 하나 이상 있는 시리즈
+  - `watched`: `completed` 작품이 하나 이상 있는 시리즈
+  - `completed`: 시리즈 구성 작품이 모두 `completed`인 시리즈
+- `query`: 선택 검색어. 관리자 시리즈명과 구성 작품의 한국어·영어·일본어·로마자 제목을 검색
+- `titleLanguage`: `ko | en | ja`, 기본값 `ko`
+- `limit`: `1~50`, 기본값 `20`
+- `cursor`: 이전 응답의 `pageInfo.nextCursor`
+
+Example:
+
+```http
+GET /api/me/anime-list/series?query=프리렌&scope=mainline&status=watched&titleLanguage=ko&limit=20
+```
+
+Response example:
+
+```json
+{
+  "success": true,
+  "items": [
+    {
+      "seriesId": 12,
+      "scope": "mainline",
+      "title": "장송의 프리렌",
+      "memberCount": 2,
+      "collectedMemberCount": 1,
+      "startedMemberCount": 1,
+      "completedMemberCount": 1,
+      "completionRate": 50,
+      "completed": false,
+      "coverImageLarge": "https://...",
+      "items": [
+        {
+          "anime": {
+            "id": 123,
+            "title": "장송의 프리렌",
+            "coverImageLarge": "https://..."
+          },
+          "userList": {
+            "id": 10,
+            "status": "completed",
+            "score": 9.5,
+            "progress": 28
+          }
+        },
+        {
+          "anime": {
+            "id": 456,
+            "title": "장송의 프리렌 2기",
+            "coverImageLarge": "https://..."
+          },
+          "userList": null
+        }
+      ]
+    }
+  ],
+  "pageInfo": {
+    "hasNext": false,
+    "nextCursor": null,
+    "limit": 20,
+    "scope": "mainline",
+    "status": "watched",
+    "titleLanguage": "ko",
+    "query": "프리렌"
+  }
+}
+```
+
 ### `GET /me/anime-list/smart-rating/candidates`
 스마트 평점 모달에서 비교할 기존 평가 작품 후보를 가져옵니다.
 
@@ -2082,10 +2159,19 @@ Response example:
         "genre": "Drama"
       }
     ],
+    "seriesStats": {
+      "scope": "mainline",
+      "startedSeriesCount": 12,
+      "watchedSeriesCount": 9,
+      "completedSeriesCount": 4,
+      "seriesCompletionRate": 44.44
+    },
     "updatedAt": "2026-05-06 13:00:00"
   }
 }
 ```
+
+`seriesStats`는 항상 `mainline` 기준으로 실시간 집계합니다. 시리즈에 속하지 않은 단독 작품은 제외됩니다. `/users/:userId/anime-stats`의 `item`에도 동일한 구조가 포함됩니다.
 
 ### `POST /me/anime-stats/recalculate`
 내 애니 통계 강제 재계산입니다.

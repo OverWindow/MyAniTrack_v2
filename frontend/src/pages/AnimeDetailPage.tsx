@@ -485,7 +485,6 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
     )
   }
 
-  const koreanTitles = item.titles.korean ?? []
   const heroImage = item.bannerImage || getPrimaryPoster(item)
 
   return (
@@ -637,31 +636,6 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
             />
           )}
 
-          {koreanTitles.length > 0 && (
-            <section className="detail-section">
-              <span className="detail-label">Korean titles</span>
-              <div className="chip-list">
-                {koreanTitles.map((title) => (
-                  <span className="info-chip" key={title.fullTitle}>
-                    {title.fullTitle}
-                  </span>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {!!item.synonyms?.length && (
-            <section className="detail-section">
-              <span className="detail-label">Synonyms</span>
-              <div className="chip-list">
-                {item.synonyms.map((synonym) => (
-                  <span className="info-chip" key={synonym}>
-                    {synonym}
-                  </span>
-                ))}
-              </div>
-            </section>
-          )}
         </aside>
       </div>
 

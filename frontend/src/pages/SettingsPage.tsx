@@ -6,7 +6,6 @@ import { fetchMyAgreements, requestPasswordReset } from '../lib/auth'
 import '../styles/pages/SettingsPage.css'
 import '../styles/pages/AuthPage.css'
 
-type SettingsCategoryKey = 'privacy' | 'screen' | 'language'
 type SettingsSectionKey =
   | 'profile'
   | 'security'
@@ -107,7 +106,6 @@ function formatAgreementDate(value: string | null) {
 export function SettingsPage() {
   const { deleteAccount, isAuthenticated, user } = useAuth()
   const navigate = useNavigate()
-  const [selectedCategory, setSelectedCategory] = useState<SettingsCategoryKey>('privacy')
   const [selectedSection, setSelectedSection] = useState<SettingsSectionKey>('profile')
   const [localSettings, setLocalSettings] = useState<LocalSettings>(() => loadLocalSettings())
   const [agreements, setAgreements] = useState<AgreementsState | null>(null)
@@ -122,8 +120,9 @@ export function SettingsPage() {
   const [deleteAccountError, setDeleteAccountError] = useState<string | null>(null)
 
   const currentCategory = useMemo(
-    () => settingsCategories.find((category) => category.key === selectedCategory) ?? settingsCategories[0],
-    [selectedCategory],
+    () => settingsCategories.find((category) => category.items.some((item) => item.key === selectedSection))
+      ?? settingsCategories[0],
+    [selectedSection],
   )
   const activeAgreementContent = activeAgreement ? AGREEMENT_SECTIONS[activeAgreement] : null
   const currentSectionMeta = currentCategory.items.find((item) => item.key === selectedSection)
@@ -473,52 +472,40 @@ export function SettingsPage() {
     <>
       <section className="settings-page">
         <div className="settings-workspace">
-          <aside className="settings-sidebar settings-sidebar-primary">
+          <aside className="settings-sidebar">
             <div className="settings-sidebar-header">
-              <span className="detail-label">Categories</span>
-              <h2>설정 분류</h2>
+              <h1>설정</h1>
+              <p>계정과 화면 환경을 관리하세요.</p>
             </div>
-            <div className="settings-sidebar-list">
+            <nav className="settings-menu" aria-label="설정 메뉴">
               {settingsCategories.map((category) => (
-                <button
-                  key={category.key}
-                  className={selectedCategory === category.key ? 'settings-sidebar-item is-active' : 'settings-sidebar-item'}
-                  type="button"
-                  onClick={() => {
-                    setSelectedCategory(category.key)
-                    setSelectedSection(category.items[0].key)
-                  }}
-                >
-                  <strong>{category.label}</strong>
-                  <small>{category.description}</small>
-                </button>
+                <section className="settings-menu-group" key={category.key}>
+                  <div className="settings-menu-group-heading">
+                    <h2>{category.label}</h2>
+                    <p>{category.description}</p>
+                  </div>
+                  <div className="settings-sidebar-list">
+                    {category.items.map((item) => (
+                      <button
+                        key={item.key}
+                        className={selectedSection === item.key ? 'settings-sidebar-item is-active' : 'settings-sidebar-item'}
+                        type="button"
+                        aria-current={selectedSection === item.key ? 'page' : undefined}
+                        onClick={() => setSelectedSection(item.key)}
+                      >
+                        <span>{item.label}</span>
+                        <small>{item.description}</small>
+                      </button>
+                    ))}
+                  </div>
+                </section>
               ))}
-            </div>
-          </aside>
-
-          <aside className="settings-sidebar settings-sidebar-secondary">
-            <div className="settings-sidebar-header">
-              <span className="detail-label">Sections</span>
-              <h2>{currentCategory.label}</h2>
-            </div>
-            <div className="settings-sidebar-list">
-              {currentCategory.items.map((item) => (
-                <button
-                  key={item.key}
-                  className={selectedSection === item.key ? 'settings-sidebar-item is-active' : 'settings-sidebar-item'}
-                  type="button"
-                  onClick={() => setSelectedSection(item.key)}
-                >
-                  <strong>{item.label}</strong>
-                  <small>{item.description}</small>
-                </button>
-              ))}
-            </div>
+            </nav>
           </aside>
 
           <div className="settings-content-panel">
             <div className="settings-panel-intro">
-              <span className="detail-label">Current section</span>
+              <span className="settings-section-path">{currentCategory.label}</span>
               <h2>{currentSectionMeta?.label}</h2>
               <p>{currentSectionMeta?.description}</p>
             </div>

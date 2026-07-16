@@ -6,13 +6,17 @@ import type {
   UserAnimeListPayload,
   UserAnimeListResponse,
   UserAnimeListSort,
+  UserSeriesCollectionResponse,
+  AnimeSeriesScope,
+  UserSeriesCollectionStatus,
   SmartRatingCandidatesResponse,
   SmartRatingEstimateResponse,
   SmartRatingRelation,
 } from '../types/collection'
 
 const COLLECTION_STORAGE_KEY_PREFIX = 'myanitrack.collection.cache'
-const COLLECTION_PAGE_STORAGE_KEY_PREFIX = 'myanitrack.collection.page-cache'
+const COLLECTION_PAGE_STORAGE_KEY_PREFIX = 'myanitrack.collection.page-cache:v3'
+const SERIES_COLLECTION_STORAGE_KEY_PREFIX = 'myanitrack.series-collection.page-cache:v1'
 export const COLLECTION_CACHE_UPDATED_EVENT = 'myanitrack:collection-cache-updated'
 
 function getApiBaseUrl() {
@@ -271,6 +275,7 @@ export async function addToCollection(payload: UserAnimeListPayload) {
 
   const entry = extractCollectionEntry(await response.json())
   updateCachedCollectionEntry(entry)
+  clearSeriesCollectionCache()
   return entry
 }
 
@@ -299,6 +304,7 @@ export async function updateCollectionEntry(
 
   const entry = extractCollectionEntry(await response.json())
   updateCachedCollectionEntry(entry)
+  clearSeriesCollectionCache()
   return entry
 }
 
@@ -312,6 +318,7 @@ export async function deleteCollectionEntry(animeId: number) {
   }
 
   removeCachedCollectionEntry(animeId)
+  clearSeriesCollectionCache()
 }
 
 export async function fetchMyCollectionEntry(animeId: number, signal?: AbortSignal) {
@@ -389,13 +396,10 @@ export async function fetchMyCollection(params: {
   }
 
   const data = (await response.json()) as UserAnimeListResponse
-  const filteredItems = data.items.filter(
-    (item) => item.anime.coverImageExtraLarge || item.anime.coverImageLarge,
-  )
 
   const cache = getCollectionCache()
 
-  for (const item of filteredItems) {
+  for (const item of data.items) {
     cache[item.animeId] = {
       animeId: item.animeId,
       status: item.status,
@@ -415,17 +419,121 @@ export async function fetchMyCollection(params: {
       year: params.year,
       score: params.score,
     },
-    {
-      ...data,
-      items: filteredItems,
-    },
+    data,
   )
   dispatchCollectionCacheUpdated()
 
-  return {
-    ...data,
-    items: filteredItems,
+  return data
+}
+
+type SeriesCollectionCacheParams = {
+  scope?: AnimeSeriesScope
+  status?: UserSeriesCollectionStatus
+  titleLanguage?: 'ko' | 'en' | 'ja'
+  query?: string
+}
+
+function getSeriesCollectionStoragePrefix() {
+  const session = getStoredSession()
+  const userId = session?.user?.id
+
+  return `${SERIES_COLLECTION_STORAGE_KEY_PREFIX}:${userId ? String(userId) : 'guest'}:`
+}
+
+function getSeriesCollectionStorageKey(params: SeriesCollectionCacheParams) {
+  const scope = params.scope ?? 'mainline'
+  const status = params.status ?? 'all'
+  const titleLanguage = params.titleLanguage ?? 'ko'
+  const query = encodeURIComponent(params.query?.trim().toLowerCase() || 'all')
+
+  return `${getSeriesCollectionStoragePrefix()}${scope}:${status}:${titleLanguage}:${query}`
+}
+
+export function getCachedSeriesCollection(params: SeriesCollectionCacheParams) {
+  const storageKey = getSeriesCollectionStorageKey(params)
+  const raw = window.localStorage.getItem(storageKey)
+
+  if (!raw) {
+    return null
   }
+
+  try {
+    const data = JSON.parse(raw) as UserSeriesCollectionResponse
+
+    if (data.pageInfo.hasNext || data.pageInfo.nextCursor) {
+      window.localStorage.removeItem(storageKey)
+      return null
+    }
+
+    return data
+  } catch {
+    window.localStorage.removeItem(storageKey)
+    return null
+  }
+}
+
+export function clearSeriesCollectionCache() {
+  const storagePrefix = getSeriesCollectionStoragePrefix()
+
+  for (let index = window.localStorage.length - 1; index >= 0; index -= 1) {
+    const key = window.localStorage.key(index)
+
+    if (key?.startsWith(storagePrefix)) {
+      window.localStorage.removeItem(key)
+    }
+  }
+}
+
+export function saveSeriesCollectionCache(
+  params: SeriesCollectionCacheParams,
+  data: UserSeriesCollectionResponse,
+) {
+  const storageKey = getSeriesCollectionStorageKey(params)
+  const serialized = JSON.stringify(data)
+
+  try {
+    window.localStorage.setItem(storageKey, serialized)
+  } catch {
+    clearSeriesCollectionCache()
+
+    try {
+      window.localStorage.setItem(storageKey, serialized)
+    } catch {
+      // Keep the page usable when browser storage is unavailable or full.
+    }
+  }
+}
+
+export async function fetchMySeriesCollection(params: {
+  scope?: AnimeSeriesScope
+  status?: UserSeriesCollectionStatus
+  titleLanguage?: 'ko' | 'en' | 'ja'
+  query?: string
+  limit?: number
+  cursor?: string | null
+  signal?: AbortSignal
+}) {
+  const url = new URL('/api/me/anime-list/series', getApiBaseUrl())
+  url.searchParams.set('scope', params.scope ?? 'mainline')
+  url.searchParams.set('status', params.status ?? 'all')
+  url.searchParams.set('titleLanguage', params.titleLanguage ?? 'ko')
+  url.searchParams.set('limit', String(params.limit ?? 20))
+
+  if (params.query?.trim()) {
+    url.searchParams.set('query', params.query.trim())
+  }
+
+  if (params.cursor) {
+    url.searchParams.set('cursor', params.cursor)
+  }
+
+  const response = await authFetch(url.toString(), { signal: params.signal })
+
+  if (!response.ok) {
+    throw new Error(getErrorMessage(response.status, '시리즈 컬렉션을 불러오지 못했어요.'))
+  }
+
+  return response.json() as Promise<UserSeriesCollectionResponse>
 }
 
 export async function fetchSmartRatingCandidates(params: {

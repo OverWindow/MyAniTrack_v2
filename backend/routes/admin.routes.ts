@@ -3,6 +3,7 @@ import { requireAdmin } from '../src/middleware/auth.middleware';
 import {
   getAdminUserController,
   getAdminUsersController,
+  rebuildAnimeSeriesController,
   syncAllAnimeController,
   syncAllAnimeIntegratedController,
   syncAnimeCastBatchController,
@@ -26,6 +27,7 @@ router.get('/admin/users', getAdminUsersController);
 router.get('/admin/users/:userId', getAdminUserController);
 router.post('/admin/anime/sync/full', requireAdmin, syncAllAnimeIntegratedController);
 router.post('/admin/anime/sync/relations', requireAdmin, syncAnimeRelationsController);
+router.post('/admin/anime/series/rebuild', requireAdmin, rebuildAnimeSeriesController);
 router.post('/admin/anime/sync/page', requireAdmin, syncAnimePageController);
 router.post('/admin/anime/sync/all', requireAdmin, syncAllAnimeController);
 router.post('/admin/anime/sync/chunked', requireAdmin, syncAnimeInChunksController);

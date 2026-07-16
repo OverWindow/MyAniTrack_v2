@@ -1,5 +1,6 @@
 import { RowDataPacket } from 'mysql2/promise';
 import { pool } from '../../config/db';
+import { getUserSeriesStats, UserSeriesStats } from './user-series-stats.service';
 
 type JsonMap = Record<string, number>;
 
@@ -133,6 +134,7 @@ export interface UserAnimeStats {
   scoreDistribution: JsonMap;
   topWatchedGenreTopAnime: TopGenreAnimeItem[];
   topRatedGenreTopAnime: TopGenreAnimeItem[];
+  seriesStats: UserSeriesStats;
   preferenceSummary: string;
   recommendationContext: string;
   updatedAt: string;
@@ -320,7 +322,7 @@ function buildTopGenreAnimeList(
     .slice(0, 5);
 }
 
-function mapStatsRow(row: UserAnimeStatsRow): UserAnimeStats {
+function mapStatsRow(row: UserAnimeStatsRow): Omit<UserAnimeStats, 'seriesStats'> {
   return {
     userId: row.userId,
     totalCount: row.totalCount,
@@ -538,6 +540,7 @@ export async function recalculateUserAnimeStats(userId: number) {
     uniqueAnime,
     animeGenres
   );
+  const seriesStats = await getUserSeriesStats(userId);
 
   const computedStats = {
     userId,
@@ -558,6 +561,7 @@ export async function recalculateUserAnimeStats(userId: number) {
     scoreDistribution,
     topWatchedGenreTopAnime,
     topRatedGenreTopAnime,
+    seriesStats,
   };
 
   const preferenceSummary = buildPreferenceSummary({
@@ -703,13 +707,17 @@ export async function getUserAnimeStats(userId: number, skipRecalculate = false)
       scoreDistribution: {},
       topWatchedGenreTopAnime: [],
       topRatedGenreTopAnime: [],
+      seriesStats: await getUserSeriesStats(userId),
       preferenceSummary: '',
       recommendationContext: '',
       updatedAt: new Date().toISOString(),
     };
   }
 
-  return mapStatsRow(rows[0]);
+  return {
+    ...mapStatsRow(rows[0]),
+    seriesStats: await getUserSeriesStats(userId),
+  };
 }
 
 function computeRecommendationScore(

@@ -129,6 +129,13 @@ function normalizeTopGenreAnimeItems(value: unknown) {
 
 export function normalizeStatsItem(payload: unknown) {
   const item = extractStatsItem(payload)
+  const seriesStats = item.seriesStats ?? {
+    scope: 'mainline' as const,
+    startedSeriesCount: 0,
+    watchedSeriesCount: 0,
+    completedSeriesCount: 0,
+    seriesCompletionRate: 0,
+  }
 
   return {
     ...item,
@@ -147,6 +154,13 @@ export function normalizeStatsItem(payload: unknown) {
     scoreDistribution: normalizeNumericMap(item.scoreDistribution),
     topWatchedGenreTopAnime: normalizeTopGenreAnimeItems(item.topWatchedGenreTopAnime),
     topRatedGenreTopAnime: normalizeTopGenreAnimeItems(item.topRatedGenreTopAnime),
+    seriesStats: {
+      scope: 'mainline' as const,
+      startedSeriesCount: toFiniteNumber(seriesStats.startedSeriesCount) ?? 0,
+      watchedSeriesCount: toFiniteNumber(seriesStats.watchedSeriesCount) ?? 0,
+      completedSeriesCount: toFiniteNumber(seriesStats.completedSeriesCount) ?? 0,
+      seriesCompletionRate: toFiniteNumber(seriesStats.seriesCompletionRate) ?? 0,
+    },
   }
 }
 

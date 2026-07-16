@@ -6,6 +6,14 @@ export type TopGenreAnimeItem = {
   genre: string
 }
 
+export type UserSeriesStats = {
+  scope: 'mainline'
+  startedSeriesCount: number
+  watchedSeriesCount: number
+  completedSeriesCount: number
+  seriesCompletionRate: number
+}
+
 export type AnimeStatsItem = {
   userId: number
   totalCount: number
@@ -25,6 +33,7 @@ export type AnimeStatsItem = {
   scoreDistribution: Record<string, number>
   topWatchedGenreTopAnime: TopGenreAnimeItem[]
   topRatedGenreTopAnime: TopGenreAnimeItem[]
+  seriesStats: UserSeriesStats
   preferenceSummary: string | null
   recommendationContext: string | null
   updatedAt: string | null

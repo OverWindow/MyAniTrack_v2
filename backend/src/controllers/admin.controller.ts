@@ -17,6 +17,10 @@ import {
 import { translateAnimeKoreanTitlesInBatches } from '../../translations/anime.korean-title.service';
 import { updateAnimeKoreanTitleByAdmin } from '../services/admin-korean-title.service';
 import { getAdminUserById, getAdminUsers } from '../services/admin-user.service';
+import {
+  rebuildAnimeSeries,
+  validateAnimeSeriesRebuildScope,
+} from '../services/admin-anime-series.service';
 
 function sendError(res: Response, error: unknown) {
   const message = error instanceof Error ? error.message : 'Unknown error';
@@ -47,6 +51,10 @@ function getErrorStatus(message: string) {
 
   if (message === 'Admin access required') {
     return 403;
+  }
+
+  if (message === 'Anime series rebuild is already running') {
+    return 409;
   }
 
   return 500;
@@ -95,6 +103,25 @@ export async function syncAnimeRelationsController(req: Request, res: Response) 
     return res.json({
       success: true,
       message: 'Anime relations sync completed',
+      result,
+    });
+  } catch (error) {
+    return sendError(res, error);
+  }
+}
+
+export async function rebuildAnimeSeriesController(req: Request, res: Response) {
+  try {
+    if (!ensureAdmin(req, res)) {
+      return;
+    }
+
+    const scope = validateAnimeSeriesRebuildScope(req.body?.scope);
+    const result = await rebuildAnimeSeries(scope);
+
+    return res.json({
+      success: true,
+      message: 'Anime series rebuild completed',
       result,
     });
   } catch (error) {

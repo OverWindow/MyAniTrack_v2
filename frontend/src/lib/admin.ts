@@ -7,6 +7,8 @@ import type {
   AdminCastSyncStatusPayload,
   AdminFullSyncPayload,
   AdminRelationSyncPayload,
+  AdminSeriesRebuildPayload,
+  AdminSeriesRebuildResponse,
   AdminStudioSyncMissingPayload,
   AdminStudioSyncMissingResult,
   AdminSyncAllPayload,
@@ -173,6 +175,36 @@ export async function syncAnimeRelations(payload: AdminRelationSyncPayload) {
         ? '미동기화 연관 작품을 처리했어요.'
         : '연관 작품 전체 재동기화를 처리했어요.',
     result,
+  } satisfies AdminActionResponse
+}
+
+export async function rebuildAnimeSeries(payload: AdminSeriesRebuildPayload) {
+  const response = await authFetch(createAdminUrl('/admin/anime/series/rebuild'), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  })
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => null) as { message?: unknown } | null
+
+    if (response.status === 409) {
+      throw new Error(typeof data?.message === 'string'
+        ? data.message
+        : '애니 시리즈 재계산이 이미 실행 중이에요.')
+    }
+
+    throw new Error(getAdminErrorMessage(response.status, '애니 시리즈 재계산에 실패했어요.'))
+  }
+
+  const data = (await response.json()) as AdminSeriesRebuildResponse
+
+  return {
+    success: data.success,
+    message: data.message,
+    result: data.result as unknown as Record<string, unknown>,
   } satisfies AdminActionResponse
 }
 

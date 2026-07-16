@@ -328,6 +328,26 @@
   object-fit: cover;
 }
 
+.collection-poster-placeholder {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 16px;
+  background:
+    linear-gradient(145deg, rgba(254, 243, 199, 0.76), rgba(245, 239, 230, 0.94)),
+    var(--bg-neutral);
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.collection-poster-placeholder span {
+  font-size: 0.72rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .collection-copy {
   display: grid;
   gap: 6px;
@@ -359,6 +379,239 @@
   font-size: 0.82rem;
 }
 
+.collection-view-switch {
+  position: relative;
+  isolation: isolate;
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-height: 48px;
+  padding: 4px;
+  border: 1px solid rgba(217, 119, 6, 0.18);
+  border-radius: 15px;
+  background: linear-gradient(135deg, rgba(255, 251, 235, 0.96), rgba(245, 239, 230, 0.72));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.88),
+    0 5px 16px rgba(120, 113, 108, 0.08);
+}
+
+.collection-view-switch::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  width: calc((100% - 8px) / 2);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 11px;
+  background: var(--bg-card);
+  box-shadow:
+    0 4px 12px rgba(180, 83, 9, 0.12),
+    inset 0 -1px 0 rgba(254, 243, 199, 0.72);
+  transition: transform var(--duration-normal) var(--ease-out);
+}
+
+.collection-view-switch[data-active-view="series"]::before {
+  transform: translateX(100%);
+}
+
+.collection-view-switch button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 94px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 750;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    color var(--duration-fast) ease,
+    transform var(--duration-fast) ease;
+}
+
+.collection-view-switch button:hover:not(.is-active) {
+  color: var(--text-primary);
+}
+
+.collection-view-switch button:active {
+  transform: scale(0.97);
+}
+
+.collection-view-switch button:focus-visible {
+  outline: 3px solid rgba(245, 158, 11, 0.24);
+  outline-offset: 1px;
+}
+
+.collection-view-switch svg {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.collection-view-switch button.is-active {
+  color: var(--point-hover);
+}
+
+.series-collection-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.series-collection-card {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  min-height: 184px;
+  overflow: hidden;
+  border: 1px solid rgba(120, 113, 108, 0.14);
+  border-radius: var(--radius-card);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-card);
+}
+
+.series-collection-cover-link {
+  min-height: 184px;
+  overflow: hidden;
+  background: var(--bg-muted);
+}
+
+.series-collection-cover,
+.series-collection-cover-placeholder {
+  width: 100%;
+  height: 100%;
+  min-height: 184px;
+}
+
+.series-collection-cover {
+  display: block;
+  object-fit: cover;
+  transition: transform var(--duration-normal) var(--ease-out);
+}
+
+.series-collection-cover-link:hover .series-collection-cover {
+  transform: scale(1.035);
+}
+
+.series-collection-cover-placeholder {
+  display: grid;
+  place-items: center;
+  color: var(--text-tertiary);
+  font-size: 0.75rem;
+}
+
+.series-collection-copy {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px;
+}
+
+.series-collection-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.series-collection-heading h3 {
+  display: -webkit-box;
+  margin: 4px 0 0;
+  overflow: hidden;
+  font-size: 0.9rem;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.series-collection-heading strong {
+  flex: 0 0 auto;
+  color: var(--point-hover);
+  font-size: 0.82rem;
+}
+
+.series-collection-scope {
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.series-collection-progress {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(120, 113, 108, 0.12);
+}
+
+.series-collection-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--point-color), var(--point-hover));
+}
+
+.series-collection-copy > p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.series-member-strip {
+  display: flex;
+  gap: 7px;
+  overflow-x: auto;
+  padding-bottom: 3px;
+  scrollbar-width: thin;
+}
+
+.series-member-item {
+  position: relative;
+  flex: 0 0 36px;
+  width: 36px;
+  height: 50px;
+  overflow: hidden;
+  border: 2px solid transparent;
+  border-radius: 7px;
+  background: var(--bg-muted);
+  opacity: 0.48;
+}
+
+.series-member-item.is-collected {
+  border-color: var(--point-color);
+  opacity: 1;
+}
+
+.series-member-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.series-member-item > span {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 900;
+}
+
 @media (max-width: 1180px) {
   .perfect-score-carousel {
     --perfect-score-card-width: 172px;
@@ -377,6 +630,10 @@
 
   .collection-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .series-collection-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -414,5 +671,34 @@
   .collection-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 22px 14px;
+  }
+
+
+  .collection-view-switch {
+    width: 100%;
+  }
+
+  .collection-view-switch button {
+    flex: 1;
+    min-height: 40px;
+  }
+
+  .series-collection-card {
+    grid-template-columns: 112px minmax(0, 1fr);
+    min-height: 180px;
+  }
+
+  .series-collection-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .series-collection-cover-link,
+  .series-collection-cover,
+  .series-collection-cover-placeholder {
+    min-height: 180px;
+  }
+
+  .series-collection-copy {
+    padding: 14px;
   }
 }

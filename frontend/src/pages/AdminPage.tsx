@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext'
 import {
   fetchAnimeCastSyncStatus,
   fetchPlatformStats,
+  rebuildAnimeSeries,
   syncAllAnimePages,
   syncAnimeCast,
   syncAnimeCastBatch,
@@ -27,6 +28,8 @@ import type {
   AdminFullSyncPayload,
   AdminRelationSyncMode,
   AdminRelationSyncPayload,
+  AdminSeriesRebuildPayload,
+  AdminSeriesRebuildScope,
   AdminSeason,
   AdminStudioSyncMissingPayload,
   AdminSyncAllPayload,
@@ -69,6 +72,7 @@ type AdminSyncActionKey =
   | 'sync-season'
   | 'studio-sync-missing'
   | 'cast-sync'
+  | 'series-rebuild'
 
 type AdminCastActionKey =
   | 'cast-sync-anime'
@@ -80,9 +84,11 @@ type AdminSpecialSyncActionKey =
   | 'studio-sync-missing'
   | 'cast-sync'
   | 'sync-relations'
+  | 'series-rebuild'
 
 const seasonOptions: AdminSeason[] = ['WINTER', 'SPRING', 'SUMMER', 'FALL']
 const castLanguageOptions: AdminCastLanguage[] = ['JAPANESE', 'ENGLISH', 'KOREAN']
+const seriesRebuildScopeOptions: AdminSeriesRebuildScope[] = ['all', 'mainline', 'franchise']
 const RESPONSE_PREVIEW_LENGTH = 360
 
 type AdminFullSyncFormValues = Omit<AdminFullSyncPayload, 'maxPages'> & {
@@ -212,6 +218,9 @@ export function AdminPage() {
     batchSize: 50,
     retryFailed: true,
     afterAnimeId: 0,
+  })
+  const [seriesRebuildValues, setSeriesRebuildValues] = useState<AdminSeriesRebuildPayload>({
+    scope: 'all',
   })
   const [chunkedValues, setChunkedValues] = useState<AdminSyncChunkedPayload>({
     startPage: 1,
@@ -544,6 +553,26 @@ export function AdminPage() {
 
   const syncActionItems = [
     {
+      key: 'series-rebuild' as const,
+      group: '특수 동기화',
+      label: '시리즈 재계산',
+      description: '메인라인·프랜차이즈 시리즈 데이터를 다시 계산합니다.',
+      content: (
+        <AdminActionCard
+          title="애니 시리즈 재계산"
+          description="전체 범위 또는 메인라인·프랜차이즈 중 하나를 선택해 시리즈와 멤버 구성을 다시 계산합니다. 서버에서 재계산이 진행 중이면 중복 실행되지 않습니다."
+          fields={[
+            { key: 'scope', label: '재계산 범위', type: 'select', options: seriesRebuildScopeOptions },
+          ]}
+          values={seriesRebuildValues}
+          isRunning={activeAction === 'series-rebuild'}
+          onChange={(key, value) => setSeriesRebuildValues((current) => ({ ...current, [key]: value }))}
+          onSubmit={() => { void runAction('series-rebuild', () => rebuildAnimeSeries(seriesRebuildValues)) }}
+          response={responseMap['series-rebuild'] ?? null}
+        />
+      ),
+    },
+    {
       key: 'sync-full' as const,
       group: '통합 동기화',
       label: '전체 통합 동기화',
@@ -828,7 +857,9 @@ export function AdminPage() {
   const studioActionItem = syncActionItems.find((item) => item.key === 'studio-sync-missing')
   const castActionItem = syncActionItems.find((item) => item.key === 'cast-sync')
   const relationActionItem = syncActionItems.find((item) => item.key === 'sync-relations')
-  const specialSyncItems = [studioActionItem, castActionItem, relationActionItem].filter((item) => item !== undefined)
+  const seriesRebuildActionItem = syncActionItems.find((item) => item.key === 'series-rebuild')
+  const specialSyncItems = [seriesRebuildActionItem, studioActionItem, castActionItem, relationActionItem]
+    .filter((item) => item !== undefined)
   const selectedSpecialSyncItem = specialSyncItems.find((item) => item.key === selectedSpecialSyncAction)
     ?? specialSyncItems[0]
   const actionItems = [
@@ -871,7 +902,7 @@ export function AdminPage() {
       key: 'special-sync' as const,
       group: '특수 동기화',
       label: '특수 동기화',
-      description: '스튜디오, 캐릭터/성우, 연관 작품 동기화를 모아서 실행합니다.',
+      description: '시리즈 재계산과 스튜디오, 캐릭터/성우, 연관 작품 동기화를 모아서 실행합니다.',
       content: (
         <div className="admin-sync-tool">
           <div className="admin-sync-mode-list" role="tablist" aria-label="특수 동기화 작업 유형">

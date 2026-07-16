@@ -19,6 +19,32 @@ export type AdminRelationSyncPayload = {
   afterAnimeId?: number
 }
 
+export type AdminSeriesRebuildScope = 'all' | 'mainline' | 'franchise'
+
+export type AdminSeriesRebuildPayload = {
+  scope: AdminSeriesRebuildScope
+}
+
+export type AdminSeriesRebuildSummary = {
+  scope: Exclude<AdminSeriesRebuildScope, 'all'>
+  seriesCount: number
+  memberCount: number
+  updatedAt: string
+}
+
+export type AdminSeriesRebuildResult = {
+  scope: AdminSeriesRebuildScope
+  rebuiltScopes: Array<Exclude<AdminSeriesRebuildScope, 'all'>>
+  durationMs: number
+  summaries: AdminSeriesRebuildSummary[]
+}
+
+export type AdminSeriesRebuildResponse = {
+  success: boolean
+  message: string
+  result: AdminSeriesRebuildResult
+}
+
 export type AdminSyncChunkedPayload = {
   startPage: number
   perPage: number

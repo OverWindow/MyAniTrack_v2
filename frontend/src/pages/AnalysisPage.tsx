@@ -1792,6 +1792,18 @@ export function AnalysisPage() {
               <span>평균 방영 연도</span>
               <strong>{averageReleaseYear !== null ? averageReleaseYear.toFixed(1) : '정보 없음'}</strong>
             </article>
+            <article>
+              <span>본 시리즈</span>
+              <strong>{(item.seriesStats?.watchedSeriesCount ?? 0).toLocaleString()}개</strong>
+            </article>
+            <article>
+              <span>완주 시리즈</span>
+              <strong>{(item.seriesStats?.completedSeriesCount ?? 0).toLocaleString()}개</strong>
+            </article>
+            <article>
+              <span>시리즈 완주율</span>
+              <strong>{(item.seriesStats?.seriesCompletionRate ?? 0).toFixed(1)}%</strong>
+            </article>
           </div>
         </section>
 

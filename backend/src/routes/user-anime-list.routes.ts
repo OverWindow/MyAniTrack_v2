@@ -4,6 +4,7 @@ import {
   createMyAnimeListItem,
   deleteMyAnimeListItem,
   getMyAnimeList,
+  getMyAnimeSeriesCollection,
   getMyAnimeRelationController,
   getUserAnimeListController,
   updateMyAnimeListItem,
@@ -17,6 +18,7 @@ const router = Router();
 
 router.post('/me/anime-list', requireAuth, createMyAnimeListItem);
 router.get('/me/anime-list', requireAuth, getMyAnimeList);
+router.get('/me/anime-list/series', requireAuth, getMyAnimeSeriesCollection);
 router.get('/me/anime-list/smart-rating/candidates', requireAuth, getSmartRatingCandidatesController);
 router.post('/me/anime-list/smart-rating/estimate', requireAuth, estimateSmartRatingController);
 router.get('/me/anime-list/:animeId', requireAuth, getMyAnimeRelationController);
