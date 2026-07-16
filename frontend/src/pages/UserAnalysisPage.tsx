@@ -4,12 +4,14 @@ import { AnalysisAnimeToast } from '../components/AnalysisAnimeToast'
 import { ConnectionErrorState } from '../components/ConnectionErrorState'
 import { ReleaseDecadeProgress } from '../components/ReleaseDecadeProgress'
 import { VoiceActorRankingSection } from '../components/VoiceActorRankingSection'
+import { ViewingDnaCard } from '../components/ViewingDnaCard'
 import { StudioRankingSection, WatchTimeComparisonTicker } from './AnalysisPage'
 import { getProfileImageSrc, handleProfileImageError } from '../lib/avatar'
 import { SERVER_CONNECTION_ERROR_MESSAGE, getFriendlyErrorMessage } from '../lib/errors'
 import {
   fetchFormatDistributionStats,
   fetchGenreBubbleStats,
+  fetchViewingDnaStats,
   fetchYearlyScoreStats,
   formatUpdatedAt,
   formatWatchHours,
@@ -18,7 +20,7 @@ import {
 import { fetchPublicUserAnimeStats, fetchPublicUserCollection } from '../lib/users'
 import type { AnimeGenre } from '../types/anime'
 import type { UserAnimeListItem } from '../types/collection'
-import type { AnimeStatsItem, FormatDistributionStats, GenreBubbleResponse, YearlyScoreStats } from '../types/stats'
+import type { AnimeStatsItem, FormatDistributionStats, GenreBubbleResponse, ViewingDnaItem, YearlyScoreStats } from '../types/stats'
 import type { PublicUserProfile } from '../types/users'
 import '../styles/pages/AnalysisPage.css'
 import '../styles/pages/UserAnalysisPage.css'
@@ -191,6 +193,15 @@ export function UserAnalysisPage() {
     isLoading: true,
     error: null,
   })
+  const [viewingDnaState, setViewingDnaState] = useState<{
+    item: ViewingDnaItem | null
+    isLoading: boolean
+    error: string | null
+  }>({
+    item: null,
+    isLoading: true,
+    error: null,
+  })
 
   useEffect(() => {
     if (!userId) {
@@ -218,6 +229,37 @@ export function UserAnalysisPage() {
     }
 
     void loadStats()
+
+    return () => controller.abort()
+  }, [userId])
+
+  useEffect(() => {
+    if (!userId) {
+      return
+    }
+
+    const controller = new AbortController()
+
+    const loadViewingDna = async () => {
+      setViewingDnaState((current) => ({ ...current, isLoading: true, error: null }))
+
+      try {
+        const item = await fetchViewingDnaStats({ userId, signal: controller.signal })
+        setViewingDnaState({ item, isLoading: false, error: null })
+      } catch (loadError) {
+        if (loadError instanceof DOMException && loadError.name === 'AbortError') {
+          return
+        }
+
+        setViewingDnaState({
+          item: null,
+          isLoading: false,
+          error: getFriendlyErrorMessage(loadError, '감상 DNA 분석을 불러오지 못했어요.'),
+        })
+      }
+    }
+
+    void loadViewingDna()
 
     return () => controller.abort()
   }, [userId])
@@ -626,6 +668,12 @@ export function UserAnalysisPage() {
               && (!formatDistributionState.item || formatDistributionState.item.items.length === 0)
               && renderEmptyMessage('아직 포맷별 분석 데이터가 없어요.')}
           </section>
+
+          <ViewingDnaCard
+            item={viewingDnaState.item}
+            isLoading={viewingDnaState.isLoading}
+            error={viewingDnaState.error}
+          />
 
           <div className="analysis-segmented-control" role="tablist" aria-label="분석 종류 선택">
             {analysisTabs.map((tab) => (

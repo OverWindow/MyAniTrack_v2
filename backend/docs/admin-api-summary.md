@@ -342,6 +342,8 @@ Response example:
 
 동시에 다른 시리즈 재계산이 실행 중이면 HTTP `409`와 `Anime series rebuild is already running`을 반환합니다. relation 동기화를 여러 청크로 실행할 때는 마지막 청크가 끝난 후 한 번 호출하는 것을 권장합니다.
 
+재계산 시 각 멤버의 완주 필수 여부도 함께 갱신됩니다. `MUSIC`, `SUMMARY`/`COMPILATION` 관계의 대상 작품, `NOT_YET_RELEASED`, `CANCELLED` 작품은 시리즈 구성에는 남아 있지만 사용자 시리즈 완주 계산에서는 제외됩니다. 이 기능을 처음 배포할 때는 최신 `sql_scripts/anime_series.sql`을 먼저 실행해 컬럼과 프로시저를 반영해야 합니다.
+
 ### `POST /admin/anime/sync/page`
 AniList 애니 데이터를 한 페이지 동기화합니다.
 

@@ -26,9 +26,11 @@ interface SeriesSummaryRow extends RowDataPacket {
   seriesTitle: string | null;
   canonicalAnimeId: number | null;
   memberCount: number | string;
+  requiredMemberCount: number | string;
   collectedMemberCount: number | string;
   startedMemberCount: number | string;
   completedMemberCount: number | string;
+  completedRequiredMemberCount: number | string;
   lastActivityAt: string;
   canonicalAnilistId: number | null;
   canonicalTitleRomaji: string | null;
@@ -53,6 +55,8 @@ interface SeriesMemberRow extends RowDataPacket {
   seasonYear: number | null;
   format: string | null;
   animeStatus: string | null;
+  completionRequired: number | boolean;
+  completionExclusionReason: string | null;
   coverImageLarge: string | null;
   coverImageExtraLarge: string | null;
   userListId: number | null;
@@ -181,12 +185,18 @@ export async function getUserSeriesStats(userId: number): Promise<UserSeriesStat
     `
     SELECT
       COALESCE(SUM(progress.startedMemberCount > 0), 0) AS startedSeriesCount,
-      COALESCE(SUM(progress.completedMemberCount > 0), 0) AS watchedSeriesCount,
-      COALESCE(SUM(progress.completedMemberCount = progress.memberCount), 0) AS completedSeriesCount,
+      COALESCE(SUM(progress.completedRequiredMemberCount > 0), 0) AS watchedSeriesCount,
+      COALESCE(SUM(
+        progress.requiredMemberCount > 0
+        AND progress.completedRequiredMemberCount = progress.requiredMemberCount
+      ), 0) AS completedSeriesCount,
       COALESCE(
         ROUND(
-          SUM(progress.completedMemberCount = progress.memberCount) * 100.0
-          / NULLIF(SUM(progress.completedMemberCount > 0), 0),
+          SUM(
+            progress.requiredMemberCount > 0
+            AND progress.completedRequiredMemberCount = progress.requiredMemberCount
+          ) * 100.0
+          / NULLIF(SUM(progress.completedRequiredMemberCount > 0), 0),
           2
         ),
         0
@@ -194,9 +204,12 @@ export async function getUserSeriesStats(userId: number): Promise<UserSeriesStat
     FROM (
       SELECT
         seriesRow.id AS seriesId,
-        COUNT(memberRow.anime_id) AS memberCount,
+        COALESCE(SUM(memberRow.is_completion_required = TRUE), 0) AS requiredMemberCount,
         COALESCE(SUM(ual.status IS NOT NULL AND ual.status <> 'planned'), 0) AS startedMemberCount,
-        COALESCE(SUM(ual.status = 'completed'), 0) AS completedMemberCount
+        COALESCE(SUM(
+          memberRow.is_completion_required = TRUE
+          AND ual.status = 'completed'
+        ), 0) AS completedRequiredMemberCount
       FROM anime_series seriesRow
       INNER JOIN anime_series_members memberRow
         ON memberRow.series_id = seriesRow.id
@@ -270,9 +283,12 @@ export async function getUserSeriesCollection(params: GetUserSeriesCollectionPar
   if (params.status === 'started') {
     statusHaving = 'AND startedMemberCount > 0';
   } else if (params.status === 'watched') {
-    statusHaving = 'AND completedMemberCount > 0';
+    statusHaving = 'AND completedRequiredMemberCount > 0';
   } else if (params.status === 'completed') {
-    statusHaving = 'AND completedMemberCount = memberCount';
+    statusHaving = `
+      AND requiredMemberCount > 0
+      AND completedRequiredMemberCount = requiredMemberCount
+    `;
   }
 
   let cursorHaving = '';
@@ -303,9 +319,14 @@ export async function getUserSeriesCollection(params: GetUserSeriesCollectionPar
       seriesRow.title AS seriesTitle,
       seriesRow.canonical_anime_id AS canonicalAnimeId,
       COUNT(memberRow.anime_id) AS memberCount,
+      COALESCE(SUM(memberRow.is_completion_required = TRUE), 0) AS requiredMemberCount,
       COALESCE(SUM(ual.id IS NOT NULL), 0) AS collectedMemberCount,
       COALESCE(SUM(ual.status IS NOT NULL AND ual.status <> 'planned'), 0) AS startedMemberCount,
       COALESCE(SUM(ual.status = 'completed'), 0) AS completedMemberCount,
+      COALESCE(SUM(
+        memberRow.is_completion_required = TRUE
+        AND ual.status = 'completed'
+      ), 0) AS completedRequiredMemberCount,
       MAX(ual.updated_at) AS lastActivityAt,
       canonicalAnime.anilist_id AS canonicalAnilistId,
       canonicalAnime.title_romaji AS canonicalTitleRomaji,
@@ -379,6 +400,8 @@ export async function getUserSeriesCollection(params: GetUserSeriesCollectionPar
         animeRow.season_year AS seasonYear,
         animeRow.format,
         animeRow.status AS animeStatus,
+        memberRow.is_completion_required AS completionRequired,
+        memberRow.completion_exclusion_reason AS completionExclusionReason,
         animeRow.cover_image_large AS coverImageLarge,
         animeRow.cover_image_extra_large AS coverImageExtraLarge,
         ual.id AS userListId,
@@ -424,7 +447,9 @@ export async function getUserSeriesCollection(params: GetUserSeriesCollectionPar
 
   const items = pageRows.map((row) => {
     const memberCount = toNumber(row.memberCount);
+    const requiredMemberCount = toNumber(row.requiredMemberCount);
     const completedMemberCount = toNumber(row.completedMemberCount);
+    const completedRequiredMemberCount = toNumber(row.completedRequiredMemberCount);
     const canonicalTitle = pickTitle({
       titleRomaji: row.canonicalTitleRomaji,
       titleEnglish: row.canonicalTitleEnglish,
@@ -440,17 +465,22 @@ export async function getUserSeriesCollection(params: GetUserSeriesCollectionPar
       customTitle: row.seriesTitle,
       canonicalAnimeId: row.canonicalAnimeId,
       memberCount,
+      requiredMemberCount,
       collectedMemberCount: toNumber(row.collectedMemberCount),
       startedMemberCount: toNumber(row.startedMemberCount),
       completedMemberCount,
-      completionRate: memberCount > 0
-        ? Number(((completedMemberCount / memberCount) * 100).toFixed(2))
+      completedRequiredMemberCount,
+      completionRate: requiredMemberCount > 0
+        ? Number(((completedRequiredMemberCount / requiredMemberCount) * 100).toFixed(2))
         : 0,
-      completed: memberCount > 0 && completedMemberCount === memberCount,
+      completed: requiredMemberCount > 0
+        && completedRequiredMemberCount === requiredMemberCount,
       lastActivityAt: row.lastActivityAt,
       coverImageLarge: row.coverImageLarge,
       coverImageExtraLarge: row.coverImageExtraLarge,
       items: (membersBySeriesId.get(row.seriesId) ?? []).map((member) => ({
+        completionRequired: Boolean(member.completionRequired),
+        completionExclusionReason: member.completionExclusionReason,
         anime: {
           id: member.animeId,
           anilistId: member.anilistId,

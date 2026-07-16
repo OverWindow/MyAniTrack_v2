@@ -4,8 +4,10 @@ import {
   getMyGenreBubbleChart,
   getMyAnimeStats,
   getMyRecommendations,
+  getMyViewingDna,
   getUserGenreBubbleChartController,
   getUserStats,
+  getUserViewingDnaController,
   recalculateMyAnimeStats,
 } from '../controllers/recommendation.controller';
 import {
@@ -32,12 +34,14 @@ import {
 const router = Router();
 
 router.get('/me/anime-stats', requireAuth, getMyAnimeStats);
+router.get('/me/anime-stats/viewing-dna', requireAuth, getMyViewingDna);
 router.get('/me/anime-stats/genre-bubble', requireAuth, getMyGenreBubbleChart);
 router.get('/me/anime-stats/yearly-scores', requireAuth, getMyYearlyScoreStats);
 router.get('/me/anime-stats/format-distribution', requireAuth, getMyFormatStats);
 router.get('/me/anime-stats/studios', requireAuth, getMyStudioRanking);
 router.get('/me/anime-stats/studios/:studioId/anime', requireAuth, getMyStudioAnime);
 router.get('/users/:userId/anime-stats', getUserStats);
+router.get('/users/:userId/anime-stats/viewing-dna', getUserViewingDnaController);
 router.get('/users/:userId/anime-stats/genre-bubble', getUserGenreBubbleChartController);
 router.get('/users/:userId/anime-stats/yearly-scores', getUserYearlyScoreStatsController);
 router.get('/users/:userId/anime-stats/format-distribution', getUserFormatStatsController);

@@ -7,6 +7,7 @@ import type {
   StudioRankingSort,
   VoiceActorAnimeResponse,
   VoiceActorRankingItem,
+  ViewingDnaItem,
   YearlyScoreStats,
 } from '../types/stats'
 import type { UserAnimeListItem } from '../types/collection'
@@ -35,6 +36,7 @@ export type AnalysisCachePayloadMap = {
   genreBubble: GenreBubbleResponse['item']
   yearlyScores: YearlyScoreStats
   formatDistribution: FormatDistributionStats
+  viewingDna: ViewingDnaItem
   studioRanking: StudioRankingResponse
   studioAnime: StudioAnimeResponse
   voiceActorRanking: {

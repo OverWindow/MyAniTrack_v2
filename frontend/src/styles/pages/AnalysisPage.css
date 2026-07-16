@@ -1,6 +1,6 @@
 .analysis-page {
   display: grid;
-  gap: 16px;
+  gap: 12px;
   width: 100%;
 }
 
@@ -40,8 +40,8 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 18px;
-  padding: 22px;
+  gap: 14px;
+  padding: 16px 18px;
   border: 1px solid rgba(120, 113, 108, 0.16);
   border-radius: 12px;
   background: var(--bg-card);
@@ -50,20 +50,20 @@
 
 .analysis-hero-copy {
   display: grid;
-  gap: 8px;
+  gap: 5px;
   max-width: 86ch;
 }
 
 .analysis-profile-heading {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
   min-width: 0;
 }
 
 .analysis-profile-avatar {
-  width: 72px;
-  height: 72px;
+  width: 56px;
+  height: 56px;
   border: 1px solid rgba(245, 158, 11, 0.24);
   border-radius: 10px;
   display: inline-flex;
@@ -72,7 +72,7 @@
   flex-shrink: 0;
   background: linear-gradient(135deg, var(--point-softest), rgba(255, 255, 255, 0.92));
   color: var(--point-hover);
-  font-size: 2rem;
+  font-size: 1.55rem;
   font-weight: 900;
   overflow: hidden;
 }
@@ -83,7 +83,7 @@
 
 .analysis-hero-copy h1 {
   margin: 0;
-  font-size: clamp(1.85rem, 3vw, 3.2rem);
+  font-size: clamp(1.55rem, 2.4vw, 2.35rem);
   line-height: 1;
 }
 
@@ -118,13 +118,13 @@
 
 .analysis-summary-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 0;
 }
 
 .analysis-summary-card {
   min-width: 0;
-  padding: 8px;
+  padding: 5px;
   border: 1px solid rgba(120, 113, 108, 0.14);
   border-radius: 12px;
   background: var(--bg-card);
@@ -133,9 +133,9 @@
 
 .analysis-summary-item {
   display: grid;
-  gap: 6px;
+  gap: 3px;
   min-width: 0;
-  padding: 16px;
+  padding: 10px 12px;
   border-right: 1px solid rgba(120, 113, 108, 0.12);
 }
 
@@ -150,7 +150,7 @@
 
 .analysis-summary-item strong {
   color: var(--point-hover);
-  font-size: clamp(1.25rem, 2vw, 1.8rem);
+  font-size: clamp(1.12rem, 1.7vw, 1.5rem);
   line-height: 1.05;
 }
 
@@ -159,14 +159,14 @@
   gap: 5px;
   min-width: 0;
   margin: 0 8px;
-  padding: 10px 12px 8px;
+  padding: 7px 10px 5px;
   border-top: 1px solid rgba(120, 113, 108, 0.1);
   background: transparent;
 }
 
 .analysis-watch-comparison-window {
   position: relative;
-  min-height: 34px;
+  min-height: 28px;
   overflow: hidden;
   perspective: 760px;
   transform-style: preserve-3d;
@@ -219,14 +219,14 @@
 
 .analysis-panel-grid {
   display: grid;
-  grid-template-columns: minmax(210px, 260px) minmax(0, 1fr);
-  gap: 16px;
+  grid-template-columns: minmax(190px, 230px) minmax(0, 1fr);
+  gap: 12px;
   align-items: start;
 }
 
 .analysis-panel {
   min-width: 0;
-  padding: 18px;
+  padding: 13px 14px;
   border: 1px solid rgba(120, 113, 108, 0.14);
   border-radius: 12px;
   background: var(--bg-card);
@@ -249,27 +249,27 @@
 
 .analysis-panel-heading h2 {
   margin: 0;
-  font-size: 1.18rem;
+  font-size: 1.02rem;
   line-height: 1.2;
 }
 
 .analysis-panel-heading p {
   margin: 2px 0 0;
   color: var(--text-secondary);
-  font-size: 0.86rem;
-  line-height: 1.45;
+  font-size: 0.78rem;
+  line-height: 1.35;
 }
 
 .analysis-facts-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 9px;
-  margin-top: 12px;
+  gap: 6px;
+  margin-top: 8px;
 }
 
 .analysis-facts-grid article {
   min-width: 0;
-  padding: 11px 12px;
+  padding: 8px 9px;
   border: 1px solid rgba(120, 113, 108, 0.1);
   border-radius: 8px;
   background: rgba(250, 247, 241, 0.68);
@@ -290,7 +290,7 @@
 
 .analysis-tab-area {
   display: grid;
-  gap: 12px;
+  gap: 9px;
   min-width: 0;
 }
 
@@ -307,14 +307,14 @@
 }
 
 .analysis-segment {
-  min-height: 38px;
+  min-height: 34px;
   padding: 0 14px;
   border: 0;
   border-radius: 8px;
   background: transparent;
   color: var(--text-secondary);
   font: inherit;
-  font-size: 0.9rem;
+  font-size: 0.82rem;
   font-weight: 800;
   cursor: pointer;
 }
@@ -326,20 +326,20 @@
 
 .analysis-format-panel {
   display: grid;
-  gap: 12px;
+  gap: 8px;
 }
 
 .analysis-format-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(150px, 0.26fr);
-  gap: 14px;
+  gap: 10px;
   align-items: start;
 }
 
 .analysis-format-chart-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: 8px;
 }
 
 .analysis-format-chart-shell {
@@ -356,12 +356,12 @@
 
 .analysis-format-summary {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .analysis-format-summary article {
   min-width: 0;
-  padding: 11px 12px;
+  padding: 8px 9px;
   border: 1px solid rgba(120, 113, 108, 0.1);
   border-radius: 8px;
   background: rgba(250, 247, 241, 0.68);
@@ -383,6 +383,190 @@
   white-space: nowrap;
 }
 
+.analysis-viewing-dna-panel {
+  display: grid;
+  gap: 10px;
+  overflow: hidden;
+}
+
+.analysis-viewing-dna-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 14px;
+}
+
+.analysis-viewing-dna-heading > div {
+  min-width: 0;
+}
+
+.analysis-viewing-dna-confidence {
+  display: inline-flex;
+  align-items: center;
+  min-height: 27px;
+  padding: 0 10px;
+  border: 1px solid rgba(217, 119, 6, 0.2);
+  border-radius: 999px;
+  background: rgba(255, 247, 237, 0.9);
+  color: #b45309;
+  font-size: 0.74rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.analysis-viewing-dna-confidence.is-none,
+.analysis-viewing-dna-confidence.is-low {
+  border-color: rgba(120, 113, 108, 0.18);
+  background: rgba(245, 245, 244, 0.86);
+  color: var(--text-secondary);
+}
+
+.analysis-viewing-dna-notice {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(217, 119, 6, 0.16);
+  border-radius: 9px;
+  background: rgba(255, 251, 235, 0.72);
+  color: #92400e;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.analysis-viewing-dna-layout {
+  display: grid;
+  grid-template-columns: minmax(330px, 0.9fr) minmax(0, 1.1fr);
+  align-items: center;
+  gap: 14px;
+}
+
+.analysis-viewing-dna-chart {
+  min-width: 0;
+  border-radius: 12px;
+  background:
+    radial-gradient(circle at 50% 48%, rgba(251, 191, 36, 0.13), transparent 58%),
+    rgba(250, 250, 249, 0.56);
+}
+
+.analysis-viewing-dna-tooltip {
+  max-width: 250px;
+}
+
+.analysis-viewing-dna-details {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.analysis-viewing-dna-strongest {
+  display: grid;
+  gap: 5px;
+  padding: 11px 12px;
+  border: 1px solid rgba(217, 119, 6, 0.2);
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(255, 247, 237, 0.95), rgba(255, 251, 235, 0.7));
+}
+
+.analysis-viewing-dna-strongest > span {
+  color: #b45309;
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+
+.analysis-viewing-dna-strongest > div,
+.analysis-viewing-dna-axis > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.analysis-viewing-dna-strongest strong {
+  font-size: 1.02rem;
+}
+
+.analysis-viewing-dna-strongest b,
+.analysis-viewing-dna-axis b {
+  color: #d97706;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.analysis-viewing-dna-strongest p,
+.analysis-viewing-dna-axis p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.74rem;
+  line-height: 1.4;
+}
+
+.analysis-viewing-dna-axis-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.analysis-viewing-dna-axis {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid rgba(120, 113, 108, 0.13);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.analysis-viewing-dna-axis.is-strongest {
+  border-color: rgba(217, 119, 6, 0.28);
+  box-shadow: inset 3px 0 #f59e0b;
+}
+
+.analysis-viewing-dna-axis.is-unavailable {
+  opacity: 0.68;
+}
+
+.analysis-viewing-dna-axis strong {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.8rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.analysis-viewing-dna-axis p {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.analysis-viewing-dna-axis:has(.analysis-viewing-dna-axis-note) p {
+  -webkit-line-clamp: 3;
+}
+
+.analysis-viewing-dna-axis-note {
+  padding-top: 4px;
+  border-top: 1px solid rgba(217, 119, 6, 0.14);
+  color: #92400e;
+  font-size: 0.68rem;
+  line-height: 1.35;
+}
+
+.analysis-viewing-dna-meta {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  text-align: right;
+}
+
+.analysis-viewing-dna-skeleton {
+  min-height: 330px;
+}
+
+.analysis-viewing-dna-empty {
+  min-height: 96px;
+}
+
 .analysis-tab-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -394,7 +578,7 @@
   display: grid;
   grid-template-columns: minmax(320px, 0.95fr) minmax(0, 1.05fr);
   grid-auto-rows: auto;
-  gap: 14px;
+  gap: 10px;
   align-items: stretch;
 }
 
@@ -414,26 +598,26 @@
 
 .analysis-score-tab {
   display: grid;
-  gap: 14px;
+  gap: 10px;
 }
 
 .analysis-year-tab {
   display: grid;
-  gap: 14px;
+  gap: 10px;
 }
 
 .analysis-year-score-summary {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 14px;
+  gap: 7px;
+  margin-top: 9px;
 }
 
 .analysis-year-score-summary article {
   display: grid;
   gap: 4px;
   min-width: 0;
-  padding: 12px;
+  padding: 8px 10px;
   border: 1px solid rgba(120, 113, 108, 0.1);
   border-radius: 8px;
   background: rgba(250, 247, 241, 0.68);
@@ -453,7 +637,7 @@
 .analysis-year-score-chart-shell {
   display: grid;
   gap: 8px;
-  margin-top: 12px;
+  margin-top: 7px;
 }
 
 .analysis-year-score-legend {
@@ -629,8 +813,8 @@
 
 .analysis-list {
   display: grid;
-  gap: 8px;
-  margin-top: 10px;
+  gap: 5px;
+  margin-top: 7px;
 }
 
 .analysis-detail-scroll-target {
@@ -818,8 +1002,8 @@
 
 .analysis-pie-shell {
   display: grid;
-  gap: 10px;
-  margin-top: 8px;
+  gap: 6px;
+  margin-top: 4px;
 }
 
 .analysis-pie-slice-label {
@@ -837,7 +1021,7 @@
 
 .analysis-pie-legend {
   display: grid;
-  gap: 6px;
+  gap: 3px;
 }
 
 .analysis-pie-legend-row,
@@ -846,13 +1030,13 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  min-height: 34px;
+  min-height: 28px;
 }
 
 .analysis-pie-legend-button,
 .analysis-genre-score-button {
   width: 100%;
-  padding: 8px;
+  padding: 5px 7px;
   border: 1px solid transparent;
   border-radius: 8px;
   background: transparent;
@@ -1072,13 +1256,13 @@
 
 .voice-actor-section {
   display: grid;
-  gap: 16px;
+  gap: 11px;
 }
 
 .voice-actor-ranking-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: 10px;
 }
 
 .voice-actor-ranking-heading {
@@ -1086,7 +1270,7 @@
   align-items: baseline;
   justify-content: space-between;
   gap: 10px;
-  margin-bottom: 10px;
+  margin-bottom: 6px;
 }
 
 .voice-actor-ranking-heading strong {
@@ -1100,8 +1284,8 @@
 
 .voice-actor-ranking-list {
   display: grid;
-  gap: 8px;
-  max-height: 452px;
+  gap: 5px;
+  max-height: 360px;
   overflow-y: auto;
   padding-right: 4px;
   overscroll-behavior: contain;
@@ -1129,9 +1313,9 @@
   display: grid;
   grid-template-columns: auto 46px minmax(0, 1fr);
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   min-width: 0;
-  padding: 8px 10px;
+  padding: 6px 8px;
   border: 1px solid rgba(120, 113, 108, 0.12);
   border-radius: 8px;
   background: rgba(250, 247, 241, 0.68);
@@ -1483,27 +1667,27 @@
 }
 
 .analysis-year-chart-shell {
-  height: 320px;
-  margin-top: 10px;
-  padding: 8px 0 0;
+  height: 248px;
+  margin-top: 6px;
+  padding: 4px 0 0;
   background: transparent;
 }
 
 .analysis-score-chart-shell {
-  height: 330px;
+  height: 248px;
 }
 
 .analysis-bubble-panel {
   display: grid;
-  gap: 12px;
+  gap: 8px;
 }
 
 .analysis-bubble-chart-shell {
   position: relative;
   display: grid;
-  gap: 10px;
-  min-height: 520px;
-  margin-top: 6px;
+  gap: 6px;
+  min-height: 388px;
+  margin-top: 3px;
 }
 
 .analysis-bubble-corner-guide {
@@ -1584,7 +1768,7 @@
 
 .studio-ranking-section {
   display: grid;
-  gap: 14px;
+  gap: 10px;
 }
 
 .studio-ranking-title-row {
@@ -1615,14 +1799,14 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 38px;
+  min-height: 34px;
   padding: 0 14px;
   border: 0;
   border-radius: 8px;
   background: transparent;
   color: var(--text-secondary);
   font: inherit;
-  font-size: 0.9rem;
+  font-size: 0.82rem;
   font-weight: 800;
   text-align: center;
   cursor: pointer;
@@ -1648,14 +1832,14 @@
 .studio-ranking-layout {
   display: grid;
   grid-template-columns: minmax(280px, 0.9fr) minmax(0, 1.35fr);
-  gap: 14px;
+  gap: 10px;
   align-items: start;
 }
 
 .studio-ranking-list {
   display: grid;
-  gap: 8px;
-  max-height: 452px;
+  gap: 5px;
+  max-height: 360px;
   overflow-y: auto;
   padding-right: 4px;
   overscroll-behavior: contain;
@@ -1667,9 +1851,9 @@
   display: grid;
   grid-template-columns: 42px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   min-width: 0;
-  padding: 10px;
+  padding: 7px 8px;
   border: 1px solid rgba(120, 113, 108, 0.12);
   border-radius: 8px;
   background: rgba(250, 247, 241, 0.68);
@@ -1735,9 +1919,9 @@
 
 .studio-anime-panel {
   display: grid;
-  gap: 10px;
+  gap: 7px;
   min-width: 0;
-  padding: 12px;
+  padding: 9px;
   border: 1px solid rgba(120, 113, 108, 0.1);
   border-radius: 10px;
   background: rgba(250, 247, 241, 0.5);
@@ -1772,8 +1956,8 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   align-items: center;
-  min-height: 270px;
-  padding: 12px 4px;
+  min-height: 218px;
+  padding: 8px 4px;
   perspective: 900px;
 }
 
@@ -1988,6 +2172,14 @@
 }
 
 @media (max-width: 760px) {
+  .analysis-viewing-dna-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .analysis-viewing-dna-chart .recharts-responsive-container {
+    height: 320px !important;
+  }
+
   .analysis-page {
     gap: 12px;
   }
@@ -2071,8 +2263,9 @@
     border-right: 1px solid rgba(120, 113, 108, 0.12);
   }
 
-  .analysis-summary-item:nth-last-child(-n + 2) {
+  .analysis-summary-item:last-child {
     border-bottom: 0;
+    border-right: 0;
   }
 
   .analysis-facts-grid {
@@ -2182,11 +2375,23 @@
   }
 
   .analysis-year-chart-shell {
-    height: 280px;
+    height: 248px;
   }
 }
 
 @media (max-width: 520px) {
+  .analysis-viewing-dna-heading {
+    grid-template-columns: 1fr;
+  }
+
+  .analysis-viewing-dna-confidence {
+    justify-self: start;
+  }
+
+  .analysis-viewing-dna-axis-list {
+    grid-template-columns: 1fr;
+  }
+
   .analysis-summary-grid {
     grid-template-columns: 1fr;
   }

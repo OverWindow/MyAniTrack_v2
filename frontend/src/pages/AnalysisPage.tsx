@@ -4,6 +4,7 @@ import { AnalysisAnimeToast } from '../components/AnalysisAnimeToast'
 import { ConnectionErrorState } from '../components/ConnectionErrorState'
 import { ReleaseDecadeProgress } from '../components/ReleaseDecadeProgress'
 import { VoiceActorRankingSection } from '../components/VoiceActorRankingSection'
+import { ViewingDnaCard } from '../components/ViewingDnaCard'
 import { useAuth } from '../contexts/AuthContext'
 import {
   deleteAnalysisCachePrefix,
@@ -26,6 +27,7 @@ import {
   fetchGenreBubbleStats,
   fetchStudioAnime,
   fetchStudioRanking,
+  fetchViewingDnaStats,
   fetchYearlyScoreStats,
   formatUpdatedAt,
   getGenreLabel,
@@ -40,6 +42,7 @@ import type {
   StudioRankingItem,
   StudioRankingResponse,
   StudioRankingSort,
+  ViewingDnaItem,
   YearlyScoreStats,
 } from '../types/stats'
 import type { AnimeGenre } from '../types/anime'
@@ -857,6 +860,15 @@ export function AnalysisPage() {
     isLoading: true,
     error: null,
   })
+  const [viewingDnaState, setViewingDnaState] = useState<{
+    item: ViewingDnaItem | null
+    isLoading: boolean
+    error: string | null
+  }>({
+    item: null,
+    isLoading: true,
+    error: null,
+  })
 
   useEffect(() => {
     const viewState = getAnalysisViewState(userId)
@@ -1150,6 +1162,59 @@ export function AnalysisPage() {
     }
 
     void loadGenreBubble()
+
+    return () => {
+      isCancelled = true
+      controller.abort()
+    }
+  }, [cacheVersion, isAuthenticated, userId])
+
+  useEffect(() => {
+    if (!isAuthenticated || !userId) {
+      return
+    }
+
+    const controller = new AbortController()
+    let isCancelled = false
+
+    const loadViewingDna = async () => {
+      setViewingDnaState((current) => ({ ...current, isLoading: true, error: null }))
+      const cacheKey = getAnalysisCacheKey(userId, 'viewingDna', 'series-completion-v2')
+
+      try {
+        const cached = await getAnalysisCache<ViewingDnaItem>(cacheKey)
+
+        if (isCancelled || controller.signal.aborted) {
+          return
+        }
+
+        if (cached) {
+          setViewingDnaState({ item: cached, isLoading: false, error: null })
+          return
+        }
+
+        const item = await fetchViewingDnaStats({ signal: controller.signal })
+
+        if (isCancelled || controller.signal.aborted) {
+          return
+        }
+
+        await setAnalysisCache(cacheKey, item)
+        setViewingDnaState({ item, isLoading: false, error: null })
+      } catch (loadError) {
+        if (loadError instanceof DOMException && loadError.name === 'AbortError') {
+          return
+        }
+
+        setViewingDnaState({
+          item: null,
+          isLoading: false,
+          error: getFriendlyErrorMessage(loadError, '감상 DNA 분석을 불러오지 못했어요.'),
+        })
+      }
+    }
+
+    void loadViewingDna()
 
     return () => {
       isCancelled = true
@@ -1613,7 +1678,7 @@ export function AnalysisPage() {
     return (
       <section className="analysis-page">
         <div className="analysis-summary-grid">
-          {Array.from({ length: 4 }).map((_, index) => (
+          {Array.from({ length: 5 }).map((_, index) => (
             <article className="analysis-summary-card skeleton-card" key={`analysis-skeleton-${index}`}>
               <div className="skeleton-line short" />
               <div className="skeleton-line long" />
@@ -1746,6 +1811,10 @@ export function AnalysisPage() {
             <strong>{item.totalCount.toLocaleString()}편</strong>
           </article>
           <article className="analysis-summary-item">
+            <span>본 시리즈</span>
+            <strong>{(item.seriesStats?.watchedSeriesCount ?? 0).toLocaleString()}개</strong>
+          </article>
+          <article className="analysis-summary-item">
             <span>평균 점수</span>
             <strong>{averageScore !== null ? `${averageScore.toFixed(1)} / 10` : '미집계'}</strong>
           </article>
@@ -1855,6 +1924,13 @@ export function AnalysisPage() {
               && (!formatDistributionItem || formatDistributionItem.items.length === 0)
               && renderEmptyMessage('아직 포맷별 분석 데이터가 없어요.')}
           </section>
+
+          <ViewingDnaCard
+            item={viewingDnaState.item}
+            isLoading={viewingDnaState.isLoading}
+            error={viewingDnaState.error}
+            isGuestPreview={isGuestPreview}
+          />
 
           <div className="analysis-segmented-control" role="tablist" aria-label="분석 종류 선택">
             {analysisTabs.map((tab) => (

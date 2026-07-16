@@ -11,6 +11,8 @@ import type {
   VoiceActorAnimeResponse,
   VoiceActorRankingResponse,
   VoiceActorRankingSort,
+  ViewingDnaItem,
+  ViewingDnaResponse,
   YearlyScoreStatsResponse,
 } from '../types/stats'
 
@@ -179,6 +181,29 @@ export async function fetchMyAnimeStats(signal?: AbortSignal) {
 
   const payload = await response.json()
   return normalizeStatsItem(payload)
+}
+
+export async function fetchViewingDnaStats(params: {
+  userId?: string
+  signal?: AbortSignal
+} = {}): Promise<ViewingDnaItem> {
+  const path = params.userId
+    ? `/api/users/${params.userId}/anime-stats/viewing-dna`
+    : '/api/me/anime-stats/viewing-dna'
+  const response = await authFetch(new URL(path, getApiBaseUrl()).toString(), {
+    signal: params.signal,
+  })
+
+  if (response.status === 401) {
+    throw new Error('로그인이 필요해요.')
+  }
+
+  if (!response.ok) {
+    throw new Error(`감상 DNA를 불러오지 못했습니다. (${response.status})`)
+  }
+
+  const data = (await response.json()) as ViewingDnaResponse
+  return data.item
 }
 
 export async function recalculateMyAnimeStats() {

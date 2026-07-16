@@ -7,6 +7,11 @@ import {
   ComposedChart,
   Pie,
   PieChart,
+  PolarAngleAxis,
+  PolarGrid,
+  PolarRadiusAxis,
+  Radar,
+  RadarChart,
   ReferenceLine,
   ResponsiveContainer,
   Scatter,
@@ -18,7 +23,8 @@ import {
 } from 'recharts'
 import { genreOptions } from '../lib/anime'
 import { formatWatchHours, getGenreLabel } from '../lib/stats'
-import type { FormatDistributionItem, GenreBubbleItem, YearlyScoreStatsItem } from '../types/stats'
+import { getViewingDnaAxisDescription, SERIES_COMPLETION_EXCLUSION_NOTE } from '../lib/viewingDna'
+import type { FormatDistributionItem, GenreBubbleItem, ViewingDnaItem, YearlyScoreStatsItem } from '../types/stats'
 
 type PieDatum = {
   key: string
@@ -39,6 +45,21 @@ type ScoreDistributionChartDatum = {
 }
 
 type YearlyScoreChartDatum = YearlyScoreStatsItem
+
+const VIEWING_DNA_RAW_LABELS: Record<string, string> = {
+  startedAnimeCount: '감상 시작 작품',
+  completedAnimeCount: '완주 작품',
+  watchedSeriesCount: '완주를 시작한 시리즈',
+  completedSeriesCount: '필수 작품 완주 시리즈',
+  distinctGenreCount: '감상 장르',
+  maximumGenreCount: '전체 장르',
+  distinctEraCount: '감상 시대 구간',
+  maximumEraCount: '전체 시대 구간',
+  ratedAnimeCount: '평가 작품',
+  totalWatchMinutes: '총 시청 분',
+  totalWatchHours: '총 시청 시간',
+  communityUserCount: '비교 사용자',
+}
 
 type NormalizedGenreBubbleItem = GenreBubbleItem & {
   normalizedCommunityAverage: number
@@ -316,7 +337,7 @@ function AnalysisGenrePieChart({
 
   return (
     <div className="analysis-pie-shell">
-      <ResponsiveContainer width="100%" height={300}>
+      <ResponsiveContainer width="100%" height={230}>
         <PieChart margin={{ top: 12, right: 74, bottom: 12, left: 74 }}>
           <Pie
             data={data}
@@ -494,7 +515,7 @@ function FormatMetricPieChart({
   return (
     <div className="analysis-format-chart-shell">
       <strong>{title}</strong>
-      <ResponsiveContainer width="100%" height={260}>
+      <ResponsiveContainer width="100%" height={210}>
         <PieChart margin={{ top: 12, right: 78, bottom: 12, left: 78 }}>
           <Pie
             data={data}
@@ -562,6 +583,73 @@ function FormatMetricPieChart({
   )
 }
 
+export function ViewingDnaRadarChart({ item }: { item: ViewingDnaItem }) {
+  const chartData = item.axes.map((axis) => ({
+    ...axis,
+    subject: axis.label,
+    value: axis.available ? axis.score : 0,
+    fullMark: item.scale.max,
+  }))
+
+  return (
+    <div
+      className="analysis-viewing-dna-chart"
+      role="img"
+      aria-label={`감상 DNA 육각형 차트. ${chartData.map((axis) => `${axis.subject} ${axis.value}점`).join(', ')}`}
+    >
+      <ResponsiveContainer width="100%" height={360}>
+        <RadarChart data={chartData} cx="50%" cy="50%" outerRadius="72%">
+          <PolarGrid gridType="polygon" stroke="rgba(120, 113, 108, 0.22)" />
+          <PolarAngleAxis
+            dataKey="subject"
+            tick={{ fill: '#57534e', fontSize: 12, fontWeight: 800 }}
+          />
+          <PolarRadiusAxis
+            angle={90}
+            domain={[item.scale.min, item.scale.max]}
+            tickCount={5}
+            tick={{ fill: '#a8a29e', fontSize: 10 }}
+            axisLine={false}
+          />
+          <Radar
+            name="감상 DNA"
+            dataKey="value"
+            stroke="#d97706"
+            strokeWidth={3}
+            fill="#fbbf24"
+            fillOpacity={0.3}
+            dot={{ r: 4, fill: '#f59e0b', stroke: '#fff7ed', strokeWidth: 2 }}
+          />
+          <Tooltip
+            content={({ active, payload }) => {
+              if (!active || !payload || payload.length === 0) {
+                return null
+              }
+
+              const axis = payload[0]?.payload as (typeof chartData)[number]
+
+              return (
+                <div className="analysis-chart-tooltip analysis-viewing-dna-tooltip">
+                  <strong>{axis.subject} · {axis.value.toFixed(1)}점</strong>
+                  <span>{axis.available ? getViewingDnaAxisDescription(axis) : '데이터가 아직 부족해요.'}</span>
+                  {axis.key === 'seriesCompletion' && axis.available && (
+                    <span>{SERIES_COMPLETION_EXCLUSION_NOTE}</span>
+                  )}
+                  {Object.entries(axis.raw).map(([key, value]) => (
+                    <span key={key}>
+                      {VIEWING_DNA_RAW_LABELS[key] ?? key} {Number(value).toLocaleString()}
+                    </span>
+                  ))}
+                </div>
+              )
+            }}
+          />
+        </RadarChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
 export function ReleaseYearBarChart({
   data,
   selectedYear,
@@ -573,7 +661,7 @@ export function ReleaseYearBarChart({
 }) {
   return (
     <div className="analysis-year-chart-shell">
-      <ResponsiveContainer width="100%" height={320}>
+      <ResponsiveContainer width="100%" height={240}>
         <BarChart data={data} margin={{ top: 12, right: 12, left: -18, bottom: 4 }}>
           <CartesianGrid stroke="rgba(120, 113, 108, 0.12)" vertical={false} />
           <XAxis
@@ -656,7 +744,7 @@ export function ScoreDistributionBarChart({
 }) {
   return (
     <div className="analysis-year-chart-shell analysis-score-chart-shell">
-      <ResponsiveContainer width="100%" height={320}>
+      <ResponsiveContainer width="100%" height={240}>
         <BarChart data={data} margin={{ top: 12, right: 12, left: -18, bottom: 4 }}>
           <CartesianGrid stroke="rgba(120, 113, 108, 0.12)" vertical={false} />
           <XAxis
@@ -739,7 +827,7 @@ export function YearlyScoreLineChart({
 }) {
   return (
     <div className="analysis-year-score-chart-shell">
-      <ResponsiveContainer width="100%" height={340}>
+      <ResponsiveContainer width="100%" height={250}>
         <ComposedChart data={data} margin={{ top: 18, right: 18, left: -8, bottom: 8 }}>
           <CartesianGrid stroke="rgba(120, 113, 108, 0.12)" vertical={false} />
           <XAxis

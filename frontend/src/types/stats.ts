@@ -44,6 +44,45 @@ export type AnimeStatsResponse = {
   item: AnimeStatsItem
 }
 
+export type ViewingDnaAxisKey =
+  | 'completion'
+  | 'seriesCompletion'
+  | 'genreExploration'
+  | 'eraExploration'
+  | 'ratingActivity'
+  | 'watchImmersion'
+
+export type ViewingDnaAxis = {
+  key: ViewingDnaAxisKey
+  label: string
+  score: number
+  available: boolean
+  description: string
+  raw: Record<string, number>
+}
+
+export type ViewingDnaItem = {
+  userId: number
+  methodologyVersion: number
+  confidence: 'none' | 'low' | 'medium' | 'high'
+  scale: {
+    min: 0
+    max: 100
+  }
+  axes: ViewingDnaAxis[]
+  strongestAxis: ViewingDnaAxisKey | null
+  raw: {
+    totalAnimeCount: number
+    startedAnimeCount: number
+  }
+  calculatedAt: string
+}
+
+export type ViewingDnaResponse = {
+  success: boolean
+  item: ViewingDnaItem
+}
+
 export type GenreBubbleTopAnime = {
   animeId?: number
   id?: number

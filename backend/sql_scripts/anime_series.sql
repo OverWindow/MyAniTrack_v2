@@ -29,6 +29,10 @@ CREATE TABLE IF NOT EXISTS anime_series (
 CREATE TABLE IF NOT EXISTS anime_series_members (
   series_id BIGINT NOT NULL,
   anime_id BIGINT NOT NULL,
+  is_completion_required BOOLEAN NOT NULL DEFAULT TRUE
+    COMMENT '시리즈 완주 계산에 포함되는 작품인지 여부',
+  completion_exclusion_reason VARCHAR(30) NULL
+    COMMENT 'MUSIC, RECAP, COMPILATION, NOT_YET_RELEASED, CANCELLED',
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
   PRIMARY KEY (series_id, anime_id),
@@ -41,6 +45,40 @@ CREATE TABLE IF NOT EXISTS anime_series_members (
     FOREIGN KEY (anime_id) REFERENCES anime(id)
     ON DELETE CASCADE
 );
+
+-- 기존 테이블에도 완주 판정 컬럼을 추가합니다. MySQL 버전에 따라
+-- ADD COLUMN IF NOT EXISTS를 지원하지 않을 수 있어 information_schema를 사용합니다.
+SET @has_completion_required = (
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'anime_series_members'
+    AND COLUMN_NAME = 'is_completion_required'
+);
+SET @add_completion_required_sql = IF(
+  @has_completion_required = 0,
+  'ALTER TABLE anime_series_members ADD COLUMN is_completion_required BOOLEAN NOT NULL DEFAULT TRUE COMMENT ''시리즈 완주 계산에 포함되는 작품인지 여부'' AFTER anime_id',
+  'SELECT 1'
+);
+PREPARE add_completion_required_stmt FROM @add_completion_required_sql;
+EXECUTE add_completion_required_stmt;
+DEALLOCATE PREPARE add_completion_required_stmt;
+
+SET @has_completion_exclusion_reason = (
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'anime_series_members'
+    AND COLUMN_NAME = 'completion_exclusion_reason'
+);
+SET @add_completion_exclusion_reason_sql = IF(
+  @has_completion_exclusion_reason = 0,
+  'ALTER TABLE anime_series_members ADD COLUMN completion_exclusion_reason VARCHAR(30) NULL COMMENT ''MUSIC, RECAP, COMPILATION, NOT_YET_RELEASED, CANCELLED'' AFTER is_completion_required',
+  'SELECT 1'
+);
+PREPARE add_completion_exclusion_reason_stmt FROM @add_completion_exclusion_reason_sql;
+EXECUTE add_completion_exclusion_reason_stmt;
+DEALLOCATE PREPARE add_completion_exclusion_reason_stmt;
 
 DROP PROCEDURE IF EXISTS rebuild_anime_series;
 
@@ -222,12 +260,51 @@ BEGIN
     ON series_row.id = member_row.series_id
   WHERE series_row.scope = p_scope;
 
-  INSERT INTO anime_series_members (series_id, anime_id)
-  SELECT series_row.id, node.anime_id
+  INSERT INTO anime_series_members (
+    series_id,
+    anime_id,
+    is_completion_required,
+    completion_exclusion_reason
+  )
+  SELECT
+    series_row.id,
+    node.anime_id,
+    CASE
+      WHEN anime_row.format = 'MUSIC' THEN FALSE
+      WHEN anime_row.status = 'NOT_YET_RELEASED' THEN FALSE
+      WHEN anime_row.status = 'CANCELLED' THEN FALSE
+      WHEN EXISTS (
+        SELECT 1
+        FROM anime_relations relation_row
+        WHERE relation_row.target_anime_id = anime_row.id
+          AND relation_row.relation_type IN ('SUMMARY', 'COMPILATION')
+      ) THEN FALSE
+      ELSE TRUE
+    END,
+    CASE
+      WHEN anime_row.format = 'MUSIC' THEN 'MUSIC'
+      WHEN anime_row.status = 'NOT_YET_RELEASED' THEN 'NOT_YET_RELEASED'
+      WHEN anime_row.status = 'CANCELLED' THEN 'CANCELLED'
+      WHEN EXISTS (
+        SELECT 1
+        FROM anime_relations relation_row
+        WHERE relation_row.target_anime_id = anime_row.id
+          AND relation_row.relation_type = 'SUMMARY'
+      ) THEN 'RECAP'
+      WHEN EXISTS (
+        SELECT 1
+        FROM anime_relations relation_row
+        WHERE relation_row.target_anime_id = anime_row.id
+          AND relation_row.relation_type = 'COMPILATION'
+      ) THEN 'COMPILATION'
+      ELSE NULL
+    END
   FROM tmp_anime_series_nodes node
   INNER JOIN anime_series series_row
     ON series_row.scope = p_scope
-    AND series_row.group_key_anime_id = node.group_key_anime_id;
+    AND series_row.group_key_anime_id = node.group_key_anime_id
+  INNER JOIN anime anime_row
+    ON anime_row.id = node.anime_id;
 
   -- 분리된 그룹에서 기존 대표 작품이 더 이상 멤버가 아니면 그룹 키 작품으로 복구합니다.
   UPDATE anime_series series_row

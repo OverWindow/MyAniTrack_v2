@@ -9,6 +9,7 @@ import {
   GenreBubbleWeighting,
   recalculateUserAnimeStats,
 } from '../services/recommendation.service';
+import { getUserViewingDna } from '../services/user-viewing-dna.service';
 
 function parseTitleLanguage(value: unknown): 'ko' | 'en' | 'ja' {
   if (value === 'ko' || value === 'en' || value === 'ja') {
@@ -162,6 +163,41 @@ export async function getUserStats(req: Request, res: Response) {
       success: true,
       user,
       item: stats,
+    });
+  } catch (error) {
+    return sendError(res, error);
+  }
+}
+
+export async function getMyViewingDna(req: Request, res: Response) {
+  try {
+    const authUser = ensureAuth(req, res);
+
+    if (!authUser) {
+      return;
+    }
+
+    const item = await getUserViewingDna(authUser.userId);
+
+    return res.json({
+      success: true,
+      item,
+    });
+  } catch (error) {
+    return sendError(res, error);
+  }
+}
+
+export async function getUserViewingDnaController(req: Request, res: Response) {
+  try {
+    const userId = parseUserId(req.params.userId);
+    const user = await getPublicUserProfile(userId);
+    const item = await getUserViewingDna(userId);
+
+    return res.json({
+      success: true,
+      user,
+      item,
     });
   } catch (error) {
     return sendError(res, error);

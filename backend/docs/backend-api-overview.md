@@ -1226,8 +1226,8 @@ Query:
 - `status`: `all | started | watched | completed`, 기본값 `all`
   - `all`: 컬렉션 작품이 하나 이상 있는 시리즈
   - `started`: `planned`가 아닌 작품이 하나 이상 있는 시리즈
-  - `watched`: `completed` 작품이 하나 이상 있는 시리즈
-  - `completed`: 시리즈 구성 작품이 모두 `completed`인 시리즈
+  - `watched`: 완주 필수 작품 중 `completed` 작품이 하나 이상 있는 시리즈
+  - `completed`: 완주 필수 작품이 하나 이상이고, 해당 작품이 모두 `completed`인 시리즈
 - `query`: 선택 검색어. 관리자 시리즈명과 구성 작품의 한국어·영어·일본어·로마자 제목을 검색
 - `titleLanguage`: `ko | en | ja`, 기본값 `ko`
 - `limit`: `1~50`, 기본값 `20`
@@ -1249,15 +1249,19 @@ Response example:
       "seriesId": 12,
       "scope": "mainline",
       "title": "장송의 프리렌",
-      "memberCount": 2,
+      "memberCount": 3,
+      "requiredMemberCount": 2,
       "collectedMemberCount": 1,
       "startedMemberCount": 1,
       "completedMemberCount": 1,
+      "completedRequiredMemberCount": 1,
       "completionRate": 50,
       "completed": false,
       "coverImageLarge": "https://...",
       "items": [
         {
+          "completionRequired": true,
+          "completionExclusionReason": null,
           "anime": {
             "id": 123,
             "title": "장송의 프리렌",
@@ -1271,9 +1275,22 @@ Response example:
           }
         },
         {
+          "completionRequired": true,
+          "completionExclusionReason": null,
           "anime": {
             "id": 456,
             "title": "장송의 프리렌 2기",
+            "coverImageLarge": "https://..."
+          },
+          "userList": null
+        },
+        {
+          "completionRequired": false,
+          "completionExclusionReason": "MUSIC",
+          "anime": {
+            "id": 789,
+            "title": "장송의 프리렌 MV",
+            "format": "MUSIC",
             "coverImageLarge": "https://..."
           },
           "userList": null
@@ -1292,6 +1309,8 @@ Response example:
   }
 }
 ```
+
+시리즈 그룹의 구성 자체는 유지하지만 `MUSIC`, 총집편·컴필레이션, 미공개 작품, 취소 작품은 완주 계산에서 제외합니다. `memberCount`와 `completedMemberCount`는 전체 구성 작품 기준의 기존 필드이고, 완주 진행률과 완료 여부는 `requiredMemberCount`와 `completedRequiredMemberCount`를 기준으로 계산됩니다. 프런트는 `completionRate`와 `completed`를 그대로 사용하고 별도로 재계산하지 않는 것을 권장합니다.
 
 ### `GET /me/anime-list/smart-rating/candidates`
 스마트 평점 모달에서 비교할 기존 평가 작품 후보를 가져옵니다.
@@ -2172,6 +2191,121 @@ Response example:
 ```
 
 `seriesStats`는 항상 `mainline` 기준으로 실시간 집계합니다. 시리즈에 속하지 않은 단독 작품은 제외됩니다. `/users/:userId/anime-stats`의 `item`에도 동일한 구조가 포함됩니다.
+
+### `GET /me/anime-stats/viewing-dna`
+
+내 컬렉션과 시리즈 통계를 기반으로 0~100 범위의 감상 DNA 6개 축을 반환합니다. 로그인 필요입니다.
+
+공개 사용자용 API도 동일한 `item` 구조를 반환합니다.
+
+```http
+GET /api/users/:userId/anime-stats/viewing-dna
+```
+
+Response example:
+
+```json
+{
+  "success": true,
+  "item": {
+    "userId": 1,
+    "methodologyVersion": 1,
+    "confidence": "high",
+    "scale": {
+      "min": 0,
+      "max": 100
+    },
+    "axes": [
+      {
+        "key": "completion",
+        "label": "작품 완주력",
+        "score": 78.43,
+        "available": true,
+        "description": "계획 중을 제외하고 실제 감상을 시작한 작품 중 완주한 비율입니다.",
+        "raw": {
+          "startedAnimeCount": 51,
+          "completedAnimeCount": 40
+        }
+      },
+      {
+        "key": "seriesCompletion",
+        "label": "시리즈 완주력",
+        "score": 44.44,
+        "available": true,
+        "raw": {
+          "watchedSeriesCount": 9,
+          "completedSeriesCount": 4
+        }
+      },
+      {
+        "key": "genreExploration",
+        "label": "장르 탐험도",
+        "score": 68.2,
+        "available": true,
+        "raw": {
+          "distinctGenreCount": 12,
+          "maximumGenreCount": 19
+        }
+      },
+      {
+        "key": "eraExploration",
+        "label": "시대 탐험도",
+        "score": 53.1,
+        "available": true,
+        "raw": {
+          "distinctEraCount": 5,
+          "maximumEraCount": 8
+        }
+      },
+      {
+        "key": "ratingActivity",
+        "label": "평가 적극성",
+        "score": 82.35,
+        "available": true,
+        "raw": {
+          "startedAnimeCount": 51,
+          "ratedAnimeCount": 42
+        }
+      },
+      {
+        "key": "watchImmersion",
+        "label": "시청 몰입도",
+        "score": 74.5,
+        "available": true,
+        "raw": {
+          "totalWatchMinutes": 18420,
+          "totalWatchHours": 307,
+          "communityUserCount": 1200
+        }
+      }
+    ],
+    "strongestAxis": "ratingActivity",
+    "raw": {
+      "totalAnimeCount": 60,
+      "startedAnimeCount": 51
+    },
+    "calculatedAt": "2026-07-16T15:00:00.000Z"
+  }
+}
+```
+
+축 순서는 프런트 레이더 차트에서 그대로 사용할 수 있도록 고정되어 있습니다.
+
+1. `completion`: `completed / planned 제외 작품`
+2. `seriesCompletion`: `완주 시리즈 / 한 작품 이상 완주한 mainline 시리즈`
+3. `genreExploration`: 19개 장르 분포의 정규화 Shannon entropy
+4. `eraExploration`: 1960년 이전부터 2020년대까지 8개 시대 구간의 정규화 Shannon entropy
+5. `ratingActivity`: `평점 입력 작품 / planned 제외 작품`
+6. `watchImmersion`: `totalWatchMinutes`의 전체 통계 사용자 백분위
+
+프런트 처리 기준:
+
+- `axes` 배열 순서를 유지합니다.
+- 차트 최솟값과 최댓값은 `scale`을 사용합니다.
+- `available=false`인 축은 0으로 그리되 툴팁에 데이터 부족 상태를 표시합니다.
+- `confidence`는 감상 시작 작품 수 기준으로 `none`, `low`, `medium`, `high`입니다.
+- 계산식이 변경될 때는 `methodologyVersion`이 증가합니다.
+- 각 축의 상세 설명과 근거 수치는 `description`, `raw`를 사용합니다.
 
 ### `POST /me/anime-stats/recalculate`
 내 애니 통계 강제 재계산입니다.
