@@ -87,8 +87,16 @@ export type UserAnimeListEntryResponse = {
 
 export type AnimeSeriesScope = 'mainline' | 'franchise'
 export type UserSeriesCollectionStatus = 'all' | 'started' | 'watched' | 'completed'
+export type SeriesCompletionExclusionReason =
+  | 'MUSIC'
+  | 'RECAP'
+  | 'COMPILATION'
+  | 'NOT_YET_RELEASED'
+  | 'CANCELLED'
 
 export type UserSeriesCollectionMember = {
+  completionRequired: boolean
+  completionExclusionReason: SeriesCompletionExclusionReason | null
   anime: {
     id: number
     anilistId: number
@@ -123,9 +131,11 @@ export type UserSeriesCollectionItem = {
   customTitle: string | null
   canonicalAnimeId: number | null
   memberCount: number
+  requiredMemberCount: number
   collectedMemberCount: number
   startedMemberCount: number
   completedMemberCount: number
+  completedRequiredMemberCount: number
   completionRate: number
   completed: boolean
   lastActivityAt: string

@@ -16,7 +16,7 @@ import type {
 
 const COLLECTION_STORAGE_KEY_PREFIX = 'myanitrack.collection.cache'
 const COLLECTION_PAGE_STORAGE_KEY_PREFIX = 'myanitrack.collection.page-cache:v3'
-const SERIES_COLLECTION_STORAGE_KEY_PREFIX = 'myanitrack.series-collection.page-cache:v1'
+const SERIES_COLLECTION_STORAGE_KEY_PREFIX = 'myanitrack.series-collection.page-cache:v2'
 export const COLLECTION_CACHE_UPDATED_EVENT = 'myanitrack:collection-cache-updated'
 
 function getApiBaseUrl() {

@@ -823,7 +823,7 @@ export function CollectionPage() {
                       <span style={{ width: `${Math.min(100, Math.max(0, series.completionRate))}%` }} />
                     </div>
                     <p>
-                      {series.completedMemberCount}/{series.memberCount} 작품 완주
+                      {series.completedRequiredMemberCount}/{series.requiredMemberCount} 필수 작품 완주
                       {' · '}
                       내 컬렉션 {series.collectedMemberCount}개
                     </p>
