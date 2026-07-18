@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { Link, Route, Routes, useLocation } from 'react-router-dom'
 import type { Location } from 'react-router-dom'
 import { handleProfileImageError, getProfileImageSrc } from './lib/avatar'
@@ -28,6 +28,11 @@ import { VerifyEmailConfirmPage } from './pages/VerifyEmailConfirmPage'
 import { VerifyEmailPendingPage } from './pages/VerifyEmailPendingPage'
 import { VoiceActorDetailPage } from './pages/VoiceActorDetailPage'
 import './styles/App.css'
+
+const RecapPage = lazy(async () => {
+  const module = await import('./pages/RecapPage')
+  return { default: module.RecapPage }
+})
 
 function App() {
   const { isAuthenticated } = useAuth()
@@ -108,6 +113,14 @@ function App() {
           <Route path="/anime/:id" element={<AnimeDetailPage />} />
           <Route path="/voice-actors/:voiceActorId" element={<VoiceActorDetailPage />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route
+            path="/recap"
+            element={(
+              <Suspense fallback={<div className="feedback-card">리캡 화면을 준비하고 있어요...</div>}>
+                <RecapPage />
+              </Suspense>
+            )}
+          />
           <Route path="/profile/edit" element={<ProfileEditPage />} />
           <Route path="/collection" element={<CollectionPage />} />
           <Route path="/friends" element={<FriendsPage />} />

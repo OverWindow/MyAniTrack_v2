@@ -624,6 +624,7 @@ export function CollectionPage() {
         state={perfectScoreState}
         location={location}
         portalRootId="collection-carousel-root"
+        recapHref={isAuthenticated ? '/recap' : undefined}
       />
 
       <section className={isGuestPreview ? 'collection-page is-sample-preview' : 'collection-page'}>

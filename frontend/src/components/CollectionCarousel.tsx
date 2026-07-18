@@ -19,6 +19,7 @@ type CollectionCarouselProps = {
   ariaLabel?: string
   location?: Location
   portalRootId?: string
+  recapHref?: string
 }
 
 function getDisplayTitle(item: UserAnimeListItem) {
@@ -79,6 +80,7 @@ function CollectionCarouselContent({
   title = '최애 애니',
   ariaLabel = '최애 애니',
   location,
+  recapHref,
 }: Omit<CollectionCarouselProps, 'portalRootId'>) {
   const carouselRef = useRef<HTMLDivElement | null>(null)
   const scrollLeftRef = useRef(0)
@@ -288,6 +290,7 @@ function CollectionCarouselContent({
           <div>
             <h2>{title}</h2>
           </div>
+          {recapHref && <Link className="perfect-score-recap-link" to={recapHref}>리캡 만들기</Link>}
         </div>
         <div className="perfect-score-carousel perfect-score-carousel-empty">
           <div className="perfect-score-empty-message">
@@ -305,8 +308,11 @@ function CollectionCarouselContent({
         <div>
           <h2>{title}</h2>
         </div>
-        {state.items.length > 0 && (
-          <span>{state.items.length.toLocaleString()}편</span>
+        {(state.items.length > 0 || recapHref) && (
+          <div className="perfect-score-heading-actions">
+            {state.items.length > 0 && <span>{state.items.length.toLocaleString()}편</span>}
+            {recapHref && <Link className="perfect-score-recap-link" to={recapHref}>리캡 만들기</Link>}
+          </div>
         )}
       </div>
 

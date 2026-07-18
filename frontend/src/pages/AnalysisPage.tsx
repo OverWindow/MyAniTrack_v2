@@ -1774,8 +1774,9 @@ export function AnalysisPage() {
             </>
           ) : (
             <>
+              <Link className="primary-button" to="/recap">내 취향 리캡 만들기</Link>
               <button
-                className="primary-button"
+                className="secondary-button"
                 type="button"
                 onClick={() => {
                   void handleRecalculate()

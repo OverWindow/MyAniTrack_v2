@@ -83,6 +83,34 @@
   font-weight: 800;
 }
 
+.perfect-score-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  pointer-events: auto;
+}
+
+.perfect-score-heading-actions > span {
+  color: var(--text-secondary);
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.perfect-score-recap-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 13px;
+  border-radius: 999px;
+  background: var(--point-color);
+  color: var(--text-inverse);
+  font-size: 0.76rem;
+  font-weight: 850;
+  text-decoration: none;
+  box-shadow: var(--shadow-highlight);
+  pointer-events: auto;
+}
+
 .perfect-score-carousel {
   --perfect-score-card-width: 190px;
   position: relative;
