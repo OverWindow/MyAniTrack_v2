@@ -28,6 +28,7 @@ import { VerifyEmailConfirmPage } from './pages/VerifyEmailConfirmPage'
 import { VerifyEmailPendingPage } from './pages/VerifyEmailPendingPage'
 import { VoiceActorDetailPage } from './pages/VoiceActorDetailPage'
 import './styles/App.css'
+import './styles/ClayTheme.css'
 
 function App() {
   const { isAuthenticated } = useAuth()
