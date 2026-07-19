@@ -5,7 +5,6 @@
 .packages
 build/
 coverage/
-pubspec.lock
 
 # Platform build output
 android/.gradle/
@@ -27,3 +26,4 @@ Thumbs.db
 # Local env
 .env
 .env.*
+!.env.example

@@ -1,0 +1,604 @@
+typedef JsonMap = Map<String, dynamic>;
+
+JsonMap asJsonMap(Object? value) {
+  if (value is Map<String, dynamic>) return value;
+  if (value is Map) return value.map((key, item) => MapEntry('$key', item));
+  return const <String, dynamic>{};
+}
+
+List<JsonMap> asJsonList(Object? value) {
+  if (value is! List) return const [];
+  return value.map(asJsonMap).where((item) => item.isNotEmpty).toList();
+}
+
+int? readInt(Object? value) {
+  if (value is num) return value.toInt();
+  return int.tryParse('$value');
+}
+
+double? readDouble(Object? value) {
+  if (value is num) return value.toDouble();
+  return double.tryParse('$value');
+}
+
+bool readBool(Object? value, {bool fallback = false}) {
+  if (value is bool) return value;
+  return fallback;
+}
+
+String? readString(Object? value) {
+  final text = value?.toString().trim();
+  return text == null || text.isEmpty || text == 'null' ? null : text;
+}
+
+class AuthUser {
+  const AuthUser({
+    required this.id,
+    required this.email,
+    required this.username,
+    required this.role,
+    required this.emailVerified,
+    this.profileImageUrl,
+    this.bio,
+  });
+
+  final int id;
+  final String email;
+  final String username;
+  final String role;
+  final bool emailVerified;
+  final String? profileImageUrl;
+  final String? bio;
+
+  String get displayName {
+    if (username.trim().isNotEmpty) return username.trim();
+    return email.split('@').first;
+  }
+
+  factory AuthUser.fromJson(JsonMap json) {
+    final data = asJsonMap(json['data']);
+    final root = data.isEmpty ? json : data;
+    final nested = asJsonMap(root['user']);
+    final user = nested.isEmpty ? root : nested;
+    return AuthUser(
+      id: readInt(user['id']) ?? 0,
+      email: readString(user['email']) ?? '',
+      username: readString(user['username']) ?? '',
+      role: readString(user['role']) ?? 'USER',
+      emailVerified: readBool(user['emailVerified']),
+      profileImageUrl: readString(user['profileImageUrl']),
+      bio: readString(user['bio']),
+    );
+  }
+}
+
+class AgreementStatus {
+  const AgreementStatus({
+    required this.termsAgreed,
+    required this.privacyAgreed,
+    this.termsVersion,
+    this.privacyVersion,
+  });
+
+  final bool termsAgreed;
+  final bool privacyAgreed;
+  final String? termsVersion;
+  final String? privacyVersion;
+
+  bool get hasRequiredAgreements => termsAgreed && privacyAgreed;
+
+  factory AgreementStatus.fromJson(JsonMap json) {
+    final data = asJsonMap(json['data']);
+    final item = asJsonMap(json['item']);
+    final root = data.isNotEmpty ? data : (item.isNotEmpty ? item : json);
+    return AgreementStatus(
+      termsAgreed: readBool(root['termsAgreed']),
+      privacyAgreed: readBool(root['privacyAgreed']),
+      termsVersion: readString(root['termsVersion']),
+      privacyVersion: readString(root['privacyVersion']),
+    );
+  }
+}
+
+class Anime {
+  const Anime({
+    required this.id,
+    required this.title,
+    this.anilistId,
+    this.coverImageUrl,
+    this.bannerImageUrl,
+    this.episodes,
+    this.duration,
+    this.seasonYear,
+    this.format,
+    this.averageScore,
+    this.description,
+    this.genres = const [],
+  });
+
+  final int id;
+  final int? anilistId;
+  final String title;
+  final String? coverImageUrl;
+  final String? bannerImageUrl;
+  final int? episodes;
+  final int? duration;
+  final int? seasonYear;
+  final String? format;
+  final double? averageScore;
+  final String? description;
+  final List<String> genres;
+
+  factory Anime.fromJson(JsonMap json) {
+    final anime = asJsonMap(json['anime']);
+    final root = anime.isEmpty ? json : anime;
+    final titles = asJsonMap(root['titles']);
+    final rawTitle = root['title'];
+    String? title;
+    if (rawTitle is String) {
+      title = readString(rawTitle);
+    } else {
+      final titleMap = asJsonMap(rawTitle);
+      title =
+          readString(titleMap['ko']) ??
+          readString(titleMap['korean']) ??
+          readString(titleMap['userPreferred']) ??
+          readString(titleMap['romaji']) ??
+          readString(titleMap['english']) ??
+          readString(titleMap['native']);
+    }
+    title ??=
+        readString(titles['korean']) ??
+        readString(titles['userPreferred']) ??
+        readString(titles['romaji']) ??
+        readString(titles['english']) ??
+        readString(titles['native']) ??
+        '제목 정보 없음';
+
+    final cover = asJsonMap(root['coverImage']);
+    final image = asJsonMap(root['image']);
+    final genres = root['genres'] is List
+        ? (root['genres'] as List).map(readString).whereType<String>().toList()
+        : const <String>[];
+
+    return Anime(
+      id: readInt(root['id']) ?? 0,
+      anilistId: readInt(root['anilistId']),
+      title: title,
+      coverImageUrl:
+          readString(root['coverImageExtraLarge']) ??
+          readString(root['coverImageLarge']) ??
+          readString(cover['extraLarge']) ??
+          readString(cover['large']) ??
+          readString(image['large']),
+      bannerImageUrl: readString(root['bannerImage']),
+      episodes: readInt(root['episodes']),
+      duration: readInt(root['duration']),
+      seasonYear: readInt(root['seasonYear']),
+      format: readString(root['format']),
+      averageScore: readDouble(root['averageScore']),
+      description: readString(root['description']),
+      genres: genres,
+    );
+  }
+}
+
+enum CollectionStatus {
+  planned('planned', '볼 예정'),
+  watching('watching', '보는 중'),
+  completed('completed', '완료'),
+  paused('paused', '잠시 멈춤'),
+  dropped('dropped', '중단');
+
+  const CollectionStatus(this.apiValue, this.label);
+  final String apiValue;
+  final String label;
+
+  static CollectionStatus fromApi(String? value) {
+    return values.firstWhere(
+      (status) => status.apiValue == value,
+      orElse: () => planned,
+    );
+  }
+}
+
+class CollectionEntry {
+  const CollectionEntry({
+    required this.entryId,
+    required this.userId,
+    required this.animeId,
+    required this.status,
+    required this.anime,
+    this.score,
+    this.progress,
+    this.startedAt,
+    this.completedAt,
+    this.notes,
+    this.createdAt,
+    this.updatedAt,
+  });
+
+  final int entryId;
+  final int userId;
+  final int animeId;
+  final CollectionStatus status;
+  final double? score;
+  final int? progress;
+  final String? startedAt;
+  final String? completedAt;
+  final String? notes;
+  final String? createdAt;
+  final String? updatedAt;
+  final Anime anime;
+
+  factory CollectionEntry.fromJson(JsonMap json) {
+    final anime = Anime.fromJson(json);
+    return CollectionEntry(
+      entryId: readInt(json['id']) ?? 0,
+      userId: readInt(json['userId']) ?? 0,
+      animeId: readInt(json['animeId']) ?? anime.id,
+      status: CollectionStatus.fromApi(readString(json['status'])),
+      score: readDouble(json['score']),
+      progress: readInt(json['progress']),
+      startedAt: readString(json['startedAt']),
+      completedAt: readString(json['completedAt']),
+      notes: readString(json['notes']),
+      createdAt: readString(json['createdAt']),
+      updatedAt: readString(json['updatedAt']),
+      anime: anime,
+    );
+  }
+}
+
+class MyCollectionState {
+  const MyCollectionState({
+    required this.exists,
+    this.status,
+    this.score,
+    this.progress,
+  });
+
+  final bool exists;
+  final CollectionStatus? status;
+  final double? score;
+  final int? progress;
+
+  factory MyCollectionState.fromJson(JsonMap json) {
+    return MyCollectionState(
+      exists: readBool(json['exists']),
+      status: readString(json['status']) == null
+          ? null
+          : CollectionStatus.fromApi(readString(json['status'])),
+      score: readDouble(json['score']),
+      progress: readInt(json['progress']),
+    );
+  }
+}
+
+class AnimeSearchResult {
+  const AnimeSearchResult({required this.anime, this.myCollection});
+  final Anime anime;
+  final MyCollectionState? myCollection;
+
+  factory AnimeSearchResult.fromJson(JsonMap json) {
+    final myCollection = asJsonMap(json['myCollection']);
+    return AnimeSearchResult(
+      anime: Anime.fromJson(json),
+      myCollection: myCollection.isEmpty
+          ? null
+          : MyCollectionState.fromJson(myCollection),
+    );
+  }
+}
+
+class CollectionDraft {
+  const CollectionDraft({
+    required this.status,
+    required this.progress,
+    this.score,
+    this.startedAt,
+    this.completedAt,
+    this.notes,
+  });
+
+  final CollectionStatus status;
+  final double? score;
+  final int progress;
+  final String? startedAt;
+  final String? completedAt;
+  final String? notes;
+
+  JsonMap toCreateJson(int animeId) => <String, dynamic>{
+    'animeId': animeId,
+    'status': status.apiValue,
+    'score': score,
+    'progress': progress,
+    'startedAt': startedAt,
+    'completedAt': completedAt,
+    'notes': notes,
+  };
+
+  JsonMap toPatchJson() => <String, dynamic>{
+    'status': status.apiValue,
+    'score': score,
+    'progress': progress,
+    'startedAt': startedAt,
+    'completedAt': completedAt,
+    'notes': notes,
+  };
+}
+
+class PageInfo {
+  const PageInfo({required this.hasNext, this.nextCursor, this.limit = 20});
+  final bool hasNext;
+  final String? nextCursor;
+  final int limit;
+
+  factory PageInfo.fromJson(JsonMap json) => PageInfo(
+    hasNext: readBool(json['hasNext']),
+    nextCursor: readString(json['nextCursor']),
+    limit: readInt(json['limit']) ?? 20,
+  );
+}
+
+class CursorPage<T> {
+  const CursorPage({required this.items, required this.pageInfo});
+  final List<T> items;
+  final PageInfo pageInfo;
+}
+
+class AnimeCastMember {
+  const AnimeCastMember({
+    required this.id,
+    required this.characterName,
+    required this.voiceActorName,
+    this.characterImageUrl,
+    this.voiceActorImageUrl,
+  });
+  final int id;
+  final String characterName;
+  final String voiceActorName;
+  final String? characterImageUrl;
+  final String? voiceActorImageUrl;
+
+  factory AnimeCastMember.fromJson(JsonMap json) {
+    final character = asJsonMap(json['character']);
+    final actor = asJsonMap(json['voiceActor']);
+    final person = asJsonMap(json['person']);
+    final actorRoot = actor.isEmpty ? person : actor;
+    String nameFrom(JsonMap root) {
+      final name = asJsonMap(root['name']);
+      return readString(name['userPreferred']) ??
+          readString(name['full']) ??
+          readString(name['native']) ??
+          readString(root['name']) ??
+          '이름 정보 없음';
+    }
+
+    final characterImage = asJsonMap(character['image']);
+    final actorImage = asJsonMap(actorRoot['image']);
+    return AnimeCastMember(
+      id: readInt(json['id']) ?? readInt(character['id']) ?? 0,
+      characterName: nameFrom(character),
+      voiceActorName: nameFrom(actorRoot),
+      characterImageUrl:
+          readString(characterImage['large']) ??
+          readString(characterImage['medium']),
+      voiceActorImageUrl:
+          readString(actorImage['large']) ?? readString(actorImage['medium']),
+    );
+  }
+}
+
+class StatsOverview {
+  const StatsOverview({
+    required this.totalCount,
+    required this.completedCount,
+    required this.watchingCount,
+    required this.droppedCount,
+    required this.totalWatchedEpisodes,
+    required this.totalWatchMinutes,
+    required this.genreDistribution,
+    required this.genreWatchMinutes,
+    required this.genreAverageScore,
+    required this.releaseYearDistribution,
+    required this.scoreDistribution,
+    this.averageScore,
+    this.favoriteGenre,
+    this.averageReleaseYear,
+  });
+
+  final int totalCount;
+  final int completedCount;
+  final int watchingCount;
+  final int droppedCount;
+  final int totalWatchedEpisodes;
+  final int totalWatchMinutes;
+  final double? averageScore;
+  final String? favoriteGenre;
+  final double? averageReleaseYear;
+  final Map<String, double> genreDistribution;
+  final Map<String, double> genreWatchMinutes;
+  final Map<String, double> genreAverageScore;
+  final Map<String, double> releaseYearDistribution;
+  final Map<String, double> scoreDistribution;
+
+  factory StatsOverview.fromJson(JsonMap json) {
+    final item = asJsonMap(json['item']);
+    final root = item.isEmpty ? json : item;
+    Map<String, double> numberMap(Object? value) => asJsonMap(
+      value,
+    ).map((key, item) => MapEntry(key, readDouble(item) ?? 0));
+    return StatsOverview(
+      totalCount: readInt(root['totalCount']) ?? 0,
+      completedCount: readInt(root['completedCount']) ?? 0,
+      watchingCount: readInt(root['watchingCount']) ?? 0,
+      droppedCount: readInt(root['droppedCount']) ?? 0,
+      totalWatchedEpisodes: readInt(root['totalWatchedEpisodes']) ?? 0,
+      totalWatchMinutes: readInt(root['totalWatchMinutes']) ?? 0,
+      averageScore: readDouble(root['avgScore']),
+      favoriteGenre: readString(root['favoriteGenre']),
+      averageReleaseYear: readDouble(root['avgReleaseYear']),
+      genreDistribution: numberMap(root['genreDistribution']),
+      genreWatchMinutes: numberMap(root['genreWatchMinutes']),
+      genreAverageScore: numberMap(root['genreAvgScore']),
+      releaseYearDistribution: numberMap(root['releaseYearDistribution']),
+      scoreDistribution: numberMap(root['scoreDistribution']),
+    );
+  }
+}
+
+class FormatStat {
+  const FormatStat({
+    required this.format,
+    required this.label,
+    required this.animeCount,
+    required this.percentage,
+    this.averageScore,
+    this.watchMinutes = 0,
+  });
+  final String format;
+  final String label;
+  final int animeCount;
+  final double percentage;
+  final double? averageScore;
+  final int watchMinutes;
+
+  factory FormatStat.fromJson(JsonMap json) => FormatStat(
+    format: readString(json['format']) ?? 'UNKNOWN',
+    label: readString(json['label']) ?? readString(json['format']) ?? '기타',
+    animeCount: readInt(json['animeCount']) ?? 0,
+    percentage: readDouble(json['percentage']) ?? 0,
+    averageScore: readDouble(json['averageScore']),
+    watchMinutes: readInt(json['watchMinutes']) ?? 0,
+  );
+}
+
+class FormatDistribution {
+  const FormatDistribution({
+    required this.items,
+    required this.totalAnimeCount,
+  });
+  final List<FormatStat> items;
+  final int totalAnimeCount;
+
+  factory FormatDistribution.fromJson(JsonMap json) {
+    final item = asJsonMap(json['item']);
+    final root = item.isEmpty ? json : item;
+    return FormatDistribution(
+      items: asJsonList(root['items']).map(FormatStat.fromJson).toList(),
+      totalAnimeCount: readInt(root['totalAnimeCount']) ?? 0,
+    );
+  }
+}
+
+class GenreBubble {
+  const GenreBubble({
+    required this.genre,
+    required this.animeCount,
+    required this.myAverageScore,
+    required this.communityAverageScore,
+    required this.preferenceScore,
+    required this.bubbleSize,
+  });
+  final String genre;
+  final int animeCount;
+  final double myAverageScore;
+  final double communityAverageScore;
+  final double preferenceScore;
+  final double bubbleSize;
+
+  factory GenreBubble.fromJson(JsonMap json) => GenreBubble(
+    genre: readString(json['genre']) ?? '기타',
+    animeCount: readInt(json['animeCount']) ?? 0,
+    myAverageScore: readDouble(json['myAverageScore']) ?? 0,
+    communityAverageScore: readDouble(json['communityAverageScore']) ?? 0,
+    preferenceScore: readDouble(json['preferenceScore']) ?? 0,
+    bubbleSize: readDouble(json['bubbleSize']) ?? 0,
+  );
+}
+
+class YearlyScore {
+  const YearlyScore({
+    required this.year,
+    required this.animeCount,
+    required this.ratedAnimeCount,
+    this.averageScore,
+    this.communityAverageScore,
+  });
+  final int year;
+  final int animeCount;
+  final int ratedAnimeCount;
+  final double? averageScore;
+  final double? communityAverageScore;
+
+  factory YearlyScore.fromJson(JsonMap json) => YearlyScore(
+    year: readInt(json['year']) ?? 0,
+    animeCount: readInt(json['animeCount']) ?? 0,
+    ratedAnimeCount: readInt(json['ratedAnimeCount']) ?? 0,
+    averageScore: readDouble(json['averageScore']),
+    communityAverageScore: readDouble(json['communityAverageScore']),
+  );
+}
+
+class StudioRanking {
+  const StudioRanking({
+    required this.id,
+    required this.name,
+    required this.animeCount,
+    required this.totalWatchMinutes,
+    this.averageScore,
+  });
+  final int id;
+  final String name;
+  final int animeCount;
+  final int totalWatchMinutes;
+  final double? averageScore;
+
+  factory StudioRanking.fromJson(JsonMap json) {
+    final studio = asJsonMap(json['studio']);
+    return StudioRanking(
+      id: readInt(studio['id']) ?? readInt(json['studioId']) ?? 0,
+      name: readString(studio['name']) ?? readString(json['name']) ?? '스튜디오',
+      animeCount: readInt(json['animeCount']) ?? 0,
+      totalWatchMinutes: readInt(json['totalWatchMinutes']) ?? 0,
+      averageScore: readDouble(json['averageScore']),
+    );
+  }
+}
+
+class VoiceActorRanking {
+  const VoiceActorRanking({
+    required this.id,
+    required this.name,
+    required this.animeCount,
+    required this.characterCount,
+    this.averageScore,
+    this.imageUrl,
+  });
+  final int id;
+  final String name;
+  final int animeCount;
+  final int characterCount;
+  final double? averageScore;
+  final String? imageUrl;
+
+  factory VoiceActorRanking.fromJson(JsonMap json) {
+    final actor = asJsonMap(json['voiceActor']);
+    final name = asJsonMap(actor['name']);
+    final image = asJsonMap(actor['image']);
+    return VoiceActorRanking(
+      id: readInt(actor['id']) ?? readInt(json['voiceActorId']) ?? 0,
+      name:
+          readString(name['userPreferred']) ??
+          readString(name['full']) ??
+          readString(name['native']) ??
+          readString(json['name']) ??
+          '성우',
+      animeCount: readInt(json['animeCount']) ?? 0,
+      characterCount: readInt(json['characterCount']) ?? 0,
+      averageScore: readDouble(json['averageScore']),
+      imageUrl: readString(image['large']) ?? readString(image['medium']),
+    );
+  }
+}

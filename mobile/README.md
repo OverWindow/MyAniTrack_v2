@@ -1,84 +1,49 @@
 # MyAniTrack Mobile
 
-Flutter client for MyAniTrack, an app for recording Japanese anime watch history and analyzing the collected anime library.
+MyAniTrack의 Android/iOS Flutter 클라이언트입니다. 웹 랜딩이나 샘플 모드 없이 Google 로그인에서 시작하며, 로그인 후 `컬렉션 · 검색 · 분석 · 프로필` 네 개 탭을 제공합니다.
 
-## Current Scope
+## 구성
 
-- Warm ivory/amber visual system based on `MYANITRACK_FLUTTER_DESIGN_GUIDE.md`
-- Shared visual assets copied from `frontend/public`
-- Signed-out exploration-only mode with login required for collection, analysis, and profile features
-- Bottom-tab app shell: Home, Collection, Analysis, Profile
-- Exploration home with public overview, platform stats, and popular anime panels
-- Collection list with search, filter, sort, pagination, add, edit, and delete flows
-- Analysis panels for overview, genres, formats, yearly scores, studios, and voice actors
-- Profile flows for Google OAuth, backend account linking, agreements, profile editing, sign out, and account deletion
-- Auth profile card for `GET /auth/me` backend user id, role, and email verification state
-- Backend logout and logout-all calls paired with Supabase sign-out
-- 401/403 protected API guidance with direct agreement flow entry when required
-- Logged-in public profile lookup screen for user profile, public collection, stats, badges, and voice actor ranking
-- API client/repository layer based on `flutter-app-api-handoff.md`
-- Supabase token injection path for authenticated backend calls
+- `CupertinoApp.router`, `go_router`, Riverpod 기반 앱 셸과 인증 게이트
+- Dio 기반 API 클라이언트와 요청 시점의 최신 Supabase access token 주입
+- cursor 컬렉션, 검색 debounce/취소, 상세 및 컬렉션 편집
+- 요약·취향·랭킹 분석과 섹션별 독립 로딩/오류 처리
+- 사용자명·프로필 이미지 수정, 약관, 로그아웃, 계정 삭제
+- warm ivory/amber 디자인 토큰과 Pretendard 폰트
 
-## API Coverage
+관리자, 친구, 공개 프로필, 배지와 웹 전용 고급 기능은 포함하지 않습니다.
 
-The app is wired for these handoff endpoints:
+## 실행 설정
 
-- `GET /sample/overview`
-- `GET /sample/anime-list`
-- `GET /stats/platform`
-- `GET /stats/platform/popular-anime`
-- `POST /auth/supabase`
-- `GET /auth/me`
-- `POST /auth/logout`
-- `POST /auth/logout-all`
-- `DELETE /auth/me`
-- `GET /me/agreements`
-- `PATCH /me/agreements`
-- `GET /me/anime-list`
-- `POST /me/anime-list`
-- `PATCH /me/anime-list/:animeId`
-- `DELETE /me/anime-list/:animeId`
-- `GET /anime/search`
-- `GET /me/anime/search`
-- `GET /anime/:id`
-- `GET /anime/:id/cast`
-- `GET /me/anime-stats`
-- `GET /me/anime-stats/genre-bubble`
-- `GET /me/anime-stats/yearly-scores`
-- `GET /me/anime-stats/format-distribution`
-- `GET /me/anime-stats/studios`
-- `GET /me/anime-stats/studios/:studioId/anime`
-- `GET /me/voice-actors/ranking`
-- `GET /me/voice-actors/:voiceActorId/anime`
-- `GET /users/:userId/profile`
-- `GET /users/:userId/anime-list`
-- `GET /users/:userId/anime-stats`
-- `GET /users/:userId/anime-stats/genre-bubble`
-- `GET /users/:userId/anime-stats/yearly-scores`
-- `GET /users/:userId/anime-stats/format-distribution`
-- `GET /users/:userId/anime-stats/studios`
-- `GET /users/:userId/anime-stats/studios/:studioId/anime`
-- `GET /users/:userId/badges`
-- `GET /users/:userId/voice-actors/ranking`
-- `GET /users/:userId/voice-actors/:voiceActorId/anime`
+`.env.example`을 복사해 로컬 `.env`를 만들고 다음 값을 채웁니다.
 
-## Runtime Config
-
-Pass backend and Supabase values with Dart defines when wiring real auth:
-
-```sh
-flutter run \
-  --dart-define=API_BASE_URL=https://myanitrack.com/api \
-  --dart-define=SUPABASE_URL=... \
-  --dart-define=SUPABASE_ANON_KEY=...
+```dotenv
+API_BASE_URL=https://api.myanitrack.com/api
+SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key
 ```
 
-Only the Supabase anon key belongs in the app. Never ship a service role key.
+기존 프로젝트를 위해 `SUPABASE_ANON_KEY`도 fallback으로 지원합니다. service role key는 앱에 포함하면 안 됩니다.
 
-## Notes
-
-This workspace is focused on the Flutter mobile app. Android/iOS platform folders should be generated with Flutter tooling when the local CLI is responsive:
-
-```sh
-flutter create --platforms=android,ios .
+```powershell
+flutter pub get
+flutter run --dart-define-from-file=.env
 ```
+
+## OAuth와 플랫폼
+
+- Android application ID: `com.myanitrack.app`
+- iOS bundle ID: `com.myanitrack.app`
+- OAuth callback: `myanitrack://auth/callback`
+
+Supabase의 redirect allow list와 Google provider 설정에도 동일한 callback을 등록해야 합니다. iOS 빌드와 실기기 OAuth 최종 검증은 macOS/Xcode 환경에서 진행합니다.
+
+## 검증
+
+```powershell
+flutter analyze --no-pub
+flutter test --no-pub
+flutter build apk --debug --no-pub
+```
+
+DTO nullable 계약과 주요 소형 화면 로그인 동작은 `test/`에서 검증합니다.
