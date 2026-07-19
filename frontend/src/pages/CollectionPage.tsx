@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import collectionEmptyMoaImage from '../assets/collection-empty-moa.png'
 import { CollectionCarousel } from '../components/CollectionCarousel'
 import { ConnectionErrorState } from '../components/ConnectionErrorState'
 import { useAuth } from '../contexts/AuthContext'
@@ -201,6 +202,10 @@ export function CollectionPage() {
   const filteredItems = items.filter((item) =>
     getCollectionSearchText(item).includes(debouncedSearchTerm.trim().toLowerCase()),
   )
+  const isCollectionEmpty = !isGuestPreview
+    && items.length === 0
+    && genre === 'all'
+    && searchTerm.trim().length === 0
 
   useEffect(() => {
     if (viewMode !== 'series' || !isAuthenticated || isBootstrapping) {
@@ -873,11 +878,18 @@ export function CollectionPage() {
       {viewMode === 'anime' && (isGuestPreview || (!isLoading && !isRefreshingQuery && !error)) && (
         <>
           {filteredItems.length === 0 ? (
-            <div className="feedback-card">
-              {isGuestPreview
-                ? '샘플 컬렉션에서 검색 결과가 없어요.'
-                : '아직 컬렉션에 담긴 작품이 없거나, 검색 결과가 없어요.'}
-            </div>
+            isCollectionEmpty ? (
+              <div className="collection-empty-state">
+                <img src={collectionEmptyMoaImage} alt="컬렉션에 담길 작품을 기다리는 모아" />
+                <p>아직 컬렉션에 담긴 작품이 없어요.</p>
+              </div>
+            ) : (
+              <div className="feedback-card">
+                {isGuestPreview
+                  ? '샘플 컬렉션에서 검색 결과가 없어요.'
+                  : '조건에 맞는 작품이 없어요.'}
+              </div>
+            )
           ) : (
             <div className="collection-grid">
               {filteredItems.map((item) => (

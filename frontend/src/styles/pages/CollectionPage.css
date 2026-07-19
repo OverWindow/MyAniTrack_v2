@@ -301,6 +301,30 @@
   gap: 24px 18px;
 }
 
+.collection-empty-state {
+  min-height: 420px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 18px;
+  padding: 28px 24px;
+  color: var(--text-secondary);
+  font-size: 1rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.collection-empty-state img {
+  width: min(320px, 76vw);
+  height: auto;
+  border-radius: 24px;
+  object-fit: contain;
+}
+
+.collection-empty-state p {
+  margin: 0;
+}
+
 .collection-card {
   display: grid;
   gap: 12px;

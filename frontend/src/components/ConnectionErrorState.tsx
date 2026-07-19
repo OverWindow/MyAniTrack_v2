@@ -1,3 +1,4 @@
+import serverConnectionErrorImage from '../assets/server-connection-error.png'
 import { SERVER_CONNECTION_ERROR_MESSAGE } from '../lib/errors'
 
 type ConnectionErrorStateProps = {
@@ -13,7 +14,7 @@ export function ConnectionErrorState({
 
   return (
     <div className={classNames}>
-      <img src="/connection_failed.png" alt="" aria-hidden="true" loading="lazy" />
+      <img src={serverConnectionErrorImage} alt="" aria-hidden="true" loading="lazy" />
       <p>{message || SERVER_CONNECTION_ERROR_MESSAGE}</p>
     </div>
   )
