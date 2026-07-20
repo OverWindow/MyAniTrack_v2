@@ -394,14 +394,18 @@ Query:
 - `genre`: optional
 - `year`: optional
 - `score`: optional, `1~10`
+- `query`: optional, 100자 이하. 한국어·영문·로마자·일본어·선호 제목 검색
 - `limit`: `1~50`
 - `cursor`: optional
+
+`cursor`는 정렬·장르·연도·평점·검색어와 결합된다. 다른 `query`의 cursor를 재사용하면 `400`을 반환한다.
 
 응답:
 
 ```json
 {
   "success": true,
+  "totalCount": 148,
   "items": [
     {
       "id": 1,
@@ -427,6 +431,8 @@ Query:
   }
 }
 ```
+
+`totalCount`는 현재 필터·검색어를 적용하기 전의 사용자 전체 컬렉션 작품 수다.
 
 ### 컬렉션 추가
 

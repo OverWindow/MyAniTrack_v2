@@ -342,9 +342,14 @@ class PageInfo {
 }
 
 class CursorPage<T> {
-  const CursorPage({required this.items, required this.pageInfo});
+  const CursorPage({
+    required this.items,
+    required this.pageInfo,
+    this.totalCount,
+  });
   final List<T> items;
   final PageInfo pageInfo;
+  final int? totalCount;
 }
 
 class AnimeCastMember {
@@ -361,31 +366,136 @@ class AnimeCastMember {
   final String? characterImageUrl;
   final String? voiceActorImageUrl;
 
+  static List<AnimeCastMember> listFromJson(JsonMap json) {
+    final voiceActors = asJsonList(json['voiceActors']);
+    if (voiceActors.isNotEmpty) {
+      final characterImage = asJsonMap(json['image']);
+      return voiceActors.map((actor) {
+        final actorImage = asJsonMap(actor['image']);
+        return AnimeCastMember(
+          id: readInt(actor['id']) ?? readInt(json['id']) ?? 0,
+          characterName: _personName(json),
+          voiceActorName: _personName(actor),
+          characterImageUrl:
+              readString(characterImage['large']) ??
+              readString(characterImage['medium']),
+          voiceActorImageUrl:
+              readString(actorImage['large']) ??
+              readString(actorImage['medium']),
+        );
+      }).toList();
+    }
+    return [AnimeCastMember.fromJson(json)];
+  }
+
+  static String _personName(JsonMap root) {
+    final name = asJsonMap(root['name']);
+    return readString(name['userPreferred']) ??
+        readString(name['full']) ??
+        readString(name['native']) ??
+        readString(root['name']) ??
+        '이름 정보 없음';
+  }
+
   factory AnimeCastMember.fromJson(JsonMap json) {
     final character = asJsonMap(json['character']);
     final actor = asJsonMap(json['voiceActor']);
     final person = asJsonMap(json['person']);
     final actorRoot = actor.isEmpty ? person : actor;
-    String nameFrom(JsonMap root) {
-      final name = asJsonMap(root['name']);
-      return readString(name['userPreferred']) ??
-          readString(name['full']) ??
-          readString(name['native']) ??
-          readString(root['name']) ??
-          '이름 정보 없음';
-    }
-
     final characterImage = asJsonMap(character['image']);
     final actorImage = asJsonMap(actorRoot['image']);
     return AnimeCastMember(
       id: readInt(json['id']) ?? readInt(character['id']) ?? 0,
-      characterName: nameFrom(character),
-      voiceActorName: nameFrom(actorRoot),
+      characterName: _personName(character),
+      voiceActorName: _personName(actorRoot),
       characterImageUrl:
           readString(characterImage['large']) ??
           readString(characterImage['medium']),
       voiceActorImageUrl:
           readString(actorImage['large']) ?? readString(actorImage['medium']),
+    );
+  }
+}
+
+class BadgeProgress {
+  const BadgeProgress({
+    required this.percent,
+    required this.isComplete,
+    this.current,
+    this.target,
+  });
+
+  final Object? current;
+  final Object? target;
+  final double percent;
+  final bool isComplete;
+
+  factory BadgeProgress.fromJson(JsonMap json) => BadgeProgress(
+    current: json['current'],
+    target: json['target'],
+    percent: (readDouble(json['percent']) ?? 0).clamp(0, 100).toDouble(),
+    isComplete: readBool(json['isComplete']),
+  );
+}
+
+class UserBadge {
+  const UserBadge({
+    required this.id,
+    required this.code,
+    required this.name,
+    required this.description,
+    required this.rarity,
+    required this.earned,
+    this.imageUrl,
+    this.earnedAt,
+    this.progress,
+  });
+
+  final int id;
+  final String code;
+  final String name;
+  final String description;
+  final String rarity;
+  final bool earned;
+  final String? imageUrl;
+  final String? earnedAt;
+  final BadgeProgress? progress;
+
+  factory UserBadge.fromJson(JsonMap json) {
+    final progress = asJsonMap(json['progress']);
+    return UserBadge(
+      id: readInt(json['id']) ?? 0,
+      code: readString(json['code']) ?? '',
+      name: readString(json['name']) ?? '배지',
+      description: readString(json['description']) ?? '',
+      rarity: readString(json['rarity']) ?? 'COMMON',
+      earned: readBool(json['earned']),
+      imageUrl: readString(json['imageUrl']),
+      earnedAt: readString(json['earnedAt']),
+      progress: progress.isEmpty ? null : BadgeProgress.fromJson(progress),
+    );
+  }
+}
+
+class BadgeOverview {
+  const BadgeOverview({
+    required this.items,
+    required this.earnedCount,
+    required this.totalCount,
+  });
+
+  final List<UserBadge> items;
+  final int earnedCount;
+  final int totalCount;
+
+  factory BadgeOverview.fromJson(JsonMap json) {
+    final items = asJsonList(json['items']).map(UserBadge.fromJson).toList();
+    return BadgeOverview(
+      items: items,
+      earnedCount:
+          readInt(json['earnedCount']) ??
+          items.where((item) => item.earned).length,
+      totalCount: readInt(json['totalCount']) ?? items.length,
     );
   }
 }

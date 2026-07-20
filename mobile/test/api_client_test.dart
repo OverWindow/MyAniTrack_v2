@@ -13,10 +13,7 @@ void main() {
     void Function(ApiFailure failure)? onSessionFailure,
   }) async {
     final dio = Dio()..httpClientAdapter = _StatusAdapter(statusCode, message);
-    final client = ApiClient(
-      dio: dio,
-      onSessionFailure: onSessionFailure,
-    );
+    final client = ApiClient(dio: dio, onSessionFailure: onSessionFailure);
 
     try {
       await client.get('/test', authenticated: false);

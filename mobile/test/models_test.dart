@@ -60,6 +60,53 @@ void main() {
       expect(pageInfo.nextCursor, 'cursor-2');
       expect(pageInfo.limit, 20);
     });
+
+    test('실제 캐스트 응답의 복수 성우를 평탄화한다', () {
+      final items = AnimeCastMember.listFromJson({
+        'id': 3,
+        'name': {'userPreferred': '프리렌'},
+        'image': {'large': 'character.jpg'},
+        'voiceActors': [
+          {
+            'id': 10,
+            'name': {'full': '성우 A'},
+            'image': {'medium': 'actor-a.jpg'},
+          },
+          {
+            'id': 11,
+            'name': {'native': '성우 B'},
+            'image': {'large': null},
+          },
+        ],
+      });
+
+      expect(items, hasLength(2));
+      expect(items.first.characterName, '프리렌');
+      expect(items.first.voiceActorName, '성우 A');
+      expect(items.first.voiceActorImageUrl, 'actor-a.jpg');
+      expect(items.last.voiceActorName, '성우 B');
+      expect(items.last.voiceActorImageUrl, isNull);
+    });
+
+    test('배지 현황과 진행률을 nullable 계약대로 읽는다', () {
+      final badges = BadgeOverview.fromJson({
+        'earnedCount': 1,
+        'totalCount': 2,
+        'items': [
+          {
+            'id': 1,
+            'code': 'ANIME_TOTAL_100',
+            'name': '100편 시청',
+            'earned': false,
+            'progress': {'current': 25, 'target': 100, 'percent': 25},
+          },
+        ],
+      });
+
+      expect(badges.earnedCount, 1);
+      expect(badges.totalCount, 2);
+      expect(badges.items.single.progress?.percent, 25);
+    });
   });
 
   group('분석 DTO', () {

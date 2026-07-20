@@ -22,6 +22,9 @@ final authRepositoryProvider = Provider<AuthRepository>(
 final collectionRepositoryProvider = Provider<CollectionRepository>(
   (ref) => CollectionRepository(ref.watch(apiClientProvider)),
 );
+final homeRepositoryProvider = Provider<HomeRepository>(
+  (ref) => HomeRepository(ref.watch(apiClientProvider)),
+);
 final analysisRepositoryProvider = Provider<AnalysisRepository>(
   (ref) => AnalysisRepository(ref.watch(apiClientProvider)),
 );
@@ -260,11 +263,31 @@ class CollectionQuery {
     this.genre,
     this.year,
     this.score,
+    this.searchQuery,
   });
   final String sort;
   final String? genre;
   final int? year;
   final int? score;
+  final String? searchQuery;
+
+  CollectionQuery copyWith({
+    String? sort,
+    String? genre,
+    int? year,
+    int? score,
+    String? searchQuery,
+    bool clearGenre = false,
+    bool clearYear = false,
+    bool clearScore = false,
+    bool clearSearch = false,
+  }) => CollectionQuery(
+    sort: sort ?? this.sort,
+    genre: clearGenre ? null : (genre ?? this.genre),
+    year: clearYear ? null : (year ?? this.year),
+    score: clearScore ? null : (score ?? this.score),
+    searchQuery: clearSearch ? null : (searchQuery ?? this.searchQuery),
+  );
 }
 
 class CollectionViewState {
@@ -274,6 +297,7 @@ class CollectionViewState {
     this.pageInfo = const PageInfo(hasNext: false),
     this.loading = false,
     this.loadingMore = false,
+    this.totalCount = 0,
     this.failure,
   });
   final List<CollectionEntry> items;
@@ -281,6 +305,7 @@ class CollectionViewState {
   final PageInfo pageInfo;
   final bool loading;
   final bool loadingMore;
+  final int totalCount;
   final ApiFailure? failure;
 
   CollectionViewState copyWith({
@@ -289,6 +314,7 @@ class CollectionViewState {
     PageInfo? pageInfo,
     bool? loading,
     bool? loadingMore,
+    int? totalCount,
     ApiFailure? failure,
     bool clearFailure = false,
   }) {
@@ -298,6 +324,7 @@ class CollectionViewState {
       pageInfo: pageInfo ?? this.pageInfo,
       loading: loading ?? this.loading,
       loadingMore: loadingMore ?? this.loadingMore,
+      totalCount: totalCount ?? this.totalCount,
       failure: clearFailure ? null : (failure ?? this.failure),
     );
   }
@@ -309,48 +336,91 @@ final collectionControllerProvider =
     );
 
 class CollectionController extends Notifier<CollectionViewState> {
+  Timer? _searchDebounce;
+  CancelToken? _cancelToken;
+
   @override
   CollectionViewState build() {
+    ref.onDispose(() {
+      _searchDebounce?.cancel();
+      _cancelToken?.cancel();
+    });
     Future<void>.microtask(refresh);
     return const CollectionViewState(loading: true);
   }
 
   Future<void> refresh() async {
+    _cancelToken?.cancel();
+    _cancelToken = CancelToken();
     state = state.copyWith(loading: true, clearFailure: true);
     try {
-      final page = await _fetch();
+      final page = await _fetch(cancelToken: _cancelToken);
       state = state.copyWith(
         items: page.items,
         pageInfo: page.pageInfo,
+        totalCount: page.totalCount ?? state.totalCount,
         loading: false,
         clearFailure: true,
       );
+    } on DioException catch (error) {
+      if (!CancelToken.isCancel(error)) rethrow;
     } on ApiFailure catch (error) {
       state = state.copyWith(loading: false, failure: error);
     }
   }
 
   Future<void> setQuery(CollectionQuery query) async {
-    state = CollectionViewState(query: query, loading: true);
+    state = CollectionViewState(
+      query: query,
+      loading: true,
+      totalCount: state.totalCount,
+    );
     await refresh();
+  }
+
+  void setSearchQuery(String value) {
+    final searchQuery = value.trim();
+    _searchDebounce?.cancel();
+    _cancelToken?.cancel();
+    state = CollectionViewState(
+      query: state.query.copyWith(
+        searchQuery: searchQuery,
+        clearSearch: searchQuery.isEmpty,
+      ),
+      loading: true,
+      totalCount: state.totalCount,
+    );
+    _searchDebounce = Timer(const Duration(milliseconds: 300), refresh);
   }
 
   Future<void> loadMore() async {
     if (!state.pageInfo.hasNext || state.loadingMore) return;
+    _cancelToken?.cancel();
+    _cancelToken = CancelToken();
+    final requestedQuery = state.query;
     state = state.copyWith(loadingMore: true, clearFailure: true);
     try {
-      final page = await _fetch(cursor: state.pageInfo.nextCursor);
+      final page = await _fetch(
+        cursor: state.pageInfo.nextCursor,
+        cancelToken: _cancelToken,
+      );
+      if (state.query != requestedQuery) return;
       state = state.copyWith(
         items: [...state.items, ...page.items],
         pageInfo: page.pageInfo,
         loadingMore: false,
       );
+    } on DioException catch (error) {
+      if (!CancelToken.isCancel(error)) rethrow;
     } on ApiFailure catch (error) {
       state = state.copyWith(loadingMore: false, failure: error);
     }
   }
 
-  Future<CursorPage<CollectionEntry>> _fetch({String? cursor}) {
+  Future<CursorPage<CollectionEntry>> _fetch({
+    String? cursor,
+    CancelToken? cancelToken,
+  }) {
     final query = state.query;
     return ref
         .read(collectionRepositoryProvider)
@@ -359,10 +429,20 @@ class CollectionController extends Notifier<CollectionViewState> {
           genre: query.genre,
           year: query.year,
           score: query.score,
+          searchQuery: query.searchQuery,
           cursor: cursor,
+          cancelToken: cancelToken,
         );
   }
 }
+
+final favoriteAnimeProvider = FutureProvider<List<CollectionEntry>>(
+  (ref) => ref.watch(homeRepositoryProvider).favorites(),
+);
+
+final badgeOverviewProvider = FutureProvider<BadgeOverview>(
+  (ref) => ref.watch(homeRepositoryProvider).badges(),
+);
 
 class SearchViewState {
   const SearchViewState({
@@ -506,8 +586,10 @@ final voiceActorAnimeProvider = FutureProvider.family<List<Anime>, int>(
 );
 
 void invalidateUserData(WidgetRef ref) {
-  ref.invalidate(collectionControllerProvider);
-  ref.invalidate(searchControllerProvider);
+  unawaited(ref.read(collectionControllerProvider.notifier).refresh());
+  unawaited(ref.read(searchControllerProvider.notifier).refresh());
+  ref.invalidate(favoriteAnimeProvider);
+  ref.invalidate(badgeOverviewProvider);
   ref.invalidate(statsOverviewProvider);
   ref.invalidate(formatDistributionProvider);
   ref.invalidate(genreBubbleProvider);

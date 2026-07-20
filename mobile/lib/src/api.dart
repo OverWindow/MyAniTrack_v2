@@ -243,8 +243,10 @@ class CollectionRepository {
     String? genre,
     int? year,
     int? score,
+    String? searchQuery,
     int limit = 20,
     String? cursor,
+    CancelToken? cancelToken,
   }) async {
     final json = await api.get(
       '/me/anime-list',
@@ -255,12 +257,15 @@ class CollectionRepository {
         if (genre != null) 'genre': genre,
         if (year != null) 'year': year,
         if (score != null) 'score': score,
+        if (searchQuery != null && searchQuery.isNotEmpty) 'query': searchQuery,
         if (cursor != null) 'cursor': cursor,
       },
+      cancelToken: cancelToken,
     );
     return CursorPage(
       items: asJsonList(json['items']).map(CollectionEntry.fromJson).toList(),
       pageInfo: PageInfo.fromJson(asJsonMap(json['pageInfo'])),
+      totalCount: readInt(json['totalCount']),
     );
   }
 
@@ -300,7 +305,9 @@ class CollectionRepository {
       authenticated: false,
       query: const {'role': 'MAIN', 'voiceLanguage': 'Japanese', 'limit': 20},
     );
-    return asJsonList(json['items']).map(AnimeCastMember.fromJson).toList();
+    return asJsonList(
+      json['items'],
+    ).expand(AnimeCastMember.listFromJson).toList();
   }
 
   Future<CollectionEntry?> entry(int animeId) async {
@@ -332,6 +339,28 @@ class CollectionRepository {
 
   Future<void> remove(int animeId) async =>
       api.delete('/me/anime-list/$animeId');
+}
+
+class HomeRepository {
+  const HomeRepository(this.api);
+  final ApiClient api;
+
+  Future<List<CollectionEntry>> favorites() async {
+    final json = await api.get(
+      '/me/anime-list',
+      query: const {
+        'sort': 'score',
+        'score': 10,
+        'titleLanguage': 'ko',
+        'limit': 12,
+      },
+    );
+    return asJsonList(json['items']).map(CollectionEntry.fromJson).toList();
+  }
+
+  Future<BadgeOverview> badges() async {
+    return BadgeOverview.fromJson(await api.get('/me/badges'));
+  }
 }
 
 class AnalysisRepository {

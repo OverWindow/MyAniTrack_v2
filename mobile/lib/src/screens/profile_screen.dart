@@ -101,7 +101,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ),
                   const SizedBox(height: 20),
                   Text(
-                    'MyAniTrack · user #${user.id}',
+                    '마이애니트랙 · user #${user.id}',
                     textAlign: TextAlign.center,
                     style: appLabelStyle(),
                   ),
@@ -122,7 +122,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       if (mounted) showAppToast(context, error.message, error: true);
     }
   }
-
 }
 
 class _ProfileMenuRow extends StatelessWidget {
@@ -275,7 +274,7 @@ class _AccountManagementScreenState
     final confirmed = await showAppConfirmation(
       context,
       title: '로그아웃할까요?',
-      message: '이 기기에서 MyAniTrack 세션을 종료합니다.',
+      message: '이 기기에서 마이애니트랙 세션을 종료합니다.',
       confirmLabel: '로그아웃',
     );
     if (!confirmed || !mounted) return;
@@ -496,7 +495,7 @@ class LegalScreen extends StatelessWidget {
               _LegalCard(
                 title: '서비스 이용약관 v1.0',
                 body:
-                    'MyAniTrack은 애니메이션 기록, 평점과 개인 분석 기능을 제공합니다. 계정 도용, 서비스 운영 방해와 자동화된 데이터 수집은 금지됩니다. 운영상 또는 기술상의 필요에 따라 기능이 변경될 수 있으며 추천 및 분석 결과는 참고 정보입니다.',
+                    '마이애니트랙은 애니메이션 기록, 평점과 개인 분석 기능을 제공합니다. 계정 도용, 서비스 운영 방해와 자동화된 데이터 수집은 금지됩니다. 운영상 또는 기술상의 필요에 따라 기능이 변경될 수 있으며 추천 및 분석 결과는 참고 정보입니다.',
               ),
               SizedBox(height: 14),
               _LegalCard(

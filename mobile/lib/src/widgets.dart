@@ -310,8 +310,8 @@ class _AppSkeletonState extends State<AppSkeleton>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 900),
-  )..repeat(reverse: true);
+    duration: const Duration(milliseconds: 1250),
+  )..repeat();
 
   @override
   void dispose() {
@@ -321,13 +321,30 @@ class _AppSkeletonState extends State<AppSkeleton>
 
   @override
   Widget build(BuildContext context) {
-    return FadeTransition(
-      opacity: Tween(begin: 0.45, end: 0.9).animate(_controller),
-      child: Container(
+    final reduceMotion =
+        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (_, _) => Container(
         height: widget.height,
         decoration: BoxDecoration(
-          color: AppColors.softBeige,
+          gradient: LinearGradient(
+            begin: Alignment(
+              -1.8 + (reduceMotion ? 0 : _controller.value * 3.6),
+              0,
+            ),
+            end: Alignment(
+              -0.8 + (reduceMotion ? 0 : _controller.value * 3.6),
+              0,
+            ),
+            colors: const [
+              AppColors.softBeige,
+              Color(0xFFFFF9ED),
+              AppColors.softBeige,
+            ],
+          ),
           borderRadius: BorderRadius.circular(widget.radius),
+          border: Border.all(color: AppColors.border),
         ),
       ),
     );
@@ -358,10 +375,8 @@ class AppNetworkImage extends StatelessWidget {
         : CachedNetworkImage(
             imageUrl: url!,
             fit: fit,
-            placeholder: (_, _) => const ColoredBox(
-              color: AppColors.softBeige,
-              child: Center(child: CupertinoActivityIndicator()),
-            ),
+            placeholder: (_, _) =>
+                const AppSkeleton(height: double.infinity, radius: 0),
             errorWidget: (_, _, _) => fallback,
           );
     if (borderRadius == null) return image;

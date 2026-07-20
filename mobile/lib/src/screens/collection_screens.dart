@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import 'package:myanitrack_mobile/src/api.dart';
+import 'package:myanitrack_mobile/src/localization.dart';
 import 'package:myanitrack_mobile/src/models.dart';
 import 'package:myanitrack_mobile/src/providers.dart';
 import 'package:myanitrack_mobile/src/theme.dart';
@@ -17,6 +18,7 @@ class CollectionScreen extends ConsumerStatefulWidget {
 }
 
 class _CollectionScreenState extends ConsumerState<CollectionScreen> {
+  late final TextEditingController _searchController = TextEditingController();
   late final ScrollController _scrollController = ScrollController()
     ..addListener(_onScroll);
 
@@ -28,6 +30,7 @@ class _CollectionScreenState extends ConsumerState<CollectionScreen> {
 
   @override
   void dispose() {
+    _searchController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -76,9 +79,21 @@ class _CollectionScreenState extends ConsumerState<CollectionScreen> {
                   .refresh,
             ),
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
               sliver: SliverToBoxAdapter(
                 child: _CollectionSummary(state: state),
+              ),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              sliver: SliverToBoxAdapter(
+                child: CupertinoSearchTextField(
+                  controller: _searchController,
+                  placeholder: '내 컬렉션 제목 검색',
+                  onChanged: ref
+                      .read(collectionControllerProvider.notifier)
+                      .setSearchQuery,
+                ),
               ),
             ),
             if (state.loading && state.items.isEmpty)
@@ -118,10 +133,18 @@ class _CollectionScreenState extends ConsumerState<CollectionScreen> {
                 sliver: SliverToBoxAdapter(
                   child: AppStateView(
                     icon: CupertinoIcons.square_grid_2x2,
-                    title: '아직 기록한 작품이 없습니다',
-                    message: '검색 탭에서 첫 작품을 찾아 컬렉션을 시작해보세요.',
-                    actionLabel: '작품 검색하기',
-                    onAction: () => context.go('/search'),
+                    title: state.query.searchQuery?.isNotEmpty == true
+                        ? '일치하는 작품이 없어요'
+                        : '아직 기록한 작품이 없습니다',
+                    message: state.query.searchQuery?.isNotEmpty == true
+                        ? '다른 제목으로 다시 검색해보세요.'
+                        : '검색 탭에서 첫 작품을 찾아 컬렉션을 시작해보세요.',
+                    actionLabel: state.query.searchQuery?.isNotEmpty == true
+                        ? null
+                        : '작품 검색하기',
+                    onAction: state.query.searchQuery?.isNotEmpty == true
+                        ? null
+                        : () => context.go('/search'),
                   ),
                 ),
               )
@@ -174,34 +197,17 @@ class _CollectionSummary extends StatelessWidget {
   Widget build(BuildContext context) {
     return AppCard(
       color: const Color(0xF9FFFFFF),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('현재 불러온 기록', style: appLabelStyle()),
-                const SizedBox(height: 4),
-                Text(
-                  '${state.items.length}편${state.pageInfo.hasNext ? ' +' : ''}',
-                  style: appTitleStyle(size: 27),
-                ),
-              ],
-            ),
-          ),
-          AppBadge(label: _sortLabel(state.query.sort)),
+          Text('전체', style: appLabelStyle()),
+          const SizedBox(height: 4),
+          Text('${state.totalCount}편', style: appTitleStyle(size: 27)),
         ],
       ),
     );
   }
 }
-
-String _sortLabel(String value) => switch (value) {
-  'added' => '추가순',
-  'score' => '높은 평점순',
-  'scoreAsc' => '낮은 평점순',
-  _ => '최근 활동순',
-};
 
 class CollectionPosterCard extends StatelessWidget {
   const CollectionPosterCard({required this.entry, super.key});
@@ -361,11 +367,11 @@ class _CollectionFilterSheetState extends State<CollectionFilterSheet> {
               const SizedBox(height: 18),
               _FilterRow(
                 label: '장르',
-                value: genre ?? '전체',
+                value: genre == null ? '전체' : genreLabel(genre),
                 onTap: () => _pickString(
                   title: '장르',
                   values: const [null, ..._genres],
-                  labels: const ['전체', ..._genres],
+                  labels: ['전체', ..._genres.map(genreLabel)],
                   current: genre,
                   onSelected: (value) => setState(() => genre = value),
                 ),
@@ -426,6 +432,7 @@ class _CollectionFilterSheetState extends State<CollectionFilterSheet> {
                     genre: genre,
                     year: year,
                     score: score,
+                    searchQuery: widget.initial.searchQuery,
                   ),
                 ),
               ),
@@ -659,11 +666,18 @@ class _AnimeSearchScreenState extends ConsumerState<AnimeSearchScreen> {
             else
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                sliver: SliverList.separated(
-                  itemCount: state.items.length,
-                  itemBuilder: (context, index) =>
-                      _SearchResultRow(result: state.items[index]),
-                  separatorBuilder: (_, _) => const SizedBox(height: 12),
+                sliver: SliverGrid(
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 18,
+                    crossAxisSpacing: 12,
+                    childAspectRatio: 0.55,
+                  ),
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) =>
+                        _SearchResultCard(result: state.items[index]),
+                    childCount: state.items.length,
+                  ),
                 ),
               ),
             if (state.loadingMore)
@@ -680,64 +694,79 @@ class _AnimeSearchScreenState extends ConsumerState<AnimeSearchScreen> {
   }
 }
 
-class _SearchResultRow extends ConsumerWidget {
-  const _SearchResultRow({required this.result});
+class _SearchResultCard extends ConsumerWidget {
+  const _SearchResultCard({required this.result});
   final AnimeSearchResult result;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final anime = result.anime;
     final exists = result.myCollection?.exists == true;
-    return AppCard(
-      padding: const EdgeInsets.all(10),
-      onTap: () => context.push('/anime/${anime.id}'),
-      child: Row(
+    return CupertinoButton(
+      padding: EdgeInsets.zero,
+      pressedOpacity: 0.8,
+      onPressed: () => context.push('/anime/${anime.id}'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 70,
-            child: AnimePoster(url: anime.coverImageUrl, radius: 11),
-          ),
-          const SizedBox(width: 13),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Stack(
+              fit: StackFit.expand,
               children: [
-                Text(
-                  anime.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: appTitleStyle(size: 16),
-                ),
-                const SizedBox(height: 7),
-                Text(
-                  [
-                    if (anime.seasonYear != null) '${anime.seasonYear}',
-                    if (anime.format != null) anime.format!,
-                    if (anime.episodes != null) '${anime.episodes}화',
-                  ].join(' · '),
-                  style: appLabelStyle(),
-                ),
-                if (exists) ...[
-                  const SizedBox(height: 8),
-                  AppBadge(
-                    label: result.myCollection?.status?.label ?? '컬렉션에 있음',
+                AnimePoster(url: anime.coverImageUrl),
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: CupertinoButton(
+                    padding: EdgeInsets.zero,
+                    minimumSize: const Size.square(44),
+                    borderRadius: BorderRadius.circular(99),
+                    color: exists
+                        ? const Color(0xF2FFF7E7)
+                        : const Color(0xEEDE851D),
+                    onPressed: () => showCollectionEditor(context, anime),
+                    child: Icon(
+                      exists ? CupertinoIcons.pencil : CupertinoIcons.add,
+                      size: 20,
+                      color: exists ? AppColors.pointPressed : AppColors.card,
+                    ),
                   ),
-                ],
+                ),
+                if (exists)
+                  Positioned(
+                    left: 8,
+                    bottom: 8,
+                    child: AppBadge(
+                      label: result.myCollection?.status?.label ?? '등록됨',
+                      color: const Color(0xF2FFFFFF),
+                    ),
+                  ),
               ],
             ),
           ),
-          const SizedBox(width: 8),
-          CupertinoButton(
-            padding: const EdgeInsets.all(10),
-            minimumSize: const Size.square(44),
-            borderRadius: BorderRadius.circular(99),
-            color: exists ? AppColors.pointSoft : AppColors.point,
-            onPressed: () => showCollectionEditor(context, anime),
-            child: Icon(
-              exists ? CupertinoIcons.pencil : CupertinoIcons.add,
-              size: 19,
-              color: exists ? AppColors.pointPressed : AppColors.card,
+          const SizedBox(height: 9),
+          Text(
+            anime.title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontFamily: 'Pretendard',
+              fontSize: 14,
+              height: 1.3,
+              fontWeight: FontWeight.w600,
+              color: AppColors.text,
             ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            [
+              if (anime.seasonYear != null) '${anime.seasonYear}',
+              if (anime.format != null) anime.format!,
+              if (anime.episodes != null) '${anime.episodes}화',
+            ].join(' · '),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: appLabelStyle(),
           ),
         ],
       ),
@@ -839,6 +868,8 @@ class _AnimeDetailContent extends ConsumerWidget {
                                 label:
                                     '커뮤니티 ${anime.averageScore!.toStringAsFixed(0)}',
                               ),
+                            for (final genre in anime.genres)
+                              AppBadge(label: genreLabel(genre)),
                           ],
                         ),
                         if (anime.description != null) ...[
@@ -864,8 +895,8 @@ class _AnimeDetailContent extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const AppSectionHeader(
-                          title: '주요 캐스트',
-                          eyebrow: 'Cast',
+                          title: '캐릭터 · 일본어 성우',
+                          eyebrow: 'Voice cast',
                         ),
                         const SizedBox(height: 14),
                         cast.when(
@@ -879,9 +910,9 @@ class _AnimeDetailContent extends ConsumerWidget {
                                 ref.invalidate(animeCastProvider(anime.id)),
                           ),
                           data: (items) => items.isEmpty
-                              ? const Text('등록된 주요 캐스트가 없습니다.')
+                              ? const Text('등록된 성우 정보가 없습니다.')
                               : SizedBox(
-                                  height: 130,
+                                  height: 166,
                                   child: ListView.separated(
                                     scrollDirection: Axis.horizontal,
                                     itemCount: items.length,
@@ -890,19 +921,37 @@ class _AnimeDetailContent extends ConsumerWidget {
                                     itemBuilder: (context, index) {
                                       final item = items[index];
                                       return SizedBox(
-                                        width: 82,
+                                        width: 152,
                                         child: Column(
                                           children: [
-                                            ClipOval(
-                                              child: SizedBox.square(
-                                                dimension: 64,
-                                                child: AppNetworkImage(
-                                                  url: item.characterImageUrl,
-                                                  profile: true,
+                                            Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: [
+                                                ClipOval(
+                                                  child: SizedBox.square(
+                                                    dimension: 62,
+                                                    child: AppNetworkImage(
+                                                      url: item
+                                                          .characterImageUrl,
+                                                      profile: true,
+                                                    ),
+                                                  ),
                                                 ),
-                                              ),
+                                                const SizedBox(width: 8),
+                                                ClipOval(
+                                                  child: SizedBox.square(
+                                                    dimension: 62,
+                                                    child: AppNetworkImage(
+                                                      url: item
+                                                          .voiceActorImageUrl,
+                                                      profile: true,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
                                             ),
-                                            const SizedBox(height: 7),
+                                            const SizedBox(height: 8),
                                             Text(
                                               item.characterName,
                                               maxLines: 1,
@@ -918,7 +967,11 @@ class _AnimeDetailContent extends ConsumerWidget {
                                               item.voiceActorName,
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
-                                              style: appLabelStyle(),
+                                              style: const TextStyle(
+                                                fontFamily: 'Pretendard',
+                                                fontSize: 12,
+                                                color: AppColors.pointPressed,
+                                              ),
                                             ),
                                           ],
                                         ),

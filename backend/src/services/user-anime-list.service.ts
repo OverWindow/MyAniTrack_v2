@@ -61,11 +61,16 @@ interface UserAnimeListListRow extends RowDataPacket {
   sortScoreValue: number | null;
 }
 
+interface UserAnimeListCountRow extends RowDataPacket {
+  totalCount: number;
+}
+
 interface UserAnimeListCursorPayload {
   sort: UserAnimeListSortOption;
   genre?: AnimeGenre | null;
   year?: number | null;
   scoreFilter?: number | null;
+  query?: string | null;
   sortScore?: number | null;
   createdAt?: string;
   updatedAt?: string;
@@ -79,6 +84,7 @@ export interface GetUserAnimeListParams {
   genre?: AnimeGenre;
   year?: number;
   score?: number;
+  query?: string;
   limit: number;
   cursor?: string;
 }
@@ -133,6 +139,23 @@ export function validateUserAnimeListLimit(value: unknown): number {
   }
 
   return limit;
+}
+
+export function validateUserAnimeListQuery(value: unknown): string | undefined {
+  if (value === undefined || value === null || value === '') {
+    return undefined;
+  }
+
+  if (typeof value !== 'string') {
+    throw new Error('query must be a string');
+  }
+
+  const query = value.trim().replace(/\s+/g, ' ');
+  if (query.length > 100) {
+    throw new Error('query must be 100 characters or fewer');
+  }
+
+  return query || undefined;
 }
 
 export function validateUserAnimeListGenre(value: unknown): AnimeGenre | undefined {
@@ -531,12 +554,49 @@ function buildYearWhereClause(
   return 'AND a.season_year = ?';
 }
 
+function buildQueryWhereClause(
+  query: string | undefined,
+  cursor: UserAnimeListCursorPayload | null,
+  params: Array<string | number | null>
+) {
+  const normalizedQuery = query?.toLocaleLowerCase() ?? null;
+  if (cursor && (cursor.query ?? null) !== normalizedQuery) {
+    throw new Error('Cursor query does not match requested query');
+  }
+
+  if (!normalizedQuery) {
+    return '';
+  }
+
+  const pattern = buildUserAnimeListSearchPattern(normalizedQuery);
+  params.push(pattern, pattern, pattern, pattern, pattern);
+  return `
+    AND (
+      LOWER(COALESCE(a.title_english, '')) LIKE ?
+      OR LOWER(COALESCE(a.title_romaji, '')) LIKE ?
+      OR LOWER(COALESCE(a.title_native, '')) LIKE ?
+      OR LOWER(COALESCE(a.title_user_preferred, '')) LIKE ?
+      OR EXISTS (
+        SELECT 1
+        FROM anime_korean_titles search_akt
+        WHERE search_akt.anime_id = a.id
+          AND LOWER(search_akt.full_title) LIKE ?
+      )
+    )
+  `;
+}
+
+export function buildUserAnimeListSearchPattern(query: string) {
+  return `%${query.replace(/[\\%_]/g, '\\$&')}%`;
+}
+
 export async function getUserAnimeList(params: GetUserAnimeListParams) {
   const decodedCursor = decodeCursor(params.cursor);
   const queryParams: Array<string | number | null> = [params.userId];
   const genreWhereClause = buildGenreWhereClause(params.genre, decodedCursor, queryParams);
   const yearWhereClause = buildYearWhereClause(params.year, decodedCursor, queryParams);
   const scoreWhereClause = buildScoreWhereClause(params.score, decodedCursor, queryParams);
+  const queryWhereClause = buildQueryWhereClause(params.query, decodedCursor, queryParams);
   const cursorWhereClause = buildCursorWhereClause(params.sort, decodedCursor, queryParams);
   const orderByClause = buildOrderClause(params.sort);
 
@@ -588,6 +648,7 @@ export async function getUserAnimeList(params: GetUserAnimeListParams) {
       ${genreWhereClause}
       ${yearWhereClause}
       ${scoreWhereClause}
+      ${queryWhereClause}
       ${cursorWhereClause}
     ORDER BY ${orderByClause}
     LIMIT ?
@@ -605,6 +666,7 @@ export async function getUserAnimeList(params: GetUserAnimeListParams) {
         genre: params.genre ?? null,
         year: params.year ?? null,
         scoreFilter: params.score ?? null,
+        query: params.query?.toLocaleLowerCase() ?? null,
         sortScore: lastItem.sortScoreValue,
         createdAt: lastItem.createdAt,
         updatedAt: lastItem.updatedAt,
@@ -612,7 +674,13 @@ export async function getUserAnimeList(params: GetUserAnimeListParams) {
       })
     : null;
 
+  const [countRows] = await pool.query<UserAnimeListCountRow[]>(
+    `SELECT COUNT(*) AS totalCount FROM user_anime_lists WHERE user_id = ?`,
+    [params.userId]
+  );
+
   return {
+    totalCount: Number(countRows[0]?.totalCount ?? 0),
     items: items.map((row) => ({
       id: row.id,
       userId: row.userId,

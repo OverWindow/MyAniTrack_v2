@@ -6,23 +6,59 @@ import 'package:myanitrack_mobile/src/providers.dart';
 import 'package:myanitrack_mobile/src/theme.dart';
 import 'package:myanitrack_mobile/src/widgets.dart';
 
-class BootstrapScreen extends StatelessWidget {
+class BootstrapScreen extends StatefulWidget {
   const BootstrapScreen({super.key});
 
   @override
+  State<BootstrapScreen> createState() => _BootstrapScreenState();
+}
+
+class _BootstrapScreenState extends State<BootstrapScreen>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1100),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return const CupertinoPageScaffold(
+    final reduceMotion =
+        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    return CupertinoPageScaffold(
       child: AppBackground(
         child: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              SizedBox(
-                width: 116,
-                child: Image(image: AssetImage(AppAssets.logo)),
+              AnimatedBuilder(
+                animation: _controller,
+                builder: (_, child) => Transform.scale(
+                  scale: reduceMotion ? 1 : 0.97 + (_controller.value * 0.04),
+                  child: Opacity(
+                    opacity: reduceMotion
+                        ? 1
+                        : 0.78 + (_controller.value * 0.22),
+                    child: child,
+                  ),
+                ),
+                child: const SizedBox(
+                  width: 124,
+                  child: Image(image: AssetImage(AppAssets.logo)),
+                ),
               ),
-              SizedBox(height: 18),
-              CupertinoActivityIndicator(radius: 13),
+              const SizedBox(height: 20),
+              const CupertinoActivityIndicator(
+                radius: 12,
+                color: AppColors.pointPressed,
+              ),
+              const SizedBox(height: 12),
+              Text('마이애니트랙을 준비하고 있어요', style: appLabelStyle()),
             ],
           ),
         ),
@@ -65,7 +101,7 @@ class LoginScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: 12),
                     const Text(
-                      'MyAniTrack은 애니 감상 기록과 분석을\n한곳에서 관리하는 개인 라이브러리입니다.',
+                      '마이애니트랙은 애니 감상 기록과 분석을\n한곳에서 관리하는 개인 라이브러리입니다.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontFamily: 'Pretendard',
@@ -377,7 +413,7 @@ class _AgreementCardState extends State<_AgreementCard> {
 }
 
 const _termsParagraphs = <String>[
-  '제1조 (목적) 본 약관은 MyAniTrack이 제공하는 애니메이션 기록 및 분석 서비스의 이용과 관련한 권리와 의무를 정합니다.',
+  '제1조 (목적) 본 약관은 마이애니트랙이 제공하는 애니메이션 기록 및 분석 서비스의 이용과 관련한 권리와 의무를 정합니다.',
   '제2조 (서비스의 내용) 서비스는 시청 기록 관리, 평점 등록, 맞춤 분석 기능을 제공합니다.',
   '제3조 (계정 및 이용자 책임) 이용자는 계정 정보를 안전하게 관리할 책임이 있습니다.',
   '제4조 (금지 행위) 계정 도용, 서비스 운영 방해, 부적절한 콘텐츠 작성과 자동화된 데이터 수집을 금지합니다.',

@@ -7,6 +7,7 @@ import 'package:myanitrack_mobile/src/providers.dart';
 import 'package:myanitrack_mobile/src/screens/analysis_screen.dart';
 import 'package:myanitrack_mobile/src/screens/auth_screens.dart';
 import 'package:myanitrack_mobile/src/screens/collection_screens.dart';
+import 'package:myanitrack_mobile/src/screens/home_screen.dart';
 import 'package:myanitrack_mobile/src/screens/profile_screen.dart';
 import 'package:myanitrack_mobile/src/theme.dart';
 import 'package:myanitrack_mobile/src/widgets.dart';
@@ -18,7 +19,7 @@ class MyAniTrackApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(appRouterProvider);
     return CupertinoApp.router(
-      title: 'MyAniTrack',
+      title: '마이애니트랙',
       debugShowCheckedModeBanner: false,
       theme: appCupertinoTheme,
       locale: const Locale('ko'),
@@ -35,7 +36,7 @@ class MyAniTrackApp extends ConsumerWidget {
 final appRouterProvider = Provider<GoRouter>((ref) {
   final session = ref.watch(sessionControllerProvider);
   return GoRouter(
-    initialLocation: '/collection',
+    initialLocation: '/home',
     redirect: (context, state) {
       final path = state.uri.path;
       final isAuthPath =
@@ -51,7 +52,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       if (session.phase == SessionPhase.agreementsRequired) {
         return path == '/agreements' ? null : '/agreements';
       }
-      if (session.isAuthenticated && isAuthPath) return '/collection';
+      if (session.isAuthenticated && isAuthPath) return '/home';
       return null;
     },
     routes: [
@@ -70,6 +71,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ShellRoute(
         builder: (context, state, child) => AppTabShell(child: child),
         routes: [
+          GoRoute(
+            path: '/home',
+            pageBuilder: (_, state) => _page(state, const HomeScreen()),
+          ),
           GoRoute(
             path: '/collection',
             pageBuilder: (_, state) => _page(state, const CollectionScreen()),
@@ -144,14 +149,16 @@ class AppTabShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final path = GoRouterState.of(context).uri.path;
-    final index = path.startsWith('/search')
+    final index = path.startsWith('/collection')
         ? 1
-        : path.startsWith('/analysis')
+        : path.startsWith('/search')
         ? 2
-        : path.startsWith('/profile')
+        : path.startsWith('/analysis')
         ? 3
+        : path.startsWith('/profile')
+        ? 4
         : 0;
-    const paths = ['/collection', '/search', '/analysis', '/profile'];
+    const paths = ['/home', '/collection', '/search', '/analysis', '/profile'];
     return Column(
       children: [
         Expanded(child: child),
@@ -165,6 +172,11 @@ class AppTabShell extends StatelessWidget {
           height: 56,
           onTap: (next) => context.go(paths[next]),
           items: const [
+            BottomNavigationBarItem(
+              icon: Icon(CupertinoIcons.house),
+              activeIcon: Icon(CupertinoIcons.house_fill),
+              label: '홈',
+            ),
             BottomNavigationBarItem(
               icon: Icon(CupertinoIcons.square_grid_2x2),
               activeIcon: Icon(CupertinoIcons.square_grid_2x2_fill),
@@ -208,7 +220,7 @@ class _RouteErrorScreen extends StatelessWidget {
               title: '화면을 열 수 없습니다',
               message: message,
               actionLabel: '컬렉션으로',
-              onAction: () => context.go('/collection'),
+              onAction: () => context.go('/home'),
             ),
           ),
         ),

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:myanitrack_mobile/src/api.dart';
+import 'package:myanitrack_mobile/src/localization.dart';
 import 'package:myanitrack_mobile/src/models.dart';
 import 'package:myanitrack_mobile/src/providers.dart';
 import 'package:myanitrack_mobile/src/theme.dart';
@@ -134,7 +135,9 @@ class _OverviewSegment extends ConsumerWidget {
                           Text('가장 선호하는 장르', style: appLabelStyle()),
                           const SizedBox(height: 3),
                           Text(
-                            item.favoriteGenre ?? '아직 데이터가 부족합니다',
+                            item.favoriteGenre == null
+                                ? '아직 데이터가 부족합니다'
+                                : genreLabel(item.favoriteGenre),
                             style: appTitleStyle(size: 18),
                           ),
                         ],
@@ -330,7 +333,7 @@ class _TasteSegment extends ConsumerWidget {
                 onTap: (key) => _showFilteredCollection(
                   context,
                   ref,
-                  title: '$key 작품',
+                  title: '${genreLabel(key)} 작품',
                   genre: key,
                 ),
               ),
@@ -440,7 +443,7 @@ class _GenreBubbleCard extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          indexed.$2.genre,
+                          genreLabel(indexed.$2.genre),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
@@ -510,7 +513,9 @@ class _DistributionCard extends StatelessWidget {
                     SizedBox(
                       width: 82,
                       child: Text(
-                        indexed.$2.key,
+                        eyebrow == 'Genre'
+                            ? genreLabel(indexed.$2.key)
+                            : indexed.$2.key,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
