@@ -110,6 +110,8 @@ await Supabase.initialize(
 SUPABASE_URL=https://프로젝트REF.supabase.co
 SUPABASE_ANON_KEY=...
 API_BASE_URL=https://myanitrack.com/api
+GOOGLE_WEB_CLIENT_ID=...apps.googleusercontent.com
+GOOGLE_IOS_CLIENT_ID=...apps.googleusercontent.com
 ```
 
 주의:
@@ -118,57 +120,37 @@ API_BASE_URL=https://myanitrack.com/api
 - `service role key`는 절대 앱에 넣지 않는다.
 - 백엔드 `SUPABASE_URL`과 앱의 Supabase URL은 같은 프로젝트여야 한다.
 
-## 4. 모바일 OAuth Redirect
+## 4. 모바일 Google Client 설정
 
-웹은 `/auth/callback`을 사용하지만 Flutter 앱은 deep link 또는 app link가 필요하다.
+Flutter 앱은 브라우저 OAuth redirect를 사용하지 않고 Google 네이티브 계정 선택창을 사용한다.
 
-예시 redirect URL:
+- Web Client ID: Supabase Authentication > Providers > Google에 등록된 Client ID와 같은 값
+- Android Client: package `com.myanitrack.app`과 debug/release signing SHA를 등록
+- iOS Client: bundle ID `com.myanitrack.app`으로 생성하고 reversed client ID를 URL Scheme으로 등록
 
-```txt
-myanitrack://auth/callback
-```
-
-Supabase Dashboard 설정:
-
-Authentication > URL Configuration > Redirect URLs에 아래를 추가한다.
-
-```txt
-myanitrack://auth/callback
-https://myanitrack.com/auth/callback
-http://localhost:5173/auth/callback
-```
-
-Google Cloud Console OAuth redirect URI는 앱 deep link가 아니라 Supabase callback이다.
-
-```txt
-https://프로젝트REF.supabase.co/auth/v1/callback
-```
-
-Flutter 쪽에서는 Android intent filter, iOS URL scheme 또는 universal link 설정이 필요하다.
+기존 웹 프론트엔드의 Supabase callback URL은 웹 로그인을 위해 그대로 유지한다.
 
 ## 5. Google 로그인 구현 흐름
 
 의사 코드:
 
 ```dart
-final supabase = Supabase.instance.client;
-
-await supabase.auth.signInWithOAuth(
-  OAuthProvider.google,
-  redirectTo: 'myanitrack://auth/callback',
+final google = GoogleSignIn.instance;
+await google.initialize(
+  clientId: iosClientId, // iOS에서만 사용
+  serverClientId: webClientId,
+);
+final account = await google.authenticate();
+final authorization = await account.authorizationClient
+    .authorizationForScopes(const []);
+await Supabase.instance.client.auth.signInWithIdToken(
+  provider: OAuthProvider.google,
+  idToken: account.authentication.idToken!,
+  accessToken: authorization!.accessToken,
 );
 ```
 
-앱이 callback을 받은 뒤 session을 확인한다.
-
-```dart
-final session = Supabase.instance.client.auth.currentSession;
-final accessToken = session?.accessToken;
-
-if (accessToken == null) {
-  throw Exception('Supabase session not found');
-}
-```
+Supabase session을 받은 후의 `/auth/supabase` 백엔드 연결·약관 게이트는 기존과 동일하다.
 
 백엔드에 Supabase login 연결:
 
@@ -790,13 +772,9 @@ Future<Map<String, dynamic>> getJson(String path) async {
 
 ## 20. 앱 화면별 추천 API
 
-### 로그인 전 홈
+### 로그인 전
 
-```txt
-GET /sample/overview
-GET /stats/platform
-GET /stats/platform/popular-anime?limit=10
-```
+모바일 앱에는 랜딩·샘플 홈이 없으며 로그인 화면만 표시한다.
 
 ### 로그인 직후
 
@@ -819,12 +797,35 @@ DELETE /me/anime-list/:animeId
 
 ```txt
 GET /me/anime-stats
+GET /me/anime-stats/viewing-dna
 GET /me/anime-stats/genre-bubble
 GET /me/anime-stats/yearly-scores
 GET /me/anime-stats/format-distribution
 GET /me/anime-stats/studios
 GET /me/voice-actors/ranking
 ```
+
+### 친구와 공개 사용자
+
+```txt
+GET /users/search?query=:username&limit=20&cursor=:cursor
+GET /friends
+GET /friends/requests
+POST /friends/requests
+PATCH /friends/requests/:requestId
+DELETE /friends/:friendUserId
+GET /users/:userId/profile
+GET /users/:userId/anime-list?query=:title
+GET /users/:userId/anime-stats
+GET /users/:userId/anime-stats/viewing-dna
+GET /users/:userId/anime-stats/genre-bubble
+GET /users/:userId/anime-stats/yearly-scores
+GET /users/:userId/anime-stats/format-distribution
+GET /users/:userId/anime-stats/studios
+GET /users/:userId/voice-actors/ranking
+```
+
+`/users/search`는 현재 사용자를 제외한 사용자명을 대소문자 구분 없이 부분 검색한다. 각 항목은 `relationship: none | incoming | outgoing | friend`와 pending 요청의 `requestId`를 포함한다. cursor는 정규화된 검색어와 결합되며 다른 검색어에 재사용하면 `400`이다.
 
 ### 프로필/설정
 

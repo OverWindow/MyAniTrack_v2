@@ -3,9 +3,26 @@ import {
   getFriendRequests,
   getFriends,
   removeFriend,
+  searchUsers,
   respondToFriendRequest,
   sendFriendRequest,
 } from '../services/friend.service';
+
+export async function searchUsersController(req: Request, res: Response) {
+  try {
+    const authUser = ensureAuth(req, res);
+    if (!authUser) return;
+    if (typeof req.query.query !== 'string') {
+      throw new Error('query must be a string');
+    }
+    const limit = req.query.limit === undefined ? 20 : Number(req.query.limit);
+    const cursor = typeof req.query.cursor === 'string' ? req.query.cursor : undefined;
+    const result = await searchUsers(authUser.userId, req.query.query, limit, cursor);
+    return res.json({ success: true, ...result });
+  } catch (error) {
+    return sendError(res, error);
+  }
+}
 
 function parsePositiveInteger(value: unknown, fieldName: string) {
   const parsedValue = Number(value);
@@ -65,6 +82,8 @@ function getErrorStatus(message: string) {
     message.includes('cannot') ||
     message.includes('Only the') ||
     message.includes('already') ||
+    message === 'Invalid cursor' ||
+    message.includes('Cursor query') ||
     message.includes('no longer pending') ||
     message.includes('Either receiverId or username is required')
   ) {

@@ -16,7 +16,10 @@ dependencies:
   dio: ^5.10.0
   fl_chart: ^1.2.0
   flutter_riverpod: ^3.3.2
+  google_sign_in: ^7.2.0
   go_router: ^17.3.0
+  crop_your_image: ^2.0.0
+  image: ^4.5.4
   image_picker: ^1.2.3
   intl: ^0.20.2
   supabase_flutter: ^2.8.0

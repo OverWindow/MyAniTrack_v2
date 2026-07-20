@@ -7,6 +7,7 @@ import 'package:myanitrack_mobile/src/providers.dart';
 import 'package:myanitrack_mobile/src/screens/analysis_screen.dart';
 import 'package:myanitrack_mobile/src/screens/auth_screens.dart';
 import 'package:myanitrack_mobile/src/screens/collection_screens.dart';
+import 'package:myanitrack_mobile/src/screens/friends_screen.dart';
 import 'package:myanitrack_mobile/src/screens/home_screen.dart';
 import 'package:myanitrack_mobile/src/screens/profile_screen.dart';
 import 'package:myanitrack_mobile/src/theme.dart';
@@ -46,7 +47,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         return path == '/loading' ? null : '/loading';
       }
       if (session.phase == SessionPhase.signedOut ||
-          session.phase == SessionPhase.oauthPending) {
+          session.phase == SessionPhase.googlePending) {
         return path == '/login' ? null : '/login';
       }
       if (session.phase == SessionPhase.agreementsRequired) {
@@ -88,10 +89,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             pageBuilder: (_, state) => _page(state, const AnalysisScreen()),
           ),
           GoRoute(
-            path: '/profile',
-            pageBuilder: (_, state) => _page(state, const ProfileScreen()),
+            path: '/friends',
+            pageBuilder: (_, state) => _page(state, const FriendsScreen()),
           ),
         ],
+      ),
+      GoRoute(
+        path: '/profile',
+        pageBuilder: (_, state) => _page(state, const ProfileScreen()),
       ),
       GoRoute(
         path: '/anime/:id',
@@ -130,6 +135,50 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/profile/legal',
         pageBuilder: (_, state) => _page(state, const LegalScreen()),
       ),
+      GoRoute(
+        path: '/users/:id',
+        pageBuilder: (_, state) {
+          final userId = int.tryParse(state.pathParameters['id'] ?? '');
+          return _page(
+            state,
+            userId == null
+                ? const _RouteErrorScreen(message: '잘못된 사용자 주소입니다.')
+                : PublicProfileScreen(userId: userId),
+          );
+        },
+      ),
+      GoRoute(
+        path: '/users/:id/collection',
+        pageBuilder: (_, state) {
+          final userId = int.tryParse(state.pathParameters['id'] ?? '');
+          return _page(
+            state,
+            userId == null
+                ? const _RouteErrorScreen(message: '잘못된 사용자 주소입니다.')
+                : PublicCollectionScreen(userId: userId),
+          );
+        },
+      ),
+      GoRoute(
+        path: '/users/:id/analysis',
+        pageBuilder: (_, state) {
+          final userId = int.tryParse(state.pathParameters['id'] ?? '');
+          final username = state.uri.queryParameters['name'];
+          return _page(
+            state,
+            userId == null
+                ? const _RouteErrorScreen(message: '잘못된 사용자 주소입니다.')
+                : ProviderScope(
+                    overrides: [
+                      analysisSubjectProvider.overrideWithValue(userId),
+                    ],
+                    child: AnalysisScreen(
+                      title: username == null ? '사용자 분석' : '$username의 분석',
+                    ),
+                  ),
+          );
+        },
+      ),
     ],
     errorPageBuilder: (_, state) => _page(
       state,
@@ -155,10 +204,10 @@ class AppTabShell extends StatelessWidget {
         ? 2
         : path.startsWith('/analysis')
         ? 3
-        : path.startsWith('/profile')
+        : path.startsWith('/friends')
         ? 4
         : 0;
-    const paths = ['/home', '/collection', '/search', '/analysis', '/profile'];
+    const paths = ['/home', '/collection', '/search', '/analysis', '/friends'];
     return Column(
       children: [
         Expanded(child: child),
@@ -193,9 +242,9 @@ class AppTabShell extends StatelessWidget {
               label: '분석',
             ),
             BottomNavigationBarItem(
-              icon: Icon(CupertinoIcons.person),
-              activeIcon: Icon(CupertinoIcons.person_fill),
-              label: '프로필',
+              icon: Icon(CupertinoIcons.person_2),
+              activeIcon: Icon(CupertinoIcons.person_2_fill),
+              label: '친구',
             ),
           ],
         ),

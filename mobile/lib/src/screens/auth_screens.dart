@@ -73,7 +73,7 @@ class LoginScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(sessionControllerProvider);
-    final isWaiting = session.phase == SessionPhase.oauthPending;
+    final isWaiting = session.phase == SessionPhase.googlePending;
 
     return CupertinoPageScaffold(
       child: AppBackground(
@@ -164,7 +164,7 @@ class LoginScreen extends ConsumerWidget {
                                           const SizedBox(width: 10),
                                           Text(
                                             isWaiting
-                                                ? 'Google 응답을 기다리는 중'
+                                                ? 'Google 계정을 확인하는 중'
                                                 : 'Google로 계속하기',
                                             style: const TextStyle(
                                               fontFamily: 'Pretendard',

@@ -19,11 +19,7 @@ class HomeScreen extends ConsumerWidget {
       child: AppBackground(
         child: CustomScrollView(
           slivers: [
-            const CupertinoSliverNavigationBar(
-              largeTitle: Text('홈'),
-              backgroundColor: Color(0xEFFFFFFF),
-              border: Border(bottom: BorderSide(color: AppColors.border)),
-            ),
+            const AppCompactSliverHeader(title: '홈'),
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
               sliver: SliverList.list(
@@ -141,61 +137,160 @@ class _ProfileSummary extends StatelessWidget {
   );
 }
 
-class _FavoriteCarousel extends StatelessWidget {
+class _FavoriteCarousel extends StatefulWidget {
   const _FavoriteCarousel({required this.items});
   final List<CollectionEntry> items;
 
   @override
-  Widget build(BuildContext context) => SizedBox(
-    height: 236,
-    child: ListView.separated(
-      scrollDirection: Axis.horizontal,
-      itemCount: items.length,
-      separatorBuilder: (_, _) => const SizedBox(width: 12),
-      itemBuilder: (context, index) {
-        final entry = items[index];
-        return SizedBox(
-          width: 128,
-          child: CupertinoButton(
-            padding: EdgeInsets.zero,
-            onPressed: () => context.push('/anime/${entry.animeId}'),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(child: AnimePoster(url: entry.anime.coverImageUrl)),
-                const SizedBox(height: 8),
-                Text(
-                  entry.anime.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontFamily: 'Pretendard',
-                    fontSize: 14,
-                    height: 1.25,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.text,
+  State<_FavoriteCarousel> createState() => _FavoriteCarouselState();
+}
+
+class _FavoriteCarouselState extends State<_FavoriteCarousel> {
+  late final PageController _controller = PageController(
+    viewportFraction: 0.58,
+  );
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final reduceMotion =
+        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    return SizedBox(
+      height: 300,
+      child: PageView.builder(
+        controller: _controller,
+        padEnds: true,
+        itemCount: widget.items.length,
+        itemBuilder: (context, index) {
+          final entry = widget.items[index];
+          return AnimatedBuilder(
+            animation: _controller,
+            builder: (context, child) {
+              final page =
+                  _controller.hasClients &&
+                      _controller.position.hasContentDimensions
+                  ? (_controller.page ?? 0)
+                  : 0.0;
+              final distance = (page - index).clamp(-1.5, 1.5);
+              final focus = (1 - distance.abs() * 0.16).clamp(0.82, 1.0);
+              final transform = Matrix4.identity();
+              if (!reduceMotion) {
+                transform
+                  ..setEntry(3, 2, 0.0014)
+                  ..translateByDouble(0, distance.abs() * 18, 0, 1)
+                  ..rotateY(distance * -0.16)
+                  ..scaleByDouble(focus, focus, 1, 1);
+              }
+              return Transform(
+                alignment: Alignment.center,
+                transform: transform,
+                child: Opacity(
+                  opacity: reduceMotion
+                      ? 1
+                      : (1 - distance.abs() * 0.2).clamp(0.68, 1),
+                  child: child,
+                ),
+              );
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+              child: CupertinoButton(
+                padding: EdgeInsets.zero,
+                onPressed: () => context.push('/anime/${entry.animeId}'),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(18),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x33000000),
+                        blurRadius: 18,
+                        offset: Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(18),
+                    child: AspectRatio(
+                      aspectRatio: 2 / 3,
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          AppNetworkImage(
+                            url: entry.anime.coverImageUrl,
+                            fit: BoxFit.cover,
+                          ),
+                          const DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [Color(0x00000000), Color(0xCC1F160F)],
+                                stops: [0.48, 1],
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            left: 12,
+                            right: 12,
+                            bottom: 13,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  entry.anime.title,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontFamily: 'Pretendard',
+                                    fontSize: 15,
+                                    height: 1.25,
+                                    fontWeight: FontWeight.w700,
+                                    color: CupertinoColors.white,
+                                  ),
+                                ),
+                                const SizedBox(height: 5),
+                                const Text(
+                                  '★★★★★  10.0',
+                                  style: TextStyle(
+                                    fontFamily: 'Pretendard',
+                                    fontSize: 12,
+                                    color: Color(0xFFFFD166),
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-              ],
+              ),
             ),
-          ),
-        );
-      },
-    ),
-  );
+          );
+        },
+      ),
+    );
+  }
 }
 
 class _PosterSkeletonRow extends StatelessWidget {
   const _PosterSkeletonRow();
   @override
   Widget build(BuildContext context) => SizedBox(
-    height: 236,
+    height: 300,
     child: ListView.separated(
       scrollDirection: Axis.horizontal,
       itemCount: 3,
       separatorBuilder: (_, _) => const SizedBox(width: 12),
       itemBuilder: (_, _) =>
-          const SizedBox(width: 128, child: AppSkeleton(height: 236)),
+          const SizedBox(width: 168, child: AppSkeleton(height: 252)),
     ),
   );
 }

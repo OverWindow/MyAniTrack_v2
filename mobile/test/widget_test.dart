@@ -82,7 +82,7 @@ void main() {
               '/collection': '컬렉션 화면',
               '/search': '검색 화면',
               '/analysis': '분석 화면',
-              '/profile': '프로필 화면',
+              '/friends': '친구 화면',
             }.entries)
               GoRoute(
                 path: route.key,
@@ -103,7 +103,7 @@ void main() {
     expect(find.text('홈'), findsOneWidget);
     expect(find.text('검색'), findsOneWidget);
     expect(find.text('분석'), findsOneWidget);
-    expect(find.text('프로필'), findsOneWidget);
+    expect(find.text('친구'), findsOneWidget);
 
     await tester.tap(find.text('분석'));
     await tester.pumpAndSettle();

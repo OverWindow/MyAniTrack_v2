@@ -170,5 +170,62 @@ void main() {
       expect(actor.name, '타네자키 아츠미');
       expect(actor.imageUrl, isNull);
     });
+
+    test('Viewing DNA와 확장 통계 응답을 읽는다', () {
+      final dna = ViewingDna.fromJson({
+        'item': {
+          'confidence': 'high',
+          'strongestAxis': 'completion',
+          'axes': [
+            {
+              'key': 'completion',
+              'label': '작품 완주력',
+              'score': 82.5,
+              'available': true,
+              'description': '완주 비율',
+            },
+          ],
+        },
+      });
+      final stats = StatsOverview.fromJson({
+        'item': {
+          'totalCount': 12,
+          'preferenceSummary': '드라마를 선호합니다.',
+          'seriesStats': {
+            'watchedSeriesCount': 4,
+            'completedSeriesCount': 3,
+            'seriesCompletionRate': 75,
+          },
+          'topRatedGenreTopAnime': [
+            {'animeId': 7, 'title': '작품', 'coverImageLarge': null, 'score': 10},
+          ],
+        },
+      });
+
+      expect(dna.axes.single.score, 82.5);
+      expect(dna.strongestAxis, 'completion');
+      expect(stats.seriesStats.completedSeriesCount, 3);
+      expect(stats.topRatedGenreAnime.single.animeId, 7);
+    });
+  });
+
+  group('친구 DTO', () {
+    test('검색 결과의 관계와 공개 프로필을 보존한다', () {
+      final result = UserSearchResult.fromJson({
+        'relationship': 'incoming',
+        'requestId': 31,
+        'user': {
+          'id': 9,
+          'username': 'friend_user',
+          'profileImageUrl': null,
+          'animeListCount': 44,
+        },
+      });
+
+      expect(result.relationship, UserRelationship.incoming);
+      expect(result.requestId, 31);
+      expect(result.user.animeListCount, 44);
+      expect(result.user.profileImageUrl, isNull);
+    });
   });
 }

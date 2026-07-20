@@ -1,8 +1,9 @@
-import 'dart:typed_data';
-
+import 'package:crop_your_image/crop_your_image.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image/image.dart' as image_lib;
 import 'package:image_picker/image_picker.dart';
 
 import 'package:myanitrack_mobile/src/api.dart';
@@ -33,11 +34,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       child: AppBackground(
         child: CustomScrollView(
           slivers: [
-            const CupertinoSliverNavigationBar(
-              largeTitle: Text('프로필'),
-              backgroundColor: Color(0xEFFFFFFF),
-              border: Border(bottom: BorderSide(color: AppColors.border)),
-            ),
+            const AppCompactSliverHeader(title: '프로필'),
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
               sliver: SliverList.list(
@@ -206,6 +203,7 @@ class _AccountManagementScreenState
       ),
       child: AppBackground(
         child: SafeArea(
+          top: false,
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 22, 16, 28),
             children: [
@@ -335,6 +333,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
       ),
       child: AppBackground(
         child: SafeArea(
+          top: false,
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 22, 16, 28),
             children: [
@@ -436,16 +435,26 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
       requestFullMetadata: false,
     );
     if (image == null) return;
-    final length = await image.length();
-    if (length > 5 * 1024 * 1024) {
-      if (mounted) showAppToast(context, '프로필 이미지는 5MB 이하여야 합니다.', error: true);
-      return;
-    }
     final bytes = await image.readAsBytes();
     if (!mounted) return;
+    final cropped = await Navigator.of(context).push<Uint8List>(
+      CupertinoPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => _ProfileCropScreen(image: bytes),
+      ),
+    );
+    if (!mounted || cropped == null) return;
+    if (cropped.lengthInBytes > 5 * 1024 * 1024) {
+      showAppToast(context, '프로필 이미지는 5MB 이하여야 합니다.', error: true);
+      return;
+    }
     setState(() {
-      _image = image;
-      _preview = bytes;
+      _image = XFile.fromData(
+        cropped,
+        mimeType: 'image/jpeg',
+        name: 'myanitrack-profile.jpg',
+      );
+      _preview = cropped;
       _removeImage = false;
     });
   }
@@ -477,6 +486,135 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   }
 }
 
+class _ProfileCropScreen extends StatefulWidget {
+  const _ProfileCropScreen({required this.image});
+
+  final Uint8List image;
+
+  @override
+  State<_ProfileCropScreen> createState() => _ProfileCropScreenState();
+}
+
+class _ProfileCropScreenState extends State<_ProfileCropScreen> {
+  final CropController _controller = CropController();
+  bool _ready = false;
+  bool _cropping = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return CupertinoPageScaffold(
+      navigationBar: CupertinoNavigationBar(
+        middle: const Text('사진 위치 조정'),
+        leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          onPressed: _cropping ? null : () => Navigator.of(context).pop(),
+          child: const Text('취소'),
+        ),
+        trailing: CupertinoButton(
+          padding: EdgeInsets.zero,
+          onPressed: !_ready || _cropping ? null : _crop,
+          child: _cropping
+              ? const CupertinoActivityIndicator(radius: 9)
+              : const Text('완료'),
+        ),
+      ),
+      child: SafeArea(
+        top: false,
+        child: ColoredBox(
+          color: const Color(0xFF17130F),
+          child: Column(
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(20, 18, 20, 12),
+                child: Text(
+                  '두 손가락으로 확대하고 드래그해 원 안에 맞춰주세요.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: 'Pretendard',
+                    fontSize: 14,
+                    color: CupertinoColors.systemGrey4,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(18),
+                  child: Crop(
+                    image: widget.image,
+                    controller: _controller,
+                    withCircleUi: true,
+                    interactive: true,
+                    fixCropRect: true,
+                    baseColor: const Color(0xFF17130F),
+                    maskColor: const Color(0xAA000000),
+                    radius: 999,
+                    progressIndicator: const Center(
+                      child: CupertinoActivityIndicator(color: AppColors.card),
+                    ),
+                    cornerDotBuilder: (_, _) => const SizedBox.shrink(),
+                    initialRectBuilder: InitialRectBuilder.withBuilder((
+                      viewport,
+                      _,
+                    ) {
+                      final side =
+                          mathMin(viewport.width, viewport.height) * 0.82;
+                      return Rect.fromCenter(
+                        center: viewport.center,
+                        width: side,
+                        height: side,
+                      );
+                    }),
+                    onStatusChanged: (status) {
+                      if (mounted) {
+                        setState(() => _ready = status == CropStatus.ready);
+                      }
+                    },
+                    onCropped: _onCropped,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _crop() {
+    setState(() => _cropping = true);
+    _controller.crop();
+  }
+
+  Future<void> _onCropped(CropResult result) async {
+    switch (result) {
+      case CropSuccess(:final croppedImage):
+        final normalized = await compute(_normalizeProfileImage, croppedImage);
+        if (mounted) Navigator.of(context).pop(normalized);
+      case CropFailure():
+        if (!mounted) return;
+        setState(() => _cropping = false);
+        showAppToast(context, '사진을 자르지 못했습니다. 다시 시도해주세요.', error: true);
+    }
+  }
+}
+
+double mathMin(double left, double right) => left < right ? left : right;
+
+Uint8List _normalizeProfileImage(Uint8List source) {
+  final decoded = image_lib.decodeImage(source);
+  if (decoded == null) return source;
+  final oriented = image_lib.bakeOrientation(decoded);
+  final resized = oriented.width > 1024 || oriented.height > 1024
+      ? image_lib.copyResize(
+          oriented,
+          width: oriented.width >= oriented.height ? 1024 : null,
+          height: oriented.height > oriented.width ? 1024 : null,
+          interpolation: image_lib.Interpolation.cubic,
+        )
+      : oriented;
+  return Uint8List.fromList(image_lib.encodeJpg(resized, quality: 88));
+}
+
 class LegalScreen extends StatelessWidget {
   const LegalScreen({super.key});
 
@@ -489,6 +627,7 @@ class LegalScreen extends StatelessWidget {
       ),
       child: AppBackground(
         child: SafeArea(
+          top: false,
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 20, 16, 28),
             children: const [

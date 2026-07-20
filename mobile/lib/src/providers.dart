@@ -1,13 +1,13 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
-import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthUser;
 
 import 'package:myanitrack_mobile/src/api.dart';
 import 'package:myanitrack_mobile/src/config.dart';
 import 'package:myanitrack_mobile/src/models.dart';
+import 'package:myanitrack_mobile/src/native_google_auth.dart';
 
 final apiClientProvider = Provider<ApiClient>(
   (ref) => ApiClient(
@@ -19,14 +19,27 @@ final apiClientProvider = Provider<ApiClient>(
 final authRepositoryProvider = Provider<AuthRepository>(
   (ref) => AuthRepository(ref.watch(apiClientProvider)),
 );
+final googleAuthGatewayProvider = Provider<GoogleAuthGateway>(
+  (_) => NativeGoogleAuthGateway(),
+);
+final authConfigurationReadyProvider = Provider<bool>(
+  (_) => AppConfig.hasSupabaseConfig,
+);
 final collectionRepositoryProvider = Provider<CollectionRepository>(
   (ref) => CollectionRepository(ref.watch(apiClientProvider)),
 );
 final homeRepositoryProvider = Provider<HomeRepository>(
   (ref) => HomeRepository(ref.watch(apiClientProvider)),
 );
+final friendsRepositoryProvider = Provider<FriendsRepository>(
+  (ref) => FriendsRepository(ref.watch(apiClientProvider)),
+);
+final analysisSubjectProvider = Provider<int?>((_) => null);
 final analysisRepositoryProvider = Provider<AnalysisRepository>(
-  (ref) => AnalysisRepository(ref.watch(apiClientProvider)),
+  (ref) => AnalysisRepository(
+    ref.watch(apiClientProvider),
+    userId: ref.watch(analysisSubjectProvider),
+  ),
 );
 final profileRepositoryProvider = Provider<ProfileRepository>(
   (ref) => ProfileRepository(ref.watch(apiClientProvider)),
@@ -35,7 +48,7 @@ final profileRepositoryProvider = Provider<ProfileRepository>(
 enum SessionPhase {
   bootstrapping,
   signedOut,
-  oauthPending,
+  googlePending,
   backendLinking,
   agreementsRequired,
   authenticated,
@@ -52,7 +65,7 @@ class SessionState {
   bool get isAuthenticated => phase == SessionPhase.authenticated;
   bool get isBusy =>
       phase == SessionPhase.bootstrapping ||
-      phase == SessionPhase.oauthPending ||
+      phase == SessionPhase.googlePending ||
       phase == SessionPhase.backendLinking;
 }
 
@@ -61,24 +74,19 @@ final sessionControllerProvider =
 
 class SessionController extends Notifier<SessionState> {
   StreamSubscription<AuthState>? _subscription;
-  AppLifecycleListener? _lifecycleListener;
-  Timer? _oauthResumeTimer;
   bool _bootstrapping = false;
 
   @override
   SessionState build() {
-    _lifecycleListener ??= AppLifecycleListener(onResume: _onAppResumed);
     ref.onDispose(() {
       _subscription?.cancel();
-      _lifecycleListener?.dispose();
-      _oauthResumeTimer?.cancel();
     });
     Future<void>.microtask(_start);
     return const SessionState.bootstrapping();
   }
 
   Future<void> _start() async {
-    if (!AppConfig.hasSupabaseConfig) {
+    if (!ref.read(authConfigurationReadyProvider)) {
       state = const SessionState(
         phase: SessionPhase.signedOut,
         message: 'Supabase 환경 설정이 필요합니다.',
@@ -104,35 +112,32 @@ class SessionController extends Notifier<SessionState> {
   }
 
   Future<void> signInWithGoogle() async {
-    if (!AppConfig.hasSupabaseConfig) {
+    if (!ref.read(authConfigurationReadyProvider)) {
       state = const SessionState(
         phase: SessionPhase.signedOut,
         message: 'SUPABASE_URL과 publishable key를 설정해주세요.',
       );
       return;
     }
-    state = const SessionState(phase: SessionPhase.oauthPending);
+    state = const SessionState(phase: SessionPhase.googlePending);
     try {
-      final launched = await Supabase.instance.client.auth.signInWithOAuth(
-        OAuthProvider.google,
-        redirectTo: AppConfig.authRedirectUrl,
+      await ref.read(googleAuthGatewayProvider).signIn();
+      await bootstrap();
+    } on NativeGoogleAuthFailure catch (error) {
+      state = SessionState(
+        phase: SessionPhase.signedOut,
+        message: error.message,
       );
-      if (!launched) {
-        state = const SessionState(
-          phase: SessionPhase.signedOut,
-          message: 'Google 로그인 창을 열지 못했습니다.',
-        );
-      }
     } on Object {
       state = const SessionState(
         phase: SessionPhase.signedOut,
-        message: 'Google 로그인을 시작하지 못했습니다.',
+        message: 'Google 로그인을 완료하지 못했습니다.',
       );
     }
   }
 
   Future<void> bootstrap() async {
-    if (_bootstrapping || !AppConfig.hasSupabaseConfig) return;
+    if (_bootstrapping || !ref.read(authConfigurationReadyProvider)) return;
     final session = Supabase.instance.client.auth.currentSession;
     if (session == null) {
       state = const SessionState(phase: SessionPhase.signedOut);
@@ -216,12 +221,13 @@ class SessionController extends Notifier<SessionState> {
   }
 
   Future<void> _supabaseSignOut() async {
-    if (!AppConfig.hasSupabaseConfig) return;
+    if (!ref.read(authConfigurationReadyProvider)) return;
     try {
       await Supabase.instance.client.auth.signOut();
     } on Object {
       // The local state still moves to signed out when the remote call fails.
     }
+    await ref.read(googleAuthGatewayProvider).signOut();
   }
 
   Future<void> handleApiFailure(ApiFailure failure) async {
@@ -239,21 +245,6 @@ class SessionController extends Notifier<SessionState> {
       phase: SessionPhase.signedOut,
       message: '로그인 세션이 만료되었습니다. 다시 로그인해주세요.',
     );
-  }
-
-  void _onAppResumed() {
-    if (state.phase != SessionPhase.oauthPending) return;
-    _oauthResumeTimer?.cancel();
-    _oauthResumeTimer = Timer(const Duration(milliseconds: 600), () {
-      if (state.phase != SessionPhase.oauthPending) return;
-      final hasSession = Supabase.instance.client.auth.currentSession != null;
-      if (!hasSession) {
-        state = const SessionState(
-          phase: SessionPhase.signedOut,
-          message: 'Google 로그인이 취소되었습니다.',
-        );
-      }
-    });
   }
 }
 
@@ -556,8 +547,26 @@ final collectionEntryProvider = FutureProvider.family<CollectionEntry?, int>(
   (ref, animeId) => ref.watch(collectionRepositoryProvider).entry(animeId),
 );
 
+final friendSnapshotProvider = FutureProvider<FriendSnapshot>(
+  (ref) => ref.watch(friendsRepositoryProvider).snapshot(),
+);
+final userSearchProvider = FutureProvider.autoDispose
+    .family<CursorPage<UserSearchResult>, String>((ref, query) async {
+      final token = CancelToken();
+      ref.onDispose(token.cancel);
+      return ref
+          .watch(friendsRepositoryProvider)
+          .search(query, cancelToken: token);
+    });
+final publicUserProvider = FutureProvider.family<PublicUser, int>(
+  (ref, userId) => ref.watch(friendsRepositoryProvider).profile(userId),
+);
+
 final statsOverviewProvider = FutureProvider<StatsOverview>(
   (ref) => ref.watch(analysisRepositoryProvider).overview(),
+);
+final viewingDnaProvider = FutureProvider<ViewingDna>(
+  (ref) => ref.watch(analysisRepositoryProvider).viewingDna(),
 );
 final formatDistributionProvider = FutureProvider<FormatDistribution>(
   (ref) => ref.watch(analysisRepositoryProvider).formats(),
@@ -591,6 +600,7 @@ void invalidateUserData(WidgetRef ref) {
   ref.invalidate(favoriteAnimeProvider);
   ref.invalidate(badgeOverviewProvider);
   ref.invalidate(statsOverviewProvider);
+  ref.invalidate(viewingDnaProvider);
   ref.invalidate(formatDistributionProvider);
   ref.invalidate(genreBubbleProvider);
   ref.invalidate(yearlyScoreProvider);

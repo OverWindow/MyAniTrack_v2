@@ -19,6 +19,40 @@ class AppBackground extends StatelessWidget {
   }
 }
 
+class AppCompactSliverHeader extends StatelessWidget {
+  const AppCompactSliverHeader({required this.title, this.trailing, super.key});
+
+  final String title;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return SliverSafeArea(
+      bottom: false,
+      sliver: SliverToBoxAdapter(
+        child: DecoratedBox(
+          decoration: const BoxDecoration(
+            color: Color(0xEFFFFFFF),
+            border: Border(bottom: BorderSide(color: AppColors.border)),
+          ),
+          child: SizedBox(
+            height: 48,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  Expanded(child: Text(title, style: appTitleStyle(size: 22))),
+                  if (trailing != null) trailing!,
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class AppCard extends StatelessWidget {
   const AppCard({
     required this.child,
@@ -198,10 +232,6 @@ class AppSectionHeader extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (eyebrow != null) ...[
-                Text(eyebrow!.toUpperCase(), style: appLabelStyle()),
-                const SizedBox(height: 4),
-              ],
               Text(title, style: appTitleStyle(size: 20)),
               if (description != null) ...[
                 const SizedBox(height: 5),

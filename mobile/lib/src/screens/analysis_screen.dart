@@ -13,7 +13,9 @@ import 'package:myanitrack_mobile/src/theme.dart';
 import 'package:myanitrack_mobile/src/widgets.dart';
 
 class AnalysisScreen extends ConsumerStatefulWidget {
-  const AnalysisScreen({super.key});
+  const AnalysisScreen({this.title = '내 분석', super.key});
+
+  final String title;
 
   @override
   ConsumerState<AnalysisScreen> createState() => _AnalysisScreenState();
@@ -29,11 +31,7 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
       child: AppBackground(
         child: CustomScrollView(
           slivers: [
-            const CupertinoSliverNavigationBar(
-              largeTitle: Text('내 분석'),
-              backgroundColor: Color(0xEFFFFFFF),
-              border: Border(bottom: BorderSide(color: AppColors.border)),
-            ),
+            AppCompactSliverHeader(title: widget.title),
             CupertinoSliverRefreshControl(onRefresh: _refresh),
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
@@ -86,7 +84,10 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
 
   Future<void> _refresh() async {
     ref.invalidate(statsOverviewProvider);
-    if (_segment == 0) ref.invalidate(formatDistributionProvider);
+    if (_segment == 0) {
+      ref.invalidate(formatDistributionProvider);
+      ref.invalidate(viewingDnaProvider);
+    }
     if (_segment == 1) {
       ref.invalidate(genreBubbleProvider);
       ref.invalidate(yearlyScoreProvider);
@@ -106,6 +107,7 @@ class _OverviewSegment extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final overview = ref.watch(statsOverviewProvider);
     final formats = ref.watch(formatDistributionProvider);
+    final dna = ref.watch(viewingDnaProvider);
     return Column(
       children: [
         overview.when(
@@ -148,6 +150,16 @@ class _OverviewSegment extends ConsumerWidget {
               ),
             ],
           ),
+        ),
+        const SizedBox(height: 16),
+        dna.when(
+          loading: () => const AppSkeleton(height: 360),
+          error: (error, _) => _AsyncErrorCard(
+            title: 'Viewing DNA를 불러오지 못했습니다',
+            error: error,
+            onRetry: () => ref.invalidate(viewingDnaProvider),
+          ),
+          data: (data) => _ViewingDnaCard(data: data),
         ),
         const SizedBox(height: 16),
         formats.when(
@@ -204,6 +216,283 @@ class _MetricGrid extends StatelessWidget {
   }
 }
 
+class _ViewingDnaCard extends StatelessWidget {
+  const _ViewingDnaCard({required this.data});
+  final ViewingDna data;
+
+  @override
+  Widget build(BuildContext context) {
+    final axes = data.axes.where((axis) => axis.available).toList();
+    if (axes.length < 3) {
+      return const AppStateView(
+        title: 'Viewing DNA 데이터가 부족합니다',
+        message: '감상과 평점 기록이 쌓이면 여섯 가지 시청 성향을 보여드립니다.',
+      );
+    }
+    final strongest = data.axes
+        .where((axis) => axis.key == data.strongestAxis)
+        .firstOrNull;
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AppSectionHeader(
+            title: 'Viewing DNA',
+            description: strongest == null
+                ? '감상 기록을 여섯 가지 축으로 분석했습니다.'
+                : '가장 뚜렷한 성향은 ${strongest.label}입니다.',
+            trailing: AppBadge(label: _confidenceLabel(data.confidence)),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            height: 280,
+            child: RadarChart(
+              RadarChartData(
+                dataSets: [
+                  RadarDataSet(
+                    dataEntries: [
+                      for (final axis in axes) RadarEntry(value: axis.score),
+                    ],
+                    fillColor: AppColors.point.withValues(alpha: .22),
+                    borderColor: AppColors.pointPressed,
+                    borderWidth: 2.5,
+                    entryRadius: 3,
+                  ),
+                ],
+                radarShape: RadarShape.polygon,
+                radarBackgroundColor: AppColors.pointSoftest,
+                radarBorderData: const BorderSide(color: AppColors.border),
+                gridBorderData: const BorderSide(color: AppColors.border),
+                tickBorderData: const BorderSide(color: AppColors.border),
+                tickCount: 4,
+                ticksTextStyle: const TextStyle(
+                  color: AppColors.mutedText,
+                  fontSize: 9,
+                ),
+                titleTextStyle: const TextStyle(
+                  fontFamily: 'Pretendard',
+                  color: AppColors.secondaryText,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+                getTitle: (index, angle) =>
+                    RadarChartTitle(text: axes[index].label, angle: angle),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          for (final axis in axes)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 96,
+                    child: Text(
+                      '${axis.label} ${axis.score.toStringAsFixed(0)}',
+                      style: appLabelStyle(color: AppColors.pointPressed),
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      axis.description,
+                      style: const TextStyle(
+                        color: AppColors.mutedText,
+                        fontSize: 12,
+                        height: 1.35,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  String _confidenceLabel(String value) => switch (value) {
+    'high' => '신뢰도 높음',
+    'medium' => '신뢰도 보통',
+    'low' => '신뢰도 낮음',
+    _ => '데이터 수집 중',
+  };
+}
+
+class _MapDonutCard extends StatefulWidget {
+  const _MapDonutCard({
+    required this.title,
+    required this.values,
+    required this.valueLabel,
+    required this.keyLabel,
+    required this.onTap,
+  });
+  final String title;
+  final Map<String, double> values;
+  final String Function(double) valueLabel;
+  final String Function(String) keyLabel;
+  final ValueChanged<String> onTap;
+
+  @override
+  State<_MapDonutCard> createState() => _MapDonutCardState();
+}
+
+class _MapDonutCardState extends State<_MapDonutCard> {
+  int? touched;
+
+  @override
+  Widget build(BuildContext context) {
+    final entries = widget.values.entries.toList()
+      ..sort((left, right) => right.value.compareTo(left.value));
+    final visible = entries.take(9).toList();
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AppSectionHeader(
+            title: widget.title,
+            description: '차트 조각을 누르면 해당 작품을 확인할 수 있습니다.',
+          ),
+          const SizedBox(height: 16),
+          if (visible.isEmpty)
+            const Text('표시할 데이터가 없습니다.')
+          else ...[
+            SizedBox(
+              height: 210,
+              child: PieChart(
+                PieChartData(
+                  centerSpaceRadius: 46,
+                  sectionsSpace: 2,
+                  pieTouchData: PieTouchData(
+                    touchCallback: (event, response) {
+                      final index = event.isInterestedForInteractions
+                          ? response?.touchedSection?.touchedSectionIndex
+                          : null;
+                      setState(() => touched = index);
+                      if (index != null &&
+                          index >= 0 &&
+                          index < visible.length) {
+                        widget.onTap(visible[index].key);
+                      }
+                    },
+                  ),
+                  sections: [
+                    for (final indexed in visible.indexed)
+                      PieChartSectionData(
+                        value: indexed.$2.value,
+                        color: AppColors
+                            .chart[indexed.$1 % AppColors.chart.length],
+                        radius: touched == indexed.$1 ? 54 : 46,
+                        showTitle: false,
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            Wrap(
+              spacing: 10,
+              runSpacing: 8,
+              children: [
+                for (final indexed in visible.indexed)
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 9,
+                        height: 9,
+                        decoration: BoxDecoration(
+                          color: AppColors
+                              .chart[indexed.$1 % AppColors.chart.length],
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        '${widget.keyLabel(indexed.$2.key)} ${widget.valueLabel(indexed.$2.value)}',
+                        style: appLabelStyle(),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _InsightAnimeCard extends StatelessWidget {
+  const _InsightAnimeCard({required this.item});
+  final StatsOverview item;
+
+  @override
+  Widget build(BuildContext context) {
+    final insights = <(String, List<AnalysisAnimeInsight>)>[
+      ('가장 많이 본 장르의 작품', item.topWatchedGenreAnime),
+      ('가장 높게 평가한 장르의 작품', item.topRatedGenreAnime),
+    ];
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const AppSectionHeader(
+            title: '취향을 만든 작품',
+            description: '장르 감상량과 평가를 대표하는 작품입니다.',
+          ),
+          for (final insight in insights)
+            if (insight.$2.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Text(insight.$1, style: appLabelStyle()),
+              const SizedBox(height: 9),
+              SizedBox(
+                height: 154,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: insight.$2.length,
+                  separatorBuilder: (_, _) => const SizedBox(width: 10),
+                  itemBuilder: (context, index) {
+                    final anime = insight.$2[index];
+                    return SizedBox(
+                      width: 84,
+                      child: CupertinoButton(
+                        padding: EdgeInsets.zero,
+                        onPressed: () =>
+                            context.push('/anime/${anime.animeId}'),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SizedBox(
+                              width: 84,
+                              height: 126,
+                              child: AnimePoster(url: anime.coverImageUrl),
+                            ),
+                            const SizedBox(height: 5),
+                            Text(
+                              anime.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: AppColors.text,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+        ],
+      ),
+    );
+  }
+}
+
 class _FormatCard extends StatefulWidget {
   const _FormatCard({required this.data});
   final FormatDistribution data;
@@ -214,6 +503,7 @@ class _FormatCard extends StatefulWidget {
 
 class _FormatCardState extends State<_FormatCard> {
   int? touched;
+  bool watchTime = false;
 
   @override
   Widget build(BuildContext context) {
@@ -233,6 +523,23 @@ class _FormatCardState extends State<_FormatCard> {
             eyebrow: 'Format',
             description: 'TV, 영화, OVA 등 작품 형식별 비중입니다.',
           ),
+          const SizedBox(height: 12),
+          CupertinoSlidingSegmentedControl<bool>(
+            groupValue: watchTime,
+            children: const {
+              false: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                child: Text('작품 수'),
+              ),
+              true: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                child: Text('시청 시간'),
+              ),
+            },
+            onValueChanged: (value) {
+              if (value != null) setState(() => watchTime = value);
+            },
+          ),
           const SizedBox(height: 16),
           SizedBox(
             height: 190,
@@ -250,12 +557,16 @@ class _FormatCardState extends State<_FormatCard> {
                 sections: [
                   for (final indexed in items.indexed)
                     PieChartSectionData(
-                      value: indexed.$2.animeCount.toDouble(),
+                      value: watchTime
+                          ? indexed.$2.watchMinutes.toDouble()
+                          : indexed.$2.animeCount.toDouble(),
                       color:
                           AppColors.chart[indexed.$1 % AppColors.chart.length],
                       radius: touched == indexed.$1 ? 52 : 44,
                       showTitle: touched == indexed.$1,
-                      title: '${indexed.$2.percentage.toStringAsFixed(0)}%',
+                      title: watchTime
+                          ? '${(indexed.$2.watchMinutes / math.max(1, widget.data.totalWatchMinutes) * 100).toStringAsFixed(0)}%'
+                          : '${indexed.$2.percentage.toStringAsFixed(0)}%',
                       titleStyle: const TextStyle(
                         fontFamily: 'Pretendard',
                         fontWeight: FontWeight.w700,
@@ -284,7 +595,9 @@ class _FormatCardState extends State<_FormatCard> {
                     ),
                     const SizedBox(width: 5),
                     Text(
-                      '${indexed.$2.label} ${indexed.$2.animeCount}편',
+                      watchTime
+                          ? '${indexed.$2.label} ${(indexed.$2.watchMinutes / 60).toStringAsFixed(1)}시간'
+                          : '${indexed.$2.label} ${indexed.$2.animeCount}편',
                       style: appLabelStyle(),
                     ),
                   ],
@@ -338,6 +651,31 @@ class _TasteSegment extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 16),
+              _MapDonutCard(
+                title: '장르별 시청 시간',
+                values: item.genreWatchMinutes,
+                valueLabel: (value) => '${(value / 60).toStringAsFixed(1)}시간',
+                keyLabel: genreLabel,
+                onTap: (key) => _showFilteredCollection(
+                  context,
+                  ref,
+                  title: '${genreLabel(key)} 작품',
+                  genre: key,
+                ),
+              ),
+              const SizedBox(height: 16),
+              _DistributionCard(
+                title: '장르별 평균 점수',
+                eyebrow: 'Genre',
+                values: item.genreAverageScore,
+                onTap: (key) => _showFilteredCollection(
+                  context,
+                  ref,
+                  title: '${genreLabel(key)} 작품',
+                  genre: key,
+                ),
+              ),
+              const SizedBox(height: 16),
               _DistributionCard(
                 title: '방영 연도 분포',
                 eyebrow: 'Release year',
@@ -355,6 +693,11 @@ class _TasteSegment extends ConsumerWidget {
                   }
                 },
               ),
+              if (item.topWatchedGenreAnime.isNotEmpty ||
+                  item.topRatedGenreAnime.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                _InsightAnimeCard(item: item),
+              ],
               const SizedBox(height: 16),
               _DistributionCard(
                 title: '내 평점 분포',
@@ -752,7 +1095,7 @@ class _StudioRankingCard extends ConsumerWidget {
           if (items.isEmpty)
             const Text('표시할 스튜디오 데이터가 없습니다.')
           else
-            for (final indexed in items.take(15).indexed)
+            for (final indexed in items.take(5).indexed)
               _RankingRow(
                 rank: indexed.$1 + 1,
                 title: indexed.$2.name,
@@ -772,6 +1115,39 @@ class _StudioRankingCard extends ConsumerWidget {
                   provider: studioAnimeProvider(indexed.$2.id),
                 ),
               ),
+          if (items.length > 5) ...[
+            const SizedBox(height: 8),
+            AppSecondaryButton(
+              label: '전체 ${items.length}개 보기',
+              icon: CupertinoIcons.chevron_down,
+              onPressed: () => _showRankingMore(
+                context,
+                title: '스튜디오 랭킹',
+                children: [
+                  for (final indexed in items.indexed)
+                    _RankingRow(
+                      rank: indexed.$1 + 1,
+                      title: indexed.$2.name,
+                      detail: switch (sort) {
+                        'score' =>
+                          indexed.$2.averageScore == null
+                              ? '평점 데이터 없음'
+                              : '평균 ${indexed.$2.averageScore!.toStringAsFixed(1)}점',
+                        'watchTime' =>
+                          '${(indexed.$2.totalWatchMinutes / 60).toStringAsFixed(1)}시간',
+                        _ => '${indexed.$2.animeCount}편',
+                      },
+                      onTap: () => _showProviderAnime(
+                        context,
+                        ref,
+                        title: indexed.$2.name,
+                        provider: studioAnimeProvider(indexed.$2.id),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -798,7 +1174,7 @@ class _VoiceActorRankingCard extends ConsumerWidget {
           if (items.isEmpty)
             const Text('표시할 성우 데이터가 없습니다.')
           else
-            for (final indexed in items.take(15).indexed)
+            for (final indexed in items.take(5).indexed)
               _RankingRow(
                 rank: indexed.$1 + 1,
                 title: indexed.$2.name,
@@ -815,6 +1191,36 @@ class _VoiceActorRankingCard extends ConsumerWidget {
                   provider: voiceActorAnimeProvider(indexed.$2.id),
                 ),
               ),
+          if (items.length > 5) ...[
+            const SizedBox(height: 8),
+            AppSecondaryButton(
+              label: '전체 ${items.length}개 보기',
+              icon: CupertinoIcons.chevron_down,
+              onPressed: () => _showRankingMore(
+                context,
+                title: '성우 랭킹',
+                children: [
+                  for (final indexed in items.indexed)
+                    _RankingRow(
+                      rank: indexed.$1 + 1,
+                      title: indexed.$2.name,
+                      detail: sort == 'score'
+                          ? (indexed.$2.averageScore == null
+                                ? '평점 데이터 없음'
+                                : '평균 ${indexed.$2.averageScore!.toStringAsFixed(1)}점')
+                          : '${indexed.$2.animeCount}편 · ${indexed.$2.characterCount}역',
+                      imageUrl: indexed.$2.imageUrl,
+                      onTap: () => _showProviderAnime(
+                        context,
+                        ref,
+                        title: indexed.$2.name,
+                        provider: voiceActorAnimeProvider(indexed.$2.id),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -893,6 +1299,52 @@ class _RankingRow extends StatelessWidget {
   }
 }
 
+Future<void> _showRankingMore(
+  BuildContext context, {
+  required String title,
+  required List<Widget> children,
+}) {
+  return showCupertinoModalPopup<void>(
+    context: context,
+    builder: (sheetContext) => Container(
+      height: MediaQuery.sizeOf(sheetContext).height * .88,
+      decoration: const BoxDecoration(
+        color: AppColors.ivory,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 8, 4),
+              child: Row(
+                children: [
+                  Expanded(child: Text(title, style: appTitleStyle(size: 21))),
+                  CupertinoButton(
+                    padding: const EdgeInsets.all(10),
+                    onPressed: () => Navigator.of(sheetContext).pop(),
+                    child: const Icon(
+                      CupertinoIcons.xmark_circle_fill,
+                      color: AppColors.mutedText,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                children: children,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
 class _AsyncErrorCard extends StatelessWidget {
   const _AsyncErrorCard({
     required this.title,
@@ -930,9 +1382,20 @@ Future<void> _showFilteredCollection(
     builder: (context) => _AnimeListSheet(
       title: title,
       loader: () async {
-        final page = await ref
-            .read(collectionRepositoryProvider)
-            .list(genre: genre, year: year, score: score, limit: 50);
+        final userId = ref.read(analysisSubjectProvider);
+        final page = userId == null
+            ? await ref
+                  .read(collectionRepositoryProvider)
+                  .list(genre: genre, year: year, score: score, limit: 50)
+            : await ref
+                  .read(friendsRepositoryProvider)
+                  .collection(
+                    userId,
+                    genre: genre,
+                    year: year,
+                    score: score,
+                    limit: 50,
+                  );
         return page.items.map((entry) => entry.anime).toList();
       },
     ),

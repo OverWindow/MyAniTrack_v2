@@ -516,6 +516,11 @@ class StatsOverview {
     this.averageScore,
     this.favoriteGenre,
     this.averageReleaseYear,
+    this.favoriteReleasePeriod,
+    this.preferenceSummary,
+    this.topWatchedGenreAnime = const [],
+    this.topRatedGenreAnime = const [],
+    this.seriesStats = const SeriesStats(),
   });
 
   final int totalCount;
@@ -527,6 +532,11 @@ class StatsOverview {
   final double? averageScore;
   final String? favoriteGenre;
   final double? averageReleaseYear;
+  final String? favoriteReleasePeriod;
+  final String? preferenceSummary;
+  final List<AnalysisAnimeInsight> topWatchedGenreAnime;
+  final List<AnalysisAnimeInsight> topRatedGenreAnime;
+  final SeriesStats seriesStats;
   final Map<String, double> genreDistribution;
   final Map<String, double> genreWatchMinutes;
   final Map<String, double> genreAverageScore;
@@ -549,6 +559,15 @@ class StatsOverview {
       averageScore: readDouble(root['avgScore']),
       favoriteGenre: readString(root['favoriteGenre']),
       averageReleaseYear: readDouble(root['avgReleaseYear']),
+      favoriteReleasePeriod: readString(root['favoriteReleasePeriod']),
+      preferenceSummary: readString(root['preferenceSummary']),
+      topWatchedGenreAnime: asJsonList(
+        root['topWatchedGenreTopAnime'],
+      ).map(AnalysisAnimeInsight.fromJson).toList(),
+      topRatedGenreAnime: asJsonList(
+        root['topRatedGenreTopAnime'],
+      ).map(AnalysisAnimeInsight.fromJson).toList(),
+      seriesStats: SeriesStats.fromJson(asJsonMap(root['seriesStats'])),
       genreDistribution: numberMap(root['genreDistribution']),
       genreWatchMinutes: numberMap(root['genreWatchMinutes']),
       genreAverageScore: numberMap(root['genreAvgScore']),
@@ -556,6 +575,50 @@ class StatsOverview {
       scoreDistribution: numberMap(root['scoreDistribution']),
     );
   }
+}
+
+class AnalysisAnimeInsight {
+  const AnalysisAnimeInsight({
+    required this.animeId,
+    required this.title,
+    this.coverImageUrl,
+    this.score,
+    this.genre,
+  });
+
+  final int animeId;
+  final String title;
+  final String? coverImageUrl;
+  final double? score;
+  final String? genre;
+
+  factory AnalysisAnimeInsight.fromJson(JsonMap json) => AnalysisAnimeInsight(
+    animeId: readInt(json['animeId']) ?? readInt(json['id']) ?? 0,
+    title: readString(json['title']) ?? '제목 정보 없음',
+    coverImageUrl:
+        readString(json['coverImageLarge']) ??
+        readString(json['coverImageUrl']),
+    score: readDouble(json['score']),
+    genre: readString(json['genre']),
+  );
+}
+
+class SeriesStats {
+  const SeriesStats({
+    this.watchedSeriesCount = 0,
+    this.completedSeriesCount = 0,
+    this.seriesCompletionRate = 0,
+  });
+
+  final int watchedSeriesCount;
+  final int completedSeriesCount;
+  final double seriesCompletionRate;
+
+  factory SeriesStats.fromJson(JsonMap json) => SeriesStats(
+    watchedSeriesCount: readInt(json['watchedSeriesCount']) ?? 0,
+    completedSeriesCount: readInt(json['completedSeriesCount']) ?? 0,
+    seriesCompletionRate: readDouble(json['seriesCompletionRate']) ?? 0,
+  );
 }
 
 class FormatStat {
@@ -588,9 +651,11 @@ class FormatDistribution {
   const FormatDistribution({
     required this.items,
     required this.totalAnimeCount,
+    this.totalWatchMinutes = 0,
   });
   final List<FormatStat> items;
   final int totalAnimeCount;
+  final int totalWatchMinutes;
 
   factory FormatDistribution.fromJson(JsonMap json) {
     final item = asJsonMap(json['item']);
@@ -598,6 +663,7 @@ class FormatDistribution {
     return FormatDistribution(
       items: asJsonList(root['items']).map(FormatStat.fromJson).toList(),
       totalAnimeCount: readInt(root['totalAnimeCount']) ?? 0,
+      totalWatchMinutes: readInt(root['totalWatchMinutes']) ?? 0,
     );
   }
 }
@@ -635,12 +701,14 @@ class YearlyScore {
     required this.ratedAnimeCount,
     this.averageScore,
     this.communityAverageScore,
+    this.preferenceDelta,
   });
   final int year;
   final int animeCount;
   final int ratedAnimeCount;
   final double? averageScore;
   final double? communityAverageScore;
+  final double? preferenceDelta;
 
   factory YearlyScore.fromJson(JsonMap json) => YearlyScore(
     year: readInt(json['year']) ?? 0,
@@ -648,7 +716,54 @@ class YearlyScore {
     ratedAnimeCount: readInt(json['ratedAnimeCount']) ?? 0,
     averageScore: readDouble(json['averageScore']),
     communityAverageScore: readDouble(json['communityAverageScore']),
+    preferenceDelta: readDouble(json['preferenceDelta']),
   );
+}
+
+class ViewingDnaAxis {
+  const ViewingDnaAxis({
+    required this.key,
+    required this.label,
+    required this.score,
+    required this.available,
+    required this.description,
+  });
+
+  final String key;
+  final String label;
+  final double score;
+  final bool available;
+  final String description;
+
+  factory ViewingDnaAxis.fromJson(JsonMap json) => ViewingDnaAxis(
+    key: readString(json['key']) ?? '',
+    label: readString(json['label']) ?? '',
+    score: readDouble(json['score']) ?? 0,
+    available: readBool(json['available']),
+    description: readString(json['description']) ?? '',
+  );
+}
+
+class ViewingDna {
+  const ViewingDna({
+    required this.axes,
+    required this.confidence,
+    this.strongestAxis,
+  });
+
+  final List<ViewingDnaAxis> axes;
+  final String confidence;
+  final String? strongestAxis;
+
+  factory ViewingDna.fromJson(JsonMap json) {
+    final item = asJsonMap(json['item']);
+    final root = item.isEmpty ? json : item;
+    return ViewingDna(
+      axes: asJsonList(root['axes']).map(ViewingDnaAxis.fromJson).toList(),
+      confidence: readString(root['confidence']) ?? 'none',
+      strongestAxis: readString(root['strongestAxis']),
+    );
+  }
 }
 
 class StudioRanking {
@@ -711,4 +826,111 @@ class VoiceActorRanking {
       imageUrl: readString(image['large']) ?? readString(image['medium']),
     );
   }
+}
+
+enum UserRelationship {
+  none,
+  incoming,
+  outgoing,
+  friend;
+
+  static UserRelationship fromApi(String? value) {
+    return values.firstWhere(
+      (relationship) => relationship.name == value,
+      orElse: () => none,
+    );
+  }
+}
+
+class PublicUser {
+  const PublicUser({
+    required this.id,
+    required this.username,
+    required this.animeListCount,
+    this.profileImageUrl,
+    this.bio,
+  });
+
+  final int id;
+  final String username;
+  final int animeListCount;
+  final String? profileImageUrl;
+  final String? bio;
+
+  factory PublicUser.fromJson(JsonMap json) {
+    final nested = asJsonMap(json['user']);
+    final root = nested.isEmpty ? json : nested;
+    return PublicUser(
+      id: readInt(root['id']) ?? 0,
+      username: readString(root['username']) ?? '사용자',
+      animeListCount: readInt(root['animeListCount']) ?? 0,
+      profileImageUrl: readString(root['profileImageUrl']),
+      bio: readString(root['bio']),
+    );
+  }
+}
+
+class UserSearchResult {
+  const UserSearchResult({
+    required this.user,
+    required this.relationship,
+    this.requestId,
+  });
+
+  final PublicUser user;
+  final UserRelationship relationship;
+  final int? requestId;
+
+  factory UserSearchResult.fromJson(JsonMap json) => UserSearchResult(
+    user: PublicUser.fromJson(json),
+    relationship: UserRelationship.fromApi(readString(json['relationship'])),
+    requestId: readInt(json['requestId']),
+  );
+}
+
+class FriendRequest {
+  const FriendRequest({
+    required this.id,
+    required this.user,
+    required this.status,
+    this.createdAt,
+  });
+
+  final int id;
+  final PublicUser user;
+  final String status;
+  final String? createdAt;
+
+  factory FriendRequest.fromJson(JsonMap json) => FriendRequest(
+    id: readInt(json['id']) ?? 0,
+    user: PublicUser.fromJson(json),
+    status: readString(json['status']) ?? 'pending',
+    createdAt: readString(json['createdAt']),
+  );
+}
+
+class FriendItem {
+  const FriendItem({required this.id, required this.user, this.createdAt});
+
+  final int id;
+  final PublicUser user;
+  final String? createdAt;
+
+  factory FriendItem.fromJson(JsonMap json) => FriendItem(
+    id: readInt(json['id']) ?? 0,
+    user: PublicUser.fromJson(json),
+    createdAt: readString(json['createdAt']),
+  );
+}
+
+class FriendSnapshot {
+  const FriendSnapshot({
+    required this.friends,
+    required this.incoming,
+    required this.outgoing,
+  });
+
+  final List<FriendItem> friends;
+  final List<FriendRequest> incoming;
+  final List<FriendRequest> outgoing;
 }

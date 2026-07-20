@@ -43,10 +43,8 @@ class _CollectionScreenState extends ConsumerState<CollectionScreen> {
         child: CustomScrollView(
           controller: _scrollController,
           slivers: [
-            CupertinoSliverNavigationBar(
-              largeTitle: const Text('내 컬렉션'),
-              backgroundColor: const Color(0xEFFFFFFF),
-              border: const Border(bottom: BorderSide(color: AppColors.border)),
+            AppCompactSliverHeader(
+              title: '내 컬렉션',
               trailing: CupertinoButton(
                 padding: EdgeInsets.zero,
                 minimumSize: const Size.square(44),
@@ -604,11 +602,7 @@ class _AnimeSearchScreenState extends ConsumerState<AnimeSearchScreen> {
         child: CustomScrollView(
           controller: _scrollController,
           slivers: [
-            const CupertinoSliverNavigationBar(
-              largeTitle: Text('작품 검색'),
-              backgroundColor: Color(0xEFFFFFFF),
-              border: Border(bottom: BorderSide(color: AppColors.border)),
-            ),
+            const AppCompactSliverHeader(title: '작품 검색'),
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
               sliver: SliverToBoxAdapter(
@@ -827,7 +821,7 @@ class _AnimeDetailContent extends ConsumerWidget {
         CustomScrollView(
           slivers: [
             CupertinoSliverNavigationBar(
-              largeTitle: const SizedBox.shrink(),
+              middle: const SizedBox.shrink(),
               backgroundColor: const Color(0xEFFFFFFF),
               previousPageTitle: '뒤로',
               trailing: entry.value == null

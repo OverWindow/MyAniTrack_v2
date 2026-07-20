@@ -206,6 +206,7 @@ export async function getUserAnimeListController(req: Request, res: Response) {
     const genre = validateUserAnimeListGenre(req.query.genre);
     const year = validateUserAnimeListYear(req.query.year);
     const score = validateUserAnimeListScoreFilter(req.query.score);
+    const query = validateUserAnimeListQuery(req.query.query);
     const limit = validateUserAnimeListLimit(req.query.limit);
     const cursor = typeof req.query.cursor === 'string' ? req.query.cursor : undefined;
 
@@ -216,6 +217,7 @@ export async function getUserAnimeListController(req: Request, res: Response) {
       genre,
       year,
       score,
+      query,
       limit,
       cursor,
     });

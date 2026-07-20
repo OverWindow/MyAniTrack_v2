@@ -363,17 +363,118 @@ class HomeRepository {
   }
 }
 
-class AnalysisRepository {
-  const AnalysisRepository(this.api);
+class FriendsRepository {
+  const FriendsRepository(this.api);
   final ApiClient api;
 
+  Future<CursorPage<UserSearchResult>> search(
+    String query, {
+    String? cursor,
+    CancelToken? cancelToken,
+  }) async {
+    final json = await api.get(
+      '/users/search',
+      query: {
+        'query': query,
+        'limit': 20,
+        if (cursor != null) 'cursor': cursor,
+      },
+      cancelToken: cancelToken,
+    );
+    return CursorPage(
+      items: asJsonList(json['items']).map(UserSearchResult.fromJson).toList(),
+      pageInfo: PageInfo.fromJson(asJsonMap(json['pageInfo'])),
+    );
+  }
+
+  Future<FriendSnapshot> snapshot() async {
+    final responses = await Future.wait([
+      api.get('/friends'),
+      api.get('/friends/requests'),
+    ]);
+    final requests = responses[1];
+    return FriendSnapshot(
+      friends: asJsonList(
+        responses[0]['items'],
+      ).map(FriendItem.fromJson).toList(),
+      incoming: asJsonList(
+        requests['incoming'],
+      ).map(FriendRequest.fromJson).toList(),
+      outgoing: asJsonList(
+        requests['outgoing'],
+      ).map(FriendRequest.fromJson).toList(),
+    );
+  }
+
+  Future<void> sendRequest(int userId) async {
+    await api.post('/friends/requests', data: {'receiverId': userId});
+  }
+
+  Future<void> actOnRequest(int requestId, String action) async {
+    await api.patch('/friends/requests/$requestId', data: {'action': action});
+  }
+
+  Future<void> removeFriend(int userId) async {
+    await api.delete('/friends/$userId');
+  }
+
+  Future<PublicUser> profile(int userId) async {
+    return PublicUser.fromJson(await api.get('/users/$userId/profile'));
+  }
+
+  Future<CursorPage<CollectionEntry>> collection(
+    int userId, {
+    String? query,
+    String? genre,
+    int? year,
+    int? score,
+    int limit = 20,
+    String? cursor,
+    CancelToken? cancelToken,
+  }) async {
+    final json = await api.get(
+      '/users/$userId/anime-list',
+      query: {
+        'sort': 'latest',
+        'titleLanguage': 'ko',
+        'limit': limit,
+        if (query != null && query.isNotEmpty) 'query': query,
+        if (genre != null) 'genre': genre,
+        if (year != null) 'year': year,
+        if (score != null) 'score': score,
+        if (cursor != null) 'cursor': cursor,
+      },
+      cancelToken: cancelToken,
+    );
+    return CursorPage(
+      items: asJsonList(json['items']).map(CollectionEntry.fromJson).toList(),
+      pageInfo: PageInfo.fromJson(asJsonMap(json['pageInfo'])),
+      totalCount: readInt(json['totalCount']),
+    );
+  }
+}
+
+class AnalysisRepository {
+  const AnalysisRepository(this.api, {this.userId});
+  final ApiClient api;
+  final int? userId;
+
+  String get _base =>
+      userId == null ? '/me/anime-stats' : '/users/$userId/anime-stats';
+  String get _voiceActorBase =>
+      userId == null ? '/me/voice-actors' : '/users/$userId/voice-actors';
+
   Future<StatsOverview> overview() async {
-    return StatsOverview.fromJson(await api.get('/me/anime-stats'));
+    return StatsOverview.fromJson(await api.get(_base));
+  }
+
+  Future<ViewingDna> viewingDna() async {
+    return ViewingDna.fromJson(await api.get('$_base/viewing-dna'));
   }
 
   Future<FormatDistribution> formats() async {
     final json = await api.get(
-      '/me/anime-stats/format-distribution',
+      '$_base/format-distribution',
       query: const {'status': 'completed', 'minCount': 1},
     );
     return FormatDistribution.fromJson(json);
@@ -381,7 +482,7 @@ class AnalysisRepository {
 
   Future<List<GenreBubble>> genres() async {
     final json = await api.get(
-      '/me/anime-stats/genre-bubble',
+      '$_base/genre-bubble',
       query: const {
         'titleLanguage': 'ko',
         'minCount': 1,
@@ -395,7 +496,7 @@ class AnalysisRepository {
 
   Future<List<YearlyScore>> yearlyScores() async {
     final json = await api.get(
-      '/me/anime-stats/yearly-scores',
+      '$_base/yearly-scores',
       query: const {'status': 'completed', 'minRatedAnimeCount': 1},
     );
     final item = asJsonMap(json['item']);
@@ -404,14 +505,14 @@ class AnalysisRepository {
 
   Future<List<StudioRanking>> studios({String sort = 'count'}) async {
     final json = await api.get(
-      '/me/anime-stats/studios',
+      '$_base/studios',
       query: {
         'sort': sort,
         'status': 'all',
         'mainOnly': true,
         'minAnimeCount': 1,
         'minRatedAnimeCount': 1,
-        'limit': 20,
+        'limit': 50,
       },
     );
     return asJsonList(json['items']).map(StudioRanking.fromJson).toList();
@@ -419,10 +520,10 @@ class AnalysisRepository {
 
   Future<List<VoiceActorRanking>> voiceActors({String sort = 'count'}) async {
     final json = await api.get(
-      '/me/voice-actors/ranking',
+      '$_voiceActorBase/ranking',
       query: {
         'sort': sort == 'watchTime' ? 'count' : sort,
-        'limit': 20,
+        'limit': 50,
         'minAnimeCount': 1,
         'minRatedAnimeCount': 1,
       },
@@ -432,7 +533,7 @@ class AnalysisRepository {
 
   Future<List<Anime>> studioAnime(int studioId) async {
     final json = await api.get(
-      '/me/anime-stats/studios/$studioId/anime',
+      '$_base/studios/$studioId/anime',
       query: const {'titleLanguage': 'ko', 'limit': 50, 'status': 'all'},
     );
     return asJsonList(json['items']).map(Anime.fromJson).toList();
@@ -440,7 +541,7 @@ class AnalysisRepository {
 
   Future<List<Anime>> voiceActorAnime(int voiceActorId) async {
     final json = await api.get(
-      '/me/voice-actors/$voiceActorId/anime',
+      '$_voiceActorBase/$voiceActorId/anime',
       query: const {'titleLanguage': 'ko', 'limit': 50},
     );
     return asJsonList(json['items']).map(Anime.fromJson).toList();
@@ -460,8 +561,8 @@ class ProfileRepository {
       if (username != null) 'username': username,
       if (removeProfileImage) 'removeProfileImage': 'true',
       if (profileImage != null)
-        'profileImage': await MultipartFile.fromFile(
-          profileImage.path,
+        'profileImage': MultipartFile.fromBytes(
+          await profileImage.readAsBytes(),
           filename: profileImage.name,
         ),
     };
