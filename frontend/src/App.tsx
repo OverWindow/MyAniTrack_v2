@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, Route, Routes, useLocation } from 'react-router-dom'
+import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import type { Location } from 'react-router-dom'
 import { handleProfileImageError, getProfileImageSrc } from './lib/avatar'
 import { formatFriendAnimeCount, getFriendPreviewName } from './lib/friends'
@@ -120,6 +120,7 @@ function App() {
           <Route path="/users/:userId/profile" element={<UserProfilePage />} />
           <Route path="/users/:userId/anime-list" element={<UserCollectionPage />} />
           <Route path="/users/:userId/anime-stats" element={<UserAnalysisPage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
       {backgroundLocation && (
