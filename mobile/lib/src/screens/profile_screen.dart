@@ -23,6 +23,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Widget build(BuildContext context) {
     final session = ref.watch(sessionControllerProvider);
     final user = session.user;
+    final favorites = ref.watch(favoriteAnimeProvider);
+    final badges = ref.watch(badgeOverviewProvider);
     if (user == null) {
       return const CupertinoPageScaffold(
         child: AppBackground(
@@ -34,7 +36,24 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       child: AppBackground(
         child: CustomScrollView(
           slivers: [
-            const AppCompactSliverHeader(title: '프로필'),
+            AppCompactSliverHeader(
+              title: '프로필',
+              leading: CupertinoButton(
+                padding: EdgeInsets.zero,
+                minimumSize: const Size.square(44),
+                onPressed: () {
+                  if (context.canPop()) {
+                    context.pop();
+                  } else {
+                    context.go('/home');
+                  }
+                },
+                child: const Icon(
+                  CupertinoIcons.back,
+                  color: AppColors.pointPressed,
+                ),
+              ),
+            ),
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
               sliver: SliverList.list(
@@ -70,6 +89,45 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         ),
                       ],
                     ),
+                  ),
+                  const SizedBox(height: 16),
+                  const AppSectionHeader(title: '획득한 배지', eyebrow: 'Badges'),
+                  const SizedBox(height: 10),
+                  badges.when(
+                    loading: () => const AppSkeleton(height: 112),
+                    error: (error, _) => AppStateView(
+                      compact: true,
+                      title: '배지를 불러오지 못했어요',
+                      message: error.toString(),
+                      actionLabel: '재시도',
+                      onAction: () => ref.invalidate(badgeOverviewProvider),
+                    ),
+                    data: (overview) => EarnedBadgeStrip(
+                      badges: overview.items
+                          .where((badge) => badge.earned)
+                          .toList(),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  const AppSectionHeader(title: '최애 애니', eyebrow: 'Favorites'),
+                  const SizedBox(height: 10),
+                  favorites.when(
+                    loading: () => const AppSkeleton(height: 300),
+                    error: (error, _) => AppStateView(
+                      compact: true,
+                      title: '최애 애니를 불러오지 못했어요',
+                      message: error.toString(),
+                      actionLabel: '재시도',
+                      onAction: () => ref.invalidate(favoriteAnimeProvider),
+                    ),
+                    data: (items) => items.isEmpty
+                        ? const AppStateView(
+                            compact: true,
+                            icon: CupertinoIcons.heart,
+                            title: '아직 최애 애니가 없어요',
+                            message: '10점을 준 작품이 여기에 표시됩니다.',
+                          )
+                        : FavoriteAnimeCarousel(items: items),
                   ),
                   const SizedBox(height: 16),
                   AppCard(

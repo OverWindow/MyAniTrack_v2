@@ -32,7 +32,50 @@ abstract final class AppColors {
     Color(0xFF65A30D),
     Color(0xFF7C3AED),
     Color(0xFFCA8A04),
+    Color(0xFF0F766E),
+    Color(0xFFC2410C),
+    Color(0xFF4F46E5),
+    Color(0xFFBE123C),
+    Color(0xFF15803D),
+    Color(0xFF0369A1),
+    Color(0xFFA21CAF),
+    Color(0xFF854D0E),
   ];
+}
+
+const _appGenreColorOrder = <String>[
+  'Action',
+  'Adventure',
+  'Comedy',
+  'Drama',
+  'Ecchi',
+  'Fantasy',
+  'Horror',
+  'Mahou Shoujo',
+  'Mecha',
+  'Music',
+  'Mystery',
+  'Psychological',
+  'Romance',
+  'Sci-Fi',
+  'Slice of Life',
+  'Sports',
+  'Supernatural',
+  'Thriller',
+];
+
+Color appGenreColor(String genre) {
+  final normalized = genre.trim().toLowerCase();
+  final knownIndex = _appGenreColorOrder.indexWhere(
+    (item) => item.toLowerCase() == normalized,
+  );
+  if (knownIndex >= 0) return AppColors.chart[knownIndex];
+
+  var stableHash = 17;
+  for (final codeUnit in normalized.codeUnits) {
+    stableHash = ((stableHash * 31) + codeUnit) & 0x7fffffff;
+  }
+  return AppColors.chart[stableHash % AppColors.chart.length];
 }
 
 abstract final class AppSpacing {
@@ -66,7 +109,7 @@ const appCupertinoTheme = CupertinoThemeData(
   brightness: Brightness.light,
   primaryColor: AppColors.pointPressed,
   scaffoldBackgroundColor: AppColors.page,
-  barBackgroundColor: Color(0xF2FFFFFF),
+  barBackgroundColor: AppColors.pointSoftest,
   textTheme: CupertinoTextThemeData(
     primaryColor: AppColors.text,
     textStyle: TextStyle(

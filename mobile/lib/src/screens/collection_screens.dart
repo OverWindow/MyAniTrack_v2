@@ -18,13 +18,18 @@ class CollectionScreen extends ConsumerStatefulWidget {
 }
 
 class _CollectionScreenState extends ConsumerState<CollectionScreen> {
+  bool _seriesMode = false;
   late final TextEditingController _searchController = TextEditingController();
   late final ScrollController _scrollController = ScrollController()
     ..addListener(_onScroll);
 
   void _onScroll() {
     if (_scrollController.position.extentAfter < 500) {
-      ref.read(collectionControllerProvider.notifier).loadMore();
+      if (_seriesMode) {
+        ref.read(seriesCollectionControllerProvider.notifier).loadMore();
+      } else {
+        ref.read(collectionControllerProvider.notifier).loadMore();
+      }
     }
   }
 
@@ -38,6 +43,14 @@ class _CollectionScreenState extends ConsumerState<CollectionScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(collectionControllerProvider);
+    final seriesState = ref.watch(seriesCollectionControllerProvider);
+    if (_seriesMode) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ref.read(seriesCollectionControllerProvider.notifier).ensureLoaded();
+        }
+      });
+    }
     return CupertinoPageScaffold(
       child: AppBackground(
         child: CustomScrollView(
@@ -48,14 +61,22 @@ class _CollectionScreenState extends ConsumerState<CollectionScreen> {
               trailing: CupertinoButton(
                 padding: EdgeInsets.zero,
                 minimumSize: const Size.square(44),
-                onPressed: () => _openFilters(context, state.query),
+                onPressed: () => _seriesMode
+                    ? _openSeriesFilters(context, seriesState.query)
+                    : _openFilters(context, state.query),
                 child: Stack(
                   clipBehavior: Clip.none,
                   children: [
                     const Icon(CupertinoIcons.slider_horizontal_3),
-                    if (state.query.genre != null ||
-                        state.query.year != null ||
-                        state.query.score != null)
+                    if ((_seriesMode &&
+                            (seriesState.query.scope !=
+                                    AnimeSeriesScope.mainline ||
+                                seriesState.query.status !=
+                                    UserSeriesStatus.all)) ||
+                        (!_seriesMode &&
+                            (state.query.genre != null ||
+                                state.query.year != null ||
+                                state.query.score != null)))
                       const Positioned(
                         right: -2,
                         top: -2,
@@ -72,14 +93,62 @@ class _CollectionScreenState extends ConsumerState<CollectionScreen> {
               ),
             ),
             CupertinoSliverRefreshControl(
-              onRefresh: ref
-                  .read(collectionControllerProvider.notifier)
-                  .refresh,
+              onRefresh: _seriesMode
+                  ? ref
+                        .read(seriesCollectionControllerProvider.notifier)
+                        .refresh
+                  : ref.read(collectionControllerProvider.notifier).refresh,
             ),
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
               sliver: SliverToBoxAdapter(
-                child: _CollectionSummary(state: state),
+                child: CupertinoSlidingSegmentedControl<bool>(
+                  groupValue: _seriesMode,
+                  thumbColor: AppColors.card,
+                  backgroundColor: AppColors.softBeige,
+                  children: const {
+                    false: Padding(
+                      padding: EdgeInsets.symmetric(
+                        vertical: 9,
+                        horizontal: 22,
+                      ),
+                      child: Text('작품'),
+                    ),
+                    true: Padding(
+                      padding: EdgeInsets.symmetric(
+                        vertical: 9,
+                        horizontal: 22,
+                      ),
+                      child: Text('시리즈'),
+                    ),
+                  },
+                  onValueChanged: (value) {
+                    if (value == null) return;
+                    setState(() => _seriesMode = value);
+                    if (value) {
+                      ref
+                          .read(seriesCollectionControllerProvider.notifier)
+                          .ensureLoaded();
+                    }
+                    final query = value
+                        ? seriesState.query.searchQuery
+                        : state.query.searchQuery;
+                    _searchController.value = TextEditingValue(
+                      text: query ?? '',
+                      selection: TextSelection.collapsed(
+                        offset: query?.length ?? 0,
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+              sliver: SliverToBoxAdapter(
+                child: _seriesMode
+                    ? _SeriesSummary(state: seriesState)
+                    : _CollectionSummary(state: state),
               ),
             ),
             SliverPadding(
@@ -87,14 +156,20 @@ class _CollectionScreenState extends ConsumerState<CollectionScreen> {
               sliver: SliverToBoxAdapter(
                 child: CupertinoSearchTextField(
                   controller: _searchController,
-                  placeholder: '내 컬렉션 제목 검색',
-                  onChanged: ref
-                      .read(collectionControllerProvider.notifier)
-                      .setSearchQuery,
+                  placeholder: _seriesMode ? '시리즈명·포함 작품명 검색' : '내 컬렉션 제목 검색',
+                  onChanged: _seriesMode
+                      ? ref
+                            .read(seriesCollectionControllerProvider.notifier)
+                            .setSearchQuery
+                      : ref
+                            .read(collectionControllerProvider.notifier)
+                            .setSearchQuery,
                 ),
               ),
             ),
-            if (state.loading && state.items.isEmpty)
+            if (_seriesMode)
+              ..._seriesSlivers(seriesState)
+            else if (state.loading && state.items.isEmpty)
               SliverPadding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 sliver: SliverGrid(
@@ -163,7 +238,7 @@ class _CollectionScreenState extends ConsumerState<CollectionScreen> {
                   ),
                 ),
               ),
-            if (state.loadingMore)
+            if (!_seriesMode && state.loadingMore)
               const SliverToBoxAdapter(
                 child: Padding(
                   padding: EdgeInsets.only(bottom: 24),
@@ -185,6 +260,82 @@ class _CollectionScreenState extends ConsumerState<CollectionScreen> {
       await ref.read(collectionControllerProvider.notifier).setQuery(next);
     }
   }
+
+  Future<void> _openSeriesFilters(
+    BuildContext context,
+    SeriesCollectionQuery query,
+  ) async {
+    final next = await showCupertinoModalPopup<SeriesCollectionQuery>(
+      context: context,
+      builder: (context) => _SeriesFilterSheet(initial: query),
+    );
+    if (next != null) {
+      await ref
+          .read(seriesCollectionControllerProvider.notifier)
+          .setQuery(next);
+    }
+  }
+
+  List<Widget> _seriesSlivers(SeriesCollectionViewState state) {
+    if (state.loading && state.items.isEmpty) {
+      return const [
+        SliverPadding(
+          padding: EdgeInsets.symmetric(horizontal: 16),
+          sliver: SliverToBoxAdapter(child: AppSkeleton(height: 230)),
+        ),
+      ];
+    }
+    if (state.failure != null && state.items.isEmpty) {
+      return [
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          sliver: SliverToBoxAdapter(
+            child: AppStateView(
+              icon: CupertinoIcons.wifi_exclamationmark,
+              title: '시리즈를 불러오지 못했습니다',
+              message: state.failure!.message,
+              actionLabel: '다시 시도',
+              onAction: ref
+                  .read(seriesCollectionControllerProvider.notifier)
+                  .refresh,
+            ),
+          ),
+        ),
+      ];
+    }
+    if (state.items.isEmpty) {
+      return const [
+        SliverPadding(
+          padding: EdgeInsets.symmetric(horizontal: 16),
+          sliver: SliverToBoxAdapter(
+            child: AppStateView(
+              icon: CupertinoIcons.square_stack_3d_up,
+              title: '일치하는 시리즈가 없어요',
+              message: '검색어나 필터를 바꿔보세요.',
+            ),
+          ),
+        ),
+      ];
+    }
+    return [
+      SliverPadding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+        sliver: SliverList.separated(
+          itemCount: state.items.length,
+          separatorBuilder: (_, _) => const SizedBox(height: 14),
+          itemBuilder: (context, index) =>
+              _SeriesCollectionCard(item: state.items[index]),
+        ),
+      ),
+      if (state.loadingMore)
+        const SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.only(bottom: 24),
+            child: Center(child: CupertinoActivityIndicator()),
+          ),
+        ),
+    ];
+  }
 }
 
 class _CollectionSummary extends StatelessWidget {
@@ -205,6 +356,252 @@ class _CollectionSummary extends StatelessWidget {
       ),
     );
   }
+}
+
+class _SeriesSummary extends StatelessWidget {
+  const _SeriesSummary({required this.state});
+  final SeriesCollectionViewState state;
+
+  @override
+  Widget build(BuildContext context) => AppCard(
+    color: const Color(0xF9FFFFFF),
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+    child: Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(state.query.scope.label, style: appLabelStyle()),
+              const SizedBox(height: 3),
+              Text(
+                '${state.items.length}개 시리즈',
+                style: appTitleStyle(size: 22),
+              ),
+            ],
+          ),
+        ),
+        AppBadge(label: state.query.status.label),
+      ],
+    ),
+  );
+}
+
+class _SeriesCollectionCard extends StatelessWidget {
+  const _SeriesCollectionCard({required this.item});
+  final SeriesCollectionItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final percent = item.completionRate <= 1
+        ? item.completionRate * 100
+        : item.completionRate;
+    final canonicalId =
+        item.canonicalAnimeId ?? item.items.firstOrNull?.anime.id;
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CupertinoButton(
+                padding: EdgeInsets.zero,
+                onPressed: canonicalId == null
+                    ? null
+                    : () => context.push('/anime/$canonicalId'),
+                child: SizedBox(
+                  width: 82,
+                  height: 116,
+                  child: AnimePoster(url: item.coverImageUrl),
+                ),
+              ),
+              const SizedBox(width: 13),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    AppBadge(label: item.scope.label),
+                    const SizedBox(height: 8),
+                    Text(
+                      item.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: appTitleStyle(size: 17),
+                    ),
+                    const SizedBox(height: 7),
+                    Text(
+                      '필수 작품 ${item.completedRequiredMemberCount}/${item.requiredMemberCount} · 내 컬렉션 ${item.collectedMemberCount}편',
+                      style: appLabelStyle(),
+                    ),
+                    const SizedBox(height: 10),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(99),
+                      child: SizedBox(
+                        height: 7,
+                        child: ColoredBox(
+                          color: AppColors.softBeige,
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: FractionallySizedBox(
+                              widthFactor: (percent / 100).clamp(0, 1),
+                              child: const ColoredBox(color: AppColors.point),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      '완주율 ${percent.toStringAsFixed(0)}%',
+                      style: appLabelStyle(),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (item.items.isNotEmpty) ...[
+            const SizedBox(height: 13),
+            SizedBox(
+              height: 76,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: item.items.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 7),
+                itemBuilder: (context, index) {
+                  final member = item.items[index];
+                  return CupertinoButton(
+                    padding: EdgeInsets.zero,
+                    onPressed: () => context.push('/anime/${member.anime.id}'),
+                    child: Stack(
+                      children: [
+                        SizedBox(
+                          width: 54,
+                          height: 76,
+                          child: AnimePoster(
+                            url: member.anime.coverImageUrl,
+                            radius: 7,
+                          ),
+                        ),
+                        if (member.userList != null)
+                          const Positioned(
+                            right: 3,
+                            top: 3,
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: AppColors.success,
+                                shape: BoxShape.circle,
+                              ),
+                              child: SizedBox.square(dimension: 9),
+                            ),
+                          ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _SeriesFilterSheet extends StatefulWidget {
+  const _SeriesFilterSheet({required this.initial});
+  final SeriesCollectionQuery initial;
+
+  @override
+  State<_SeriesFilterSheet> createState() => _SeriesFilterSheetState();
+}
+
+class _SeriesFilterSheetState extends State<_SeriesFilterSheet> {
+  late AnimeSeriesScope scope = widget.initial.scope;
+  late UserSeriesStatus status = widget.initial.status;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    decoration: const BoxDecoration(
+      color: AppColors.ivory,
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    child: SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 18, 16, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(child: Text('시리즈 필터', style: appTitleStyle(size: 22))),
+                CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  onPressed: () => setState(() {
+                    scope = AnimeSeriesScope.mainline;
+                    status = UserSeriesStatus.all;
+                  }),
+                  child: const Text('초기화'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            Text('범위', style: appLabelStyle()),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: CupertinoSlidingSegmentedControl<AnimeSeriesScope>(
+                groupValue: scope,
+                children: {
+                  for (final value in AnimeSeriesScope.values)
+                    value: Padding(
+                      padding: const EdgeInsets.all(9),
+                      child: Text(value.label),
+                    ),
+                },
+                onValueChanged: (value) {
+                  if (value != null) setState(() => scope = value);
+                },
+              ),
+            ),
+            const SizedBox(height: 18),
+            Text('상태', style: appLabelStyle()),
+            const SizedBox(height: 8),
+            CupertinoSlidingSegmentedControl<UserSeriesStatus>(
+              groupValue: status,
+              children: {
+                for (final value in UserSeriesStatus.values)
+                  value: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 9,
+                    ),
+                    child: Text(value.label.replaceAll(' 시리즈', '')),
+                  ),
+              },
+              onValueChanged: (value) {
+                if (value != null) setState(() => status = value);
+              },
+            ),
+            const SizedBox(height: 24),
+            AppPrimaryButton(
+              label: '적용하기',
+              onPressed: () => Navigator.of(context).pop(
+                SeriesCollectionQuery(
+                  scope: scope,
+                  status: status,
+                  searchQuery: widget.initial.searchQuery,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 class CollectionPosterCard extends StatelessWidget {
@@ -604,41 +1001,35 @@ class _AnimeSearchScreenState extends ConsumerState<AnimeSearchScreen> {
           slivers: [
             const AppCompactSliverHeader(title: '작품 검색'),
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
-              sliver: SliverToBoxAdapter(
-                child: CupertinoSearchTextField(
-                  controller: _controller,
-                  autofocus: false,
-                  placeholder: '한국어·영문·일본어 제목 검색',
-                  onChanged: ref
-                      .read(searchControllerProvider.notifier)
-                      .setQuery,
-                ),
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+              sliver: SliverList.list(
+                children: [
+                  CupertinoSearchTextField(
+                    controller: _controller,
+                    autofocus: false,
+                    placeholder: '한국어·영문·일본어 제목 검색',
+                    onChanged: ref
+                        .read(searchControllerProvider.notifier)
+                        .setQuery,
+                  ),
+                  const SizedBox(height: 10),
+                  _SearchFilters(state: state),
+                  const SizedBox(height: 8),
+                  Text('포스터를 길게 누르면 빠르게 별점을 남길 수 있어요.', style: appLabelStyle()),
+                ],
               ),
             ),
-            if (state.query.length < 2)
-              const SliverPadding(
-                padding: EdgeInsets.symmetric(horizontal: 16),
-                sliver: SliverToBoxAdapter(
-                  child: AppStateView(
-                    compact: true,
-                    icon: CupertinoIcons.search,
-                    title: '찾고 싶은 작품을 입력해주세요',
-                    message: '두 글자 이상 입력하면 내 컬렉션 등록 여부와 함께 표시됩니다.',
-                  ),
-                ),
-              )
-            else if (state.loading)
+            if (state.loading)
               const SliverPadding(
                 padding: EdgeInsets.symmetric(horizontal: 16),
                 sliver: SliverToBoxAdapter(child: AppSkeleton(height: 220)),
               )
-            else if (state.failure != null)
+            else if (state.failure != null && state.items.isEmpty)
               SliverPadding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 sliver: SliverToBoxAdapter(
                   child: AppStateView(
-                    title: '검색하지 못했습니다',
+                    title: '작품을 불러오지 못했습니다',
                     message: state.failure!.message,
                     actionLabel: '다시 시도',
                     onAction: ref
@@ -688,79 +1079,323 @@ class _AnimeSearchScreenState extends ConsumerState<AnimeSearchScreen> {
   }
 }
 
-class _SearchResultCard extends ConsumerWidget {
+class _SearchFilters extends ConsumerWidget {
+  const _SearchFilters({required this.state});
+  final SearchViewState state;
+
+  static const sorts = <String, String>{
+    'popularity': '인기순',
+    'score': '평점순',
+    'latest': '최신순',
+    'season': '시즌순',
+  };
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => Row(
+    children: [
+      Expanded(
+        child: _FilterButton(
+          label: sorts[state.sort] ?? '인기순',
+          onPressed: () => _showSearchChoice(
+            context,
+            title: '정렬',
+            values: sorts,
+            selected: state.sort,
+            onSelected: ref.read(searchControllerProvider.notifier).setSort,
+          ),
+        ),
+      ),
+      const SizedBox(width: 8),
+      Expanded(
+        child: _FilterButton(
+          label: state.genre == null ? '전체 장르' : genreLabel(state.genre),
+          onPressed: () => _showSearchChoice(
+            context,
+            title: '장르',
+            values: {
+              '': '전체 장르',
+              for (final genre in _genres) genre: genreLabel(genre),
+            },
+            selected: state.genre ?? '',
+            onSelected: (value) => ref
+                .read(searchControllerProvider.notifier)
+                .setGenre(value.isEmpty ? null : value),
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
+class _FilterButton extends StatelessWidget {
+  const _FilterButton({required this.label, required this.onPressed});
+  final String label;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => CupertinoButton(
+    color: AppColors.card,
+    borderRadius: BorderRadius.circular(AppRadii.input),
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+    onPressed: onPressed,
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Flexible(
+          child: Text(
+            label,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: AppColors.secondaryText,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        const SizedBox(width: 5),
+        const Icon(CupertinoIcons.chevron_down, size: 14),
+      ],
+    ),
+  );
+}
+
+Future<void> _showSearchChoice(
+  BuildContext context, {
+  required String title,
+  required Map<String, String> values,
+  required String selected,
+  required ValueChanged<String> onSelected,
+}) => showCupertinoModalPopup<void>(
+  context: context,
+  builder: (context) => CupertinoActionSheet(
+    title: Text(title),
+    actions: [
+      for (final entry in values.entries)
+        CupertinoActionSheetAction(
+          isDefaultAction: entry.key == selected,
+          onPressed: () {
+            Navigator.of(context).pop();
+            onSelected(entry.key);
+          },
+          child: Text(entry.value),
+        ),
+    ],
+    cancelButton: CupertinoActionSheetAction(
+      onPressed: () => Navigator.of(context).pop(),
+      child: const Text('취소'),
+    ),
+  ),
+);
+
+class _SearchResultCard extends ConsumerStatefulWidget {
   const _SearchResultCard({required this.result});
   final AnimeSearchResult result;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_SearchResultCard> createState() => _SearchResultCardState();
+}
+
+class _SearchResultCardState extends ConsumerState<_SearchResultCard> {
+  bool _showRating = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final result = widget.result;
     final anime = result.anime;
     final exists = result.myCollection?.exists == true;
-    return CupertinoButton(
-      padding: EdgeInsets.zero,
-      pressedOpacity: 0.8,
-      onPressed: () => context.push('/anime/${anime.id}'),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                AnimePoster(url: anime.coverImageUrl),
-                Positioned(
-                  right: 8,
-                  top: 8,
-                  child: CupertinoButton(
-                    padding: EdgeInsets.zero,
-                    minimumSize: const Size.square(44),
-                    borderRadius: BorderRadius.circular(99),
-                    color: exists
-                        ? const Color(0xF2FFF7E7)
-                        : const Color(0xEEDE851D),
-                    onPressed: () => showCollectionEditor(context, anime),
-                    child: Icon(
-                      exists ? CupertinoIcons.pencil : CupertinoIcons.add,
-                      size: 20,
-                      color: exists ? AppColors.pointPressed : AppColors.card,
-                    ),
-                  ),
-                ),
-                if (exists)
+    final searchState = ref.watch(searchControllerProvider);
+    final rating = searchState.ratingAnimeId == anime.id;
+    return GestureDetector(
+      onLongPress: () => setState(() => _showRating = true),
+      child: CupertinoButton(
+        padding: EdgeInsets.zero,
+        pressedOpacity: 0.8,
+        onPressed: () => context.push('/anime/${anime.id}'),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  AnimePoster(url: anime.coverImageUrl),
                   Positioned(
-                    left: 8,
-                    bottom: 8,
-                    child: AppBadge(
-                      label: result.myCollection?.status?.label ?? '등록됨',
-                      color: const Color(0xF2FFFFFF),
+                    right: 8,
+                    top: 8,
+                    child: CupertinoButton(
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size.square(44),
+                      borderRadius: BorderRadius.circular(99),
+                      color: exists
+                          ? const Color(0xF2FFF7E7)
+                          : const Color(0xEEDE851D),
+                      onPressed: () => showCollectionEditor(context, anime),
+                      child: Icon(
+                        exists ? CupertinoIcons.pencil : CupertinoIcons.add,
+                        size: 20,
+                        color: exists ? AppColors.pointPressed : AppColors.card,
+                      ),
                     ),
                   ),
-              ],
+                  if (exists)
+                    Positioned(
+                      left: 8,
+                      bottom: 8,
+                      child: AppBadge(
+                        label: result.myCollection?.status?.label ?? '등록됨',
+                        color: const Color(0xF2FFFFFF),
+                      ),
+                    ),
+                  if (_showRating)
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      child: _QuickRatingOverlay(
+                        score: result.myCollection?.score ?? 0,
+                        loading: rating,
+                        onRate: _rate,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 9),
+            Text(
+              anime.title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontFamily: 'Pretendard',
+                fontSize: 14,
+                height: 1.3,
+                fontWeight: FontWeight.w600,
+                color: AppColors.text,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              [
+                if (anime.seasonYear != null) '${anime.seasonYear}',
+                if (anime.format != null) anime.format!,
+                if (anime.episodes != null) '${anime.episodes}화',
+              ].join(' · '),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: appLabelStyle(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _rate(int score) async {
+    try {
+      await ref
+          .read(searchControllerProvider.notifier)
+          .quickRate(widget.result, score);
+      invalidateUserData(ref);
+      if (mounted) {
+        setState(() => _showRating = false);
+        showAppToast(context, '$score점으로 컬렉션에 저장했습니다.');
+      }
+    } on ApiFailure catch (error) {
+      if (mounted) showAppToast(context, error.message, error: true);
+    } on Object catch (error) {
+      if (mounted) showAppToast(context, error.toString(), error: true);
+    }
+  }
+}
+
+class _QuickRatingOverlay extends StatelessWidget {
+  const _QuickRatingOverlay({
+    required this.score,
+    required this.loading,
+    required this.onRate,
+  });
+  final double score;
+  final bool loading;
+  final ValueChanged<int> onRate;
+
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+    decoration: const BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color(0x001C1917), Color(0xE61C1917)],
+      ),
+    ),
+    child: Padding(
+      padding: const EdgeInsets.fromLTRB(8, 30, 8, 12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          if (loading)
+            const CupertinoActivityIndicator(color: CupertinoColors.white)
+          else
+            for (var index = 0; index < 5; index++)
+              _HalfStar(index: index, score: score, onSelected: onRate),
+        ],
+      ),
+    ),
+  );
+}
+
+class _HalfStar extends StatelessWidget {
+  const _HalfStar({
+    required this.index,
+    required this.score,
+    required this.onSelected,
+  });
+  final int index;
+  final double score;
+  final ValueChanged<int> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final fill = (score / 2 - index).clamp(0.0, 1.0);
+    return SizedBox.square(
+      dimension: 30,
+      child: Stack(
+        children: [
+          const Center(
+            child: Icon(
+              CupertinoIcons.star_fill,
+              size: 25,
+              color: Color(0x66FFFFFF),
             ),
           ),
-          const SizedBox(height: 9),
-          Text(
-            anime.title,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontFamily: 'Pretendard',
-              fontSize: 14,
-              height: 1.3,
-              fontWeight: FontWeight.w600,
-              color: AppColors.text,
+          ClipRect(
+            child: Align(
+              alignment: Alignment.centerLeft,
+              widthFactor: fill,
+              child: const Icon(
+                CupertinoIcons.star_fill,
+                size: 25,
+                color: Color(0xFFFFD166),
+              ),
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            [
-              if (anime.seasonYear != null) '${anime.seasonYear}',
-              if (anime.format != null) anime.format!,
-              if (anime.episodes != null) '${anime.episodes}화',
-            ].join(' · '),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: appLabelStyle(),
+          Positioned(
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: 15,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => onSelected(index * 2 + 1),
+            ),
+          ),
+          Positioned(
+            right: 0,
+            top: 0,
+            bottom: 0,
+            width: 15,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => onSelected(index * 2 + 2),
+            ),
           ),
         ],
       ),
@@ -820,10 +1455,17 @@ class _AnimeDetailContent extends ConsumerWidget {
       children: [
         CustomScrollView(
           slivers: [
-            CupertinoSliverNavigationBar(
-              middle: const SizedBox.shrink(),
-              backgroundColor: const Color(0xEFFFFFFF),
-              previousPageTitle: '뒤로',
+            AppCompactSliverHeader(
+              title: anime.title,
+              leading: CupertinoButton(
+                padding: EdgeInsets.zero,
+                minimumSize: const Size.square(44),
+                onPressed: () => Navigator.of(context).maybePop(),
+                child: const Icon(
+                  CupertinoIcons.back,
+                  color: AppColors.pointPressed,
+                ),
+              ),
               trailing: entry.value == null
                   ? null
                   : const Icon(

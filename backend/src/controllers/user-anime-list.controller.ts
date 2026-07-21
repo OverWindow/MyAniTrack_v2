@@ -7,6 +7,7 @@ import {
   removeAnimeFromUserList,
   updateUserAnimeListItem,
   validateUserAnimeListGenre,
+  validateUserAnimeListFormat,
   validateUserAnimeListLimit,
   validateUserAnimeListQuery,
   validateUserAnimeListScoreFilter,
@@ -39,6 +40,7 @@ function getErrorStatus(message: string) {
     message === 'Invalid cursor' ||
     message.includes('Cursor sort') ||
     message.includes('Cursor genre') ||
+    message.includes('Cursor format') ||
     message.includes('Cursor year') ||
     message.includes('Cursor score filter') ||
     message.includes('Cursor scope') ||
@@ -133,6 +135,7 @@ export async function getMyAnimeList(req: Request, res: Response) {
       typeof req.query.titleLanguage === 'string' ? req.query.titleLanguage : 'ko'
     );
     const genre = validateUserAnimeListGenre(req.query.genre);
+    const format = validateUserAnimeListFormat(req.query.format);
     const year = validateUserAnimeListYear(req.query.year);
     const score = validateUserAnimeListScoreFilter(req.query.score);
     const query = validateUserAnimeListQuery(req.query.query);
@@ -144,6 +147,7 @@ export async function getMyAnimeList(req: Request, res: Response) {
       sort,
       titleLanguage,
       genre,
+      format,
       year,
       score,
       query,
@@ -204,6 +208,7 @@ export async function getUserAnimeListController(req: Request, res: Response) {
       typeof req.query.titleLanguage === 'string' ? req.query.titleLanguage : 'ko'
     );
     const genre = validateUserAnimeListGenre(req.query.genre);
+    const format = validateUserAnimeListFormat(req.query.format);
     const year = validateUserAnimeListYear(req.query.year);
     const score = validateUserAnimeListScoreFilter(req.query.score);
     const query = validateUserAnimeListQuery(req.query.query);
@@ -215,6 +220,7 @@ export async function getUserAnimeListController(req: Request, res: Response) {
       sort,
       titleLanguage,
       genre,
+      format,
       year,
       score,
       query,

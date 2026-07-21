@@ -34,13 +34,11 @@ final homeRepositoryProvider = Provider<HomeRepository>(
 final friendsRepositoryProvider = Provider<FriendsRepository>(
   (ref) => FriendsRepository(ref.watch(apiClientProvider)),
 );
-final analysisSubjectProvider = Provider<int?>((_) => null);
-final analysisRepositoryProvider = Provider<AnalysisRepository>(
-  (ref) => AnalysisRepository(
-    ref.watch(apiClientProvider),
-    userId: ref.watch(analysisSubjectProvider),
-  ),
-);
+final analysisRepositoryProvider = Provider.autoDispose
+    .family<AnalysisRepository, int?>((ref, userId) {
+      ref.watch(activeUserIdProvider);
+      return AnalysisRepository(ref.watch(apiClientProvider), userId: userId);
+    });
 final profileRepositoryProvider = Provider<ProfileRepository>(
   (ref) => ProfileRepository(ref.watch(apiClientProvider)),
 );
@@ -71,6 +69,12 @@ class SessionState {
 
 final sessionControllerProvider =
     NotifierProvider<SessionController, SessionState>(SessionController.new);
+
+final activeUserIdProvider = Provider<int?>((ref) {
+  return ref.watch(
+    sessionControllerProvider.select((session) => session.user?.id),
+  );
+});
 
 class SessionController extends Notifier<SessionState> {
   StreamSubscription<AuthState>? _subscription;
@@ -332,6 +336,7 @@ class CollectionController extends Notifier<CollectionViewState> {
 
   @override
   CollectionViewState build() {
+    ref.watch(activeUserIdProvider);
     ref.onDispose(() {
       _searchDebounce?.cancel();
       _cancelToken?.cancel();
@@ -427,29 +432,239 @@ class CollectionController extends Notifier<CollectionViewState> {
   }
 }
 
-final favoriteAnimeProvider = FutureProvider<List<CollectionEntry>>(
-  (ref) => ref.watch(homeRepositoryProvider).favorites(),
-);
+class SeriesCollectionQuery {
+  const SeriesCollectionQuery({
+    this.scope = AnimeSeriesScope.mainline,
+    this.status = UserSeriesStatus.all,
+    this.searchQuery,
+  });
 
-final badgeOverviewProvider = FutureProvider<BadgeOverview>(
-  (ref) => ref.watch(homeRepositoryProvider).badges(),
-);
+  final AnimeSeriesScope scope;
+  final UserSeriesStatus status;
+  final String? searchQuery;
 
-class SearchViewState {
-  const SearchViewState({
-    this.query = '',
+  SeriesCollectionQuery copyWith({
+    AnimeSeriesScope? scope,
+    UserSeriesStatus? status,
+    String? searchQuery,
+    bool clearSearch = false,
+  }) => SeriesCollectionQuery(
+    scope: scope ?? this.scope,
+    status: status ?? this.status,
+    searchQuery: clearSearch ? null : (searchQuery ?? this.searchQuery),
+  );
+}
+
+class SeriesCollectionViewState {
+  const SeriesCollectionViewState({
     this.items = const [],
+    this.query = const SeriesCollectionQuery(),
     this.pageInfo = const PageInfo(hasNext: false),
     this.loading = false,
     this.loadingMore = false,
     this.failure,
   });
-  final String query;
-  final List<AnimeSearchResult> items;
+
+  final List<SeriesCollectionItem> items;
+  final SeriesCollectionQuery query;
   final PageInfo pageInfo;
   final bool loading;
   final bool loadingMore;
   final ApiFailure? failure;
+
+  SeriesCollectionViewState copyWith({
+    List<SeriesCollectionItem>? items,
+    SeriesCollectionQuery? query,
+    PageInfo? pageInfo,
+    bool? loading,
+    bool? loadingMore,
+    ApiFailure? failure,
+    bool clearFailure = false,
+  }) => SeriesCollectionViewState(
+    items: items ?? this.items,
+    query: query ?? this.query,
+    pageInfo: pageInfo ?? this.pageInfo,
+    loading: loading ?? this.loading,
+    loadingMore: loadingMore ?? this.loadingMore,
+    failure: clearFailure ? null : (failure ?? this.failure),
+  );
+}
+
+final seriesCollectionControllerProvider =
+    NotifierProvider<SeriesCollectionController, SeriesCollectionViewState>(
+      SeriesCollectionController.new,
+    );
+
+class SeriesCollectionController extends Notifier<SeriesCollectionViewState> {
+  Timer? _searchDebounce;
+  CancelToken? _cancelToken;
+  int _requestGeneration = 0;
+  bool _loaded = false;
+
+  @override
+  SeriesCollectionViewState build() {
+    ref.watch(activeUserIdProvider);
+    _loaded = false;
+    _requestGeneration++;
+    _cancelToken?.cancel();
+    ref.onDispose(() {
+      _searchDebounce?.cancel();
+      _cancelToken?.cancel();
+    });
+    return const SeriesCollectionViewState();
+  }
+
+  void ensureLoaded() {
+    if (_loaded) return;
+    _loaded = true;
+    unawaited(refresh());
+  }
+
+  Future<void> refresh() async {
+    _loaded = true;
+    final generation = ++_requestGeneration;
+    _cancelToken?.cancel();
+    _cancelToken = CancelToken();
+    state = state.copyWith(loading: true, clearFailure: true);
+    try {
+      final page = await _fetch(cancelToken: _cancelToken);
+      if (generation != _requestGeneration) return;
+      state = state.copyWith(
+        items: page.items,
+        pageInfo: page.pageInfo,
+        loading: false,
+        clearFailure: true,
+      );
+    } on DioException catch (error) {
+      if (!CancelToken.isCancel(error)) rethrow;
+    } on ApiFailure catch (error) {
+      if (generation == _requestGeneration) {
+        state = state.copyWith(loading: false, failure: error);
+      }
+    }
+  }
+
+  Future<void> setQuery(SeriesCollectionQuery query) async {
+    state = SeriesCollectionViewState(query: query, loading: true);
+    await refresh();
+  }
+
+  void setSearchQuery(String value) {
+    final query = value.trim();
+    _searchDebounce?.cancel();
+    _cancelToken?.cancel();
+    _requestGeneration++;
+    state = SeriesCollectionViewState(
+      query: state.query.copyWith(
+        searchQuery: query,
+        clearSearch: query.isEmpty,
+      ),
+      loading: true,
+    );
+    _searchDebounce = Timer(const Duration(milliseconds: 300), refresh);
+  }
+
+  Future<void> loadMore() async {
+    if (!state.pageInfo.hasNext || state.loadingMore) return;
+    final generation = ++_requestGeneration;
+    _cancelToken?.cancel();
+    _cancelToken = CancelToken();
+    state = state.copyWith(loadingMore: true, clearFailure: true);
+    try {
+      final page = await _fetch(
+        cursor: state.pageInfo.nextCursor,
+        cancelToken: _cancelToken,
+      );
+      if (generation != _requestGeneration) return;
+      state = state.copyWith(
+        items: [...state.items, ...page.items],
+        pageInfo: page.pageInfo,
+        loadingMore: false,
+      );
+    } on DioException catch (error) {
+      if (!CancelToken.isCancel(error)) rethrow;
+    } on ApiFailure catch (error) {
+      if (generation == _requestGeneration) {
+        state = state.copyWith(loadingMore: false, failure: error);
+      }
+    }
+  }
+
+  Future<CursorPage<SeriesCollectionItem>> _fetch({
+    String? cursor,
+    CancelToken? cancelToken,
+  }) {
+    final query = state.query;
+    return ref
+        .read(collectionRepositoryProvider)
+        .series(
+          scope: query.scope,
+          status: query.status,
+          query: query.searchQuery,
+          cursor: cursor,
+          cancelToken: cancelToken,
+        );
+  }
+}
+
+final favoriteAnimeProvider = FutureProvider.autoDispose<List<CollectionEntry>>(
+  (ref) {
+    ref.watch(activeUserIdProvider);
+    return ref.watch(homeRepositoryProvider).favorites();
+  },
+);
+
+final badgeOverviewProvider = FutureProvider.autoDispose<BadgeOverview>((ref) {
+  ref.watch(activeUserIdProvider);
+  return ref.watch(homeRepositoryProvider).badges();
+});
+
+class SearchViewState {
+  const SearchViewState({
+    this.query = '',
+    this.sort = 'popularity',
+    this.genre,
+    this.items = const [],
+    this.pageInfo = const PageInfo(hasNext: false),
+    this.loading = false,
+    this.loadingMore = false,
+    this.ratingAnimeId,
+    this.failure,
+  });
+  final String query;
+  final String sort;
+  final String? genre;
+  final List<AnimeSearchResult> items;
+  final PageInfo pageInfo;
+  final bool loading;
+  final bool loadingMore;
+  final int? ratingAnimeId;
+  final ApiFailure? failure;
+
+  SearchViewState copyWith({
+    String? query,
+    String? sort,
+    String? genre,
+    bool clearGenre = false,
+    List<AnimeSearchResult>? items,
+    PageInfo? pageInfo,
+    bool? loading,
+    bool? loadingMore,
+    int? ratingAnimeId,
+    bool clearRating = false,
+    ApiFailure? failure,
+    bool clearFailure = false,
+  }) => SearchViewState(
+    query: query ?? this.query,
+    sort: sort ?? this.sort,
+    genre: clearGenre ? null : (genre ?? this.genre),
+    items: items ?? this.items,
+    pageInfo: pageInfo ?? this.pageInfo,
+    loading: loading ?? this.loading,
+    loadingMore: loadingMore ?? this.loadingMore,
+    ratingAnimeId: clearRating ? null : (ratingAnimeId ?? this.ratingAnimeId),
+    failure: clearFailure ? null : (failure ?? this.failure),
+  );
 }
 
 final searchControllerProvider =
@@ -461,39 +676,82 @@ class SearchController extends Notifier<SearchViewState> {
 
   @override
   SearchViewState build() {
+    ref.watch(activeUserIdProvider);
     ref.onDispose(() {
       _debounce?.cancel();
       _cancelToken?.cancel();
     });
-    return const SearchViewState();
+    Future<void>.microtask(refresh);
+    return const SearchViewState(loading: true);
   }
 
   void setQuery(String value) {
     final query = value.trim();
     _debounce?.cancel();
     _cancelToken?.cancel();
-    if (query.length < 2) {
-      state = SearchViewState(query: query);
-      return;
-    }
-    state = SearchViewState(query: query, loading: true);
-    _debounce = Timer(const Duration(milliseconds: 300), () => _search(query));
+    state = state.copyWith(
+      query: query,
+      loading: true,
+      loadingMore: false,
+      pageInfo: const PageInfo(hasNext: false),
+      clearFailure: true,
+    );
+    _debounce = Timer(const Duration(milliseconds: 300), _search);
   }
 
-  Future<void> refresh() async {
-    if (state.query.length < 2) return;
-    await _search(state.query);
+  void setSort(String sort) {
+    if (sort == state.sort) return;
+    _cancelToken?.cancel();
+    state = state.copyWith(
+      sort: sort,
+      loading: true,
+      loadingMore: false,
+      pageInfo: const PageInfo(hasNext: false),
+      clearFailure: true,
+    );
+    unawaited(_search());
   }
 
-  Future<void> _search(String query) async {
+  void setGenre(String? genre) {
+    if (genre == state.genre) return;
+    _cancelToken?.cancel();
+    state = state.copyWith(
+      genre: genre,
+      clearGenre: genre == null,
+      loading: true,
+      loadingMore: false,
+      pageInfo: const PageInfo(hasNext: false),
+      clearFailure: true,
+    );
+    unawaited(_search());
+  }
+
+  Future<void> refresh() => _search();
+
+  Future<void> _search() async {
+    _cancelToken?.cancel();
+    final requestedQuery = state.query;
+    final requestedSort = state.sort;
+    final requestedGenre = state.genre;
     _cancelToken = CancelToken();
     try {
       final page = await ref
           .read(collectionRepositoryProvider)
-          .search(query, cancelToken: _cancelToken);
-      if (query != state.query) return;
+          .search(
+            query: requestedQuery,
+            sort: requestedSort,
+            genre: requestedGenre,
+            cancelToken: _cancelToken,
+          );
+      if (requestedQuery != state.query ||
+          requestedSort != state.sort ||
+          requestedGenre != state.genre) {
+        return;
+      }
       state = SearchViewState(
-        query: query,
+        query: requestedQuery,
+        sort: requestedSort,
+        genre: requestedGenre,
         items: page.items,
         pageInfo: page.pageInfo,
       );
@@ -502,36 +760,85 @@ class SearchController extends Notifier<SearchViewState> {
         rethrow;
       }
     } on ApiFailure catch (error) {
-      if (query == state.query) {
-        state = SearchViewState(query: query, failure: error);
+      if (requestedQuery == state.query &&
+          requestedSort == state.sort &&
+          requestedGenre == state.genre) {
+        state = SearchViewState(
+          query: requestedQuery,
+          sort: requestedSort,
+          genre: requestedGenre,
+          failure: error,
+        );
       }
     }
   }
 
   Future<void> loadMore() async {
     if (!state.pageInfo.hasNext || state.loadingMore) return;
-    state = SearchViewState(
-      query: state.query,
-      items: state.items,
-      pageInfo: state.pageInfo,
-      loadingMore: true,
-    );
+    final requestedQuery = state.query;
+    final requestedSort = state.sort;
+    final requestedGenre = state.genre;
+    final requestedCursor = state.pageInfo.nextCursor;
+    state = state.copyWith(loadingMore: true, clearFailure: true);
     try {
       final page = await ref
           .read(collectionRepositoryProvider)
-          .search(state.query, cursor: state.pageInfo.nextCursor);
+          .search(
+            query: requestedQuery,
+            sort: requestedSort,
+            genre: requestedGenre,
+            cursor: requestedCursor,
+          );
+      if (requestedQuery != state.query ||
+          requestedSort != state.sort ||
+          requestedGenre != state.genre) {
+        return;
+      }
       state = SearchViewState(
-        query: state.query,
+        query: requestedQuery,
+        sort: requestedSort,
+        genre: requestedGenre,
         items: [...state.items, ...page.items],
         pageInfo: page.pageInfo,
       );
     } on ApiFailure catch (error) {
-      state = SearchViewState(
-        query: state.query,
-        items: state.items,
-        pageInfo: state.pageInfo,
-        failure: error,
+      state = state.copyWith(loadingMore: false, failure: error);
+    }
+  }
+
+  Future<void> quickRate(AnimeSearchResult result, int score) async {
+    if (state.ratingAnimeId != null) return;
+    final anime = result.anime;
+    final progress = anime.episodes ?? result.myCollection?.progress ?? 0;
+    state = state.copyWith(ratingAnimeId: anime.id, clearFailure: true);
+    try {
+      await ref
+          .read(collectionRepositoryProvider)
+          .quickRate(
+            animeId: anime.id,
+            score: score.toDouble(),
+            exists: result.myCollection?.exists == true,
+            progress: progress,
+          );
+      final updated = AnimeSearchResult(
+        anime: anime,
+        myCollection: MyCollectionState(
+          exists: true,
+          status: CollectionStatus.completed,
+          score: score.toDouble(),
+          progress: progress,
+        ),
       );
+      state = state.copyWith(
+        items: [
+          for (final item in state.items)
+            if (item.anime.id == anime.id) updated else item,
+        ],
+        clearRating: true,
+      );
+    } catch (_) {
+      state = state.copyWith(clearRating: true);
+      rethrow;
     }
   }
 }
@@ -543,59 +850,98 @@ final animeDetailProvider = FutureProvider.family<Anime, int>(
 final animeCastProvider = FutureProvider.family<List<AnimeCastMember>, int>(
   (ref, animeId) => ref.watch(collectionRepositoryProvider).cast(animeId),
 );
-final collectionEntryProvider = FutureProvider.family<CollectionEntry?, int>(
-  (ref, animeId) => ref.watch(collectionRepositoryProvider).entry(animeId),
-);
+final collectionEntryProvider = FutureProvider.family<CollectionEntry?, int>((
+  ref,
+  animeId,
+) {
+  ref.watch(activeUserIdProvider);
+  return ref.watch(collectionRepositoryProvider).entry(animeId);
+});
 
-final friendSnapshotProvider = FutureProvider<FriendSnapshot>(
-  (ref) => ref.watch(friendsRepositoryProvider).snapshot(),
-);
+final friendSnapshotProvider = FutureProvider.autoDispose<FriendSnapshot>((
+  ref,
+) {
+  ref.watch(activeUserIdProvider);
+  return ref.watch(friendsRepositoryProvider).snapshot();
+});
 final userSearchProvider = FutureProvider.autoDispose
     .family<CursorPage<UserSearchResult>, String>((ref, query) async {
+      ref.watch(activeUserIdProvider);
       final token = CancelToken();
       ref.onDispose(token.cancel);
       return ref
           .watch(friendsRepositoryProvider)
           .search(query, cancelToken: token);
     });
-final publicUserProvider = FutureProvider.family<PublicUser, int>(
-  (ref, userId) => ref.watch(friendsRepositoryProvider).profile(userId),
-);
+final publicUserProvider = FutureProvider.autoDispose.family<PublicUser, int>((
+  ref,
+  userId,
+) {
+  ref.watch(activeUserIdProvider);
+  return ref.watch(friendsRepositoryProvider).profile(userId);
+});
+final publicBadgeOverviewProvider = FutureProvider.autoDispose
+    .family<BadgeOverview, int>((ref, userId) {
+      ref.watch(activeUserIdProvider);
+      return ref.watch(friendsRepositoryProvider).badges(userId);
+    });
+final publicFavoriteAnimeProvider = FutureProvider.autoDispose
+    .family<List<CollectionEntry>, int>((ref, userId) async {
+      ref.watch(activeUserIdProvider);
+      final page = await ref
+          .watch(friendsRepositoryProvider)
+          .collection(userId, sort: 'score', score: 10, limit: 12);
+      return page.items;
+    });
 
-final statsOverviewProvider = FutureProvider<StatsOverview>(
-  (ref) => ref.watch(analysisRepositoryProvider).overview(),
-);
-final viewingDnaProvider = FutureProvider<ViewingDna>(
-  (ref) => ref.watch(analysisRepositoryProvider).viewingDna(),
-);
-final formatDistributionProvider = FutureProvider<FormatDistribution>(
-  (ref) => ref.watch(analysisRepositoryProvider).formats(),
-);
-final genreBubbleProvider = FutureProvider<List<GenreBubble>>(
-  (ref) => ref.watch(analysisRepositoryProvider).genres(),
-);
-final yearlyScoreProvider = FutureProvider<List<YearlyScore>>(
-  (ref) => ref.watch(analysisRepositoryProvider).yearlyScores(),
-);
-final studioRankingProvider =
-    FutureProvider.family<List<StudioRanking>, String>(
-      (ref, sort) => ref.watch(analysisRepositoryProvider).studios(sort: sort),
+final statsOverviewProvider = FutureProvider.autoDispose
+    .family<StatsOverview, int?>(
+      (ref, userId) => ref.watch(analysisRepositoryProvider(userId)).overview(),
     );
-final voiceActorRankingProvider =
-    FutureProvider.family<List<VoiceActorRanking>, String>(
-      (ref, sort) =>
-          ref.watch(analysisRepositoryProvider).voiceActors(sort: sort),
+final viewingDnaProvider = FutureProvider.autoDispose.family<ViewingDna, int?>(
+  (ref, userId) => ref.watch(analysisRepositoryProvider(userId)).viewingDna(),
+);
+final formatDistributionProvider = FutureProvider.autoDispose
+    .family<FormatDistribution, int?>(
+      (ref, userId) => ref.watch(analysisRepositoryProvider(userId)).formats(),
+    );
+final genreBubbleProvider = FutureProvider.autoDispose
+    .family<List<GenreBubble>, int?>(
+      (ref, userId) => ref.watch(analysisRepositoryProvider(userId)).genres(),
+    );
+final yearlyScoreProvider = FutureProvider.autoDispose
+    .family<List<YearlyScore>, int?>(
+      (ref, userId) =>
+          ref.watch(analysisRepositoryProvider(userId)).yearlyScores(),
+    );
+final studioRankingProvider = FutureProvider.autoDispose
+    .family<List<StudioRanking>, ({int? userId, String sort})>(
+      (ref, key) => ref
+          .watch(analysisRepositoryProvider(key.userId))
+          .studios(sort: key.sort),
+    );
+final voiceActorRankingProvider = FutureProvider.autoDispose
+    .family<List<VoiceActorRanking>, ({int? userId, String sort})>(
+      (ref, key) => ref
+          .watch(analysisRepositoryProvider(key.userId))
+          .voiceActors(sort: key.sort),
     );
 
-final studioAnimeProvider = FutureProvider.family<List<Anime>, int>(
-  (ref, id) => ref.watch(analysisRepositoryProvider).studioAnime(id),
-);
-final voiceActorAnimeProvider = FutureProvider.family<List<Anime>, int>(
-  (ref, id) => ref.watch(analysisRepositoryProvider).voiceActorAnime(id),
-);
+final studioAnimeProvider = FutureProvider.autoDispose
+    .family<List<AnalysisAnimeWork>, ({int? userId, int id})>(
+      (ref, key) =>
+          ref.watch(analysisRepositoryProvider(key.userId)).studioAnime(key.id),
+    );
+final voiceActorAnimeProvider = FutureProvider.autoDispose
+    .family<List<AnalysisAnimeWork>, ({int? userId, int id})>(
+      (ref, key) => ref
+          .watch(analysisRepositoryProvider(key.userId))
+          .voiceActorAnime(key.id),
+    );
 
 void invalidateUserData(WidgetRef ref) {
   unawaited(ref.read(collectionControllerProvider.notifier).refresh());
+  unawaited(ref.read(seriesCollectionControllerProvider.notifier).refresh());
   unawaited(ref.read(searchControllerProvider.notifier).refresh());
   ref.invalidate(favoriteAnimeProvider);
   ref.invalidate(badgeOverviewProvider);
@@ -606,4 +952,6 @@ void invalidateUserData(WidgetRef ref) {
   ref.invalidate(yearlyScoreProvider);
   ref.invalidate(studioRankingProvider);
   ref.invalidate(voiceActorRankingProvider);
+  ref.invalidate(studioAnimeProvider);
+  ref.invalidate(voiceActorAnimeProvider);
 }

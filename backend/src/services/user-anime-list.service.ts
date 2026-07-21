@@ -6,10 +6,14 @@ import { markUserVoiceActorStatsDirty } from './user-voice-actor-stats.service';
 
 const LIST_STATUS_OPTIONS = ['planned', 'watching', 'completed', 'paused', 'dropped'] as const;
 const USER_ANIME_LIST_SORT_OPTIONS = ['latest', 'added', 'score', 'scoreAsc'] as const;
+const USER_ANIME_LIST_FORMAT_OPTIONS = [
+  'TV', 'TV_SHORT', 'MOVIE', 'SPECIAL', 'OVA', 'ONA', 'MUSIC',
+] as const;
 
 type ListStatus = typeof LIST_STATUS_OPTIONS[number];
 export type UserAnimeListSortOption = typeof USER_ANIME_LIST_SORT_OPTIONS[number];
 export type UserAnimeListTitleLanguage = 'ko' | 'en' | 'ja';
+export type UserAnimeListFormat = typeof USER_ANIME_LIST_FORMAT_OPTIONS[number];
 
 interface UserAnimeListRow extends RowDataPacket {
   id: number;
@@ -68,6 +72,7 @@ interface UserAnimeListCountRow extends RowDataPacket {
 interface UserAnimeListCursorPayload {
   sort: UserAnimeListSortOption;
   genre?: AnimeGenre | null;
+  format?: UserAnimeListFormat | null;
   year?: number | null;
   scoreFilter?: number | null;
   query?: string | null;
@@ -82,6 +87,7 @@ export interface GetUserAnimeListParams {
   sort: UserAnimeListSortOption;
   titleLanguage: UserAnimeListTitleLanguage;
   genre?: AnimeGenre;
+  format?: UserAnimeListFormat;
   year?: number;
   score?: number;
   query?: string;
@@ -190,6 +196,17 @@ export function validateUserAnimeListGenre(value: unknown): AnimeGenre | undefin
   }
 
   return value as AnimeGenre;
+}
+
+export function validateUserAnimeListFormat(value: unknown): UserAnimeListFormat | undefined {
+  if (value === undefined || value === null || value === '') return undefined;
+  if (
+    typeof value !== 'string'
+    || !USER_ANIME_LIST_FORMAT_OPTIONS.includes(value as UserAnimeListFormat)
+  ) {
+    throw new Error(`format must be one of ${USER_ANIME_LIST_FORMAT_OPTIONS.join(', ')}`);
+  }
+  return value as UserAnimeListFormat;
 }
 
 export function validateUserAnimeListYear(value: unknown): number | undefined {
@@ -537,6 +554,19 @@ function buildGenreWhereClause(
   `;
 }
 
+function buildFormatWhereClause(
+  format: UserAnimeListFormat | undefined,
+  cursor: UserAnimeListCursorPayload | null,
+  params: Array<string | number | null>
+) {
+  if (cursor && (cursor.format ?? null) !== (format ?? null)) {
+    throw new Error('Cursor format does not match requested format');
+  }
+  if (!format) return '';
+  params.push(format);
+  return 'AND a.format = ?';
+}
+
 function buildYearWhereClause(
   year: number | undefined,
   cursor: UserAnimeListCursorPayload | null,
@@ -594,6 +624,7 @@ export async function getUserAnimeList(params: GetUserAnimeListParams) {
   const decodedCursor = decodeCursor(params.cursor);
   const queryParams: Array<string | number | null> = [params.userId];
   const genreWhereClause = buildGenreWhereClause(params.genre, decodedCursor, queryParams);
+  const formatWhereClause = buildFormatWhereClause(params.format, decodedCursor, queryParams);
   const yearWhereClause = buildYearWhereClause(params.year, decodedCursor, queryParams);
   const scoreWhereClause = buildScoreWhereClause(params.score, decodedCursor, queryParams);
   const queryWhereClause = buildQueryWhereClause(params.query, decodedCursor, queryParams);
@@ -646,6 +677,7 @@ export async function getUserAnimeList(params: GetUserAnimeListParams) {
       AND akt.is_primary = TRUE
     WHERE ual.user_id = ?
       ${genreWhereClause}
+      ${formatWhereClause}
       ${yearWhereClause}
       ${scoreWhereClause}
       ${queryWhereClause}
@@ -664,6 +696,7 @@ export async function getUserAnimeList(params: GetUserAnimeListParams) {
     ? encodeCursor({
         sort: params.sort,
         genre: params.genre ?? null,
+        format: params.format ?? null,
         year: params.year ?? null,
         scoreFilter: params.score ?? null,
         query: params.query?.toLocaleLowerCase() ?? null,
@@ -728,6 +761,7 @@ export async function getUserAnimeList(params: GetUserAnimeListParams) {
       sort: params.sort,
       titleLanguage: params.titleLanguage,
       genre: params.genre ?? null,
+      format: params.format ?? null,
       year: params.year ?? null,
       score: params.score ?? null,
     },

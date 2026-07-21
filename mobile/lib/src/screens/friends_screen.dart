@@ -282,81 +282,220 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
   }
 }
 
-class PublicProfileScreen extends ConsumerWidget {
+class PublicProfileScreen extends ConsumerStatefulWidget {
   const PublicProfileScreen({required this.userId, super.key});
   final int userId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<PublicProfileScreen> createState() =>
+      _PublicProfileScreenState();
+}
+
+class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
+  bool _acting = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final userId = widget.userId;
     final profile = ref.watch(publicUserProvider(userId));
+    final favorites = ref.watch(publicFavoriteAnimeProvider(userId));
+    final badges = ref.watch(publicBadgeOverviewProvider(userId));
+    final snapshot = ref.watch(friendSnapshotProvider);
     return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(middle: Text('사용자 프로필')),
       child: AppBackground(
-        child: SafeArea(
-          top: false,
-          child: profile.when(
-            loading: () => const Padding(
-              padding: EdgeInsets.all(16),
-              child: AppSkeleton(height: 260),
-            ),
-            error: (error, _) => Padding(
-              padding: const EdgeInsets.all(16),
-              child: AppStateView(
-                title: '프로필을 불러오지 못했어요',
-                message: error.toString(),
-                actionLabel: '재시도',
-                onAction: () => ref.invalidate(publicUserProvider(userId)),
+        child: CustomScrollView(
+          slivers: [
+            AppCompactSliverHeader(
+              title: '사용자 프로필',
+              leading: CupertinoButton(
+                padding: EdgeInsets.zero,
+                minimumSize: const Size.square(44),
+                onPressed: () => Navigator.of(context).maybePop(),
+                child: const Icon(
+                  CupertinoIcons.back,
+                  color: AppColors.pointPressed,
+                ),
               ),
             ),
-            data: (user) => ListView(
-              padding: const EdgeInsets.fromLTRB(16, 24, 16, 32),
-              children: [
-                AppCard(
-                  child: Column(
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+              sliver: SliverToBoxAdapter(
+                child: profile.when(
+                  loading: () => const AppSkeleton(height: 260),
+                  error: (error, _) => AppStateView(
+                    title: '프로필을 불러오지 못했어요',
+                    message: error.toString(),
+                    actionLabel: '재시도',
+                    onAction: () => ref.invalidate(publicUserProvider(userId)),
+                  ),
+                  data: (user) => Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      ClipOval(
-                        child: SizedBox.square(
-                          dimension: 92,
-                          child: AppNetworkImage(
-                            url: user.profileImageUrl,
-                            profile: true,
-                          ),
+                      AppCard(
+                        child: Column(
+                          children: [
+                            ClipOval(
+                              child: SizedBox.square(
+                                dimension: 92,
+                                child: AppNetworkImage(
+                                  url: user.profileImageUrl,
+                                  profile: true,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            Text(user.username, style: appTitleStyle(size: 24)),
+                            const SizedBox(height: 5),
+                            Text(
+                              '${user.animeListCount}편의 기록',
+                              style: appLabelStyle(),
+                            ),
+                            if (user.bio != null) ...[
+                              const SizedBox(height: 12),
+                              Text(user.bio!, textAlign: TextAlign.center),
+                            ],
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 14),
-                      Text(user.username, style: appTitleStyle(size: 24)),
-                      const SizedBox(height: 5),
-                      Text(
-                        '${user.animeListCount}편의 기록',
-                        style: appLabelStyle(),
+                      const SizedBox(height: 16),
+                      snapshot.maybeWhen(
+                        data: (value) => _relationshipAction(value, userId),
+                        orElse: () => const SizedBox.shrink(),
                       ),
-                      if (user.bio != null) ...[
-                        const SizedBox(height: 12),
-                        Text(user.bio!, textAlign: TextAlign.center),
-                      ],
+                      const SizedBox(height: 10),
+                      AppPrimaryButton(
+                        label: '컬렉션 보기',
+                        icon: const Icon(
+                          CupertinoIcons.square_grid_2x2,
+                          size: 18,
+                        ),
+                        onPressed: () =>
+                            context.push('/users/$userId/collection'),
+                      ),
+                      const SizedBox(height: 10),
+                      AppSecondaryButton(
+                        label: '분석 보기',
+                        icon: CupertinoIcons.chart_bar,
+                        onPressed: () => context.push(
+                          '/users/$userId/analysis?name=${Uri.encodeQueryComponent(user.username)}',
+                        ),
+                      ),
+                      const SizedBox(height: 22),
+                      const AppSectionHeader(
+                        title: '획득한 배지',
+                        eyebrow: 'Badges',
+                      ),
+                      const SizedBox(height: 10),
+                      badges.when(
+                        loading: () => const AppSkeleton(height: 112),
+                        error: (error, _) => AppStateView(
+                          compact: true,
+                          title: '배지를 불러오지 못했어요',
+                          message: error.toString(),
+                          actionLabel: '재시도',
+                          onAction: () => ref.invalidate(
+                            publicBadgeOverviewProvider(userId),
+                          ),
+                        ),
+                        data: (overview) => EarnedBadgeStrip(
+                          badges: overview.items,
+                          flat: true,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      const AppSectionHeader(
+                        title: '최애 애니',
+                        eyebrow: 'Favorites',
+                      ),
+                      const SizedBox(height: 10),
+                      favorites.when(
+                        loading: () => const AppSkeleton(height: 300),
+                        error: (error, _) => AppStateView(
+                          compact: true,
+                          title: '최애 애니를 불러오지 못했어요',
+                          message: error.toString(),
+                          actionLabel: '재시도',
+                          onAction: () => ref.invalidate(
+                            publicFavoriteAnimeProvider(userId),
+                          ),
+                        ),
+                        data: (items) => items.isEmpty
+                            ? const AppStateView(
+                                compact: true,
+                                icon: CupertinoIcons.heart,
+                                title: '공개된 최애 애니가 없어요',
+                                message: '10점을 준 작품이 여기에 표시됩니다.',
+                              )
+                            : FavoriteAnimeCarousel(items: items),
+                      ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 16),
-                AppPrimaryButton(
-                  label: '컬렉션 보기',
-                  icon: const Icon(CupertinoIcons.square_grid_2x2, size: 18),
-                  onPressed: () => context.push('/users/$userId/collection'),
-                ),
-                const SizedBox(height: 10),
-                AppSecondaryButton(
-                  label: '분석 보기',
-                  icon: CupertinoIcons.chart_bar,
-                  onPressed: () => context.push(
-                    '/users/$userId/analysis?name=${Uri.encodeQueryComponent(user.username)}',
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );
+  }
+
+  Widget _relationshipAction(FriendSnapshot snapshot, int userId) {
+    for (final request in snapshot.incoming) {
+      if (request.user.id == userId) {
+        return AppPrimaryButton(
+          label: _acting ? '수락 중...' : '친구 요청 수락',
+          icon: const Icon(CupertinoIcons.person_badge_plus, size: 18),
+          onPressed: _acting
+              ? null
+              : () => _act(
+                  () => ref
+                      .read(friendsRepositoryProvider)
+                      .actOnRequest(request.id, 'accept'),
+                ),
+        );
+      }
+    }
+    for (final request in snapshot.outgoing) {
+      if (request.user.id == userId) {
+        return const AppSecondaryButton(
+          label: '친구 요청을 보냈어요',
+          icon: CupertinoIcons.clock,
+          onPressed: null,
+        );
+      }
+    }
+    for (final friend in snapshot.friends) {
+      if (friend.user.id == userId) {
+        return const AppSecondaryButton(
+          label: '친구',
+          icon: CupertinoIcons.person_2_fill,
+          onPressed: null,
+        );
+      }
+    }
+    return AppPrimaryButton(
+      label: _acting ? '요청 중...' : '친구 추가',
+      icon: const Icon(CupertinoIcons.person_add, size: 18),
+      onPressed: _acting
+          ? null
+          : () => _act(
+              () => ref.read(friendsRepositoryProvider).sendRequest(userId),
+            ),
+    );
+  }
+
+  Future<void> _act(Future<void> Function() action) async {
+    setState(() => _acting = true);
+    try {
+      await action();
+      ref.invalidate(friendSnapshotProvider);
+      ref.invalidate(userSearchProvider);
+      if (mounted) showAppToast(context, '친구 상태를 업데이트했습니다.');
+    } on ApiFailure catch (error) {
+      if (mounted) showAppToast(context, error.message, error: true);
+    } finally {
+      if (mounted) setState(() => _acting = false);
+    }
   }
 }
 

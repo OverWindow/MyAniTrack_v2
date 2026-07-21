@@ -168,13 +168,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             state,
             userId == null
                 ? const _RouteErrorScreen(message: '잘못된 사용자 주소입니다.')
-                : ProviderScope(
-                    overrides: [
-                      analysisSubjectProvider.overrideWithValue(userId),
-                    ],
-                    child: AnalysisScreen(
-                      title: username == null ? '사용자 분석' : '$username의 분석',
-                    ),
+                : AnalysisScreen(
+                    userId: userId,
+                    title: username == null ? '사용자 분석' : '$username의 분석',
                   ),
           );
         },

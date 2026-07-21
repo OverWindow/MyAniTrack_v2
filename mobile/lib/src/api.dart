@@ -241,6 +241,7 @@ class CollectionRepository {
   Future<CursorPage<CollectionEntry>> list({
     String sort = 'latest',
     String? genre,
+    String? format,
     int? year,
     int? score,
     String? searchQuery,
@@ -255,6 +256,7 @@ class CollectionRepository {
         'titleLanguage': 'ko',
         'limit': limit,
         if (genre != null) 'genre': genre,
+        if (format != null) 'format': format,
         if (year != null) 'year': year,
         if (score != null) 'score': score,
         if (searchQuery != null && searchQuery.isNotEmpty) 'query': searchQuery,
@@ -269,15 +271,47 @@ class CollectionRepository {
     );
   }
 
-  Future<CursorPage<AnimeSearchResult>> search(
-    String query, {
+  Future<CursorPage<SeriesCollectionItem>> series({
+    AnimeSeriesScope scope = AnimeSeriesScope.mainline,
+    UserSeriesStatus status = UserSeriesStatus.all,
+    String? query,
+    int limit = 20,
+    String? cursor,
+    CancelToken? cancelToken,
+  }) async {
+    final json = await api.get(
+      '/me/anime-list/series',
+      query: {
+        'scope': scope.apiValue,
+        'status': status.apiValue,
+        'titleLanguage': 'ko',
+        'limit': limit,
+        if (query != null && query.isNotEmpty) 'query': query,
+        if (cursor != null) 'cursor': cursor,
+      },
+      cancelToken: cancelToken,
+    );
+    return CursorPage(
+      items: asJsonList(
+        json['items'],
+      ).map(SeriesCollectionItem.fromJson).toList(),
+      pageInfo: PageInfo.fromJson(asJsonMap(json['pageInfo'])),
+    );
+  }
+
+  Future<CursorPage<AnimeSearchResult>> search({
+    String query = '',
+    String sort = 'popularity',
+    String? genre,
     String? cursor,
     CancelToken? cancelToken,
   }) async {
     final json = await api.get(
       '/me/anime/search',
       query: {
-        'query': query,
+        if (query.isNotEmpty) 'query': query,
+        'sort': sort,
+        if (genre != null) 'genre': genre,
         'titleLanguage': 'ko',
         'limit': 20,
         if (cursor != null) 'cursor': cursor,
@@ -288,6 +322,25 @@ class CollectionRepository {
       items: asJsonList(json['items']).map(AnimeSearchResult.fromJson).toList(),
       pageInfo: PageInfo.fromJson(asJsonMap(json['pageInfo'])),
     );
+  }
+
+  Future<void> quickRate({
+    required int animeId,
+    required double score,
+    required bool exists,
+    required int progress,
+  }) async {
+    final data = <String, dynamic>{
+      if (!exists) 'animeId': animeId,
+      'status': CollectionStatus.completed.apiValue,
+      'score': score,
+      'progress': progress,
+    };
+    if (exists) {
+      await api.patch('/me/anime-list/$animeId', data: data);
+    } else {
+      await api.post('/me/anime-list', data: data);
+    }
   }
 
   Future<Anime> animeDetail(int animeId) async {
@@ -422,12 +475,18 @@ class FriendsRepository {
     return PublicUser.fromJson(await api.get('/users/$userId/profile'));
   }
 
+  Future<BadgeOverview> badges(int userId) async {
+    return BadgeOverview.fromJson(await api.get('/users/$userId/badges'));
+  }
+
   Future<CursorPage<CollectionEntry>> collection(
     int userId, {
     String? query,
     String? genre,
+    String? format,
     int? year,
     int? score,
+    String sort = 'latest',
     int limit = 20,
     String? cursor,
     CancelToken? cancelToken,
@@ -435,11 +494,12 @@ class FriendsRepository {
     final json = await api.get(
       '/users/$userId/anime-list',
       query: {
-        'sort': 'latest',
+        'sort': sort,
         'titleLanguage': 'ko',
         'limit': limit,
         if (query != null && query.isNotEmpty) 'query': query,
         if (genre != null) 'genre': genre,
+        if (format != null) 'format': format,
         if (year != null) 'year': year,
         if (score != null) 'score': score,
         if (cursor != null) 'cursor': cursor,
@@ -522,7 +582,7 @@ class AnalysisRepository {
     final json = await api.get(
       '$_voiceActorBase/ranking',
       query: {
-        'sort': sort == 'watchTime' ? 'count' : sort,
+        'sort': sort,
         'limit': 50,
         'minAnimeCount': 1,
         'minRatedAnimeCount': 1,
@@ -531,20 +591,20 @@ class AnalysisRepository {
     return asJsonList(json['items']).map(VoiceActorRanking.fromJson).toList();
   }
 
-  Future<List<Anime>> studioAnime(int studioId) async {
+  Future<List<AnalysisAnimeWork>> studioAnime(int studioId) async {
     final json = await api.get(
       '$_base/studios/$studioId/anime',
       query: const {'titleLanguage': 'ko', 'limit': 50, 'status': 'all'},
     );
-    return asJsonList(json['items']).map(Anime.fromJson).toList();
+    return asJsonList(json['items']).map(AnalysisAnimeWork.fromJson).toList();
   }
 
-  Future<List<Anime>> voiceActorAnime(int voiceActorId) async {
+  Future<List<AnalysisAnimeWork>> voiceActorAnime(int voiceActorId) async {
     final json = await api.get(
       '$_voiceActorBase/$voiceActorId/anime',
       query: const {'titleLanguage': 'ko', 'limit': 50},
     );
-    return asJsonList(json['items']).map(Anime.fromJson).toList();
+    return asJsonList(json['items']).map(AnalysisAnimeWork.fromJson).toList();
   }
 }
 

@@ -107,6 +107,38 @@ void main() {
       expect(badges.totalCount, 2);
       expect(badges.items.single.progress?.percent, 25);
     });
+
+    test('earnedAt 또는 완료 진행률이 있으면 획득 배지로 판정한다', () {
+      final badges = BadgeOverview.fromJson({
+        'items': [
+          {
+            'id': 1,
+            'code': 'PUBLIC_BADGE',
+            'name': '공개 배지',
+            'earnedAt': '2026-07-20T12:00:00Z',
+          },
+          {
+            'id': 2,
+            'code': 'COMPLETED_BADGE',
+            'name': '완료 배지',
+            'earned': false,
+            'progress': {'percent': 100, 'isComplete': true},
+          },
+          {
+            'id': 3,
+            'code': 'LOCKED_BADGE',
+            'name': '미획득 배지',
+            'earned': false,
+            'progress': {'percent': 50, 'isComplete': false},
+          },
+        ],
+      });
+
+      expect(badges.items[0].earned, isTrue);
+      expect(badges.items[1].earned, isTrue);
+      expect(badges.items[2].earned, isFalse);
+      expect(badges.earnedCount, 2);
+    });
   });
 
   group('분석 DTO', () {
@@ -135,7 +167,7 @@ void main() {
         'genre': '드라마',
         'animeCount': 4,
         'myAverageScore': 8.5,
-        'communityAverageScore': 79,
+        'communityAverageScore': 7.9,
         'preferenceScore': 0.82,
         'bubbleSize': 32,
       });
@@ -144,7 +176,7 @@ void main() {
         'animeCount': 3,
         'ratedAnimeCount': 0,
         'averageScore': null,
-        'communityAverageScore': 81,
+        'communityAverageScore': 8.1,
       });
       final studio = StudioRanking.fromJson({
         'studio': {'id': 9, 'name': 'Madhouse'},
@@ -165,10 +197,78 @@ void main() {
 
       expect(genre.genre, '드라마');
       expect(year.averageScore, isNull);
+      expect(year.communityAverageScore, 8.1);
       expect(studio.id, 9);
       expect(studio.averageScore, isNull);
       expect(actor.name, '타네자키 아츠미');
       expect(actor.imageUrl, isNull);
+    });
+
+    test('성우 작품 응답의 애니와 복수 캐릭터를 함께 보존한다', () {
+      final work = AnalysisAnimeWork.fromJson({
+        'anime': {
+          'id': 123,
+          'title': '장송의 프리렌',
+          'coverImageLarge': 'anime.jpg',
+          'episodes': 28,
+          'duration': 24,
+        },
+        'userList': {'score': 9.5, 'status': 'completed', 'progress': 20},
+        'characters': [
+          {
+            'id': 7,
+            'role': 'MAIN',
+            'name': {'userPreferred': '프리렌'},
+            'image': {'large': 'frieren.jpg'},
+          },
+          {
+            'id': 8,
+            'role': 'SUPPORT',
+            'name': {'full': '다른 캐릭터'},
+            'image': {'medium': 'other.jpg'},
+          },
+        ],
+      });
+
+      expect(work.anime.id, 123);
+      expect(work.score, 9.5);
+      expect(work.characters, hasLength(2));
+      expect(work.characters.first.name, '프리렌');
+      expect(work.characters.first.role, 'MAIN');
+      expect(work.characters.last.imageUrl, 'other.jpg');
+      expect(work.watchMinutes, 672);
+    });
+
+    test('시리즈 컬렉션의 완주율과 멤버 상태를 보존한다', () {
+      final item = SeriesCollectionItem.fromJson({
+        'seriesId': 4,
+        'scope': 'franchise',
+        'title': '테스트 시리즈',
+        'canonicalAnimeId': 11,
+        'memberCount': 2,
+        'requiredMemberCount': 1,
+        'collectedMemberCount': 2,
+        'completedRequiredMemberCount': 1,
+        'completionRate': 100,
+        'completed': true,
+        'items': [
+          {
+            'completionRequired': true,
+            'anime': {'id': 11, 'title': '본편'},
+            'userList': {'status': 'completed', 'score': 8, 'progress': 12},
+          },
+          {
+            'completionRequired': false,
+            'anime': {'id': 12, 'title': '외전'},
+          },
+        ],
+      });
+
+      expect(item.scope, AnimeSeriesScope.franchise);
+      expect(item.completionRate, 100);
+      expect(item.items, hasLength(2));
+      expect(item.items.first.userList?.status, CollectionStatus.completed);
+      expect(item.items.last.userList, isNull);
     });
 
     test('Viewing DNA와 확장 통계 응답을 읽는다', () {

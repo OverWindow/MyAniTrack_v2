@@ -2,7 +2,7 @@ import { ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import { pool } from '../../config/db';
 import { AnimeTitleLanguage } from './anime.service';
 
-export type VoiceActorRankingSort = 'count' | 'score';
+export type VoiceActorRankingSort = 'count' | 'score' | 'watchTime';
 
 interface VoiceActorStatsRow extends RowDataPacket {
   voiceActorId: number;
@@ -18,6 +18,7 @@ interface VoiceActorStatsRow extends RowDataPacket {
   ratedAnimeCount: number;
   scoreSum: string | number | null;
   averageScore: string | number | null;
+  totalWatchMinutes: string | number | null;
   statsVersion: number;
   lastCalculatedAt: string | null;
 }
@@ -57,6 +58,8 @@ interface VoiceActorAnimeRow extends RowDataPacket {
   format: string | null;
   status: string | null;
   averageScore: number | null;
+  episodes: number | null;
+  duration: number | null;
   userStatus: string;
   userScore: number | null;
   userProgress: number;
@@ -100,6 +103,7 @@ interface RankingCursorPayload {
   animeCount?: number;
   ratedAnimeCount?: number;
   averageScore?: number | null;
+  totalWatchMinutes?: number;
   voiceActorId: number;
 }
 
@@ -175,8 +179,8 @@ function normalizeLimit(value: unknown) {
 export function validateVoiceActorRankingSort(value: unknown): VoiceActorRankingSort {
   const sort = typeof value === 'string' ? value : 'count';
 
-  if (sort !== 'count' && sort !== 'score') {
-    throw new Error('sort must be one of count, score');
+  if (sort !== 'count' && sort !== 'score' && sort !== 'watchTime') {
+    throw new Error('sort must be one of count, score, watchTime');
   }
 
   return sort;
@@ -458,6 +462,7 @@ function mapStatsRow(row: VoiceActorStatsRow) {
     ratedAnimeCount: row.ratedAnimeCount,
     scoreSum: toNumber(row.scoreSum),
     averageScore: toNumber(row.averageScore),
+    totalWatchMinutes: Number(row.totalWatchMinutes ?? 0),
     statsVersion: row.statsVersion,
     lastCalculatedAt: row.lastCalculatedAt,
   };
@@ -509,6 +514,27 @@ export async function getUserVoiceActorRanking(params: {
         cursor.voiceActorId
       );
     }
+  } else if (params.sort === 'watchTime') {
+    if (cursor) {
+      if (cursor.sort !== params.sort || cursor.minAnimeCount !== params.minAnimeCount || cursor.minRatedAnimeCount !== params.minRatedAnimeCount) {
+        throw new Error('Cursor does not match ranking query');
+      }
+      cursorWhere = `
+        AND (
+          COALESCE(wt.totalWatchMinutes, 0) < ?
+          OR (COALESCE(wt.totalWatchMinutes, 0) = ? AND uvas.anime_count < ?)
+          OR (COALESCE(wt.totalWatchMinutes, 0) = ? AND uvas.anime_count = ? AND uvas.voice_actor_id < ?)
+        )
+      `;
+      queryParams.push(
+        cursor.totalWatchMinutes ?? 0,
+        cursor.totalWatchMinutes ?? 0,
+        cursor.animeCount ?? 0,
+        cursor.totalWatchMinutes ?? 0,
+        cursor.animeCount ?? 0,
+        cursor.voiceActorId
+      );
+    }
   } else if (cursor) {
     if (cursor.sort !== params.sort || cursor.minAnimeCount !== params.minAnimeCount || cursor.minRatedAnimeCount !== params.minRatedAnimeCount) {
       throw new Error('Cursor does not match ranking query');
@@ -530,7 +556,9 @@ export async function getUserVoiceActorRanking(params: {
     : '';
   const orderClause = params.sort === 'score'
     ? 'uvas.average_score DESC, uvas.rated_anime_count DESC, uvas.anime_count DESC, uvas.voice_actor_id DESC'
-    : 'uvas.anime_count DESC, uvas.voice_actor_id DESC';
+    : params.sort === 'watchTime'
+      ? 'COALESCE(wt.totalWatchMinutes, 0) DESC, uvas.anime_count DESC, uvas.voice_actor_id DESC'
+      : 'uvas.anime_count DESC, uvas.voice_actor_id DESC';
 
   const [rows] = await pool.query<VoiceActorStatsRow[]>(
     `
@@ -548,6 +576,7 @@ export async function getUserVoiceActorRanking(params: {
       uvas.rated_anime_count AS ratedAnimeCount,
       uvas.score_sum AS scoreSum,
       uvas.average_score AS averageScore,
+      COALESCE(wt.totalWatchMinutes, 0) AS totalWatchMinutes,
       uas.voice_actor_stats_version AS statsVersion,
       uvas.last_calculated_at AS lastCalculatedAt
     FROM user_voice_actor_stats uvas
@@ -555,6 +584,28 @@ export async function getUserVoiceActorRanking(params: {
       ON va.id = uvas.voice_actor_id
     INNER JOIN user_analysis_state uas
       ON uas.user_id = uvas.user_id
+    LEFT JOIN (
+      SELECT
+        ual.user_id AS userId,
+        relation.voice_actor_id AS voiceActorId,
+        SUM(
+          CASE
+            WHEN a.duration IS NULL THEN 0
+            WHEN ual.status = 'completed' AND a.episodes IS NOT NULL
+              THEN a.episodes * a.duration
+            ELSE LEAST(ual.progress, COALESCE(a.episodes, ual.progress)) * a.duration
+          END
+        ) AS totalWatchMinutes
+      FROM user_anime_lists ual
+      INNER JOIN anime a ON a.id = ual.anime_id
+      INNER JOIN (
+        SELECT DISTINCT anime_id, voice_actor_id
+        FROM anime_character_voice_actors
+      ) relation ON relation.anime_id = ual.anime_id
+      GROUP BY ual.user_id, relation.voice_actor_id
+    ) wt
+      ON wt.userId = uvas.user_id
+      AND wt.voiceActorId = uvas.voice_actor_id
     WHERE uvas.user_id = ?
       AND uvas.anime_count >= ?
       ${scoreFilter}
@@ -585,6 +636,7 @@ export async function getUserVoiceActorRanking(params: {
           animeCount: lastRow.animeCount,
           ratedAnimeCount: lastRow.ratedAnimeCount,
           averageScore: toNumber(lastRow.averageScore),
+          totalWatchMinutes: Number(lastRow.totalWatchMinutes ?? 0),
           voiceActorId: lastRow.voiceActorId,
         })
         : null,
@@ -666,6 +718,8 @@ export async function getUserVoiceActorAnime(params: {
       a.format,
       a.status,
       a.average_score AS averageScore,
+      a.episodes,
+      a.duration,
       ual.status AS userStatus,
       ual.score AS userScore,
       ual.progress AS userProgress,
@@ -769,6 +823,8 @@ export async function getUserVoiceActorAnime(params: {
         format: row.format,
         status: row.status,
         averageScore: row.averageScore,
+        episodes: row.episodes,
+        duration: row.duration,
       },
       userList: {
         status: row.userStatus,

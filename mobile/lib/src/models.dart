@@ -462,17 +462,24 @@ class UserBadge {
   final BadgeProgress? progress;
 
   factory UserBadge.fromJson(JsonMap json) {
-    final progress = asJsonMap(json['progress']);
+    final progressJson = asJsonMap(json['progress']);
+    final progress = progressJson.isEmpty
+        ? null
+        : BadgeProgress.fromJson(progressJson);
+    final earnedAt = readString(json['earnedAt']);
     return UserBadge(
       id: readInt(json['id']) ?? 0,
       code: readString(json['code']) ?? '',
       name: readString(json['name']) ?? '배지',
       description: readString(json['description']) ?? '',
       rarity: readString(json['rarity']) ?? 'COMMON',
-      earned: readBool(json['earned']),
+      earned:
+          readBool(json['earned']) ||
+          earnedAt != null ||
+          (progress?.isComplete ?? false),
       imageUrl: readString(json['imageUrl']),
-      earnedAt: readString(json['earnedAt']),
-      progress: progress.isEmpty ? null : BadgeProgress.fromJson(progress),
+      earnedAt: earnedAt,
+      progress: progress,
     );
   }
 }
@@ -800,6 +807,7 @@ class VoiceActorRanking {
     required this.characterCount,
     this.averageScore,
     this.imageUrl,
+    this.totalWatchMinutes = 0,
   });
   final int id;
   final String name;
@@ -807,6 +815,7 @@ class VoiceActorRanking {
   final int characterCount;
   final double? averageScore;
   final String? imageUrl;
+  final int totalWatchMinutes;
 
   factory VoiceActorRanking.fromJson(JsonMap json) {
     final actor = asJsonMap(json['voiceActor']);
@@ -824,8 +833,195 @@ class VoiceActorRanking {
       characterCount: readInt(json['characterCount']) ?? 0,
       averageScore: readDouble(json['averageScore']),
       imageUrl: readString(image['large']) ?? readString(image['medium']),
+      totalWatchMinutes: readInt(json['totalWatchMinutes']) ?? 0,
     );
   }
+}
+
+class VoiceActorCharacter {
+  const VoiceActorCharacter({
+    required this.id,
+    required this.name,
+    this.imageUrl,
+    this.role,
+  });
+
+  final int id;
+  final String name;
+  final String? imageUrl;
+  final String? role;
+
+  factory VoiceActorCharacter.fromJson(JsonMap json) {
+    final name = asJsonMap(json['name']);
+    final image = asJsonMap(json['image']);
+    return VoiceActorCharacter(
+      id: readInt(json['id']) ?? 0,
+      name:
+          readString(name['userPreferred']) ??
+          readString(name['full']) ??
+          readString(name['native']) ??
+          '캐릭터',
+      imageUrl: readString(image['large']) ?? readString(image['medium']),
+      role: readString(json['role']),
+    );
+  }
+}
+
+class AnalysisAnimeWork {
+  const AnalysisAnimeWork({
+    required this.anime,
+    this.characters = const [],
+    this.score,
+    this.status,
+    this.progress,
+  });
+
+  final Anime anime;
+  final List<VoiceActorCharacter> characters;
+  final double? score;
+  final CollectionStatus? status;
+  final int? progress;
+
+  int? get watchMinutes {
+    final duration = anime.duration;
+    if (duration == null || duration <= 0) return null;
+    final recordedProgress = progress ?? 0;
+    final episodes = anime.episodes;
+    final watchedEpisodes =
+        status == CollectionStatus.completed && episodes != null
+        ? episodes
+        : episodes == null
+        ? recordedProgress
+        : recordedProgress.clamp(0, episodes);
+    return watchedEpisodes * duration;
+  }
+
+  factory AnalysisAnimeWork.fromJson(JsonMap json) {
+    final userList = asJsonMap(json['userList']);
+    return AnalysisAnimeWork(
+      anime: Anime.fromJson(json),
+      characters: asJsonList(
+        json['characters'],
+      ).map(VoiceActorCharacter.fromJson).toList(),
+      score: readDouble(userList['score']),
+      status: userList.isEmpty
+          ? null
+          : CollectionStatus.fromApi(readString(userList['status'])),
+      progress: readInt(userList['progress']),
+    );
+  }
+
+  factory AnalysisAnimeWork.fromCollectionEntry(CollectionEntry entry) {
+    return AnalysisAnimeWork(
+      anime: entry.anime,
+      score: entry.score,
+      status: entry.status,
+      progress: entry.progress,
+    );
+  }
+}
+
+enum AnimeSeriesScope {
+  mainline('mainline', '본편 시리즈'),
+  franchise('franchise', '관련 작품 전체');
+
+  const AnimeSeriesScope(this.apiValue, this.label);
+  final String apiValue;
+  final String label;
+}
+
+enum UserSeriesStatus {
+  all('all', '전체 시리즈'),
+  started('started', '시작한 시리즈'),
+  watched('watched', '본 시리즈'),
+  completed('completed', '완주한 시리즈');
+
+  const UserSeriesStatus(this.apiValue, this.label);
+  final String apiValue;
+  final String label;
+}
+
+class SeriesCollectionMember {
+  const SeriesCollectionMember({
+    required this.anime,
+    required this.completionRequired,
+    this.completionExclusionReason,
+    this.userList,
+  });
+
+  final Anime anime;
+  final bool completionRequired;
+  final String? completionExclusionReason;
+  final MyCollectionState? userList;
+
+  factory SeriesCollectionMember.fromJson(JsonMap json) {
+    final userList = asJsonMap(json['userList']);
+    return SeriesCollectionMember(
+      anime: Anime.fromJson(asJsonMap(json['anime'])),
+      completionRequired: readBool(json['completionRequired']),
+      completionExclusionReason: readString(json['completionExclusionReason']),
+      userList: userList.isEmpty
+          ? null
+          : MyCollectionState(
+              exists: true,
+              status: CollectionStatus.fromApi(readString(userList['status'])),
+              score: readDouble(userList['score']),
+              progress: readInt(userList['progress']),
+            ),
+    );
+  }
+}
+
+class SeriesCollectionItem {
+  const SeriesCollectionItem({
+    required this.seriesId,
+    required this.scope,
+    required this.title,
+    required this.memberCount,
+    required this.requiredMemberCount,
+    required this.collectedMemberCount,
+    required this.completedRequiredMemberCount,
+    required this.completionRate,
+    required this.completed,
+    required this.items,
+    this.canonicalAnimeId,
+    this.coverImageUrl,
+  });
+
+  final int seriesId;
+  final AnimeSeriesScope scope;
+  final String title;
+  final int memberCount;
+  final int requiredMemberCount;
+  final int collectedMemberCount;
+  final int completedRequiredMemberCount;
+  final double completionRate;
+  final bool completed;
+  final List<SeriesCollectionMember> items;
+  final int? canonicalAnimeId;
+  final String? coverImageUrl;
+
+  factory SeriesCollectionItem.fromJson(JsonMap json) => SeriesCollectionItem(
+    seriesId: readInt(json['seriesId']) ?? 0,
+    scope: readString(json['scope']) == AnimeSeriesScope.franchise.apiValue
+        ? AnimeSeriesScope.franchise
+        : AnimeSeriesScope.mainline,
+    title: readString(json['title']) ?? '이름 없는 시리즈',
+    memberCount: readInt(json['memberCount']) ?? 0,
+    requiredMemberCount: readInt(json['requiredMemberCount']) ?? 0,
+    collectedMemberCount: readInt(json['collectedMemberCount']) ?? 0,
+    completedRequiredMemberCount:
+        readInt(json['completedRequiredMemberCount']) ?? 0,
+    completionRate: readDouble(json['completionRate']) ?? 0,
+    completed: readBool(json['completed']),
+    canonicalAnimeId: readInt(json['canonicalAnimeId']),
+    coverImageUrl:
+        readString(json['coverImageExtraLarge']) ??
+        readString(json['coverImageLarge']),
+    items: asJsonList(
+      json['items'],
+    ).map(SeriesCollectionMember.fromJson).toList(),
+  );
 }
 
 enum UserRelationship {

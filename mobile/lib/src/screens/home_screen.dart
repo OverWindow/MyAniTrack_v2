@@ -44,7 +44,7 @@ class HomeScreen extends ConsumerWidget {
                             title: '아직 최애 애니가 없어요',
                             message: '가장 좋아하는 작품에 10점을 남겨보세요.',
                           )
-                        : _FavoriteCarousel(items: items),
+                        : FavoriteAnimeCarousel(items: items),
                   ),
                   const SizedBox(height: 26),
                   Row(
@@ -100,7 +100,7 @@ class _ProfileSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => AppCard(
-    onTap: () => context.go('/profile'),
+    onTap: () => context.push('/profile'),
     child: Row(
       children: [
         ClipOval(
@@ -137,149 +137,6 @@ class _ProfileSummary extends StatelessWidget {
   );
 }
 
-class _FavoriteCarousel extends StatefulWidget {
-  const _FavoriteCarousel({required this.items});
-  final List<CollectionEntry> items;
-
-  @override
-  State<_FavoriteCarousel> createState() => _FavoriteCarouselState();
-}
-
-class _FavoriteCarouselState extends State<_FavoriteCarousel> {
-  late final PageController _controller = PageController(
-    viewportFraction: 0.58,
-  );
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final reduceMotion =
-        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
-    return SizedBox(
-      height: 300,
-      child: PageView.builder(
-        controller: _controller,
-        padEnds: true,
-        itemCount: widget.items.length,
-        itemBuilder: (context, index) {
-          final entry = widget.items[index];
-          return AnimatedBuilder(
-            animation: _controller,
-            builder: (context, child) {
-              final page =
-                  _controller.hasClients &&
-                      _controller.position.hasContentDimensions
-                  ? (_controller.page ?? 0)
-                  : 0.0;
-              final distance = (page - index).clamp(-1.5, 1.5);
-              final focus = (1 - distance.abs() * 0.16).clamp(0.82, 1.0);
-              final transform = Matrix4.identity();
-              if (!reduceMotion) {
-                transform
-                  ..setEntry(3, 2, 0.0014)
-                  ..translateByDouble(0, distance.abs() * 18, 0, 1)
-                  ..rotateY(distance * -0.16)
-                  ..scaleByDouble(focus, focus, 1, 1);
-              }
-              return Transform(
-                alignment: Alignment.center,
-                transform: transform,
-                child: Opacity(
-                  opacity: reduceMotion
-                      ? 1
-                      : (1 - distance.abs() * 0.2).clamp(0.68, 1),
-                  child: child,
-                ),
-              );
-            },
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-              child: CupertinoButton(
-                padding: EdgeInsets.zero,
-                onPressed: () => context.push('/anime/${entry.animeId}'),
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(18),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Color(0x33000000),
-                        blurRadius: 18,
-                        offset: Offset(0, 10),
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(18),
-                    child: AspectRatio(
-                      aspectRatio: 2 / 3,
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          AppNetworkImage(
-                            url: entry.anime.coverImageUrl,
-                            fit: BoxFit.cover,
-                          ),
-                          const DecoratedBox(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                                colors: [Color(0x00000000), Color(0xCC1F160F)],
-                                stops: [0.48, 1],
-                              ),
-                            ),
-                          ),
-                          Positioned(
-                            left: 12,
-                            right: 12,
-                            bottom: 13,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  entry.anime.title,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontFamily: 'Pretendard',
-                                    fontSize: 15,
-                                    height: 1.25,
-                                    fontWeight: FontWeight.w700,
-                                    color: CupertinoColors.white,
-                                  ),
-                                ),
-                                const SizedBox(height: 5),
-                                const Text(
-                                  '★★★★★  10.0',
-                                  style: TextStyle(
-                                    fontFamily: 'Pretendard',
-                                    fontSize: 12,
-                                    color: Color(0xFFFFD166),
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
 class _PosterSkeletonRow extends StatelessWidget {
   const _PosterSkeletonRow();
   @override
@@ -307,10 +164,7 @@ class _BadgePreview extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '획득 ${overview.earnedCount} / ${overview.totalCount}',
-            style: appTitleStyle(size: 18),
-          ),
+          Text('획득한 배지', style: appTitleStyle(size: 18)),
           const SizedBox(height: 14),
           if (display.isEmpty)
             Text('아직 표시할 배지가 없어요.', style: appLabelStyle())
@@ -331,25 +185,29 @@ class _BadgeIcon extends StatelessWidget {
   final UserBadge badge;
 
   @override
-  Widget build(BuildContext context) => Opacity(
-    opacity: badge.earned ? 1 : 0.45,
-    child: Column(
-      children: [
-        ClipOval(
-          child: SizedBox.square(
-            dimension: 54,
-            child: AppNetworkImage(url: badge.imageUrl, profile: true),
+  Widget build(BuildContext context) => CupertinoButton(
+    padding: EdgeInsets.zero,
+    onPressed: () => showBadgeDetailSheet(context, badge),
+    child: Opacity(
+      opacity: badge.earned ? 1 : 0.45,
+      child: Column(
+        children: [
+          ClipOval(
+            child: SizedBox.square(
+              dimension: 54,
+              child: AppNetworkImage(url: badge.imageUrl, profile: true),
+            ),
           ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          badge.name,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.center,
-          style: appLabelStyle(),
-        ),
-      ],
+          const SizedBox(height: 6),
+          Text(
+            badge.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: appLabelStyle(),
+          ),
+        ],
+      ),
     ),
   );
 }
@@ -373,12 +231,7 @@ class _BadgeSheet extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 14, 8, 8),
             child: Row(
               children: [
-                Expanded(
-                  child: Text(
-                    '내 배지 ${overview.earnedCount}/${overview.totalCount}',
-                    style: appTitleStyle(size: 22),
-                  ),
-                ),
+                Expanded(child: Text('내 배지', style: appTitleStyle(size: 22))),
                 CupertinoButton(
                   onPressed: () => Navigator.pop(context),
                   child: const Text('닫기'),
@@ -394,6 +247,7 @@ class _BadgeSheet extends StatelessWidget {
               itemBuilder: (context, index) {
                 final badge = overview.items[index];
                 return AppCard(
+                  onTap: () => showBadgeDetailSheet(context, badge),
                   child: Row(
                     children: [
                       SizedBox(width: 66, child: _BadgeIcon(badge: badge)),
