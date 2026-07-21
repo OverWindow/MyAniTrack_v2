@@ -1,0 +1,481 @@
+.policy-page {
+  width: min(100%, 860px);
+  min-width: 0;
+  margin: 0 auto;
+  display: grid;
+  gap: 28px;
+  color: var(--text-primary);
+}
+
+.policy-hero,
+.policy-toc,
+.policy-section,
+.policy-footer {
+  border: 1px solid rgba(120, 113, 108, 0.16);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-soft);
+}
+
+.policy-hero {
+  padding: clamp(28px, 5vw, 48px);
+  background:
+    radial-gradient(circle at 92% 8%, rgba(245, 158, 11, 0.18), transparent 30%),
+    var(--bg-card);
+}
+
+.policy-eyebrow {
+  color: var(--point-hover);
+  font-size: 0.74rem;
+  font-weight: 900;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.policy-hero h1 {
+  max-width: 18ch;
+  margin: 10px 0 14px;
+  font-size: clamp(2rem, 5vw, 3.35rem);
+  line-height: 1.08;
+  letter-spacing: -0.045em;
+}
+
+.policy-hero > p {
+  max-width: 650px;
+  margin: 0;
+  color: var(--text-secondary);
+  line-height: 1.75;
+}
+
+.policy-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  margin: 28px 0 0;
+  overflow: hidden;
+  border: 1px solid rgba(120, 113, 108, 0.14);
+  background: rgba(120, 113, 108, 0.14);
+}
+
+.policy-meta-grid > div {
+  min-width: 0;
+  padding: 14px;
+  display: grid;
+  gap: 5px;
+  background: rgba(255, 251, 235, 0.92);
+}
+
+.policy-meta-grid dt {
+  color: var(--text-tertiary);
+  font-size: 0.72rem;
+  font-weight: 750;
+}
+
+.policy-meta-grid dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 0.9rem;
+  font-weight: 850;
+}
+
+.policy-hero-actions,
+.policy-modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.policy-hero-actions a,
+.policy-hero-actions button {
+  text-decoration: none;
+}
+
+.deletion-email-guide {
+  max-width: 650px;
+  margin-top: 18px;
+  padding: 18px;
+  display: grid;
+  gap: 12px;
+  border: 1px solid rgba(245, 158, 11, 0.26);
+  background: rgba(255, 251, 235, 0.94);
+}
+
+.deletion-email-guide p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.65;
+}
+
+.deletion-email-guide code {
+  width: fit-content;
+  max-width: 100%;
+  padding: 9px 11px;
+  overflow-wrap: anywhere;
+  border: 1px solid rgba(120, 113, 108, 0.14);
+  background: #fff;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-weight: 800;
+}
+
+.deletion-email-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.deletion-copy-feedback {
+  color: var(--point-hover) !important;
+  font-weight: 750;
+}
+
+.policy-toc {
+  padding: 22px 26px;
+}
+
+.policy-toc > strong {
+  display: block;
+  margin-bottom: 12px;
+}
+
+.policy-toc ol {
+  margin: 0;
+  padding-left: 1.35rem;
+  columns: 2;
+  column-gap: 40px;
+}
+
+.policy-toc li {
+  margin: 0 0 8px;
+  break-inside: avoid;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.policy-toc a,
+.policy-section a,
+.policy-footer a,
+.deletion-account-card > a,
+.deletion-signed-out-card > a {
+  color: var(--point-hover);
+  font-weight: 750;
+  text-underline-offset: 3px;
+}
+
+.policy-toc a:focus-visible,
+.policy-section a:focus-visible,
+.policy-footer a:focus-visible,
+.deletion-account-card > a:focus-visible,
+.deletion-signed-out-card > a:focus-visible {
+  border-radius: 2px;
+  outline: 3px solid var(--point-border);
+  outline-offset: 2px;
+}
+
+.policy-content {
+  min-width: 0;
+  display: grid;
+  gap: 18px;
+}
+
+.policy-section {
+  min-width: 0;
+  scroll-margin-top: 100px;
+  padding: clamp(24px, 4vw, 34px);
+}
+
+.policy-section h2 {
+  margin: 0 0 18px;
+  font-size: clamp(1.25rem, 3vw, 1.55rem);
+  letter-spacing: -0.025em;
+}
+
+.policy-section p,
+.policy-section li {
+  color: var(--text-secondary);
+  font-size: 0.96rem;
+  line-height: 1.78;
+}
+
+.policy-section p {
+  margin: 0;
+}
+
+.policy-section p + p,
+.policy-section p + ul,
+.policy-section ul + p {
+  margin-top: 14px;
+}
+
+.policy-section ul {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 0;
+  padding-left: 1.25rem;
+}
+
+.policy-table-wrap {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  margin-top: 22px;
+  overflow-x: auto;
+  border: 1px solid rgba(120, 113, 108, 0.16);
+}
+
+.policy-table-wrap:focus-visible {
+  outline: 3px solid var(--point-border);
+  outline-offset: 3px;
+}
+
+.policy-table-wrap table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+
+.policy-table-wrap th,
+.policy-table-wrap td {
+  padding: 12px;
+  border-bottom: 1px solid rgba(120, 113, 108, 0.12);
+  text-align: left;
+  vertical-align: top;
+}
+
+.policy-table-wrap thead th {
+  background: var(--point-softest);
+  color: var(--text-primary);
+  font-weight: 850;
+}
+
+.policy-table-wrap tbody th {
+  width: 118px;
+  color: var(--text-primary);
+  font-weight: 800;
+}
+
+.policy-table-wrap tbody tr:last-child th,
+.policy-table-wrap tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.policy-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 22px;
+  padding: 22px 26px;
+  margin-bottom: 24px;
+}
+
+.deletion-hero h1 {
+  max-width: 16ch;
+}
+
+.deletion-account-card,
+.deletion-signed-out-card,
+.deletion-success {
+  display: grid;
+  gap: 16px;
+  padding: 22px;
+  border: 1px solid rgba(120, 113, 108, 0.16);
+  background: var(--bg-page);
+}
+
+.deletion-account-card p,
+.deletion-signed-out-card p,
+.deletion-success p {
+  margin: 0;
+}
+
+.deletion-account-summary {
+  display: grid;
+  gap: 4px;
+}
+
+.deletion-account-summary span,
+.deletion-account-summary small {
+  color: var(--text-secondary);
+}
+
+.deletion-account-summary strong {
+  font-size: 1.2rem;
+}
+
+.deletion-warning {
+  padding: 16px;
+  border-left: 4px solid #dc2626;
+  background: rgba(254, 242, 242, 0.92);
+}
+
+.deletion-warning strong,
+.deletion-warning p {
+  color: #7f1d1d;
+}
+
+.policy-confirm-field {
+  display: grid;
+  gap: 8px;
+  max-width: 420px;
+}
+
+.policy-confirm-field span {
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
+.policy-confirm-field input {
+  min-height: 46px;
+  padding: 0 14px;
+  border: 1px solid rgba(120, 113, 108, 0.24);
+  border-radius: 2px;
+  background: #fff;
+  color: var(--text-primary);
+  font: inherit;
+}
+
+.policy-confirm-field input:focus-visible {
+  border-color: var(--point-color);
+  outline: 3px solid var(--point-border);
+}
+
+.policy-danger-button {
+  width: fit-content;
+  min-height: 44px;
+  padding: 0 18px;
+  border: 1px solid rgba(153, 27, 27, 0.45);
+  border-radius: var(--radius-pill);
+  background: #dc2626;
+  color: #fff;
+  font: inherit;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.policy-danger-button:hover:not(:disabled),
+.policy-danger-button:focus-visible:not(:disabled) {
+  background: #b91c1c;
+  outline: 3px solid rgba(220, 38, 38, 0.2);
+  outline-offset: 2px;
+}
+
+.policy-danger-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.policy-error {
+  padding: 14px 16px;
+  border: 1px solid rgba(220, 38, 38, 0.2);
+  background: rgba(254, 242, 242, 0.92);
+  color: #7f1d1d;
+  font-weight: 700;
+  line-height: 1.6;
+}
+
+.deletion-signed-out-card hr {
+  width: 100%;
+  margin: 4px 0;
+  border: 0;
+  border-top: 1px solid rgba(120, 113, 108, 0.16);
+}
+
+.deletion-success {
+  border-color: rgba(5, 150, 105, 0.22);
+  background: rgba(236, 253, 245, 0.88);
+}
+
+.deletion-success strong {
+  color: #065f46;
+  font-size: 1.1rem;
+}
+
+.policy-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(28, 25, 23, 0.62);
+  backdrop-filter: blur(8px);
+}
+
+.policy-confirm-modal {
+  width: min(520px, 100%);
+  padding: clamp(24px, 5vw, 34px);
+  border: 1px solid rgba(120, 113, 108, 0.18);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-float);
+}
+
+.policy-confirm-modal h2 {
+  margin: 10px 0 12px;
+}
+
+.policy-confirm-modal p {
+  margin: 0;
+  color: var(--text-secondary);
+  line-height: 1.7;
+}
+
+.policy-modal-actions {
+  justify-content: flex-end;
+}
+
+@media (max-width: 760px) {
+  .policy-page {
+    gap: 16px;
+  }
+
+  .policy-meta-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .policy-toc ol {
+    columns: 1;
+  }
+
+  .policy-hero-actions,
+  .policy-modal-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .policy-hero-actions a,
+  .policy-hero-actions button,
+  .deletion-email-actions a,
+  .deletion-email-actions button,
+  .policy-modal-actions button,
+  .deletion-account-card > button,
+  .deletion-signed-out-card > .primary-button,
+  .deletion-success > .primary-button {
+    width: 100%;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .deletion-email-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .policy-footer {
+    display: grid;
+  }
+}
+
+@media (max-width: 420px) {
+  .policy-meta-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .policy-hero,
+  .policy-toc,
+  .policy-section {
+    padding-inline: 20px;
+  }
+}

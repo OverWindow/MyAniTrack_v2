@@ -469,7 +469,7 @@
 
 .home-footer-nav {
   display: grid;
-  grid-template-columns: repeat(2, minmax(120px, 1fr));
+  grid-template-columns: repeat(3, minmax(120px, 1fr));
   gap: clamp(30px, 6vw, 76px);
 }
 
@@ -725,6 +725,7 @@
   }
 
   .home-footer-nav {
+    grid-template-columns: repeat(2, minmax(120px, 1fr));
     gap: 28px;
   }
 
@@ -732,5 +733,11 @@
     align-items: flex-start;
     flex-direction: column;
     gap: 6px;
+  }
+}
+
+@media (max-width: 420px) {
+  .home-footer-nav {
+    grid-template-columns: 1fr;
   }
 }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { AGREEMENT_ORDER, AGREEMENT_SECTIONS, type AgreementKey } from '../content/agreements'
 import { useAuth } from '../contexts/AuthContext'
 import { fetchMyAgreements, requestPasswordReset } from '../lib/auth'
@@ -104,8 +104,7 @@ function formatAgreementDate(value: string | null) {
 }
 
 export function SettingsPage() {
-  const { deleteAccount, isAuthenticated, user } = useAuth()
-  const navigate = useNavigate()
+  const { isAuthenticated, user } = useAuth()
   const [selectedSection, setSelectedSection] = useState<SettingsSectionKey>('profile')
   const [localSettings, setLocalSettings] = useState<LocalSettings>(() => loadLocalSettings())
   const [agreements, setAgreements] = useState<AgreementsState | null>(null)
@@ -115,9 +114,6 @@ export function SettingsPage() {
   const [isSendingResetMail, setIsSendingResetMail] = useState(false)
   const [resetMailFeedback, setResetMailFeedback] = useState<string | null>(null)
   const [resetMailError, setResetMailError] = useState<string | null>(null)
-  const [deleteConfirmation, setDeleteConfirmation] = useState('')
-  const [isDeletingAccount, setIsDeletingAccount] = useState(false)
-  const [deleteAccountError, setDeleteAccountError] = useState<string | null>(null)
 
   const currentCategory = useMemo(
     () => settingsCategories.find((category) => category.items.some((item) => item.key === selectedSection))
@@ -196,27 +192,6 @@ export function SettingsPage() {
     }
   }
 
-  const handleDeleteAccount = async () => {
-    if (deleteConfirmation.trim() !== '계정 삭제') {
-      setDeleteAccountError('계정을 삭제하려면 입력창에 "계정 삭제"를 정확히 입력해주세요.')
-      return
-    }
-
-    setIsDeletingAccount(true)
-    setDeleteAccountError(null)
-
-    try {
-      await deleteAccount()
-      navigate('/', { replace: true })
-    } catch (deleteError) {
-      setDeleteAccountError(
-        deleteError instanceof Error ? deleteError.message : '계정 삭제에 실패했어요.',
-      )
-    } finally {
-      setIsDeletingAccount(false)
-    }
-  }
-
   if (!isAuthenticated || !user) {
     return (
       <section className="settings-page">
@@ -282,27 +257,9 @@ export function SettingsPage() {
                 <strong>계정 삭제</strong>
                 <p>계정을 삭제하면 컬렉션, 분석 데이터, 친구 관계, 프로필 정보가 함께 삭제됩니다. 이 작업은 되돌릴 수 없어요.</p>
               </div>
-              <label className="auth-field settings-delete-confirm-field">
-                <span>삭제 확인 문구</span>
-                <input
-                  type="text"
-                  value={deleteConfirmation}
-                  onChange={(event) => setDeleteConfirmation(event.target.value)}
-                  placeholder="계정 삭제"
-                  disabled={isDeletingAccount}
-                />
-              </label>
-              {deleteAccountError && <div className="feedback-card is-error">{deleteAccountError}</div>}
-              <button
-                className="settings-danger-button"
-                type="button"
-                onClick={() => {
-                  void handleDeleteAccount()
-                }}
-                disabled={isDeletingAccount || deleteConfirmation.trim() !== '계정 삭제'}
-              >
-                {isDeletingAccount ? '삭제 중...' : '내 계정 영구 삭제'}
-              </button>
+              <Link className="settings-danger-button" to="/account-deletion">
+                계정 삭제 안내 및 진행
+              </Link>
             </div>
           </div>
         )
@@ -333,6 +290,9 @@ export function SettingsPage() {
                   <button className="agreement-inline-link settings-inline-link" type="button" onClick={() => setActiveAgreement('privacy')}>
                     약관 보기
                   </button>
+                  <Link className="agreement-inline-link settings-inline-link" to="/privacy">
+                    공개 전문 보기
+                  </Link>
                 </article>
                 <article className="settings-info-card">
                   <span>최종 동의 일시</span>
@@ -357,6 +317,9 @@ export function SettingsPage() {
                   {AGREEMENT_SECTIONS[key].title}
                 </button>
               ))}
+              <Link className="secondary-button agreement-open-button" to="/account-deletion">
+                계정 및 데이터 삭제
+              </Link>
             </div>
           </>
         )

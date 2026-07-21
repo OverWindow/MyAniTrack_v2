@@ -7,6 +7,8 @@
 
 이 문서는 현재 저장소 설정을 기준으로 작성한 출시 전 확인 사항이다. 스토어 정책과 대상 API 요구사항은 바뀔 수 있으므로 제출 직전에 공식 문서를 다시 확인한다.
 
+웹 개인정보처리방침 및 계정 삭제 URL 구현 명세는 `PLAY_STORE_POLICY_URL_FRONTEND_HANDOFF.md`를 따른다.
+
 ## 현재 출시 차단 항목
 
 - [ ] **Android release 서명을 디버그 키에서 실제 업로드 키로 교체한다.** 현재 `android/app/build.gradle.kts`의 release 빌드가 `signingConfigs.getByName("debug")`를 사용한다. 이 상태로 스토어 출시용 파일을 만들면 안 된다.

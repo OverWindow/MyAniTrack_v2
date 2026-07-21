@@ -359,6 +359,25 @@
   color: var(--text-secondary);
 }
 
+.auth-policy-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 16px;
+  margin-top: 12px;
+  font-size: 0.8rem;
+}
+
+.auth-policy-links a {
+  color: var(--text-secondary);
+  text-underline-offset: 3px;
+}
+
+.auth-policy-links a:hover,
+.auth-policy-links a:focus-visible {
+  color: var(--point-hover);
+}
+
 @media (max-width: 1180px) {
   .auth-grid {
     grid-template-columns: 1fr;

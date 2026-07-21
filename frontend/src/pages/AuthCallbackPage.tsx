@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { getPendingSupabaseAuthIntent, isAgreementsRequiredError } from '../lib/auth'
+import {
+  consumePendingAuthReturnPath,
+  getPendingSupabaseAuthIntent,
+  isAgreementsRequiredError,
+} from '../lib/auth'
 import '../styles/pages/AuthPage.css'
 
 export function AuthCallbackPage() {
@@ -18,10 +22,11 @@ export function AuthCallbackPage() {
 
     callbackPromiseRef.current = completeGoogleLogin(intent)
       .then(() => {
-        navigate('/', { replace: true })
+        navigate(consumePendingAuthReturnPath() ?? '/', { replace: true })
       })
       .catch((callbackError: unknown) => {
         if (isAgreementsRequiredError(callbackError)) {
+          consumePendingAuthReturnPath()
           navigate('/signup', {
             replace: true,
             state: {
@@ -35,6 +40,7 @@ export function AuthCallbackPage() {
           return
         }
 
+        consumePendingAuthReturnPath()
         setError(
           callbackError instanceof Error
             ? callbackError.message

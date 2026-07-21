@@ -280,10 +280,6 @@
   line-height: 1.6;
 }
 
-.settings-delete-confirm-field {
-  max-width: 360px;
-}
-
 .settings-danger-button {
   min-height: 44px;
   width: fit-content;
@@ -295,6 +291,7 @@
   font: inherit;
   font-weight: 850;
   cursor: pointer;
+  text-decoration: none;
 }
 
 .settings-danger-button:disabled {

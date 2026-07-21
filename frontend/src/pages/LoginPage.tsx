@@ -2,7 +2,11 @@ import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { GoogleIcon } from '../components/GoogleIcon'
 import { useAuth } from '../contexts/AuthContext'
-import { isEmailVerificationRequiredError } from '../lib/auth'
+import {
+  getSafeAuthReturnPath,
+  isEmailVerificationRequiredError,
+  savePendingAuthReturnPath,
+} from '../lib/auth'
 import '../styles/pages/AuthPage.css'
 
 function getWebDeviceName() {
@@ -19,7 +23,7 @@ export function LoginPage() {
   const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const redirectTo = (location.state as { from?: string } | null)?.from ?? '/'
+  const redirectTo = getSafeAuthReturnPath((location.state as { from?: unknown } | null)?.from) ?? '/'
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -54,10 +58,12 @@ export function LoginPage() {
   const handleGoogleLogin = async () => {
     setIsGoogleSubmitting(true)
     setError(null)
+    savePendingAuthReturnPath(redirectTo)
 
     try {
       await loginWithGoogle('login')
     } catch (submitError) {
+      savePendingAuthReturnPath(null)
       setError(
         submitError instanceof Error ? submitError.message : 'Google 로그인에 실패했어요.',
       )
@@ -128,6 +134,10 @@ export function LoginPage() {
         <p className="auth-helper">
           아직 계정이 없다면 <Link to="/signup">회원가입</Link>
         </p>
+        <nav className="auth-policy-links" aria-label="정책 링크">
+          <Link to="/privacy">개인정보처리방침</Link>
+          <Link to="/account-deletion">계정 및 데이터 삭제</Link>
+        </nav>
       </div>
     </section>
   )

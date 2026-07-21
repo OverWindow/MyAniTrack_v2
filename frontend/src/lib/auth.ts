@@ -20,7 +20,9 @@ const SESSION_STORAGE_KEY = 'myanitrack.auth.session'
 const PENDING_AGREEMENTS_KEY = 'myanitrack.pending.agreements'
 const PENDING_SUPABASE_AGREEMENTS_KEY = 'myanitrack.pending.supabase.agreements'
 const PENDING_SUPABASE_AUTH_INTENT_KEY = 'myanitrack.pending.supabase.intent'
+const PENDING_AUTH_RETURN_PATH_KEY = 'myanitrack.pending.auth-return-path'
 const ACCESS_TOKEN_REFRESH_BUFFER_MS = 60_000
+const ALLOWED_AUTH_RETURN_PATHS = new Set(['/account-deletion'])
 
 let refreshPromise: Promise<AuthTokens> | null = null
 let memoryAccessToken: string | null = null
@@ -38,6 +40,37 @@ type AuthApiError = Error & {
 
 function createAuthError(message: string, status?: number, code?: string) {
   return Object.assign(new Error(message), { status, code }) as AuthApiError
+}
+
+export function getAuthErrorStatus(error: unknown) {
+  return typeof error === 'object' && error !== null && 'status' in error
+    && typeof error.status === 'number'
+    ? error.status
+    : null
+}
+
+export function getSafeAuthReturnPath(value: unknown) {
+  if (typeof value !== 'string' || value.startsWith('//') || !value.startsWith('/')) {
+    return null
+  }
+
+  return ALLOWED_AUTH_RETURN_PATHS.has(value) ? value : null
+}
+
+export function savePendingAuthReturnPath(value: unknown) {
+  const safePath = getSafeAuthReturnPath(value)
+
+  if (safePath) {
+    window.sessionStorage.setItem(PENDING_AUTH_RETURN_PATH_KEY, safePath)
+  } else {
+    window.sessionStorage.removeItem(PENDING_AUTH_RETURN_PATH_KEY)
+  }
+}
+
+export function consumePendingAuthReturnPath() {
+  const value = window.sessionStorage.getItem(PENDING_AUTH_RETURN_PATH_KEY)
+  window.sessionStorage.removeItem(PENDING_AUTH_RETURN_PATH_KEY)
+  return getSafeAuthReturnPath(value)
 }
 
 function getApiBaseUrl() {
@@ -700,7 +733,11 @@ export async function deleteMyAccount() {
   })
 
   if (!response.ok) {
-    throw new Error(getErrorMessage(response.status, '계정 삭제에 실패했어요.'))
+    const data = await parseJsonSafe<{ message?: string }>(response)
+    throw createAuthError(
+      data?.message || getErrorMessage(response.status, '계정 삭제에 실패했어요.'),
+      response.status,
+    )
   }
 
   return response.json().catch(() => ({ success: true })) as Promise<{

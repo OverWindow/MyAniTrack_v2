@@ -374,6 +374,10 @@ export function SignupPage() {
           <p className="auth-helper">
             이미 계정이 있다면 <Link to="/login">로그인</Link>
           </p>
+          <nav className="auth-policy-links" aria-label="정책 링크">
+            <Link to="/privacy">개인정보처리방침 전문</Link>
+            <Link to="/account-deletion">계정 및 데이터 삭제</Link>
+          </nav>
         </div>
       </section>
 

@@ -7,6 +7,7 @@ import { Header } from './components/Header'
 import { useAuth } from './contexts/AuthContext'
 import { useFriends } from './contexts/FriendsContext'
 import { AdminPage } from './pages/AdminPage'
+import { AccountDeletionPage } from './pages/AccountDeletionPage'
 import { AnimeDetailPage } from './pages/AnimeDetailPage'
 import { AnalysisPage } from './pages/AnalysisPage'
 import { AuthCallbackPage } from './pages/AuthCallbackPage'
@@ -17,6 +18,7 @@ import { HomePage } from './pages/HomePage'
 import { LoginPage } from './pages/LoginPage'
 import { PasswordResetConfirmPage } from './pages/PasswordResetConfirmPage'
 import { PasswordResetRequestPage } from './pages/PasswordResetRequestPage'
+import { PrivacyPolicyPage } from './pages/PrivacyPolicyPage'
 import { ProfileEditPage } from './pages/ProfileEditPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { SettingsPage } from './pages/SettingsPage'
@@ -43,7 +45,8 @@ function App() {
   const activeRoute = backgroundLocation ?? location
   const isHomeRoute = activeRoute.pathname === '/'
   const isUserCollectionRoute = /^\/users\/[^/]+\/anime-list$/.test(activeRoute.pathname)
-  const shouldShowFloatingCta = !backgroundLocation && !['/login', '/signup'].includes(location.pathname)
+  const isPolicyRoute = ['/privacy', '/account-deletion'].includes(location.pathname)
+  const shouldShowFloatingCta = !backgroundLocation && !isPolicyRoute && !['/login', '/signup'].includes(location.pathname)
   const [isFriendsOpen, setIsFriendsOpen] = useState(false)
   const floatingPanelRef = useRef<HTMLDivElement | null>(null)
 
@@ -102,6 +105,8 @@ function App() {
           <Route path="/verify-email/confirm" element={<VerifyEmailConfirmPage />} />
           <Route path="/password-reset" element={<PasswordResetRequestPage />} />
           <Route path="/password-reset/confirm" element={<PasswordResetConfirmPage />} />
+          <Route path="/privacy" element={<PrivacyPolicyPage />} />
+          <Route path="/account-deletion" element={<AccountDeletionPage />} />
           <Route path="/explore" element={<ExplorePage />} />
           <Route path="/analysis" element={<AnalysisPage />} />
           <Route path="/admin" element={<AdminPage />} />

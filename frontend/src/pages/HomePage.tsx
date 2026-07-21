@@ -200,6 +200,11 @@ export function HomePage() {
               <Link to="/login">로그인</Link>
               <Link to="/signup">회원가입</Link>
             </div>
+            <div>
+              <strong>정책</strong>
+              <Link to="/privacy">개인정보처리방침</Link>
+              <Link to="/account-deletion">계정 및 데이터 삭제</Link>
+            </div>
           </nav>
         </div>
 

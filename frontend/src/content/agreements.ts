@@ -1,4 +1,6 @@
-export const AGREEMENT_VERSION = 'v1.0'
+import { PRIVACY_POLICY_SUMMARY, PRIVACY_POLICY_VERSION } from './privacyPolicy'
+
+export const AGREEMENT_VERSION = PRIVACY_POLICY_VERSION
 
 export type AgreementKey = 'terms' | 'privacy' | 'data'
 
@@ -23,14 +25,7 @@ export const AGREEMENT_SECTIONS: Record<AgreementKey, AgreementSection> = {
   },
   privacy: {
     title: '개인정보처리방침',
-    body: [
-      '제1조 (수집하는 개인정보 항목) 회원가입 시 이메일, 사용자명, 비밀번호(암호화 저장)를 수집하며, 서비스 이용 시 애니 시청 기록·평점·즐겨찾기 정보와 친구 관계 정보를 수집합니다.',
-      '제2조 (개인정보 수집 및 이용 목적) 수집된 정보는 사용자 맞춤 추천 제공, 시청 기록 및 통계 분석, 친구 기능 제공, 서비스 개선 목적으로 사용됩니다.',
-      '제3조 (개인정보 보관 및 이용 기간) 이용자의 개인정보는 회원 탈퇴 시까지 보관되며, 탈퇴 시 지체 없이 삭제됩니다.',
-      '제4조 (개인정보의 제3자 제공) 서비스는 이용자의 개인정보를 외부에 제공하지 않으며, 법령에 의해 요구되는 경우만 예외로 합니다.',
-      '제5조 (이용자의 권리) 이용자는 언제든지 자신의 개인정보를 조회, 수정, 삭제 요청할 수 있습니다.',
-      '제6조 (데이터 보안) 서비스는 개인정보 보호를 위해 합리적인 보안 조치를 적용합니다.',
-    ],
+    body: PRIVACY_POLICY_SUMMARY,
   },
   data: {
     title: '데이터 출처 및 고지',

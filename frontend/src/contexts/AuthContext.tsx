@@ -199,10 +199,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       },
       async deleteAccount() {
+        await deleteMyAccount()
+
         try {
-          await deleteMyAccount()
-        } finally {
           await logoutSupabaseSession().catch(() => {})
+        } finally {
           clearStoredSession()
           setUser(null)
         }
