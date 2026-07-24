@@ -12,6 +12,7 @@ import {
   getAnimeRelations,
   searchAnimeWithRelations,
 } from '../services/anime.service';
+import { AnimeSeriesScope, getAnimeSeriesList } from '../services/anime-series.service';
 
 const SORT_OPTIONS: AnimeSortOption[] = ['latest', 'score', 'season', 'popularity'];
 const TITLE_LANGUAGE_OPTIONS: AnimeTitleLanguage[] = ['ko', 'en', 'ja'];
@@ -108,6 +109,16 @@ function parseGenre(value: unknown): AnimeGenre | undefined {
   }
 
   return value as AnimeGenre;
+}
+
+function parseSeriesScope(value: unknown): AnimeSeriesScope {
+  const scope = typeof value === 'string' ? value : 'mainline';
+
+  if (scope !== 'mainline' && scope !== 'franchise') {
+    throw new Error('scope must be one of mainline, franchise');
+  }
+
+  return scope;
 }
 
 function parseAnimeId(value: string): number {
@@ -213,6 +224,32 @@ export async function getAnimeIndex(req: Request, res: Response) {
     });
   } catch (error) {
     return sendError(res, error);
+  }
+}
+
+export async function getAnimeSeriesIndex(req: Request, res: Response) {
+  try {
+    const scope = parseSeriesScope(req.query.scope);
+    const sort = parseSort(req.query.sort);
+    const titleLanguage = parseTitleLanguage(req.query.titleLanguage);
+    const genre = parseGenre(req.query.genre);
+    const limit = parseLimit(req.query.limit);
+    const query = parseOptionalSearchQuery(req.query.query);
+    const cursor = typeof req.query.cursor === 'string' ? req.query.cursor : undefined;
+
+    const result = await getAnimeSeriesList({
+      scope,
+      sort,
+      titleLanguage,
+      genre,
+      limit,
+      query,
+      cursor,
+    });
+
+    return res.json({ success: true, ...result });
+  } catch (error) {
+    return sendError(res, error, ['Cursor scope', 'Cursor query', 'Cursor genre']);
   }
 }
 
