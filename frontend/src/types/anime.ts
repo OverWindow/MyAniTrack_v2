@@ -84,6 +84,58 @@ export type AnimeListResponse = {
   }
 }
 
+export type AnimeSeriesScope = 'mainline' | 'franchise'
+
+export type AnimeSeriesListMember = {
+  id: number
+  anilistId: number
+  title: string
+  titles: {
+    korean: string | null
+    english: string | null
+    native: string | null
+    romaji: string | null
+    userPreferred: string | null
+  }
+  coverImageLarge: string | null
+  coverImageExtraLarge: string | null
+  season: string | null
+  seasonYear: number | null
+  format: string | null
+  status: string | null
+}
+
+export type AnimeSeriesListItem = {
+  seriesId: number
+  scope: AnimeSeriesScope
+  title: string
+  customTitle: string | null
+  canonicalAnimeId: number
+  memberCount: number
+  averageScore: number | null
+  popularity: number | null
+  season: string | null
+  seasonYear: number | null
+  coverImageLarge: string | null
+  coverImageExtraLarge: string | null
+  items: AnimeSeriesListMember[]
+}
+
+export type AnimeSeriesListResponse = {
+  success: boolean
+  items: AnimeSeriesListItem[]
+  pageInfo: {
+    hasNext: boolean
+    nextCursor: string | null
+    limit: number
+    scope: AnimeSeriesScope
+    sort: AnimeSort
+    titleLanguage: 'ko' | 'en' | 'ja'
+    query: string | null
+    genre: AnimeGenre | null
+  }
+}
+
 export type AnimeRelationType =
   | 'PREQUEL'
   | 'SEQUEL'

@@ -438,7 +438,7 @@
 
 .admin-user-row {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) 64px repeat(3, 58px);
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
   min-width: 0;
@@ -446,18 +446,56 @@
   border: 1px solid transparent;
   border-radius: 2px;
   background: var(--bg-card);
+}
+
+.admin-user-row:hover,
+.admin-user-row:focus-within,
+.admin-user-row.is-active {
+  border-color: var(--point-border);
+  background: var(--point-softest);
+  outline: none;
+}
+
+.admin-user-row-main {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) 64px repeat(3, 58px);
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: inherit;
   font: inherit;
   text-align: left;
   cursor: pointer;
 }
 
-.admin-user-row:hover,
-.admin-user-row:focus-visible,
-.admin-user-row.is-active {
-  border-color: var(--point-border);
-  background: var(--point-softest);
-  outline: none;
+.admin-user-row-main:focus-visible,
+.admin-user-profile-link:focus-visible {
+  outline: 2px solid var(--point-color);
+  outline-offset: 3px;
+}
+
+.admin-user-profile-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--point-border);
+  border-radius: 2px;
+  background: var(--bg-neutral);
+  color: var(--point-hover);
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.admin-user-profile-link:hover {
+  background: var(--point-soft);
 }
 
 .admin-user-identity {
@@ -668,10 +706,15 @@
   }
 
   .admin-user-row {
+    align-items: stretch;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .admin-user-row-main {
     grid-template-columns: minmax(0, 1fr) 58px;
   }
 
-  .admin-user-row > .admin-user-metric {
+  .admin-user-row-main > .admin-user-metric {
     display: none;
   }
 

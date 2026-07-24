@@ -8,6 +8,8 @@ import type {
   AnimeListItem,
   AnimeListResponse,
   AnimeRelationType,
+  AnimeSeriesListResponse,
+  AnimeSeriesScope,
   AnimeSearchWithRelationsResponse,
   AnimeSort,
   PopularAnimeItem,
@@ -174,6 +176,32 @@ export async function fetchAnimeList(params: {
     ...data,
     items: data.items.filter((item) => item.coverImageExtraLarge || item.coverImageLarge),
   }
+}
+
+export async function fetchAnimeSeries(params: {
+  scope: AnimeSeriesScope
+  sort: AnimeSort
+  titleLanguage: 'ko' | 'en' | 'ja'
+  limit: number
+  query?: string
+  genre?: AnimeGenre | null
+  cursor?: string | null
+  signal?: AbortSignal
+}) {
+  const url = new URL('/api/anime/series', getApiBaseUrl())
+  url.searchParams.set('scope', params.scope)
+  url.searchParams.set('sort', params.sort)
+  url.searchParams.set('titleLanguage', params.titleLanguage)
+  url.searchParams.set('limit', String(params.limit))
+
+  if (params.query?.trim()) url.searchParams.set('query', params.query.trim())
+  if (params.genre) url.searchParams.set('genre', params.genre)
+  if (params.cursor) url.searchParams.set('cursor', params.cursor)
+
+  const response = await authFetch(url.toString(), { signal: params.signal })
+  if (!response.ok) throw new Error(`시리즈 목록을 불러오지 못했습니다. (${response.status})`)
+
+  return response.json() as Promise<AnimeSeriesListResponse>
 }
 
 export async function searchAnime(params: {

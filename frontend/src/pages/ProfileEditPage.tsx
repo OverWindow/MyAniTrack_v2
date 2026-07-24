@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { Pencil } from 'lucide-react'
+import { ProfileImageCropper } from '../components/ProfileImageCropper'
 import { useAuth } from '../contexts/AuthContext'
 import { getProfileImageSrc, handleProfileImageError } from '../lib/avatar'
 import { checkUsernameAvailability } from '../lib/auth'
@@ -18,6 +20,7 @@ export function ProfileEditPage() {
   const [username, setUsername] = useState(user?.username ?? '')
   const [bio, setBio] = useState(user?.bio ?? '')
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [isCropModalOpen, setIsCropModalOpen] = useState(false)
   const [removeProfileImage, setRemoveProfileImage] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isCheckingUsername, setIsCheckingUsername] = useState(false)
@@ -170,12 +173,22 @@ export function ProfileEditPage() {
 
         <form className="auth-form" onSubmit={handleSubmit}>
           <div className="profile-edit-preview">
-            <img
-              className="profile-hero-avatar profile-hero-avatar-image"
-              src={getProfileImageSrc(previewUrl)}
-              alt={displayName}
-              onError={handleProfileImageError}
-            />
+            <button
+              className="profile-edit-avatar-button"
+              type="button"
+              aria-label="프로필 이미지 수정"
+              onClick={() => setIsCropModalOpen(true)}
+            >
+              <img
+                className="profile-hero-avatar profile-hero-avatar-image"
+                src={getProfileImageSrc(previewUrl)}
+                alt={displayName}
+                onError={handleProfileImageError}
+              />
+              <span className="profile-edit-avatar-overlay" aria-hidden="true">
+                <Pencil size={22} />
+              </span>
+            </button>
 
             <div className="profile-edit-preview-copy">
               <strong>{displayName}</strong>
@@ -230,20 +243,20 @@ export function ProfileEditPage() {
             />
           </label>
 
-          <label className="auth-field">
-            <span>프로필 이미지</span>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(event) => {
-                const file = event.target.files?.[0] ?? null
-                setSelectedFile(file)
-                if (file) {
-                  setRemoveProfileImage(false)
-                }
+          {isCropModalOpen && (
+            <ProfileImageCropper
+              onApply={(croppedFile) => {
+                setSelectedFile(croppedFile)
+                setIsCropModalOpen(false)
+                setRemoveProfileImage(false)
               }}
+              onClose={() => setIsCropModalOpen(false)}
             />
-          </label>
+          )}
+
+          {selectedFile && (
+            <p className="auth-field-hint is-success">프레임 조절이 적용됐어요. 저장하면 새 이미지로 변경됩니다.</p>
+          )}
 
           <label className="consent-field">
             <input
@@ -255,6 +268,7 @@ export function ProfileEditPage() {
 
                 if (checked) {
                   setSelectedFile(null)
+                  setIsCropModalOpen(false)
                 }
               }}
             />

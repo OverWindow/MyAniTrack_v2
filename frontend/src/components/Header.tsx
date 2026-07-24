@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
+import brandLogo from '../assets/myanitrack-logo.png'
 import { useAuth } from '../contexts/AuthContext'
 import { getProfileImageSrc, handleProfileImageError } from '../lib/avatar'
 
@@ -64,9 +65,7 @@ export function Header() {
         <div className="topbar">
           <div className="brand-block">
             <NavLink className="brand" to="/" aria-label="MyAniTrack 홈">
-              <span className="brand-mark" aria-hidden="true">
-                <span className="brand-mark-core" />
-              </span>
+              <img className="brand-mark" src={brandLogo} alt="" aria-hidden="true" />
               <span className="brand-text">
                 <span className="brand-title">MyAniTrack</span>
                 <span className="brand-caption">Track your anime taste</span>

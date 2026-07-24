@@ -14,6 +14,39 @@
   /* border: 1px solid var(--point-border); */
 }
 
+.explore-view-switch {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-neutral);
+}
+
+.explore-view-switch button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 0 13px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.explore-view-switch button.is-active {
+  background: var(--point-color);
+  color: var(--text-inverse);
+  box-shadow: 0 3px 10px rgba(245, 158, 11, 0.22);
+}
+
 .search-language-button {
   min-width: 44px;
   min-height: 36px;
@@ -209,13 +242,159 @@
   line-height: 1.4;
 }
 
+.explore-series-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.explore-series-card {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr);
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid rgba(120, 113, 108, 0.16);
+  border-radius: var(--radius-card);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-card);
+}
+
+.explore-series-cover-link {
+  position: relative;
+  display: block;
+  min-height: 230px;
+  overflow: hidden;
+  background: var(--bg-soft-beige);
+}
+
+.explore-series-cover,
+.explore-series-cover-placeholder {
+  width: 100%;
+  height: 100%;
+  min-height: 230px;
+}
+
+.explore-series-cover {
+  display: block;
+  object-fit: cover;
+  transition: transform var(--duration-normal) var(--ease-out);
+}
+
+.explore-series-cover-link:hover .explore-series-cover {
+  transform: scale(1.03);
+}
+
+.explore-series-cover-placeholder {
+  display: grid;
+  place-items: center;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+}
+
+.explore-series-copy {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-width: 0;
+  padding: 18px;
+}
+
+.explore-series-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.explore-series-heading span {
+  display: inline-flex;
+  width: fit-content;
+  padding: 4px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--point-softest);
+  color: var(--point-hover);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.explore-series-heading strong {
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+}
+
+.explore-series-copy h3 {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 1.02rem;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.explore-series-members {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+  padding: 3px 2px 8px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.explore-series-member {
+  display: block;
+  flex: 0 0 58px;
+  height: 82px;
+  overflow: hidden;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background: var(--bg-soft-beige);
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+
+.explore-series-member:hover,
+.explore-series-member:focus-visible {
+  border-color: var(--point-color);
+  outline: none;
+}
+
+.explore-series-member img,
+.explore-series-member span {
+  width: 100%;
+  height: 100%;
+}
+
+.explore-series-member img {
+  display: block;
+  object-fit: cover;
+}
+
+.explore-series-member span {
+  display: grid;
+  place-items: center;
+  font-size: 0.62rem;
+  text-align: center;
+}
+
 @media (max-width: 1180px) {
   .anime-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+
+  .explore-series-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 760px) {
+  .explore-view-switch {
+    width: 100%;
+  }
+
+  .explore-view-switch button {
+    flex: 1;
+  }
+
   .anime-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 22px 14px;
@@ -223,5 +402,19 @@
 
   .anime-copy h3 {
     font-size: 0.92rem;
+  }
+
+  .explore-series-card {
+    grid-template-columns: 112px minmax(0, 1fr);
+  }
+
+  .explore-series-cover-link,
+  .explore-series-cover,
+  .explore-series-cover-placeholder {
+    min-height: 190px;
+  }
+
+  .explore-series-copy {
+    padding: 14px;
   }
 }

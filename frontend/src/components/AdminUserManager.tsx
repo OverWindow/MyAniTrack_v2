@@ -1,4 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
+import { ExternalLink } from 'lucide-react'
 import { fetchAdminUserDetail, fetchAdminUsers } from '../lib/admin'
 import { getProfileImageSrc, handleProfileImageError } from '../lib/avatar'
 import type {
@@ -201,38 +203,50 @@ export function AdminUserManager() {
           {!listState.isLoading && !listState.error && listState.data && listState.data.items.length > 0 && (
             <div className="admin-user-list">
               {listState.data.items.map((item) => (
-                <button
+                <div
                   className={`admin-user-row${selectedUserId === item.id ? ' is-active' : ''}`}
                   key={item.id}
-                  type="button"
-                  onClick={() => setSelectedUserId(item.id)}
                 >
-                  <span className="admin-user-identity">
-                    <img
-                      src={getProfileImageSrc(item.profileImageUrl)}
-                      alt=""
-                      loading="lazy"
-                      onError={handleProfileImageError}
-                    />
-                    <span>
-                      <strong>{item.username}</strong>
-                      <small>{item.email}</small>
+                  <button
+                    className="admin-user-row-main"
+                    type="button"
+                    onClick={() => setSelectedUserId(item.id)}
+                  >
+                    <span className="admin-user-identity">
+                      <img
+                        src={getProfileImageSrc(item.profileImageUrl)}
+                        alt=""
+                        loading="lazy"
+                        onError={handleProfileImageError}
+                      />
+                      <span>
+                        <strong>{item.username}</strong>
+                        <small>{item.email}</small>
+                      </span>
                     </span>
-                  </span>
-                  <span className={`admin-user-role is-${item.role.toLowerCase()}`}>{item.role}</span>
-                  <span className="admin-user-metric">
-                    <strong>{item.animeListCount.toLocaleString('ko-KR')}</strong>
-                    <small>작품</small>
-                  </span>
-                  <span className="admin-user-metric">
-                    <strong>{item.completedCount.toLocaleString('ko-KR')}</strong>
-                    <small>완주</small>
-                  </span>
-                  <span className="admin-user-metric">
-                    <strong>{item.activeSessionCount.toLocaleString('ko-KR')}</strong>
-                    <small>세션</small>
-                  </span>
-                </button>
+                    <span className={`admin-user-role is-${item.role.toLowerCase()}`}>{item.role}</span>
+                    <span className="admin-user-metric">
+                      <strong>{item.animeListCount.toLocaleString('ko-KR')}</strong>
+                      <small>작품</small>
+                    </span>
+                    <span className="admin-user-metric">
+                      <strong>{item.completedCount.toLocaleString('ko-KR')}</strong>
+                      <small>완주</small>
+                    </span>
+                    <span className="admin-user-metric">
+                      <strong>{item.activeSessionCount.toLocaleString('ko-KR')}</strong>
+                      <small>세션</small>
+                    </span>
+                  </button>
+                  <Link
+                    className="admin-user-profile-link"
+                    to={`/users/${item.id}/profile`}
+                    aria-label={`${item.username} 프로필 보기`}
+                    title={`${item.username} 프로필 보기`}
+                  >
+                    <ExternalLink size={17} strokeWidth={2.2} aria-hidden="true" />
+                  </Link>
+                </div>
               ))}
             </div>
           )}

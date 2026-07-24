@@ -90,23 +90,12 @@
 }
 
 .brand-mark {
-  display: grid;
-  place-items: center;
+  display: block;
   width: 46px;
   height: 46px;
-  border-radius: 50%;
-  background: var(--point-color);
+  border-radius: 14px;
+  object-fit: cover;
   box-shadow: var(--shadow-highlight);
-}
-
-.brand-mark-core {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow:
-    0 0 0 4px rgba(255, 255, 255, 0.16),
-    0 0 0 8px rgba(255, 255, 255, 0.08);
 }
 
 .brand-text {
