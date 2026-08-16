@@ -44,6 +44,7 @@ class _CollectionScreenState extends ConsumerState<CollectionScreen> {
   Widget build(BuildContext context) {
     final state = ref.watch(collectionControllerProvider);
     final seriesState = ref.watch(seriesCollectionControllerProvider);
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
     if (_seriesMode) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
@@ -52,200 +53,210 @@ class _CollectionScreenState extends ConsumerState<CollectionScreen> {
       });
     }
     return CupertinoPageScaffold(
+      resizeToAvoidBottomInset: false,
       child: AppBackground(
-        child: CustomScrollView(
-          controller: _scrollController,
-          slivers: [
-            AppCompactSliverHeader(
-              title: '내 컬렉션',
-              trailing: CupertinoButton(
-                padding: EdgeInsets.zero,
-                minimumSize: const Size.square(44),
-                onPressed: () => _seriesMode
-                    ? _openSeriesFilters(context, seriesState.query)
-                    : _openFilters(context, state.query),
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    const Icon(CupertinoIcons.slider_horizontal_3),
-                    if ((_seriesMode &&
-                            (seriesState.query.scope !=
-                                    AnimeSeriesScope.mainline ||
-                                seriesState.query.status !=
-                                    UserSeriesStatus.all)) ||
-                        (!_seriesMode &&
-                            (state.query.genre != null ||
-                                state.query.year != null ||
-                                state.query.score != null)))
-                      const Positioned(
-                        right: -2,
-                        top: -2,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            color: AppColors.point,
-                            shape: BoxShape.circle,
+        child: AppContentWidth(
+          child: CustomScrollView(
+            controller: _scrollController,
+            slivers: [
+              AppCompactSliverHeader(
+                title: '내 컬렉션',
+                trailing: CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  minimumSize: const Size.square(44),
+                  onPressed: () => _seriesMode
+                      ? _openSeriesFilters(context, seriesState.query)
+                      : _openFilters(context, state.query),
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      const Icon(CupertinoIcons.slider_horizontal_3),
+                      if ((_seriesMode &&
+                              (seriesState.query.scope !=
+                                      AnimeSeriesScope.mainline ||
+                                  seriesState.query.status !=
+                                      UserSeriesStatus.all)) ||
+                          (!_seriesMode &&
+                              (state.query.genre != null ||
+                                  state.query.year != null ||
+                                  state.query.score != null)))
+                        const Positioned(
+                          right: -2,
+                          top: -2,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: AppColors.point,
+                              shape: BoxShape.circle,
+                            ),
+                            child: SizedBox.square(dimension: 8),
                           ),
-                          child: SizedBox.square(dimension: 8),
                         ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
-            CupertinoSliverRefreshControl(
-              onRefresh: _seriesMode
-                  ? ref
-                        .read(seriesCollectionControllerProvider.notifier)
-                        .refresh
-                  : ref.read(collectionControllerProvider.notifier).refresh,
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
-              sliver: SliverToBoxAdapter(
-                child: CupertinoSlidingSegmentedControl<bool>(
-                  groupValue: _seriesMode,
-                  thumbColor: AppColors.card,
-                  backgroundColor: AppColors.softBeige,
-                  children: const {
-                    false: Padding(
-                      padding: EdgeInsets.symmetric(
-                        vertical: 9,
-                        horizontal: 22,
-                      ),
-                      child: Text('작품'),
-                    ),
-                    true: Padding(
-                      padding: EdgeInsets.symmetric(
-                        vertical: 9,
-                        horizontal: 22,
-                      ),
-                      child: Text('시리즈'),
-                    ),
-                  },
-                  onValueChanged: (value) {
-                    if (value == null) return;
-                    setState(() => _seriesMode = value);
-                    if (value) {
-                      ref
+              CupertinoSliverRefreshControl(
+                onRefresh: _seriesMode
+                    ? ref
                           .read(seriesCollectionControllerProvider.notifier)
-                          .ensureLoaded();
-                    }
-                    final query = value
-                        ? seriesState.query.searchQuery
-                        : state.query.searchQuery;
-                    _searchController.value = TextEditingValue(
-                      text: query ?? '',
-                      selection: TextSelection.collapsed(
-                        offset: query?.length ?? 0,
+                          .refresh
+                    : ref.read(collectionControllerProvider.notifier).refresh,
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+                sliver: SliverToBoxAdapter(
+                  child: CupertinoSlidingSegmentedControl<bool>(
+                    groupValue: _seriesMode,
+                    thumbColor: AppColors.card,
+                    backgroundColor: AppColors.softBeige,
+                    children: const {
+                      false: Padding(
+                        padding: EdgeInsets.symmetric(
+                          vertical: 9,
+                          horizontal: 22,
+                        ),
+                        child: Text('작품'),
                       ),
-                    );
-                  },
-                ),
-              ),
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-              sliver: SliverToBoxAdapter(
-                child: _seriesMode
-                    ? _SeriesSummary(state: seriesState)
-                    : _CollectionSummary(state: state),
-              ),
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              sliver: SliverToBoxAdapter(
-                child: CupertinoSearchTextField(
-                  controller: _searchController,
-                  placeholder: _seriesMode ? '시리즈명·포함 작품명 검색' : '내 컬렉션 제목 검색',
-                  onChanged: _seriesMode
-                      ? ref
+                      true: Padding(
+                        padding: EdgeInsets.symmetric(
+                          vertical: 9,
+                          horizontal: 22,
+                        ),
+                        child: Text('시리즈'),
+                      ),
+                    },
+                    onValueChanged: (value) {
+                      if (value == null) return;
+                      setState(() => _seriesMode = value);
+                      if (value) {
+                        ref
                             .read(seriesCollectionControllerProvider.notifier)
-                            .setSearchQuery
-                      : ref
-                            .read(collectionControllerProvider.notifier)
-                            .setSearchQuery,
+                            .ensureLoaded();
+                      }
+                      final query = value
+                          ? seriesState.query.searchQuery
+                          : state.query.searchQuery;
+                      _searchController.value = TextEditingValue(
+                        text: query ?? '',
+                        selection: TextSelection.collapsed(
+                          offset: query?.length ?? 0,
+                        ),
+                      );
+                    },
+                  ),
                 ),
               ),
-            ),
-            if (_seriesMode)
-              ..._seriesSlivers(seriesState)
-            else if (state.loading && state.items.isEmpty)
               SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                sliver: SliverGrid(
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    mainAxisSpacing: 14,
-                    crossAxisSpacing: 12,
-                    childAspectRatio: 0.57,
-                  ),
-                  delegate: SliverChildBuilderDelegate(
-                    (_, _) => const AppSkeleton(height: 250),
-                    childCount: 6,
-                  ),
-                ),
-              )
-            else if (state.failure != null && state.items.isEmpty)
-              SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
                 sliver: SliverToBoxAdapter(
-                  child: AppStateView(
-                    icon: CupertinoIcons.wifi_exclamationmark,
-                    title: '컬렉션을 불러오지 못했습니다',
-                    message: state.failure!.message,
-                    actionLabel: '다시 시도',
-                    onAction: ref
-                        .read(collectionControllerProvider.notifier)
-                        .refresh,
-                  ),
+                  child: _seriesMode
+                      ? _SeriesSummary(state: seriesState)
+                      : _CollectionSummary(state: state),
                 ),
-              )
-            else if (state.items.isEmpty)
+              ),
               SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                 sliver: SliverToBoxAdapter(
-                  child: AppStateView(
-                    icon: CupertinoIcons.square_grid_2x2,
-                    title: state.query.searchQuery?.isNotEmpty == true
-                        ? '일치하는 작품이 없어요'
-                        : '아직 기록한 작품이 없습니다',
-                    message: state.query.searchQuery?.isNotEmpty == true
-                        ? '다른 제목으로 다시 검색해보세요.'
-                        : '검색 탭에서 첫 작품을 찾아 컬렉션을 시작해보세요.',
-                    actionLabel: state.query.searchQuery?.isNotEmpty == true
-                        ? null
-                        : '작품 검색하기',
-                    onAction: state.query.searchQuery?.isNotEmpty == true
-                        ? null
-                        : () => context.go('/search'),
-                  ),
-                ),
-              )
-            else
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                sliver: SliverGrid(
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    mainAxisSpacing: 18,
-                    crossAxisSpacing: 12,
-                    childAspectRatio: 0.55,
-                  ),
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) =>
-                        CollectionPosterCard(entry: state.items[index]),
-                    childCount: state.items.length,
+                  child: CupertinoSearchTextField(
+                    controller: _searchController,
+                    placeholder: _seriesMode ? '시리즈명·포함 작품명 검색' : '내 컬렉션 제목 검색',
+                    onChanged: _seriesMode
+                        ? ref
+                              .read(seriesCollectionControllerProvider.notifier)
+                              .setSearchQuery
+                        : ref
+                              .read(collectionControllerProvider.notifier)
+                              .setSearchQuery,
                   ),
                 ),
               ),
-            if (!_seriesMode && state.loadingMore)
-              const SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.only(bottom: 24),
-                  child: Center(child: CupertinoActivityIndicator()),
+              if (_seriesMode)
+                ..._seriesSlivers(seriesState)
+              else if (state.loading && state.items.isEmpty)
+                SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  sliver: SliverLayoutBuilder(
+                    builder: (context, constraints) => SliverGrid(
+                      gridDelegate: _collectionPosterGridDelegate(
+                        context,
+                        constraints.crossAxisExtent,
+                        mainAxisSpacing: 14,
+                      ),
+                      delegate: SliverChildBuilderDelegate(
+                        (_, _) => const AppSkeleton(height: 250),
+                        childCount: 6,
+                      ),
+                    ),
+                  ),
+                )
+              else if (state.failure != null && state.items.isEmpty)
+                SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  sliver: SliverToBoxAdapter(
+                    child: AppStateView(
+                      icon: CupertinoIcons.wifi_exclamationmark,
+                      title: '컬렉션을 불러오지 못했습니다',
+                      message: state.failure!.message,
+                      actionLabel: '다시 시도',
+                      onAction: ref
+                          .read(collectionControllerProvider.notifier)
+                          .refresh,
+                    ),
+                  ),
+                )
+              else if (state.items.isEmpty)
+                SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  sliver: SliverToBoxAdapter(
+                    child: AppStateView(
+                      icon: CupertinoIcons.square_grid_2x2,
+                      title: state.query.searchQuery?.isNotEmpty == true
+                          ? '일치하는 작품이 없어요'
+                          : '아직 기록한 작품이 없습니다',
+                      message: state.query.searchQuery?.isNotEmpty == true
+                          ? '다른 제목으로 다시 검색해보세요.'
+                          : '탐색 탭에서 첫 작품을 찾아 컬렉션을 시작해보세요.',
+                      actionLabel: state.query.searchQuery?.isNotEmpty == true
+                          ? null
+                          : '작품 탐색하기',
+                      onAction: state.query.searchQuery?.isNotEmpty == true
+                          ? null
+                          : () => context.go('/search'),
+                    ),
+                  ),
+                )
+              else
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                  sliver: SliverLayoutBuilder(
+                    builder: (context, constraints) => SliverGrid(
+                      gridDelegate: _collectionPosterGridDelegate(
+                        context,
+                        constraints.crossAxisExtent,
+                      ),
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) =>
+                            CollectionPosterCard(entry: state.items[index]),
+                        childCount: state.items.length,
+                      ),
+                    ),
+                  ),
+                ),
+              if (!_seriesMode && state.loadingMore)
+                const SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.only(bottom: 24),
+                    child: Center(child: CupertinoActivityIndicator()),
+                  ),
+                ),
+              SliverToBoxAdapter(
+                child: SizedBox(
+                  key: const ValueKey('collection-keyboard-spacer'),
+                  height: keyboardInset,
                 ),
               ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -254,7 +265,8 @@ class _CollectionScreenState extends ConsumerState<CollectionScreen> {
   Future<void> _openFilters(BuildContext context, CollectionQuery query) async {
     final next = await showCupertinoModalPopup<CollectionQuery>(
       context: context,
-      builder: (context) => CollectionFilterSheet(initial: query),
+      builder: (context) =>
+          AppModalWidth(child: CollectionFilterSheet(initial: query)),
     );
     if (next != null) {
       await ref.read(collectionControllerProvider.notifier).setQuery(next);
@@ -267,7 +279,8 @@ class _CollectionScreenState extends ConsumerState<CollectionScreen> {
   ) async {
     final next = await showCupertinoModalPopup<SeriesCollectionQuery>(
       context: context,
-      builder: (context) => _SeriesFilterSheet(initial: query),
+      builder: (context) =>
+          AppModalWidth(child: _SeriesFilterSheet(initial: query)),
     );
     if (next != null) {
       await ref
@@ -393,9 +406,7 @@ class _SeriesCollectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final percent = item.completionRate <= 1
-        ? item.completionRate * 100
-        : item.completionRate;
+    final percent = item.completionPercent;
     final canonicalId =
         item.canonicalAnimeId ?? item.items.firstOrNull?.anime.id;
     return AppCard(
@@ -438,13 +449,20 @@ class _SeriesCollectionCard extends StatelessWidget {
                     ClipRRect(
                       borderRadius: BorderRadius.circular(99),
                       child: SizedBox(
+                        key: ValueKey(
+                          'series-completion-track-${item.seriesId}',
+                        ),
                         height: 7,
                         child: ColoredBox(
                           color: AppColors.softBeige,
                           child: Align(
                             alignment: Alignment.centerLeft,
                             child: FractionallySizedBox(
-                              widthFactor: (percent / 100).clamp(0, 1),
+                              key: ValueKey(
+                                'series-completion-fill-${item.seriesId}',
+                              ),
+                              widthFactor: item.completionFraction,
+                              heightFactor: 1,
                               child: const ColoredBox(color: AppColors.point),
                             ),
                           ),
@@ -617,7 +635,9 @@ class CollectionPosterCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
+          AspectRatio(
+            key: ValueKey('collection-poster-${entry.animeId}'),
+            aspectRatio: 2 / 3,
             child: Stack(
               fit: StackFit.expand,
               children: [
@@ -644,16 +664,19 @@ class CollectionPosterCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 9),
-          Text(
-            entry.anime.title,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontFamily: 'Pretendard',
-              fontSize: 14,
-              height: 1.3,
-              fontWeight: FontWeight.w600,
-              color: AppColors.text,
+          SizedBox(
+            height: 36.4,
+            child: Text(
+              entry.anime.title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontFamily: 'Pretendard',
+                fontSize: 14,
+                height: 1.3,
+                fontWeight: FontWeight.w600,
+                color: AppColors.text,
+              ),
             ),
           ),
           const SizedBox(height: 4),
@@ -671,6 +694,24 @@ class CollectionPosterCard extends StatelessWidget {
       ),
     );
   }
+}
+
+SliverGridDelegateWithFixedCrossAxisCount _collectionPosterGridDelegate(
+  BuildContext context,
+  double crossAxisExtent, {
+  double mainAxisSpacing = 18,
+}) {
+  const crossAxisSpacing = 12.0;
+  final crossAxisCount = AppLayout.posterGridCount(context);
+  final posterWidth =
+      (crossAxisExtent - crossAxisSpacing * (crossAxisCount - 1)) /
+      crossAxisCount;
+  return SliverGridDelegateWithFixedCrossAxisCount(
+    crossAxisCount: crossAxisCount,
+    mainAxisSpacing: mainAxisSpacing,
+    crossAxisSpacing: crossAxisSpacing,
+    mainAxisExtent: posterWidth * 1.5 + 66,
+  );
 }
 
 class CollectionFilterSheet extends StatefulWidget {
@@ -994,85 +1035,98 @@ class _AnimeSearchScreenState extends ConsumerState<AnimeSearchScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(searchControllerProvider);
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
     return CupertinoPageScaffold(
+      resizeToAvoidBottomInset: false,
       child: AppBackground(
-        child: CustomScrollView(
-          controller: _scrollController,
-          slivers: [
-            const AppCompactSliverHeader(title: '작품 검색'),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-              sliver: SliverList.list(
-                children: [
-                  CupertinoSearchTextField(
-                    controller: _controller,
-                    autofocus: false,
-                    placeholder: '한국어·영문·일본어 제목 검색',
-                    onChanged: ref
-                        .read(searchControllerProvider.notifier)
-                        .setQuery,
-                  ),
-                  const SizedBox(height: 10),
-                  _SearchFilters(state: state),
-                  const SizedBox(height: 8),
-                  Text('포스터를 길게 누르면 빠르게 별점을 남길 수 있어요.', style: appLabelStyle()),
-                ],
-              ),
-            ),
-            if (state.loading)
-              const SliverPadding(
-                padding: EdgeInsets.symmetric(horizontal: 16),
-                sliver: SliverToBoxAdapter(child: AppSkeleton(height: 220)),
-              )
-            else if (state.failure != null && state.items.isEmpty)
+        child: AppContentWidth(
+          child: CustomScrollView(
+            controller: _scrollController,
+            slivers: [
+              const AppCompactSliverHeader(title: '작품 탐색'),
               SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                sliver: SliverToBoxAdapter(
-                  child: AppStateView(
-                    title: '작품을 불러오지 못했습니다',
-                    message: state.failure!.message,
-                    actionLabel: '다시 시도',
-                    onAction: ref
-                        .read(searchControllerProvider.notifier)
-                        .refresh,
-                  ),
-                ),
-              )
-            else if (state.items.isEmpty)
-              const SliverPadding(
-                padding: EdgeInsets.symmetric(horizontal: 16),
-                sliver: SliverToBoxAdapter(
-                  child: AppStateView(
-                    title: '검색 결과가 없습니다',
-                    message: '다른 제목이나 원어 제목으로 다시 검색해보세요.',
-                  ),
-                ),
-              )
-            else
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                sliver: SliverGrid(
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    mainAxisSpacing: 18,
-                    crossAxisSpacing: 12,
-                    childAspectRatio: 0.55,
-                  ),
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) =>
-                        _SearchResultCard(result: state.items[index]),
-                    childCount: state.items.length,
-                  ),
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+                sliver: SliverList.list(
+                  children: [
+                    CupertinoSearchTextField(
+                      controller: _controller,
+                      autofocus: false,
+                      placeholder: '한국어·영문·일본어 제목 검색',
+                      onChanged: ref
+                          .read(searchControllerProvider.notifier)
+                          .setQuery,
+                    ),
+                    const SizedBox(height: 10),
+                    _SearchFilters(state: state),
+                    const SizedBox(height: 8),
+                    Text(
+                      '포스터를 길게 누르면 빠르게 별점을 남길 수 있어요.',
+                      style: appLabelStyle(),
+                    ),
+                  ],
                 ),
               ),
-            if (state.loadingMore)
-              const SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.only(bottom: 24),
-                  child: Center(child: CupertinoActivityIndicator()),
+              if (state.loading)
+                const SliverPadding(
+                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  sliver: SliverToBoxAdapter(child: AppSkeleton(height: 220)),
+                )
+              else if (state.failure != null && state.items.isEmpty)
+                SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  sliver: SliverToBoxAdapter(
+                    child: AppStateView(
+                      title: '작품을 불러오지 못했습니다',
+                      message: state.failure!.message,
+                      actionLabel: '다시 시도',
+                      onAction: ref
+                          .read(searchControllerProvider.notifier)
+                          .refresh,
+                    ),
+                  ),
+                )
+              else if (state.items.isEmpty)
+                const SliverPadding(
+                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  sliver: SliverToBoxAdapter(
+                    child: AppStateView(
+                      title: '검색 결과가 없습니다',
+                      message: '다른 제목이나 원어 제목으로 다시 검색해보세요.',
+                    ),
+                  ),
+                )
+              else
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                  sliver: SliverGrid(
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: AppLayout.posterGridCount(context),
+                      mainAxisSpacing: 18,
+                      crossAxisSpacing: 12,
+                      childAspectRatio: 0.55,
+                    ),
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) =>
+                          _SearchResultCard(result: state.items[index]),
+                      childCount: state.items.length,
+                    ),
+                  ),
+                ),
+              if (state.loadingMore)
+                const SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.only(bottom: 24),
+                    child: Center(child: CupertinoActivityIndicator()),
+                  ),
+                ),
+              SliverToBoxAdapter(
+                child: SizedBox(
+                  key: const ValueKey('search-keyboard-spacer'),
+                  height: keyboardInset,
                 ),
               ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -1202,6 +1256,7 @@ class _SearchResultCardState extends ConsumerState<_SearchResultCard> {
     final result = widget.result;
     final anime = result.anime;
     final exists = result.myCollection?.exists == true;
+    final completed = result.myCollection?.status == CollectionStatus.completed;
     final searchState = ref.watch(searchControllerProvider);
     final rating = searchState.ratingAnimeId == anime.id;
     return GestureDetector(
@@ -1221,20 +1276,44 @@ class _SearchResultCardState extends ConsumerState<_SearchResultCard> {
                   Positioned(
                     right: 8,
                     top: 8,
-                    child: CupertinoButton(
-                      padding: EdgeInsets.zero,
-                      minimumSize: const Size.square(44),
-                      borderRadius: BorderRadius.circular(99),
-                      color: exists
-                          ? const Color(0xF2FFF7E7)
-                          : const Color(0xEEDE851D),
-                      onPressed: () => showCollectionEditor(context, anime),
-                      child: Icon(
-                        exists ? CupertinoIcons.pencil : CupertinoIcons.add,
-                        size: 20,
-                        color: exists ? AppColors.pointPressed : AppColors.card,
-                      ),
-                    ),
+                    child: completed
+                        ? Semantics(
+                            label: '완료한 작품',
+                            child: const DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: AppColors.successSoft,
+                                shape: BoxShape.circle,
+                              ),
+                              child: SizedBox.square(
+                                key: ValueKey('completed-anime-check'),
+                                dimension: 44,
+                                child: Icon(
+                                  CupertinoIcons.check_mark,
+                                  size: 21,
+                                  color: AppColors.success,
+                                ),
+                              ),
+                            ),
+                          )
+                        : CupertinoButton(
+                            padding: EdgeInsets.zero,
+                            minimumSize: const Size.square(44),
+                            borderRadius: BorderRadius.circular(99),
+                            color: exists
+                                ? const Color(0xF2FFF7E7)
+                                : const Color(0xEEDE851D),
+                            onPressed: () =>
+                                showCollectionEditor(context, anime),
+                            child: Icon(
+                              exists
+                                  ? CupertinoIcons.pencil
+                                  : CupertinoIcons.add,
+                              size: 20,
+                              color: exists
+                                  ? AppColors.pointPressed
+                                  : AppColors.card,
+                            ),
+                          ),
                   ),
                   if (exists)
                     Positioned(
@@ -1451,208 +1530,293 @@ class _AnimeDetailContent extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final cast = ref.watch(animeCastProvider(anime.id));
     final entry = ref.watch(collectionEntryProvider(anime.id));
-    return Stack(
-      children: [
-        CustomScrollView(
-          slivers: [
-            AppCompactSliverHeader(
-              title: anime.title,
-              leading: CupertinoButton(
-                padding: EdgeInsets.zero,
-                minimumSize: const Size.square(44),
-                onPressed: () => Navigator.of(context).maybePop(),
-                child: const Icon(
-                  CupertinoIcons.back,
-                  color: AppColors.pointPressed,
+    return AppContentWidth(
+      child: Stack(
+        children: [
+          CustomScrollView(
+            slivers: [
+              AppCompactSliverHeader(
+                title: anime.title,
+                leading: CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  minimumSize: const Size.square(44),
+                  onPressed: () => Navigator.of(context).maybePop(),
+                  child: const Icon(
+                    CupertinoIcons.back,
+                    color: AppColors.pointPressed,
+                  ),
                 ),
+                trailing: entry.value == null
+                    ? null
+                    : const Icon(
+                        CupertinoIcons.check_mark_circled_solid,
+                        color: AppColors.success,
+                      ),
               ),
-              trailing: entry.value == null
-                  ? null
-                  : const Icon(
-                      CupertinoIcons.check_mark_circled_solid,
-                      color: AppColors.success,
-                    ),
-            ),
-            SliverToBoxAdapter(child: _DetailHero(anime: anime)),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 18, 16, 120),
-              sliver: SliverList.list(
-                children: [
-                  AppCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const AppSectionHeader(
-                          title: '작품 정보',
-                          eyebrow: 'About',
-                        ),
-                        const SizedBox(height: 14),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            if (anime.seasonYear != null)
-                              AppBadge(label: '${anime.seasonYear}'),
-                            if (anime.format != null)
-                              AppBadge(label: anime.format!),
-                            if (anime.episodes != null)
-                              AppBadge(label: '${anime.episodes}화'),
-                            if (anime.duration != null)
-                              AppBadge(label: '회당 ${anime.duration}분'),
-                            if (anime.averageScore != null)
-                              AppBadge(
-                                label:
-                                    '커뮤니티 ${anime.averageScore!.toStringAsFixed(0)}',
-                              ),
-                            for (final genre in anime.genres)
-                              AppBadge(label: genreLabel(genre)),
-                          ],
-                        ),
-                        if (anime.description != null) ...[
-                          const SizedBox(height: 16),
-                          Text(
-                            anime.description!
-                                .replaceAll(RegExp('<[^>]*>'), '')
-                                .replaceAll('&quot;', '"'),
-                            style: const TextStyle(
-                              fontFamily: 'Pretendard',
-                              fontSize: 14,
-                              height: 1.6,
-                              color: AppColors.secondaryText,
+              SliverToBoxAdapter(child: _DetailHero(anime: anime)),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 18, 16, 120),
+                sliver: SliverList.list(
+                  children: [
+                    AppCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const AppSectionHeader(
+                            title: '작품 정보',
+                            eyebrow: 'About',
+                          ),
+                          const SizedBox(height: 14),
+                          _AnimeFactGrid(anime: anime),
+                          if (anime.genres.isNotEmpty) ...[
+                            const SizedBox(height: 16),
+                            Text('장르', style: appLabelStyle()),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                for (final genre in anime.genres)
+                                  AppBadge(label: genreLabel(genre)),
+                              ],
                             ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    AppCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const AppSectionHeader(
+                            title: '캐릭터 · 일본어 성우',
+                            eyebrow: 'Voice cast',
+                          ),
+                          const SizedBox(height: 14),
+                          cast.when(
+                            loading: () => const AppSkeleton(height: 92),
+                            error: (error, _) => AppStateView(
+                              compact: true,
+                              title: '캐스트를 불러오지 못했습니다',
+                              message: error.toString(),
+                              actionLabel: '재시도',
+                              onAction: () =>
+                                  ref.invalidate(animeCastProvider(anime.id)),
+                            ),
+                            data: (items) => items.isEmpty
+                                ? const Text('등록된 성우 정보가 없습니다.')
+                                : SizedBox(
+                                    height: 166,
+                                    child: ListView.separated(
+                                      scrollDirection: Axis.horizontal,
+                                      itemCount: items.length,
+                                      separatorBuilder: (_, _) =>
+                                          const SizedBox(width: 12),
+                                      itemBuilder: (context, index) {
+                                        final item = items[index];
+                                        return SizedBox(
+                                          width: 152,
+                                          child: Column(
+                                            children: [
+                                              Row(
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment.center,
+                                                children: [
+                                                  ClipOval(
+                                                    child: SizedBox.square(
+                                                      dimension: 62,
+                                                      child: AppNetworkImage(
+                                                        url: item
+                                                            .characterImageUrl,
+                                                        profile: true,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  ClipOval(
+                                                    child: SizedBox.square(
+                                                      dimension: 62,
+                                                      child: AppNetworkImage(
+                                                        url: item
+                                                            .voiceActorImageUrl,
+                                                        profile: true,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              const SizedBox(height: 8),
+                                              Text(
+                                                item.characterName,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  fontFamily: 'Pretendard',
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: AppColors.text,
+                                                ),
+                                              ),
+                                              Text(
+                                                item.voiceActorName,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  fontFamily: 'Pretendard',
+                                                  fontSize: 12,
+                                                  color: AppColors.pointPressed,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
                           ),
                         ],
-                      ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  AppCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const AppSectionHeader(
-                          title: '캐릭터 · 일본어 성우',
-                          eyebrow: 'Voice cast',
-                        ),
-                        const SizedBox(height: 14),
-                        cast.when(
-                          loading: () => const AppSkeleton(height: 92),
-                          error: (error, _) => AppStateView(
-                            compact: true,
-                            title: '캐스트를 불러오지 못했습니다',
-                            message: error.toString(),
-                            actionLabel: '재시도',
-                            onAction: () =>
-                                ref.invalidate(animeCastProvider(anime.id)),
-                          ),
-                          data: (items) => items.isEmpty
-                              ? const Text('등록된 성우 정보가 없습니다.')
-                              : SizedBox(
-                                  height: 166,
-                                  child: ListView.separated(
-                                    scrollDirection: Axis.horizontal,
-                                    itemCount: items.length,
-                                    separatorBuilder: (_, _) =>
-                                        const SizedBox(width: 12),
-                                    itemBuilder: (context, index) {
-                                      final item = items[index];
-                                      return SizedBox(
-                                        width: 152,
-                                        child: Column(
-                                          children: [
-                                            Row(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment.center,
-                                              children: [
-                                                ClipOval(
-                                                  child: SizedBox.square(
-                                                    dimension: 62,
-                                                    child: AppNetworkImage(
-                                                      url: item
-                                                          .characterImageUrl,
-                                                      profile: true,
-                                                    ),
-                                                  ),
-                                                ),
-                                                const SizedBox(width: 8),
-                                                ClipOval(
-                                                  child: SizedBox.square(
-                                                    dimension: 62,
-                                                    child: AppNetworkImage(
-                                                      url: item
-                                                          .voiceActorImageUrl,
-                                                      profile: true,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                            const SizedBox(height: 8),
-                                            Text(
-                                              item.characterName,
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: const TextStyle(
-                                                fontFamily: 'Pretendard',
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.w600,
-                                                color: AppColors.text,
-                                              ),
-                                            ),
-                                            Text(
-                                              item.voiceActorName,
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: const TextStyle(
-                                                fontFamily: 'Pretendard',
-                                                fontSize: 12,
-                                                color: AppColors.pointPressed,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: 0,
-          child: DecoratedBox(
-            decoration: const BoxDecoration(
-              color: Color(0xF7FFFFFF),
-              border: Border(top: BorderSide(color: AppColors.border)),
-            ),
-            child: SafeArea(
-              top: false,
-              minimum: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-              child: AppPrimaryButton(
-                label: entry.value == null ? '내 컬렉션에 추가' : '내 기록 수정',
-                icon: Icon(
-                  entry.value == null
-                      ? CupertinoIcons.add
-                      : CupertinoIcons.pencil,
-                  color: AppColors.card,
-                  size: 19,
+                  ],
                 ),
-                onPressed: entry.isLoading
-                    ? null
-                    : () => showCollectionEditor(context, anime),
+              ),
+            ],
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: DecoratedBox(
+              decoration: const BoxDecoration(
+                color: Color(0xF7FFFFFF),
+                border: Border(top: BorderSide(color: AppColors.border)),
+              ),
+              child: SafeArea(
+                top: false,
+                minimum: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                child: AppPrimaryButton(
+                  label: entry.value == null ? '내 컬렉션에 추가' : '내 기록 수정',
+                  icon: Icon(
+                    entry.value == null
+                        ? CupertinoIcons.add
+                        : CupertinoIcons.pencil,
+                    color: AppColors.card,
+                    size: 19,
+                  ),
+                  onPressed: entry.isLoading
+                      ? null
+                      : () => showCollectionEditor(context, anime),
+                ),
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AnimeFactGrid extends StatelessWidget {
+  const _AnimeFactGrid({required this.anime});
+
+  final Anime anime;
+
+  @override
+  Widget build(BuildContext context) {
+    final facts = <({IconData icon, String label, String value})>[
+      if (anime.seasonYear != null)
+        (
+          icon: CupertinoIcons.calendar,
+          label: '방영 연도',
+          value: '${anime.seasonYear}년',
         ),
-      ],
+      if (anime.format != null)
+        (
+          icon: CupertinoIcons.film,
+          label: '형식',
+          value: animeFormatLabel(anime.format),
+        ),
+      if (anime.episodes != null)
+        (
+          icon: CupertinoIcons.play_rectangle,
+          label: '에피소드',
+          value: '${anime.episodes}화',
+        ),
+      if (anime.duration != null)
+        (
+          icon: CupertinoIcons.clock,
+          label: '상영 시간',
+          value: '회당 ${anime.duration}분',
+        ),
+      if (anime.averageScore != null)
+        (
+          icon: CupertinoIcons.star_fill,
+          label: '커뮤니티 평점',
+          value: '${anime.averageScore!.toStringAsFixed(0)}점',
+        ),
+    ];
+    if (facts.isEmpty) {
+      return Text('등록된 작품 정보가 없습니다.', style: appLabelStyle());
+    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final tileWidth = (constraints.maxWidth - 10) / 2;
+        return Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            for (final fact in facts)
+              SizedBox(
+                width: tileWidth,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: AppColors.neutral,
+                    borderRadius: BorderRadius.circular(AppRadii.input),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
+                      children: [
+                        DecoratedBox(
+                          decoration: const BoxDecoration(
+                            color: AppColors.pointSoft,
+                            shape: BoxShape.circle,
+                          ),
+                          child: SizedBox.square(
+                            dimension: 34,
+                            child: Icon(
+                              fact.icon,
+                              size: 17,
+                              color: AppColors.pointPressed,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 9),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(fact.label, style: appLabelStyle()),
+                              const SizedBox(height: 2),
+                              Text(
+                                fact.value,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: appTitleStyle(size: 14),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }
@@ -1756,7 +1920,8 @@ class CollectionEditorRouteScreen extends ConsumerWidget {
     }
     return CupertinoPageScaffold(
       child: AppBackground(
-        child: Align(
+        child: AppContentWidth(
+          maxWidth: AppLayout.formMaxWidth,
           alignment: Alignment.bottomCenter,
           child: CollectionEditorSheet(
             anime: detail.requireValue,

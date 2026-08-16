@@ -230,7 +230,7 @@ class AppTabShell extends StatelessWidget {
             BottomNavigationBarItem(
               icon: Icon(CupertinoIcons.search),
               activeIcon: Icon(CupertinoIcons.search_circle_fill),
-              label: '검색',
+              label: '탐색',
             ),
             BottomNavigationBarItem(
               icon: Icon(CupertinoIcons.chart_bar),

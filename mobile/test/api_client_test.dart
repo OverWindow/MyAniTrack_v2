@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image_picker/image_picker.dart';
 
 import 'package:myanitrack_mobile/src/api.dart';
 
@@ -58,6 +59,55 @@ void main() {
     expect(failure.kind, ApiFailureKind.unknown);
     expect(event, isNull);
   });
+
+  test('프로필 이미지는 JPEG 파일명과 MIME 타입으로 전송한다', () async {
+    final recorder = _ProfileRequestRecorder();
+    final dio = Dio()..interceptors.add(recorder);
+    final repository = ProfileRepository(ApiClient(dio: dio));
+
+    final user = await repository.update(
+      username: 'tester',
+      profileImage: XFile.fromData(
+        Uint8List.fromList([1, 2, 3]),
+        name: 'picked.png',
+        mimeType: 'image/png',
+      ),
+    );
+
+    expect(user.id, 7);
+    expect(recorder.filename, 'myanitrack-profile.jpg');
+    expect(recorder.contentType, 'image/jpeg');
+    expect(recorder.username, 'tester');
+  });
+}
+
+class _ProfileRequestRecorder extends Interceptor {
+  String? filename;
+  String? contentType;
+  String? username;
+
+  @override
+  void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
+    final form = options.data as FormData;
+    username = form.fields
+        .singleWhere((field) => field.key == 'username')
+        .value;
+    final image = form.files
+        .singleWhere((file) => file.key == 'profileImage')
+        .value;
+    filename = image.filename;
+    contentType = image.contentType?.toString();
+    handler.resolve(
+      Response<dynamic>(
+        requestOptions: options,
+        statusCode: 200,
+        data: const {
+          'success': true,
+          'user': {'id': 7, 'email': 'user@example.com', 'username': 'tester'},
+        },
+      ),
+    );
+  }
 }
 
 class _StatusAdapter implements HttpClientAdapter {

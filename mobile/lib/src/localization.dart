@@ -24,3 +24,17 @@ String genreLabel(String? genre) {
   if (genre == null || genre.trim().isEmpty) return '정보 없음';
   return genreLabels[genre] ?? genre;
 }
+
+String animeFormatLabel(String? format) {
+  if (format == null || format.trim().isEmpty) return '정보 없음';
+  return switch (format.toUpperCase()) {
+    'TV' => 'TV 애니메이션',
+    'TV_SHORT' => 'TV 숏',
+    'MOVIE' => '극장판',
+    'SPECIAL' => '스페셜',
+    'OVA' => 'OVA',
+    'ONA' => 'ONA',
+    'MUSIC' => '뮤직',
+    _ => format,
+  };
+}

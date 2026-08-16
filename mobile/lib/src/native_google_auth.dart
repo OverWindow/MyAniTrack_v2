@@ -8,6 +8,7 @@ const _googleAuthScopes = <String>['openid'];
 
 abstract interface class GoogleAuthGateway {
   Future<void> signIn();
+  Future<bool> restorePreviousSession();
   Future<void> signOut();
 }
 
@@ -50,23 +51,10 @@ class NativeGoogleAuthGateway implements GoogleAuthGateway {
   Future<void> signIn() async {
     await _initialize();
     try {
-      final account = await _googleSignIn.authenticate();
-      final idToken = account.authentication.idToken;
-      if (idToken == null || idToken.isEmpty) {
-        throw const NativeGoogleAuthFailure('Google ID 토큰을 받지 못했습니다.');
-      }
-
-      final authorization = await account.authorizationClient
-          .authorizationForScopes(_googleAuthScopes);
-      if (authorization == null || authorization.accessToken.isEmpty) {
-        throw const NativeGoogleAuthFailure('Google 접근 토큰을 받지 못했습니다.');
-      }
-
-      await Supabase.instance.client.auth.signInWithIdToken(
-        provider: OAuthProvider.google,
-        idToken: idToken,
-        accessToken: authorization.accessToken,
+      final account = await _googleSignIn.authenticate(
+        scopeHint: _googleAuthScopes,
       );
+      await _exchangeAccount(account, allowAuthorizationPrompt: true);
     } on GoogleSignInException catch (error) {
       if (kDebugMode) {
         debugPrint(
@@ -80,6 +68,66 @@ class NativeGoogleAuthGateway implements GoogleAuthGateway {
         error.message.isEmpty ? 'Google 계정을 연결하지 못했습니다.' : error.message,
       );
     }
+  }
+
+  @override
+  Future<bool> restorePreviousSession() async {
+    await _initialize();
+    try {
+      final attempt = _googleSignIn.attemptLightweightAuthentication();
+      if (attempt == null) return false;
+      final account = await attempt;
+      if (account == null) return false;
+      return _exchangeAccount(account, allowAuthorizationPrompt: false);
+    } on GoogleSignInException catch (error) {
+      if (kDebugMode) {
+        debugPrint(
+          'Google lightweight authentication failed: code=${error.code}, '
+          'description=${error.description}',
+        );
+      }
+      return false;
+    } on AuthException catch (_) {
+      return false;
+    } on NativeGoogleAuthFailure catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> _exchangeAccount(
+    GoogleSignInAccount account, {
+    required bool allowAuthorizationPrompt,
+  }) async {
+    final idToken = account.authentication.idToken;
+    if (idToken == null || idToken.isEmpty) {
+      if (allowAuthorizationPrompt) {
+        throw const NativeGoogleAuthFailure('Google ID 토큰을 받지 못했습니다.');
+      }
+      return false;
+    }
+
+    final authorization =
+        await account.authorizationClient.authorizationForScopes(
+          _googleAuthScopes,
+        ) ??
+        (allowAuthorizationPrompt
+            ? await account.authorizationClient.authorizeScopes(
+                _googleAuthScopes,
+              )
+            : null);
+    if (authorization == null || authorization.accessToken.isEmpty) {
+      if (allowAuthorizationPrompt) {
+        throw const NativeGoogleAuthFailure('Google 접근 토큰을 받지 못했습니다.');
+      }
+      return false;
+    }
+
+    await Supabase.instance.client.auth.signInWithIdToken(
+      provider: OAuthProvider.google,
+      idToken: idToken,
+      accessToken: authorization.accessToken,
+    );
+    return true;
   }
 
   @override

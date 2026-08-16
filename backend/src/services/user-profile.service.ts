@@ -8,7 +8,7 @@ import {
   uploadProfileImage,
 } from '../lib/supabase-storage';
 
-interface UserProfileRow extends RowDataPacket {
+export interface UserProfileRecord extends RowDataPacket {
   id: number;
   email: string;
   username: string;
@@ -33,11 +33,43 @@ interface UploadedProfileImageFile {
   mimetype: string;
 }
 
+export type ProfileUpdateStage =
+  | 'file_validated'
+  | 'storage_upload_started'
+  | 'storage_upload_succeeded'
+  | 'storage_upload_failed'
+  | 'database_update_started'
+  | 'database_update_succeeded'
+  | 'database_update_failed'
+  | 'new_object_cleanup_succeeded'
+  | 'new_object_cleanup_failed'
+  | 'old_object_delete_started'
+  | 'old_object_delete_succeeded'
+  | 'old_object_delete_failed';
+
+export type ProfileUpdateTrace = (
+  stage: ProfileUpdateStage,
+  details?: Record<string, unknown>,
+) => void;
+
+export interface UserProfileDependencies {
+  findUserById(userId: number): Promise<UserProfileRecord | null>;
+  updateUser(
+    userId: number,
+    username: string,
+    profileImageUrl: string | null,
+  ): Promise<void>;
+  uploadProfileImage: typeof uploadProfileImage;
+  deleteObjectByKey: typeof deleteObjectByKey;
+  deleteProfileImageByUrl: typeof deleteProfileImageByUrl;
+}
+
 export interface UpdateUserProfileParams {
   userId: number;
   username?: unknown;
   removeProfileImage?: unknown;
   profileImage?: UploadedProfileImageFile;
+  trace?: ProfileUpdateTrace;
 }
 
 function normalizeOptionalUsername(username: unknown) {
@@ -74,10 +106,14 @@ function validateProfileImage(file?: UploadedProfileImageFile) {
   if (!file.mimetype.startsWith('image/')) {
     throw new Error('profileImage must be an image file');
   }
+
+  if (file.buffer.length > 5 * 1024 * 1024) {
+    throw new Error('profileImage must be 5MB or smaller');
+  }
 }
 
 async function findUserById(userId: number) {
-  const [rows] = await pool.query<UserProfileRow[]>(
+  const [rows] = await pool.query<UserProfileRecord[]>(
     `
     SELECT
       id,
@@ -95,6 +131,24 @@ async function findUserById(userId: number) {
   );
 
   return rows[0] ?? null;
+}
+
+async function updateUser(
+  userId: number,
+  username: string,
+  profileImageUrl: string | null,
+) {
+  await pool.execute<ResultSetHeader>(
+    `
+    UPDATE users
+    SET
+      username = ?,
+      profile_image_url = ?,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+    `,
+    [username, profileImageUrl, userId],
+  );
 }
 
 async function findPublicUserById(userId: number) {
@@ -122,7 +176,7 @@ async function findPublicUserById(userId: number) {
   return rows[0] ?? null;
 }
 
-function mapUserProfile(user: UserProfileRow) {
+function mapUserProfile(user: UserProfileRecord) {
   return {
     id: user.id,
     email: user.email,
@@ -156,8 +210,19 @@ export async function getPublicUserProfile(userId: number) {
   return mapPublicUserProfile(user);
 }
 
-export async function updateUserProfile(params: UpdateUserProfileParams) {
-  const user = await findUserById(params.userId);
+const defaultDependencies: UserProfileDependencies = {
+  findUserById,
+  updateUser,
+  uploadProfileImage,
+  deleteObjectByKey,
+  deleteProfileImageByUrl,
+};
+
+export async function updateUserProfile(
+  params: UpdateUserProfileParams,
+  dependencies: UserProfileDependencies = defaultDependencies,
+) {
+  const user = await dependencies.findUserById(params.userId);
 
   if (!user) {
     throw new Error('User not found');
@@ -166,6 +231,12 @@ export async function updateUserProfile(params: UpdateUserProfileParams) {
   const username = normalizeOptionalUsername(params.username);
   const removeProfileImage = normalizeRemoveProfileImage(params.removeProfileImage);
   validateProfileImage(params.profileImage);
+  params.trace?.('file_validated', {
+    hasImage: Boolean(params.profileImage),
+    removeProfileImage,
+    mimeType: params.profileImage?.mimetype,
+    size: params.profileImage?.buffer.length,
+  });
 
   if (username === undefined && !params.profileImage && !removeProfileImage) {
     throw new Error('At least one profile field is required');
@@ -176,11 +247,24 @@ export async function updateUserProfile(params: UpdateUserProfileParams) {
   let oldProfileImageUrlToDelete: string | null = null;
 
   if (params.profileImage) {
-    const uploadedImage = await uploadProfileImage({
-      userId: params.userId,
-      buffer: params.profileImage.buffer,
-      contentType: params.profileImage.mimetype,
-    });
+    params.trace?.('storage_upload_started');
+    let uploadedImage: Awaited<ReturnType<typeof uploadProfileImage>>;
+
+    try {
+      uploadedImage = await dependencies.uploadProfileImage({
+        userId: params.userId,
+        buffer: params.profileImage.buffer,
+        contentType: params.profileImage.mimetype,
+      });
+      params.trace?.('storage_upload_succeeded', {
+        objectKey: uploadedImage.objectKey,
+      });
+    } catch (error) {
+      params.trace?.('storage_upload_failed', {
+        errorName: error instanceof Error ? error.name : 'UnknownError',
+      });
+      throw error;
+    }
 
     uploadedObjectKey = uploadedImage.objectKey;
     newProfileImageUrl = uploadedImage.publicUrl;
@@ -192,21 +276,30 @@ export async function updateUserProfile(params: UpdateUserProfileParams) {
 
   const nextUsername = username ?? user.username;
 
+  params.trace?.('database_update_started');
   try {
-    await pool.execute<ResultSetHeader>(
-      `
-      UPDATE users
-      SET
-        username = ?,
-        profile_image_url = ?,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-      `,
-      [nextUsername, newProfileImageUrl, params.userId]
+    await dependencies.updateUser(
+      params.userId,
+      nextUsername,
+      newProfileImageUrl,
     );
+    params.trace?.('database_update_succeeded');
   } catch (error) {
+    params.trace?.('database_update_failed', {
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+    });
     if (uploadedObjectKey) {
-      await deleteObjectByKey(uploadedObjectKey).catch(() => undefined);
+      try {
+        await dependencies.deleteObjectByKey(uploadedObjectKey);
+        params.trace?.('new_object_cleanup_succeeded');
+      } catch (cleanupError) {
+        params.trace?.('new_object_cleanup_failed', {
+          errorName:
+            cleanupError instanceof Error
+              ? cleanupError.name
+              : 'UnknownError',
+        });
+      }
     }
 
     if ((error as { code?: string }).code === 'ER_DUP_ENTRY') {
@@ -217,10 +310,18 @@ export async function updateUserProfile(params: UpdateUserProfileParams) {
   }
 
   if (oldProfileImageUrlToDelete && oldProfileImageUrlToDelete !== newProfileImageUrl) {
-    await deleteProfileImageByUrl(oldProfileImageUrlToDelete).catch(() => undefined);
+    params.trace?.('old_object_delete_started');
+    try {
+      await dependencies.deleteProfileImageByUrl(oldProfileImageUrlToDelete);
+      params.trace?.('old_object_delete_succeeded');
+    } catch (error) {
+      params.trace?.('old_object_delete_failed', {
+        errorName: error instanceof Error ? error.name : 'UnknownError',
+      });
+    }
   }
 
-  const updatedUser = await findUserById(params.userId);
+  const updatedUser = await dependencies.findUserById(params.userId);
 
   if (!updatedUser) {
     throw new Error('User not found');

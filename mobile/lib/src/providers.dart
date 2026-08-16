@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -53,12 +54,22 @@ enum SessionPhase {
 }
 
 class SessionState {
-  const SessionState({required this.phase, this.user, this.message});
+  const SessionState({
+    required this.phase,
+    this.user,
+    this.message,
+    this.profileImageRevision = 0,
+    this.profileImagePreview,
+    this.profileImageRemoved = false,
+  });
   const SessionState.bootstrapping() : this(phase: SessionPhase.bootstrapping);
 
   final SessionPhase phase;
   final AuthUser? user;
   final String? message;
+  final int profileImageRevision;
+  final Uint8List? profileImagePreview;
+  final bool profileImageRemoved;
 
   bool get isAuthenticated => phase == SessionPhase.authenticated;
   bool get isBusy =>
@@ -79,6 +90,7 @@ final activeUserIdProvider = Provider<int?>((ref) {
 class SessionController extends Notifier<SessionState> {
   StreamSubscription<AuthState>? _subscription;
   bool _bootstrapping = false;
+  bool _handlingSessionFailure = false;
 
   @override
   SessionState build() {
@@ -142,47 +154,76 @@ class SessionController extends Notifier<SessionState> {
 
   Future<void> bootstrap() async {
     if (_bootstrapping || !ref.read(authConfigurationReadyProvider)) return;
-    final session = Supabase.instance.client.auth.currentSession;
-    if (session == null) {
-      state = const SessionState(phase: SessionPhase.signedOut);
-      return;
-    }
-
     _bootstrapping = true;
-    state = const SessionState(phase: SessionPhase.backendLinking);
-    AuthUser? user;
     try {
-      final repository = ref.read(authRepositoryProvider);
-      await repository.connectSupabase();
-      user = await repository.me();
-      final agreements = await repository.agreements();
-      state = SessionState(
-        phase: agreements.hasRequiredAgreements
-            ? SessionPhase.authenticated
-            : SessionPhase.agreementsRequired,
-        user: user,
-      );
-    } on ApiFailure catch (error) {
-      if (error.needsAgreements) {
+      var recoveryAttempted = false;
+      while (true) {
+        if (Supabase.instance.client.auth.currentSession == null) {
+          if (recoveryAttempted || !await _restoreGoogleSession()) {
+            state = const SessionState(phase: SessionPhase.signedOut);
+            return;
+          }
+          recoveryAttempted = true;
+        }
+
         state = SessionState(
-          phase: SessionPhase.agreementsRequired,
-          user: user,
-          message: error.message,
+          phase: SessionPhase.backendLinking,
+          profileImageRevision: state.profileImageRevision,
+          profileImagePreview: state.profileImagePreview,
+          profileImageRemoved: state.profileImageRemoved,
         );
-        return;
+        AuthUser? user;
+        try {
+          final repository = ref.read(authRepositoryProvider);
+          await repository.connectSupabase();
+          user = await repository.me();
+          final agreements = await repository.agreements();
+          state = SessionState(
+            phase: agreements.hasRequiredAgreements
+                ? SessionPhase.authenticated
+                : SessionPhase.agreementsRequired,
+            user: user,
+            profileImageRevision: state.profileImageRevision,
+            profileImagePreview: state.profileImagePreview,
+            profileImageRemoved: state.profileImageRemoved,
+          );
+          return;
+        } on ApiFailure catch (error) {
+          if (error.needsAgreements) {
+            state = SessionState(
+              phase: SessionPhase.agreementsRequired,
+              user: user,
+              message: error.message,
+              profileImageRevision: state.profileImageRevision,
+              profileImagePreview: state.profileImagePreview,
+              profileImageRemoved: state.profileImageRemoved,
+            );
+            return;
+          }
+          if (!error.isUnauthorized || recoveryAttempted) {
+            if (error.isUnauthorized) await _clearSupabaseSession();
+            state = SessionState(
+              phase: SessionPhase.signedOut,
+              message: error.message,
+            );
+            return;
+          }
+          recoveryAttempted = true;
+          if (!await _refreshOrRestoreSession()) {
+            state = SessionState(
+              phase: SessionPhase.signedOut,
+              message: error.message,
+            );
+            return;
+          }
+        } on Object {
+          state = const SessionState(
+            phase: SessionPhase.signedOut,
+            message: '계정 정보를 확인하지 못했습니다. 다시 시도해주세요.',
+          );
+          return;
+        }
       }
-      if (error.isUnauthorized) {
-        await _supabaseSignOut();
-      }
-      state = SessionState(
-        phase: SessionPhase.signedOut,
-        message: error.message,
-      );
-    } on Object {
-      state = const SessionState(
-        phase: SessionPhase.signedOut,
-        message: '계정 정보를 확인하지 못했습니다. 다시 시도해주세요.',
-      );
     } finally {
       _bootstrapping = false;
     }
@@ -190,22 +231,60 @@ class SessionController extends Notifier<SessionState> {
 
   Future<void> acceptAgreements() async {
     final user = state.user;
-    state = SessionState(phase: SessionPhase.backendLinking, user: user);
+    final profileImageRevision = state.profileImageRevision;
+    final profileImagePreview = state.profileImagePreview;
+    final profileImageRemoved = state.profileImageRemoved;
+    state = SessionState(
+      phase: SessionPhase.backendLinking,
+      user: user,
+      profileImageRevision: profileImageRevision,
+      profileImagePreview: profileImagePreview,
+      profileImageRemoved: profileImageRemoved,
+    );
     try {
       await ref.read(authRepositoryProvider).acceptAgreements();
-      state = SessionState(phase: SessionPhase.authenticated, user: user);
+      state = SessionState(
+        phase: SessionPhase.authenticated,
+        user: user,
+        profileImageRevision: profileImageRevision,
+        profileImagePreview: profileImagePreview,
+        profileImageRemoved: profileImageRemoved,
+      );
     } on ApiFailure catch (error) {
       state = SessionState(
         phase: SessionPhase.agreementsRequired,
         user: user,
         message: error.message,
+        profileImageRevision: profileImageRevision,
+        profileImagePreview: profileImagePreview,
+        profileImageRemoved: profileImageRemoved,
       );
     }
   }
 
   Future<void> refreshUser() async {
     final user = await ref.read(authRepositoryProvider).me();
-    state = SessionState(phase: SessionPhase.authenticated, user: user);
+    applyUpdatedUser(user);
+  }
+
+  void applyUpdatedUser(
+    AuthUser user, {
+    bool profileImageChanged = false,
+    Uint8List? profileImagePreview,
+    bool profileImageRemoved = false,
+  }) {
+    state = SessionState(
+      phase: SessionPhase.authenticated,
+      user: user,
+      profileImageRevision:
+          state.profileImageRevision + (profileImageChanged ? 1 : 0),
+      profileImagePreview: profileImageChanged
+          ? profileImagePreview
+          : state.profileImagePreview,
+      profileImageRemoved: profileImageChanged
+          ? profileImageRemoved
+          : state.profileImageRemoved,
+    );
   }
 
   Future<void> signOut() async {
@@ -240,15 +319,55 @@ class SessionController extends Notifier<SessionState> {
         phase: SessionPhase.agreementsRequired,
         user: state.user,
         message: failure.message,
+        profileImageRevision: state.profileImageRevision,
+        profileImagePreview: state.profileImagePreview,
+        profileImageRemoved: state.profileImageRemoved,
       );
       return;
     }
     if (!failure.isUnauthorized) return;
-    await _supabaseSignOut();
-    state = const SessionState(
-      phase: SessionPhase.signedOut,
-      message: '로그인 세션이 만료되었습니다. 다시 로그인해주세요.',
-    );
+    if (_bootstrapping || _handlingSessionFailure) return;
+    _handlingSessionFailure = true;
+    try {
+      await bootstrap();
+      if (!state.isAuthenticated &&
+          state.phase != SessionPhase.agreementsRequired) {
+        state = const SessionState(
+          phase: SessionPhase.signedOut,
+          message: '로그인 세션이 만료되었습니다. 다시 로그인해주세요.',
+        );
+      }
+    } finally {
+      _handlingSessionFailure = false;
+    }
+  }
+
+  Future<bool> _refreshOrRestoreSession() async {
+    try {
+      final response = await Supabase.instance.client.auth.refreshSession();
+      if (response.session != null) return true;
+    } on Object {
+      // Fall through to the non-interactive Google restoration path.
+    }
+    await _clearSupabaseSession();
+    return _restoreGoogleSession();
+  }
+
+  Future<bool> _restoreGoogleSession() async {
+    try {
+      return await ref.read(googleAuthGatewayProvider).restorePreviousSession();
+    } on Object {
+      return false;
+    }
+  }
+
+  Future<void> _clearSupabaseSession() async {
+    if (!ref.read(authConfigurationReadyProvider)) return;
+    try {
+      await Supabase.instance.client.auth.signOut();
+    } on Object {
+      // Clearing local app state is sufficient when the auth service is offline.
+    }
   }
 }
 

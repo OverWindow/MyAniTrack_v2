@@ -1,4 +1,6 @@
+import crypto from 'crypto';
 import { Request, Response } from 'express';
+import { SupabaseStorageError } from '../lib/supabase-storage';
 import { getPublicUserProfile, updateUserProfile } from '../services/user-profile.service';
 
 function parseUserId(value: unknown) {
@@ -11,7 +13,13 @@ function parseUserId(value: unknown) {
   return userId;
 }
 
-function getErrorStatus(message: string) {
+function getErrorStatus(error: unknown) {
+  if (error instanceof SupabaseStorageError) {
+    return 502;
+  }
+
+  const message = error instanceof Error ? error.message : 'Unknown error';
+
   if (
     message.includes('must be') ||
     message.includes('required') ||
@@ -31,17 +39,33 @@ function getErrorStatus(message: string) {
   return 500;
 }
 
-function sendError(res: Response, error: unknown) {
+function sendError(
+  res: Response,
+  error: unknown,
+  context?: { requestId: string; userId?: number },
+) {
   const message = error instanceof Error ? error.message : 'Unknown error';
-  const statusCode = getErrorStatus(message);
+  const statusCode = getErrorStatus(error);
 
   if (statusCode === 500) {
-    console.error(error);
+    console.error(JSON.stringify({
+      event: 'profile_update',
+      stage: 'request_failed',
+      requestId: context?.requestId,
+      userId: context?.userId,
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+    }));
   }
+
+  const responseMessage = statusCode === 502
+    ? '프로필 이미지 저장소에 연결하지 못했습니다. 잠시 후 다시 시도해주세요.'
+    : statusCode === 500
+      ? '프로필을 저장하지 못했습니다. 잠시 후 다시 시도해주세요.'
+      : message;
 
   return res.status(statusCode).json({
     success: false,
-    message,
+    message: responseMessage,
   });
 }
 
@@ -60,6 +84,19 @@ export async function getUserProfile(req: Request, res: Response) {
 }
 
 export async function updateMyProfile(req: Request, res: Response) {
+  const requestId = req.header('x-request-id')?.trim() || crypto.randomUUID();
+  res.setHeader('x-request-id', requestId);
+  const userId = req.authUser?.userId;
+  const trace = (stage: string, details?: Record<string, unknown>) => {
+    console.info(JSON.stringify({
+      event: 'profile_update',
+      stage,
+      requestId,
+      userId,
+      ...details,
+    }));
+  };
+
   try {
     const authUser = req.authUser;
 
@@ -70,12 +107,22 @@ export async function updateMyProfile(req: Request, res: Response) {
       });
     }
 
+    trace('request_received', {
+      hasImage: Boolean(req.file),
+      removeProfileImage: req.body.removeProfileImage === 'true',
+      mimeType: req.file?.mimetype,
+      size: req.file?.size,
+    });
+
     const user = await updateUserProfile({
       userId: authUser.userId,
       username: req.body.username,
       removeProfileImage: req.body.removeProfileImage,
       profileImage: req.file,
+      trace,
     });
+
+    trace('request_succeeded');
 
     return res.json({
       success: true,
@@ -83,6 +130,6 @@ export async function updateMyProfile(req: Request, res: Response) {
       user,
     });
   } catch (error) {
-    return sendError(res, error);
+    return sendError(res, error, { requestId, userId });
   }
 }

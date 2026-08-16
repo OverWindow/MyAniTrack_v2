@@ -623,7 +623,8 @@ class ProfileRepository {
       if (profileImage != null)
         'profileImage': MultipartFile.fromBytes(
           await profileImage.readAsBytes(),
-          filename: profileImage.name,
+          filename: 'myanitrack-profile.jpg',
+          contentType: DioMediaType('image', 'jpeg'),
         ),
     };
     final json = await api.patch('/me/profile', data: FormData.fromMap(data));

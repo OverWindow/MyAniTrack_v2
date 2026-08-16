@@ -271,6 +271,27 @@ void main() {
       expect(item.items.last.userList, isNull);
     });
 
+    test('화면에 100%로 반올림되는 시리즈 완주율은 바도 완전히 채운다', () {
+      SeriesCollectionItem item(double rate) => SeriesCollectionItem(
+        seriesId: 1,
+        scope: AnimeSeriesScope.mainline,
+        title: '시리즈',
+        memberCount: 1,
+        requiredMemberCount: 1,
+        collectedMemberCount: 1,
+        completedRequiredMemberCount: 1,
+        completionRate: rate,
+        completed: true,
+        items: const [],
+      );
+
+      for (final rate in const [1.0, .999, 99.9, 100.0]) {
+        expect(item(rate).completionFraction, 1, reason: 'rate=$rate');
+      }
+      expect(item(.75).completionFraction, .75);
+      expect(item(42).completionFraction, .42);
+    });
+
     test('Viewing DNA와 확장 통계 응답을 읽는다', () {
       final dna = ViewingDna.fromJson({
         'item': {

@@ -72,6 +72,9 @@ class _PendingGoogleAuthGateway implements GoogleAuthGateway {
   @override
   Future<void> signIn() => _completer.future;
 
+  @override
+  Future<bool> restorePreviousSession() async => false;
+
   void completeWithCancellation() {
     _completer.completeError(
       const NativeGoogleAuthFailure('Google 로그인이 취소되었습니다.'),

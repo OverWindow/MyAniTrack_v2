@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/cupertino.dart';
@@ -7,6 +8,63 @@ import 'package:go_router/go_router.dart';
 import 'package:myanitrack_mobile/src/config.dart';
 import 'package:myanitrack_mobile/src/models.dart';
 import 'package:myanitrack_mobile/src/theme.dart';
+
+abstract final class AppLayout {
+  static const tabletBreakpoint = 600.0;
+  static const contentMaxWidth = 960.0;
+  static const formMaxWidth = 720.0;
+  static const modalMaxWidth = 640.0;
+
+  static bool isTablet(BuildContext context) =>
+      MediaQuery.sizeOf(context).width >= tabletBreakpoint;
+
+  static int posterGridCount(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    if (size.width < tabletBreakpoint) return 2;
+    return size.width > size.height ? 4 : 3;
+  }
+}
+
+class AppContentWidth extends StatelessWidget {
+  const AppContentWidth({
+    required this.child,
+    this.maxWidth = AppLayout.contentMaxWidth,
+    this.alignment = Alignment.topCenter,
+    super.key,
+  });
+
+  final Widget child;
+  final double maxWidth;
+  final Alignment alignment;
+
+  @override
+  Widget build(BuildContext context) {
+    final tablet = AppLayout.isTablet(context);
+    return Align(
+      alignment: alignment,
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: tablet ? 8 : 0),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: maxWidth),
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
+class AppModalWidth extends StatelessWidget {
+  const AppModalWidth({required this.child, super.key});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => AppContentWidth(
+    maxWidth: AppLayout.modalMaxWidth,
+    alignment: Alignment.bottomCenter,
+    child: child,
+  );
+}
 
 class AppBackground extends StatelessWidget {
   const AppBackground({required this.child, super.key});
@@ -400,12 +458,18 @@ class _AppSkeletonState extends State<AppSkeleton>
 class AppNetworkImage extends StatelessWidget {
   const AppNetworkImage({
     this.url,
+    this.cacheKey,
+    this.memoryBytes,
+    this.removed = false,
     this.fit = BoxFit.cover,
     this.borderRadius,
     this.profile = false,
     super.key,
   });
   final String? url;
+  final String? cacheKey;
+  final Uint8List? memoryBytes;
+  final bool removed;
   final BoxFit fit;
   final BorderRadius? borderRadius;
   final bool profile;
@@ -416,10 +480,15 @@ class AppNetworkImage extends StatelessWidget {
       profile ? AppAssets.defaultProfile : AppAssets.logo,
       fit: profile ? BoxFit.cover : BoxFit.contain,
     );
-    final image = url == null
+    final image = removed
+        ? fallback
+        : memoryBytes != null
+        ? Image.memory(memoryBytes!, fit: fit, gaplessPlayback: true)
+        : url == null
         ? fallback
         : CachedNetworkImage(
             imageUrl: url!,
+            cacheKey: cacheKey,
             fit: fit,
             placeholder: (_, _) =>
                 const AppSkeleton(height: double.infinity, radius: 0),

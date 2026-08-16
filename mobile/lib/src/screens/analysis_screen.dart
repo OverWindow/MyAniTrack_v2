@@ -30,55 +30,57 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
       child: AppBackground(
-        child: CustomScrollView(
-          slivers: [
-            AppCompactSliverHeader(title: widget.title),
-            CupertinoSliverRefreshControl(onRefresh: _refresh),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
-              sliver: SliverToBoxAdapter(
-                child: CupertinoSlidingSegmentedControl<int>(
-                  groupValue: _segment,
-                  thumbColor: AppColors.card,
-                  backgroundColor: AppColors.softBeige,
-                  children: const {
-                    0: Padding(
-                      padding: EdgeInsets.symmetric(vertical: 9),
-                      child: Text('요약'),
-                    ),
-                    1: Padding(
-                      padding: EdgeInsets.symmetric(vertical: 9),
-                      child: Text('취향'),
-                    ),
-                    2: Padding(
-                      padding: EdgeInsets.symmetric(vertical: 9),
-                      child: Text('랭킹'),
-                    ),
-                  },
-                  onValueChanged: (value) {
-                    if (value != null) setState(() => _segment = value);
-                  },
+        child: AppContentWidth(
+          child: CustomScrollView(
+            slivers: [
+              AppCompactSliverHeader(title: widget.title),
+              CupertinoSliverRefreshControl(onRefresh: _refresh),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+                sliver: SliverToBoxAdapter(
+                  child: CupertinoSlidingSegmentedControl<int>(
+                    groupValue: _segment,
+                    thumbColor: AppColors.card,
+                    backgroundColor: AppColors.softBeige,
+                    children: const {
+                      0: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 9),
+                        child: Text('요약'),
+                      ),
+                      1: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 9),
+                        child: Text('취향'),
+                      ),
+                      2: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 9),
+                        child: Text('랭킹'),
+                      ),
+                    },
+                    onValueChanged: (value) {
+                      if (value != null) setState(() => _segment = value);
+                    },
+                  ),
                 ),
               ),
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 28),
-              sliver: SliverList.list(
-                children: [
-                  switch (_segment) {
-                    0 => _OverviewSegment(userId: widget.userId),
-                    1 => _TasteSegment(userId: widget.userId),
-                    _ => _RankingSegment(
-                      userId: widget.userId,
-                      sort: _rankingSort,
-                      onSortChanged: (value) =>
-                          setState(() => _rankingSort = value),
-                    ),
-                  },
-                ],
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 28),
+                sliver: SliverList.list(
+                  children: [
+                    switch (_segment) {
+                      0 => _OverviewSegment(userId: widget.userId),
+                      1 => _TasteSegment(userId: widget.userId),
+                      _ => _RankingSegment(
+                        userId: widget.userId,
+                        sort: _rankingSort,
+                        onSortChanged: (value) =>
+                            setState(() => _rankingSort = value),
+                      ),
+                    },
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -2022,31 +2024,33 @@ Future<void> _showFilteredCollection(
 }) async {
   await showCupertinoModalPopup<void>(
     context: context,
-    builder: (context) => _AnimeListSheet(
-      title: title,
-      loader: () async {
-        final page = userId == null
-            ? await ref
-                  .read(collectionRepositoryProvider)
-                  .list(
-                    genre: genre,
-                    year: year,
-                    score: score,
-                    format: format,
-                    limit: 50,
-                  )
-            : await ref
-                  .read(friendsRepositoryProvider)
-                  .collection(
-                    userId,
-                    genre: genre,
-                    year: year,
-                    score: score,
-                    format: format,
-                    limit: 50,
-                  );
-        return page.items.map(AnalysisAnimeWork.fromCollectionEntry).toList();
-      },
+    builder: (context) => AppModalWidth(
+      child: _AnimeListSheet(
+        title: title,
+        loader: () async {
+          final page = userId == null
+              ? await ref
+                    .read(collectionRepositoryProvider)
+                    .list(
+                      genre: genre,
+                      year: year,
+                      score: score,
+                      format: format,
+                      limit: 50,
+                    )
+              : await ref
+                    .read(friendsRepositoryProvider)
+                    .collection(
+                      userId,
+                      genre: genre,
+                      year: year,
+                      score: score,
+                      format: format,
+                      limit: 50,
+                    );
+          return page.items.map(AnalysisAnimeWork.fromCollectionEntry).toList();
+        },
+      ),
     ),
   );
 }
@@ -2059,8 +2063,9 @@ Future<void> _showProviderAnime(
 }) async {
   await showCupertinoModalPopup<void>(
     context: context,
-    builder: (context) =>
-        _AnimeListSheet(title: title, loader: loader, metric: metric),
+    builder: (context) => AppModalWidth(
+      child: _AnimeListSheet(title: title, loader: loader, metric: metric),
+    ),
   );
 }
 
@@ -2100,8 +2105,9 @@ Future<void> _showVoiceActorWorks(
 }) async {
   await showCupertinoModalPopup<void>(
     context: context,
-    builder: (context) =>
-        _VoiceActorWorkSheet(title: title, loader: loader, metric: metric),
+    builder: (context) => AppModalWidth(
+      child: _VoiceActorWorkSheet(title: title, loader: loader, metric: metric),
+    ),
   );
 }
 
@@ -2312,143 +2318,262 @@ class _VoiceActorWorkSheetState extends State<_VoiceActorWorkSheet> {
   late Future<List<AnalysisAnimeWork>> future = widget.loader();
 
   @override
-  Widget build(BuildContext context) => Container(
-    height: MediaQuery.sizeOf(context).height * .72,
-    decoration: const BoxDecoration(
-      color: AppColors.ivory,
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-    ),
-    child: SafeArea(
-      top: false,
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 8, 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(widget.title, style: appTitleStyle(size: 21)),
-                ),
-                CupertinoButton(
-                  padding: const EdgeInsets.all(10),
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Icon(CupertinoIcons.xmark_circle_fill),
-                ),
-              ],
+  Widget build(BuildContext context) {
+    final sheetHeight = math
+        .min(MediaQuery.sizeOf(context).height * .72, 620.0)
+        .toDouble();
+    return Container(
+      height: sheetHeight,
+      decoration: const BoxDecoration(
+        color: AppColors.ivory,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 8, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(widget.title, style: appTitleStyle(size: 21)),
+                  ),
+                  CupertinoButton(
+                    padding: const EdgeInsets.all(10),
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Icon(CupertinoIcons.xmark_circle_fill),
+                  ),
+                ],
+              ),
             ),
-          ),
-          Expanded(
-            child: FutureBuilder<List<AnalysisAnimeWork>>(
-              future: future,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState != ConnectionState.done) {
-                  return const Center(child: CupertinoActivityIndicator());
-                }
-                if (snapshot.hasError) {
-                  return Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: AppStateView(
-                      title: '작품을 불러오지 못했습니다',
-                      message: snapshot.error.toString(),
-                      actionLabel: '다시 시도',
-                      onAction: () => setState(() => future = widget.loader()),
-                    ),
-                  );
-                }
-                final works = snapshot.data ?? const <AnalysisAnimeWork>[];
-                if (works.isEmpty) {
-                  return const AppStateView(
-                    title: '담당 작품이 없습니다',
-                    message: '캐릭터 정보가 수집되면 여기에 표시됩니다.',
-                  );
-                }
-                return ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                  itemCount: works.length,
-                  separatorBuilder: (_, _) => const SizedBox(width: 12),
-                  itemBuilder: (context, index) {
-                    final work = works[index];
-                    return SizedBox(
-                      width: 186,
-                      child: CupertinoButton(
-                        padding: EdgeInsets.zero,
-                        onPressed: () {
-                          Navigator.of(context).pop();
-                          context.push('/anime/${work.anime.id}');
-                        },
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            SizedBox(
-                              height: 158,
-                              child: _PosterWork(
-                                work: work,
-                                metric: widget.metric,
-                                onTap: null,
-                              ),
-                            ),
-                            const SizedBox(height: 9),
-                            Text(
-                              '담당 캐릭터',
-                              style: appLabelStyle(
-                                color: AppColors.pointPressed,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Expanded(
-                              child: work.characters.isEmpty
-                                  ? Text('캐릭터 정보 없음', style: appLabelStyle())
-                                  : ListView.separated(
-                                      padding: EdgeInsets.zero,
-                                      itemCount: work.characters.length,
-                                      separatorBuilder: (_, _) =>
-                                          const SizedBox(height: 6),
-                                      itemBuilder: (context, characterIndex) {
-                                        final character =
-                                            work.characters[characterIndex];
-                                        return Row(
-                                          children: [
-                                            ClipOval(
-                                              child: SizedBox.square(
-                                                dimension: 32,
-                                                child: AppNetworkImage(
-                                                  url: character.imageUrl,
-                                                  profile: true,
-                                                ),
-                                              ),
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Expanded(
-                                              child: Text(
-                                                [
-                                                  character.name,
-                                                  if (character.role != null)
-                                                    character.role!,
-                                                ].join(' · '),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: appLabelStyle(
-                                                  color:
-                                                      AppColors.secondaryText,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        );
-                                      },
-                                    ),
-                            ),
-                          ],
-                        ),
+            Expanded(
+              child: FutureBuilder<List<AnalysisAnimeWork>>(
+                future: future,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState != ConnectionState.done) {
+                    return const Center(child: CupertinoActivityIndicator());
+                  }
+                  if (snapshot.hasError) {
+                    return Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: AppStateView(
+                        title: '작품을 불러오지 못했습니다',
+                        message: snapshot.error.toString(),
+                        actionLabel: '다시 시도',
+                        onAction: () =>
+                            setState(() => future = widget.loader()),
                       ),
                     );
-                  },
-                );
-              },
+                  }
+                  final works = snapshot.data ?? const <AnalysisAnimeWork>[];
+                  if (works.isEmpty) {
+                    return const AppStateView(
+                      title: '담당 작품이 없습니다',
+                      message: '캐릭터 정보가 수집되면 여기에 표시됩니다.',
+                    );
+                  }
+                  return LayoutBuilder(
+                    builder: (context, constraints) {
+                      const verticalListPadding = 32.0;
+                      const characterAreaHeight = 83.0;
+                      final posterHeight = math
+                          .max(
+                            190.0,
+                            constraints.maxHeight -
+                                verticalListPadding -
+                                characterAreaHeight,
+                          )
+                          .toDouble();
+                      final cardWidth = (posterHeight * 2 / 3)
+                          .clamp(210.0, 320.0)
+                          .toDouble();
+                      return ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                        itemCount: works.length,
+                        separatorBuilder: (_, _) => const SizedBox(width: 12),
+                        itemBuilder: (context, index) {
+                          final work = works[index];
+                          return SizedBox(
+                            width: cardWidth,
+                            child: _VoiceActorWorkCard(
+                              work: work,
+                              metric: widget.metric,
+                              posterHeight: posterHeight,
+                              onOpenAnime: () {
+                                Navigator.of(context).pop();
+                                context.push('/anime/${work.anime.id}');
+                              },
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  );
+                },
+              ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _VoiceActorWorkCard extends StatelessWidget {
+  const _VoiceActorWorkCard({
+    required this.work,
+    required this.metric,
+    required this.posterHeight,
+    required this.onOpenAnime,
+  });
+
+  final AnalysisAnimeWork work;
+  final _WorkMetric metric;
+  final double posterHeight;
+  final VoidCallback onOpenAnime;
+
+  @override
+  Widget build(BuildContext context) {
+    final characters = work.characters;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          key: ValueKey('voice-work-poster-${work.anime.id}'),
+          height: posterHeight,
+          child: _PosterWork(work: work, metric: metric, onTap: onOpenAnime),
+        ),
+        const SizedBox(height: 9),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                '담당 캐릭터',
+                style: appLabelStyle(color: AppColors.pointPressed),
+              ),
+            ),
+            if (characters.length > 1)
+              Semantics(
+                button: true,
+                label: '${work.anime.title} 전체 캐릭터 보기',
+                child: CupertinoButton(
+                  key: ValueKey('voice-characters-more-${work.anime.id}'),
+                  padding: EdgeInsets.zero,
+                  minimumSize: const Size.square(32),
+                  onPressed: () => _showCharacterList(context, work),
+                  child: const Icon(
+                    CupertinoIcons.ellipsis,
+                    size: 20,
+                    color: AppColors.pointPressed,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        if (characters.isEmpty)
+          Text('캐릭터 정보 없음', style: appLabelStyle())
+        else
+          _VoiceActorCharacterRow(character: characters.first),
+      ],
+    );
+  }
+}
+
+class _VoiceActorCharacterRow extends StatelessWidget {
+  const _VoiceActorCharacterRow({required this.character});
+
+  final VoiceActorCharacter character;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      ClipOval(
+        child: SizedBox.square(
+          dimension: 36,
+          child: AppNetworkImage(url: character.imageUrl, profile: true),
+        ),
+      ),
+      const SizedBox(width: 8),
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              character.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: appLabelStyle(color: AppColors.secondaryText),
+            ),
+            if (character.role != null)
+              Text(
+                character.role!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: appLabelStyle(),
+              ),
+          ],
+        ),
+      ),
+    ],
+  );
+}
+
+Future<void> _showCharacterList(
+  BuildContext context,
+  AnalysisAnimeWork work,
+) async {
+  await showCupertinoModalPopup<void>(
+    context: context,
+    builder: (context) => AppModalWidth(
+      child: Container(
+        height: MediaQuery.sizeOf(context).height * .52,
+        decoration: const BoxDecoration(
+          color: AppColors.ivory,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 8, 6),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '${work.anime.title} · 담당 캐릭터',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: appTitleStyle(size: 19),
+                      ),
+                    ),
+                    CupertinoButton(
+                      padding: const EdgeInsets.all(10),
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Icon(CupertinoIcons.xmark_circle_fill),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                  itemCount: work.characters.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 12),
+                  itemBuilder: (_, index) => AppCard(
+                    padding: const EdgeInsets.all(12),
+                    child: _VoiceActorCharacterRow(
+                      character: work.characters[index],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     ),
   );

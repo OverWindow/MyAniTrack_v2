@@ -1,5 +1,5 @@
 import express from 'express';
-import dotenv from 'dotenv';
+import { validateSupabaseStorageEnv } from './src/config/env';
 import adminRoutes from './routes/admin.routes';
 import animeRoutes from './src/routes/anime.routes';
 import authRoutes from './src/routes/auth.routes';
@@ -12,7 +12,7 @@ import userAnimeListRoutes from './src/routes/user-anime-list.routes';
 import userProfileRoutes from './src/routes/user-profile.routes';
 import userVoiceActorStatsRoutes from './src/routes/user-voice-actor-stats.routes';
 
-dotenv.config();
+validateSupabaseStorageEnv();
 
 const app = express();
 

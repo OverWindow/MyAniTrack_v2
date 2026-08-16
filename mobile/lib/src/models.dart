@@ -1001,6 +1001,16 @@ class SeriesCollectionItem {
   final int? canonicalAnimeId;
   final String? coverImageUrl;
 
+  double get completionPercent {
+    final percent = completionRate <= 1 ? completionRate * 100 : completionRate;
+    return percent.clamp(0, 100);
+  }
+
+  double get completionFraction {
+    final percent = completionPercent;
+    return percent.toStringAsFixed(0) == '100' ? 1 : percent / 100;
+  }
+
   factory SeriesCollectionItem.fromJson(JsonMap json) => SeriesCollectionItem(
     seriesId: readInt(json['seriesId']) ?? 0,
     scope: readString(json['scope']) == AnimeSeriesScope.franchise.apiValue

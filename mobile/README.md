@@ -1,6 +1,6 @@
 # MyAniTrack Mobile
 
-MyAniTrack의 Android/iOS Flutter 클라이언트입니다. 웹 랜딩이나 샘플 모드 없이 Google 로그인에서 시작하며, `홈 · 컬렉션 · 검색 · 분석 · 프로필` 탭을 제공합니다.
+MyAniTrack의 Android/iOS Flutter 클라이언트입니다. 웹 랜딩이나 샘플 모드 없이 Google 로그인에서 시작하며, `홈 · 컬렉션 · 탐색 · 분석 · 친구` 탭을 제공합니다.
 
 ## 구성
 

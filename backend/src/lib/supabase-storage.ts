@@ -1,21 +1,24 @@
 import crypto from 'crypto';
+import { getSupabaseStorageConfig } from '../config/env';
 
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const SUPABASE_STORAGE_BUCKET = process.env.SUPABASE_STORAGE_BUCKET;
-const SUPABASE_STORAGE_PUBLIC_BASE_URL = process.env.SUPABASE_STORAGE_PUBLIC_BASE_URL;
-const SUPABASE_PROFILE_IMAGES_PREFIX = process.env.SUPABASE_PROFILE_IMAGES_PREFIX || 'profile-images';
+const STORAGE_TIMEOUT_MS = 15_000;
 
-function requireEnv(value: string | undefined, name: string) {
-  if (!value) {
-    throw new Error(`${name} is required`);
+export class SupabaseStorageError extends Error {
+  public readonly cause?: unknown;
+
+  constructor(
+    public readonly action: 'upload' | 'delete',
+    public readonly storageStatus?: number,
+    options?: { cause?: unknown },
+  ) {
+    super(`Supabase Storage ${action} failed`);
+    this.name = 'SupabaseStorageError';
+    this.cause = options?.cause;
   }
-
-  return value;
 }
 
 function getSupabaseUrl() {
-  const rawUrl = requireEnv(SUPABASE_URL, 'SUPABASE_URL').replace(/\/+$/, '');
+  const rawUrl = getSupabaseStorageConfig().url.replace(/\/+$/, '');
 
   try {
     const url = new URL(rawUrl);
@@ -42,16 +45,18 @@ function encodeObjectPath(objectKey: string) {
 }
 
 function getServiceRoleKey() {
-  return requireEnv(SUPABASE_SERVICE_ROLE_KEY, 'SUPABASE_SERVICE_ROLE_KEY');
+  return getSupabaseStorageConfig().serviceRoleKey;
 }
 
 function getBucketName() {
-  return requireEnv(SUPABASE_STORAGE_BUCKET, 'SUPABASE_STORAGE_BUCKET');
+  return getSupabaseStorageConfig().bucket;
 }
 
 function getPublicBaseUrl() {
-  if (SUPABASE_STORAGE_PUBLIC_BASE_URL) {
-    const rawUrl = SUPABASE_STORAGE_PUBLIC_BASE_URL.replace(/\/+$/, '');
+  const configuredPublicBaseUrl = getSupabaseStorageConfig().publicBaseUrl;
+
+  if (configuredPublicBaseUrl) {
+    const rawUrl = configuredPublicBaseUrl.replace(/\/+$/, '');
 
     try {
       const url = new URL(rawUrl);
@@ -94,8 +99,29 @@ async function assertStorageResponse(response: Response, action: string) {
     return;
   }
 
-  const message = await response.text().catch(() => '');
-  throw new Error(`Supabase Storage ${action} failed: ${response.status}${message ? ` ${message}` : ''}`);
+  await response.body?.cancel().catch(() => undefined);
+  throw new SupabaseStorageError(action as 'upload' | 'delete', response.status);
+}
+
+async function storageFetch(
+  action: 'upload' | 'delete',
+  url: string,
+  init: RequestInit,
+) {
+  try {
+    const response = await fetch(url, {
+      ...init,
+      signal: AbortSignal.timeout(STORAGE_TIMEOUT_MS),
+    });
+    await assertStorageResponse(response, action);
+    return response;
+  } catch (error) {
+    if (error instanceof SupabaseStorageError) {
+      throw error;
+    }
+
+    throw new SupabaseStorageError(action, undefined, { cause: error });
+  }
 }
 
 export async function uploadProfileImage(params: {
@@ -106,10 +132,11 @@ export async function uploadProfileImage(params: {
   const bucket = getBucketName();
   const extension = getFileExtension(params.contentType);
   const randomId = crypto.randomBytes(8).toString('hex');
-  const objectKey = `${SUPABASE_PROFILE_IMAGES_PREFIX}/user-${params.userId}/${Date.now()}-${randomId}.${extension}`;
+  const prefix = getSupabaseStorageConfig().profileImagesPrefix;
+  const objectKey = `${prefix}/user-${params.userId}/${Date.now()}-${randomId}.${extension}`;
   const uploadUrl = `${getSupabaseUrl()}/storage/v1/object/${encodeURIComponent(bucket)}/${encodeObjectPath(objectKey)}`;
 
-  const response = await fetch(uploadUrl, {
+  await storageFetch('upload', uploadUrl, {
     method: 'POST',
     headers: {
       ...getStorageHeaders(params.contentType),
@@ -117,8 +144,6 @@ export async function uploadProfileImage(params: {
     },
     body: params.buffer,
   });
-
-  await assertStorageResponse(response, 'upload');
 
   return {
     objectKey,
@@ -128,7 +153,7 @@ export async function uploadProfileImage(params: {
 
 export async function deleteObjectByKey(objectKey: string) {
   const bucket = getBucketName();
-  const response = await fetch(`${getSupabaseUrl()}/storage/v1/object/${encodeURIComponent(bucket)}`, {
+  await storageFetch('delete', `${getSupabaseUrl()}/storage/v1/object/${encodeURIComponent(bucket)}`, {
     method: 'DELETE',
     headers: {
       ...getStorageHeaders('application/json'),
@@ -137,8 +162,6 @@ export async function deleteObjectByKey(objectKey: string) {
       prefixes: [objectKey],
     }),
   });
-
-  await assertStorageResponse(response, 'delete');
 }
 
 export async function deleteProfileImageByUrl(imageUrl: string | null | undefined) {

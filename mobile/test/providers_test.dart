@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:dio/dio.dart';
@@ -82,6 +84,55 @@ void main() {
     expect(home.favoriteCalls, 2);
     expect(home.badgeCalls, 2);
     expect(friends.snapshotCalls, 2);
+  });
+
+  test('프로필 수정 응답은 사용자와 이미지 리비전을 즉시 반영한다', () {
+    final container = ProviderContainer(
+      overrides: [
+        sessionControllerProvider.overrideWith(
+          _SwitchableSessionController.new,
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final controller = container.read(sessionControllerProvider.notifier);
+    final preview = Uint8List.fromList([1, 2, 3]);
+    controller.applyUpdatedUser(
+      const AuthUser(
+        id: 1,
+        email: 'user1@example.com',
+        username: '새이름',
+        role: 'USER',
+        emailVerified: true,
+        profileImageUrl: 'https://example.com/profile.jpg',
+      ),
+      profileImageChanged: true,
+      profileImagePreview: preview,
+    );
+
+    final state = container.read(sessionControllerProvider);
+    expect(state.user?.username, '새이름');
+    expect(state.user?.profileImageUrl, contains('profile.jpg'));
+    expect(state.profileImageRevision, 1);
+    expect(state.profileImagePreview, same(preview));
+    expect(state.profileImageRemoved, isFalse);
+
+    controller.applyUpdatedUser(
+      const AuthUser(
+        id: 1,
+        email: 'user1@example.com',
+        username: '새이름',
+        role: 'USER',
+        emailVerified: true,
+      ),
+      profileImageChanged: true,
+      profileImageRemoved: true,
+    );
+    final removed = container.read(sessionControllerProvider);
+    expect(removed.profileImagePreview, isNull);
+    expect(removed.profileImageRemoved, isTrue);
+    expect(removed.profileImageRevision, 2);
   });
 }
 

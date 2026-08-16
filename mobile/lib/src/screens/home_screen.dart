@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -12,75 +14,87 @@ class HomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(sessionControllerProvider).user;
+    final session = ref.watch(sessionControllerProvider);
+    final user = session.user;
     final favorites = ref.watch(favoriteAnimeProvider);
     final badges = ref.watch(badgeOverviewProvider);
     return CupertinoPageScaffold(
       child: AppBackground(
-        child: CustomScrollView(
-          slivers: [
-            const AppCompactSliverHeader(title: '홈'),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
-              sliver: SliverList.list(
-                children: [
-                  if (user != null) _ProfileSummary(user: user),
-                  const SizedBox(height: 22),
-                  const AppSectionHeader(title: '최애 애니', eyebrow: 'Favorites'),
-                  const SizedBox(height: 12),
-                  favorites.when(
-                    loading: () => const _PosterSkeletonRow(),
-                    error: (error, _) => AppStateView(
-                      compact: true,
-                      title: '최애 애니를 불러오지 못했어요',
-                      message: error.toString(),
-                      actionLabel: '재시도',
-                      onAction: () => ref.invalidate(favoriteAnimeProvider),
-                    ),
-                    data: (items) => items.isEmpty
-                        ? const AppStateView(
-                            compact: true,
-                            icon: CupertinoIcons.heart,
-                            title: '아직 최애 애니가 없어요',
-                            message: '가장 좋아하는 작품에 10점을 남겨보세요.',
-                          )
-                        : FavoriteAnimeCarousel(items: items),
-                  ),
-                  const SizedBox(height: 26),
-                  Row(
-                    children: [
-                      const Expanded(
-                        child: AppSectionHeader(
-                          title: '내 배지',
-                          eyebrow: 'Badges',
-                        ),
+        child: AppContentWidth(
+          child: CustomScrollView(
+            slivers: [
+              const AppCompactSliverHeader(title: '홈'),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+                sliver: SliverList.list(
+                  children: [
+                    if (user != null)
+                      _ProfileSummary(
+                        user: user,
+                        imageRevision: session.profileImageRevision,
+                        imagePreview: session.profileImagePreview,
+                        imageRemoved: session.profileImageRemoved,
                       ),
-                      badges.maybeWhen(
-                        data: (value) => CupertinoButton(
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                          onPressed: () => _showBadges(context, value),
-                          child: const Text('전체보기'),
-                        ),
-                        orElse: () => const SizedBox.shrink(),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  badges.when(
-                    loading: () => const AppSkeleton(height: 154),
-                    error: (error, _) => AppStateView(
-                      compact: true,
-                      title: '배지를 불러오지 못했어요',
-                      message: error.toString(),
-                      actionLabel: '재시도',
-                      onAction: () => ref.invalidate(badgeOverviewProvider),
+                    const SizedBox(height: 22),
+                    const AppSectionHeader(
+                      title: '최애 애니',
+                      eyebrow: 'Favorites',
                     ),
-                    data: (value) => _BadgePreview(overview: value),
-                  ),
-                ],
+                    const SizedBox(height: 12),
+                    favorites.when(
+                      loading: () => const _PosterSkeletonRow(),
+                      error: (error, _) => AppStateView(
+                        compact: true,
+                        title: '최애 애니를 불러오지 못했어요',
+                        message: error.toString(),
+                        actionLabel: '재시도',
+                        onAction: () => ref.invalidate(favoriteAnimeProvider),
+                      ),
+                      data: (items) => items.isEmpty
+                          ? const AppStateView(
+                              compact: true,
+                              icon: CupertinoIcons.heart,
+                              title: '아직 최애 애니가 없어요',
+                              message: '가장 좋아하는 작품에 10점을 남겨보세요.',
+                            )
+                          : FavoriteAnimeCarousel(items: items),
+                    ),
+                    const SizedBox(height: 26),
+                    Row(
+                      children: [
+                        const Expanded(
+                          child: AppSectionHeader(
+                            title: '내 배지',
+                            eyebrow: 'Badges',
+                          ),
+                        ),
+                        badges.maybeWhen(
+                          data: (value) => CupertinoButton(
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            onPressed: () => _showBadges(context, value),
+                            child: const Text('전체보기'),
+                          ),
+                          orElse: () => const SizedBox.shrink(),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    badges.when(
+                      loading: () => const AppSkeleton(height: 154),
+                      error: (error, _) => AppStateView(
+                        compact: true,
+                        title: '배지를 불러오지 못했어요',
+                        message: error.toString(),
+                        actionLabel: '재시도',
+                        onAction: () => ref.invalidate(badgeOverviewProvider),
+                      ),
+                      data: (value) => _BadgePreview(overview: value),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -89,14 +103,23 @@ class HomeScreen extends ConsumerWidget {
   void _showBadges(BuildContext context, BadgeOverview overview) {
     showCupertinoModalPopup<void>(
       context: context,
-      builder: (context) => _BadgeSheet(overview: overview),
+      builder: (context) =>
+          AppModalWidth(child: _BadgeSheet(overview: overview)),
     );
   }
 }
 
 class _ProfileSummary extends StatelessWidget {
-  const _ProfileSummary({required this.user});
+  const _ProfileSummary({
+    required this.user,
+    required this.imageRevision,
+    required this.imagePreview,
+    required this.imageRemoved,
+  });
   final AuthUser user;
+  final int imageRevision;
+  final Uint8List? imagePreview;
+  final bool imageRemoved;
 
   @override
   Widget build(BuildContext context) => AppCard(
@@ -106,7 +129,15 @@ class _ProfileSummary extends StatelessWidget {
         ClipOval(
           child: SizedBox.square(
             dimension: 64,
-            child: AppNetworkImage(url: user.profileImageUrl, profile: true),
+            child: AppNetworkImage(
+              url: user.profileImageUrl,
+              cacheKey: user.profileImageUrl == null
+                  ? null
+                  : '${user.profileImageUrl}#$imageRevision',
+              memoryBytes: imagePreview,
+              removed: imageRemoved,
+              profile: true,
+            ),
           ),
         ),
         const SizedBox(width: 14),
