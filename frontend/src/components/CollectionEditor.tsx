@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { ErrorToast } from './ErrorToast'
 import { useAuth } from '../contexts/AuthContext'
 import {
   addToCollection,
@@ -217,7 +218,7 @@ function SmartRatingModal({ animeId, targetAnime, onClose, onApplyScore }: Smart
         </div>
 
         {isLoading && <div className="feedback-inline">비교 후보를 불러오는 중이에요.</div>}
-        {error && <div className="feedback-card is-error">{error}</div>}
+        <ErrorToast message={error} />
 
         {!isLoading && activeCandidate && (
           <div className="smart-rating-candidate-list">
@@ -328,6 +329,7 @@ export function CollectionEditor({ animeId, maxProgress, targetAnime }: Collecti
   const [notes, setNotes] = useState(cached?.notes ?? '')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [feedback, setFeedback] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
   const [isAdded, setIsAdded] = useState(Boolean(cached))
   const [isLoadingEntry, setIsLoadingEntry] = useState(false)
   const [isSmartRatingOpen, setIsSmartRatingOpen] = useState(false)
@@ -372,7 +374,7 @@ export function CollectionEditor({ animeId, maxProgress, targetAnime }: Collecti
           return
         }
 
-        setFeedback(error instanceof Error ? error.message : '내 기록을 불러오지 못했어요.')
+        setActionError(error instanceof Error ? error.message : '내 기록을 불러오지 못했어요.')
       } finally {
         if (!controller.signal.aborted) {
           setIsLoadingEntry(false)
@@ -409,6 +411,7 @@ export function CollectionEditor({ animeId, maxProgress, targetAnime }: Collecti
 
     setIsSubmitting(true)
     setFeedback(null)
+    setActionError(null)
 
     try {
       const nextStatus = isAdded ? status : 'completed'
@@ -436,7 +439,7 @@ export function CollectionEditor({ animeId, maxProgress, targetAnime }: Collecti
       setFeedback(`${nextScore.toFixed(1)}점으로 저장했어요.`)
     } catch (submitError) {
       const message = submitError instanceof Error ? submitError.message : '별점을 저장하지 못했어요.'
-      setFeedback(message)
+      setActionError(message)
       throw new Error(message)
     } finally {
       setIsSubmitting(false)
@@ -447,12 +450,17 @@ export function CollectionEditor({ animeId, maxProgress, targetAnime }: Collecti
     event.preventDefault()
     event.stopPropagation()
 
-    await saveScore(nextScore)
+    try {
+      await saveScore(nextScore)
+    } catch {
+      // saveScore already exposes the friendly error through the global toast.
+    }
   }
 
   const handleSave = async () => {
     setIsSubmitting(true)
     setFeedback(null)
+    setActionError(null)
 
     try {
       if (isAdded) {
@@ -467,7 +475,7 @@ export function CollectionEditor({ animeId, maxProgress, targetAnime }: Collecti
         setFeedback('컬렉션에 추가했어요.')
       }
     } catch (submitError) {
-      setFeedback(
+      setActionError(
         submitError instanceof Error
           ? submitError.message
           : '컬렉션 저장에 실패했어요.',
@@ -480,6 +488,7 @@ export function CollectionEditor({ animeId, maxProgress, targetAnime }: Collecti
   const handleDelete = async () => {
     setIsSubmitting(true)
     setFeedback(null)
+    setActionError(null)
 
     try {
       await deleteCollectionEntry(animeId)
@@ -492,7 +501,7 @@ export function CollectionEditor({ animeId, maxProgress, targetAnime }: Collecti
       setNotes('')
       setFeedback('컬렉션에서 삭제했어요.')
     } catch (submitError) {
-      setFeedback(
+      setActionError(
         submitError instanceof Error
           ? submitError.message
           : '컬렉션 삭제에 실패했어요.',
@@ -650,6 +659,7 @@ export function CollectionEditor({ animeId, maxProgress, targetAnime }: Collecti
       </label>
 
       {feedback && <div className="feedback-card">{feedback}</div>}
+      <ErrorToast message={actionError} />
 
       <div className="collection-actions">
         <button

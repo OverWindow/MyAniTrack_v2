@@ -469,6 +469,7 @@ export async function getAnimeList(params: AnimeListParams) {
       AND akt.is_primary = TRUE
     WHERE 1 = 1
       AND a.is_adult = FALSE
+      AND a.app_visible = TRUE
       ${genreWhereClause}
       ${searchWhereClause}
       ${cursorWhereClause}
@@ -620,6 +621,8 @@ export async function getAnimeDetailById(id: number, titleLanguage: AnimeTitleLa
       a.updated_at AS updatedAt
     FROM anime a
     WHERE a.id = ?
+      AND a.is_adult = FALSE
+      AND a.app_visible = TRUE
     LIMIT 1
     `,
     [id]
@@ -825,8 +828,10 @@ async function findAnimeRelations(
       target.cover_image_extra_large AS coverImageExtraLarge,
       target.is_adult AS isAdult
     FROM anime_relations ar
-    LEFT JOIN anime target
+    INNER JOIN anime target
       ON target.anilist_id = ar.target_anilist_id
+      AND target.is_adult = FALSE
+      AND target.app_visible = TRUE
     LEFT JOIN anime_korean_titles akt
       ON akt.anime_id = target.id
       AND akt.is_primary = TRUE
@@ -880,7 +885,7 @@ export async function getAnimeRelations(params: {
   relationType?: AnimeRelationType;
 }) {
   const [animeRows] = await pool.query<IdRow[]>(
-    'SELECT id FROM anime WHERE id = ? LIMIT 1',
+    'SELECT id FROM anime WHERE id = ? AND is_adult = FALSE AND app_visible = TRUE LIMIT 1',
     [params.animeId]
   );
 
@@ -950,6 +955,8 @@ export async function getAnimeCastByRole(params: {
     SELECT id
     FROM anime
     WHERE id = ?
+      AND is_adult = FALSE
+      AND app_visible = TRUE
     LIMIT 1
     `,
     [animeId]

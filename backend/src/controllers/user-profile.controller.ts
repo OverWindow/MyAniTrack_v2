@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { Request, Response } from 'express';
 import { SupabaseStorageError } from '../lib/supabase-storage';
 import { getPublicUserProfile, updateUserProfile } from '../services/user-profile.service';
+import { getUserAgreementStatus } from '../services/user-agreement.service';
 
 function parseUserId(value: unknown) {
   const userId = Number(value);
@@ -113,6 +114,16 @@ export async function updateMyProfile(req: Request, res: Response) {
       mimeType: req.file?.mimetype,
       size: req.file?.size,
     });
+
+    if (req.file) {
+      const agreements = await getUserAgreementStatus(authUser.userId);
+      if (!agreements.hasRequiredAgreements) {
+        return res.status(403).json({
+          success: false,
+          message: 'Current terms agreement is required before uploading a profile image',
+        });
+      }
+    }
 
     const user = await updateUserProfile({
       userId: authUser.userId,

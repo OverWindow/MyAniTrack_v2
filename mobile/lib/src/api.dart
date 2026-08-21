@@ -218,16 +218,17 @@ class AuthRepository {
     return AgreementStatus.fromJson(await api.get('/me/agreements'));
   }
 
-  Future<void> acceptAgreements() async {
-    await api.patch(
+  Future<AgreementStatus> acceptAgreements() async {
+    final json = await api.patch(
       '/me/agreements',
       data: const {
         'termsAgreed': true,
-        'termsVersion': 'v1.0',
+        'termsVersion': 'v1.1',
         'privacyAgreed': true,
         'privacyVersion': 'v1.0',
       },
     );
+    return AgreementStatus.fromJson(json);
   }
 
   Future<void> logout() async => api.post('/auth/logout');
@@ -469,6 +470,18 @@ class FriendsRepository {
 
   Future<void> removeFriend(int userId) async {
     await api.delete('/friends/$userId');
+  }
+
+  Future<void> reportProfile(int userId, String reason) async {
+    await api.post('/users/$userId/profile-reports', data: {'reason': reason});
+  }
+
+  Future<void> blockUser(int userId) async {
+    await api.post('/users/$userId/block');
+  }
+
+  Future<void> unblockUser(int userId) async {
+    await api.delete('/users/$userId/block');
   }
 
   Future<PublicUser> profile(int userId) async {

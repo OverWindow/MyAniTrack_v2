@@ -4,6 +4,7 @@ import type { Location } from 'react-router-dom'
 import { handleProfileImageError, getProfileImageSrc } from './lib/avatar'
 import { formatFriendAnimeCount, getFriendPreviewName } from './lib/friends'
 import { Header } from './components/Header'
+import { ErrorToast } from './components/ErrorToast'
 import { useAuth } from './contexts/AuthContext'
 import { useFriends } from './contexts/FriendsContext'
 import { AdminPage } from './pages/AdminPage'
@@ -151,7 +152,10 @@ function App() {
               {isLoadingFriends ? (
                 <p className="floating-friends-feedback">친구 목록을 불러오는 중...</p>
               ) : friendsError ? (
-                <p className="floating-friends-feedback is-error">{friendsError}</p>
+                <>
+                  <ErrorToast message={friendsError} />
+                  <p className="floating-friends-feedback">친구 목록을 표시할 수 없어요.</p>
+                </>
               ) : friends.length === 0 ? (
                 <p className="floating-friends-feedback">아직 추가된 친구가 없어요.</p>
               ) : (

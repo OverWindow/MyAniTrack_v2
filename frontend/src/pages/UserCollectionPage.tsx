@@ -1,12 +1,21 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useLocation, useParams } from 'react-router-dom'
 import { CollectionCarousel } from '../components/CollectionCarousel'
+import { CollectionViewSwitch } from '../components/CollectionViewSwitch'
 import { ConnectionErrorState } from '../components/ConnectionErrorState'
+import { ErrorToast } from '../components/ErrorToast'
+import { SeriesCollectionGrid, SeriesCollectionSkeleton } from '../components/SeriesCollectionGrid'
 import { genreOptions } from '../lib/anime'
-import { SERVER_CONNECTION_ERROR_MESSAGE, getFriendlyErrorMessage } from '../lib/errors'
-import { fetchPublicUserCollection } from '../lib/users'
+import { getFriendlyErrorMessage } from '../lib/errors'
+import { fetchPublicUserCollection, fetchPublicUserSeriesCollection } from '../lib/users'
 import type { AnimeGenre } from '../types/anime'
-import type { UserAnimeListItem, UserAnimeListSort } from '../types/collection'
+import type {
+  AnimeSeriesScope,
+  UserAnimeListItem,
+  UserAnimeListSort,
+  UserSeriesCollectionItem,
+  UserSeriesCollectionStatus,
+} from '../types/collection'
 import type { PublicUserProfile } from '../types/users'
 import '../styles/pages/CatalogPage.css'
 import '../styles/pages/CollectionPage.css'
@@ -27,6 +36,13 @@ type PublicCarouselState = {
   items: UserAnimeListItem[]
   isLoading: boolean
   error: string | null
+}
+
+type PublicSeriesCollectionState = {
+  items: UserSeriesCollectionItem[]
+  isLoading: boolean
+  error: string | null
+  requestKey: string
 }
 
 const sortOptions: Array<{ value: UserAnimeListSort; label: string }> = [
@@ -86,14 +102,26 @@ function formatScore(score?: number | null) {
 }
 
 export function UserCollectionPage() {
+  const location = useLocation()
   const { userId } = useParams<{ userId: string }>()
   const [sort, setSort] = useState<UserAnimeListSort>('latest')
   const [genre, setGenre] = useState<AnimeGenre | 'all'>('all')
   const [searchTerm, setSearchTerm] = useState('')
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
   const [searchLanguage, setSearchLanguage] = useState<'ko' | 'en'>('ko')
+  const [viewMode, setViewMode] = useState<'anime' | 'series'>('anime')
+  const [seriesScope, setSeriesScope] = useState<AnimeSeriesScope>('mainline')
+  const [seriesStatus, setSeriesStatus] = useState<UserSeriesCollectionStatus>('all')
   const selectedGenre = genre === 'all' ? null : genre
-  const requestKey = `${userId ?? 'unknown'}:${sort}:${genre}:${searchLanguage}`
+  const requestKey = `anime:${userId ?? 'unknown'}:${sort}:${genre}:${searchLanguage}`
+  const seriesRequestKey = `series:${userId ?? 'unknown'}:${seriesScope}:${seriesStatus}:${searchLanguage}:${debouncedSearchTerm.trim()}`
   const [state, setState] = useState<PublicCollectionState>(() => createInitialState(requestKey))
+  const [seriesState, setSeriesState] = useState<PublicSeriesCollectionState>({
+    items: [],
+    isLoading: true,
+    error: null,
+    requestKey: seriesRequestKey,
+  })
   const [carouselState, setCarouselState] = useState<PublicCarouselState>({
     items: [],
     isLoading: true,
@@ -102,6 +130,7 @@ export function UserCollectionPage() {
   const sentinelRef = useRef<HTMLDivElement | null>(null)
   const { user, items, nextCursor, hasNext, isLoading, isLoadingMore, error } = state
   const isRefreshingQuery = state.requestKey !== requestKey
+  const isRefreshingSeriesQuery = seriesState.requestKey !== seriesRequestKey
   const totalAnimeCount = user?.animeListCount ?? items.length
 
   const filteredItems = items.filter((item) =>
@@ -109,7 +138,15 @@ export function UserCollectionPage() {
   )
 
   useEffect(() => {
-    if (!userId) {
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm)
+    }, 550)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [searchTerm])
+
+  useEffect(() => {
+    if (!userId || viewMode !== 'anime') {
       return
     }
 
@@ -157,7 +194,89 @@ export function UserCollectionPage() {
     void loadFirstPage()
 
     return () => controller.abort()
-  }, [genre, requestKey, searchLanguage, selectedGenre, sort, userId])
+  }, [genre, requestKey, searchLanguage, selectedGenre, sort, userId, viewMode])
+
+  useEffect(() => {
+    if (!userId || viewMode !== 'series') {
+      return
+    }
+
+    const controller = new AbortController()
+
+    const loadSeries = async () => {
+      setSeriesState((current) => ({
+        ...current,
+        isLoading: true,
+        error: null,
+        requestKey: seriesRequestKey,
+      }))
+
+      try {
+        const firstPage = await fetchPublicUserSeriesCollection({
+          userId,
+          scope: seriesScope,
+          status: seriesStatus,
+          titleLanguage: searchLanguage,
+          query: debouncedSearchTerm,
+          limit: 50,
+          signal: controller.signal,
+        })
+        const allItems = [...firstPage.items]
+        const seenSeriesIds = new Set(allItems.map((item) => item.seriesId))
+        const seenCursors = new Set<string>()
+        let cursor = firstPage.pageInfo.nextCursor
+        let hasMore = firstPage.pageInfo.hasNext
+
+        while (hasMore && cursor && !seenCursors.has(cursor)) {
+          seenCursors.add(cursor)
+          const nextPage = await fetchPublicUserSeriesCollection({
+            userId,
+            scope: seriesScope,
+            status: seriesStatus,
+            titleLanguage: searchLanguage,
+            query: debouncedSearchTerm,
+            limit: 50,
+            cursor,
+            signal: controller.signal,
+          })
+
+          for (const item of nextPage.items) {
+            if (!seenSeriesIds.has(item.seriesId)) {
+              seenSeriesIds.add(item.seriesId)
+              allItems.push(item)
+            }
+          }
+
+          const nextCursor = nextPage.pageInfo.nextCursor
+          hasMore = nextPage.pageInfo.hasNext && Boolean(nextCursor) && nextCursor !== cursor
+          cursor = nextCursor
+        }
+
+        if (controller.signal.aborted) return
+
+        setState((current) => ({ ...current, user: firstPage.user }))
+        setSeriesState({
+          items: allItems,
+          isLoading: false,
+          error: null,
+          requestKey: seriesRequestKey,
+        })
+      } catch (fetchError) {
+        if (fetchError instanceof DOMException && fetchError.name === 'AbortError') return
+
+        setSeriesState({
+          items: [],
+          isLoading: false,
+          error: getFriendlyErrorMessage(fetchError, '시리즈 컬렉션을 불러오지 못했어요.'),
+          requestKey: seriesRequestKey,
+        })
+      }
+    }
+
+    void loadSeries()
+
+    return () => controller.abort()
+  }, [debouncedSearchTerm, searchLanguage, seriesRequestKey, seriesScope, seriesStatus, userId, viewMode])
 
   useEffect(() => {
     if (!userId) {
@@ -204,7 +323,16 @@ export function UserCollectionPage() {
   useEffect(() => {
     const node = sentinelRef.current
 
-    if (!userId || !node || !hasNext || isLoading || isLoadingMore || !nextCursor || isRefreshingQuery) {
+    if (
+      viewMode !== 'anime'
+      || !userId
+      || !node
+      || !hasNext
+      || isLoading
+      || isLoadingMore
+      || !nextCursor
+      || isRefreshingQuery
+    ) {
       return
     }
 
@@ -267,12 +395,13 @@ export function UserCollectionPage() {
     observer.observe(node)
 
     return () => observer.disconnect()
-  }, [hasNext, isLoading, isLoadingMore, isRefreshingQuery, nextCursor, searchLanguage, selectedGenre, sort, userId])
+  }, [hasNext, isLoading, isLoadingMore, isRefreshingQuery, nextCursor, searchLanguage, selectedGenre, sort, userId, viewMode])
 
   if (!userId) {
     return (
       <section className="collection-page">
-        <div className="feedback-card is-error">잘못된 사용자 경로예요.</div>
+        <ErrorToast message="잘못된 사용자 경로예요." />
+        <div className="feedback-card">요청한 컬렉션을 열 수 없어요.</div>
       </section>
     )
   }
@@ -305,11 +434,12 @@ export function UserCollectionPage() {
       <div className="explore-toolbar-shell">
         <div className="explore-toolbar">
           <div className="search-group">
+            <CollectionViewSwitch value={viewMode} onChange={setViewMode} />
             <label className="search-field minimalist-search" htmlFor="user-collection-search">
               <input
                 id="user-collection-search"
                 type="search"
-                placeholder="컬렉션에서 검색하기"
+                placeholder={viewMode === 'series' ? '시리즈 또는 작품 제목 검색' : '컬렉션에서 검색하기'}
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
               />
@@ -333,33 +463,60 @@ export function UserCollectionPage() {
           </div>
 
           <div className="catalog-control-group">
-            <label className="sort-field" htmlFor="user-collection-genre">
-              <select id="user-collection-genre" value={genre} onChange={(event) => setGenre(event.target.value as AnimeGenre | 'all')}>
-                <option value="all">전체 장르</option>
-                {genreOptions.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-            </label>
+            {viewMode === 'series' ? (
+              <>
+                <label className="sort-field" htmlFor="user-collection-series-scope">
+                  <select
+                    id="user-collection-series-scope"
+                    value={seriesScope}
+                    onChange={(event) => setSeriesScope(event.target.value as AnimeSeriesScope)}
+                  >
+                    <option value="mainline">본편 시리즈</option>
+                    <option value="franchise">관련 작품 전체</option>
+                  </select>
+                </label>
+                <label className="sort-field" htmlFor="user-collection-series-status">
+                  <select
+                    id="user-collection-series-status"
+                    value={seriesStatus}
+                    onChange={(event) => setSeriesStatus(event.target.value as UserSeriesCollectionStatus)}
+                  >
+                    <option value="all">전체 시리즈</option>
+                    <option value="started">시작한 시리즈</option>
+                    <option value="watched">본 시리즈</option>
+                    <option value="completed">완주한 시리즈</option>
+                  </select>
+                </label>
+              </>
+            ) : (
+              <>
+                <label className="sort-field" htmlFor="user-collection-genre">
+                  <select id="user-collection-genre" value={genre} onChange={(event) => setGenre(event.target.value as AnimeGenre | 'all')}>
+                    <option value="all">전체 장르</option>
+                    {genreOptions.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </label>
 
-            <label className="sort-field" htmlFor="user-collection-sort">
-              <select id="user-collection-sort" value={sort} onChange={(event) => setSort(event.target.value as UserAnimeListSort)}>
-                {sortOptions.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-            </label>
+                <label className="sort-field" htmlFor="user-collection-sort">
+                  <select id="user-collection-sort" value={sort} onChange={(event) => setSort(event.target.value as UserAnimeListSort)}>
+                    {sortOptions.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </label>
+              </>
+            )}
           </div>
         </div>
       </div>
 
-      {error && (
-        error === SERVER_CONNECTION_ERROR_MESSAGE
-          ? <ConnectionErrorState message={error} />
-          : <div className="feedback-card is-error">{error}</div>
+      {viewMode === 'anime' && error && (
+        <ConnectionErrorState message={error} />
       )}
 
-      {!error && (isLoading || isRefreshingQuery) && (
+      {viewMode === 'anime' && !error && (isLoading || isRefreshingQuery) && (
         <div className="collection-grid">
           {Array.from({ length: 8 }).map((_, index) => (
             <article className="collection-card skeleton-card" key={`user-collection-skeleton-${index}`}>
@@ -371,7 +528,7 @@ export function UserCollectionPage() {
         </div>
       )}
 
-      {!isLoading && !isRefreshingQuery && !error && (
+      {viewMode === 'anime' && !isLoading && !isRefreshingQuery && !error && (
         <>
           {filteredItems.length === 0 ? (
             <div className="feedback-card">아직 공개된 컬렉션이 없거나, 검색 결과가 없어요.</div>
@@ -404,6 +561,27 @@ export function UserCollectionPage() {
           {isLoadingMore && <div className="feedback-inline">컬렉션을 더 불러오는 중이에요.</div>}
           {!hasNext && items.length > 0 && <div className="feedback-inline">마지막 작품까지 모두 확인했어요.</div>}
         </>
+      )}
+
+      {viewMode === 'series' && seriesState.error && (
+        <ConnectionErrorState message={seriesState.error} />
+      )}
+
+      {viewMode === 'series' && !seriesState.error && (seriesState.isLoading || isRefreshingSeriesQuery) && (
+        <SeriesCollectionSkeleton />
+      )}
+
+      {viewMode === 'series' && !seriesState.error && !seriesState.isLoading && !isRefreshingSeriesQuery && (
+        seriesState.items.length === 0 ? (
+          <div className="feedback-card">조건에 맞는 시리즈가 없어요.</div>
+        ) : (
+          <SeriesCollectionGrid
+            items={seriesState.items}
+            location={location}
+            fromPage="user-collection"
+            collectionLabel="컬렉션"
+          />
+        )
       )}
     </section>
     </>

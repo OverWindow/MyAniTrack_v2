@@ -1,4 +1,5 @@
 import type { UserBadge } from '../types/badges'
+import { ErrorToast } from './ErrorToast'
 
 type BadgeSectionProps = {
   badges: UserBadge[]
@@ -55,7 +56,10 @@ export function BadgeSection({
           <strong>배지를 불러오는 중이에요.</strong>
         </div>
       ) : error ? (
-        <div className="badge-empty-state">{error}</div>
+        <>
+          <ErrorToast message={error} />
+          <div className="badge-empty-state">지금은 배지를 표시할 수 없어요.</div>
+        </>
       ) : badges.length === 0 ? (
         <div className="badge-empty-state">{emptyMessage}</div>
       ) : (

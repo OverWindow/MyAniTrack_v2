@@ -9,6 +9,7 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import { ImagePlus, RotateCcw, X } from 'lucide-react'
+import { ErrorToast } from './ErrorToast'
 
 type ProfileImageCropperProps = {
   onApply: (file: File) => void
@@ -390,7 +391,7 @@ export function ProfileImageCropper({ onApply, onClose }: ProfileImageCropperPro
           </>
         )}
 
-        {error && <div className="feedback-card is-error">{error}</div>}
+        <ErrorToast message={error} />
 
         <div className="profile-cropper-actions">
           {dataUrl && (

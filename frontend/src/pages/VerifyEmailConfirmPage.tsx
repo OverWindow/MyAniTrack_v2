@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { ErrorToast } from '../components/ErrorToast'
 import { confirmEmailVerification } from '../lib/auth'
 import '../styles/pages/AuthPage.css'
 
@@ -57,7 +58,7 @@ export function VerifyEmailConfirmPage() {
         <div className="auth-form">
           {isLoading && <div className="feedback-card">이메일 인증을 확인하는 중...</div>}
           {successMessage && !isLoading && <div className="feedback-card">{successMessage}</div>}
-          {error && !isLoading && <div className="feedback-card is-error">{error}</div>}
+          {!isLoading && <ErrorToast message={error} />}
 
           <div className="auth-action-row">
             <Link className="primary-button" to="/login">로그인하러 가기</Link>

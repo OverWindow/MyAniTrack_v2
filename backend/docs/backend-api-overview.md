@@ -1661,6 +1661,25 @@ Response example:
 }
 ```
 
+### `GET /users/:userId/anime-list/series`
+
+다른 사용자의 공개 컬렉션을 시리즈 단위로 조회하고 검색합니다. 선택적 인증을 사용하며 대상 사용자가 정지되었거나 요청자와 차단 관계이면 `404`를 반환합니다.
+
+Query:
+
+- `scope`: `mainline | franchise`, 기본값 `mainline`
+- `status`: `all | started | watched | completed`, 기본값 `all`
+- `query`: 선택 검색어. 시리즈명과 구성 작품의 한국어·영어·일본어·로마자 제목을 검색
+- `titleLanguage`: `ko | en | ja`, 기본값 `ko`
+- `limit`: `1~50`, 기본값 `20`
+- `cursor`: 이전 응답의 `pageInfo.nextCursor`; scope, status, query가 바뀌면 재사용할 수 없음
+
+```http
+GET /api/users/12/anime-list/series?query=프리렌&scope=mainline&status=watched&titleLanguage=ko&limit=20
+```
+
+응답은 공개 사용자 정보인 `user`와 `/me/anime-list/series`와 같은 `items`, `pageInfo`를 반환합니다. 각 구성 작품의 `userList`는 대상 사용자의 기록이며, 숨김·성인 작품은 시리즈와 구성 작품 모두에서 제외됩니다.
+
 ### `GET /users/:userId/anime-stats`
 다른 유저 애니 통계 조회입니다.
 

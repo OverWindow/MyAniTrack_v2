@@ -4,6 +4,7 @@ import { Film, Layers3 } from 'lucide-react'
 import { CollectionButton } from '../components/CollectionButton'
 import { ConnectionErrorState } from '../components/ConnectionErrorState'
 import { useAuth } from '../contexts/AuthContext'
+import { useToast } from '../contexts/ToastContext'
 import {
   addToCollection,
   syncCollectionCacheFromSearchItems,
@@ -19,7 +20,7 @@ import {
   searchMyAnime,
   sortOptions,
 } from '../lib/anime'
-import { SERVER_CONNECTION_ERROR_MESSAGE, getFriendlyErrorMessage } from '../lib/errors'
+import { getFriendlyErrorMessage } from '../lib/errors'
 import type {
   AnimeGenre,
   AnimeListItem,
@@ -124,6 +125,7 @@ function logExploreCollectionOnHover(item: AnimeListItem, collection: AnimeListI
 
 function HoverRating({ animeId, maxProgress, collection, onCollectionChange }: HoverRatingProps) {
   const { isAuthenticated } = useAuth()
+  const { showError } = useToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const score = getOverlayScore(collection?.score)
   const isAdded = Boolean(collection?.exists)
@@ -160,6 +162,8 @@ function HoverRating({ animeId, maxProgress, collection, onCollectionChange }: H
         score: nextScore,
         progress: maxProgress && maxProgress > 0 ? maxProgress : collection?.progress ?? null,
       })
+    } catch (submitError) {
+      showError(submitError instanceof Error ? submitError.message : '별점을 저장하지 못했어요.')
     } finally {
       setIsSubmitting(false)
     }
@@ -860,9 +864,7 @@ export function ExplorePage() {
       </div>
 
       {viewMode === 'anime' && error && (
-        error === SERVER_CONNECTION_ERROR_MESSAGE
-          ? <ConnectionErrorState message={error} />
-          : <div className="feedback-card is-error">{error}</div>
+        <ConnectionErrorState message={error} />
       )}
 
       {viewMode === 'anime' && !error && (isLoading || isRefreshingQuery) && (
@@ -910,9 +912,7 @@ export function ExplorePage() {
       )}
 
       {viewMode === 'series' && seriesError && (
-        seriesError === SERVER_CONNECTION_ERROR_MESSAGE
-          ? <ConnectionErrorState message={seriesError} />
-          : <div className="feedback-card is-error">{seriesError}</div>
+        <ConnectionErrorState message={seriesError} />
       )}
 
       {viewMode === 'series' && !seriesError && (isLoadingSeries || isRefreshingSeriesQuery) && (

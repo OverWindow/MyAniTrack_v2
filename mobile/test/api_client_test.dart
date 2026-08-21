@@ -79,6 +79,39 @@ void main() {
     expect(recorder.contentType, 'image/jpeg');
     expect(recorder.username, 'tester');
   });
+
+  test('약관 저장 응답의 서버 확정 상태를 반환한다', () async {
+    final dio = Dio()..interceptors.add(_AgreementRequestRecorder());
+    final repository = AuthRepository(ApiClient(dio: dio));
+
+    final status = await repository.acceptAgreements();
+
+    expect(status.hasRequiredAgreements, isTrue);
+    expect(status.termsVersion, 'v1.1');
+  });
+}
+
+class _AgreementRequestRecorder extends Interceptor {
+  @override
+  void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
+    expect(options.data['termsVersion'], 'v1.1');
+    handler.resolve(
+      Response<dynamic>(
+        requestOptions: options,
+        statusCode: 200,
+        data: const {
+          'success': true,
+          'item': {
+            'termsAgreed': true,
+            'privacyAgreed': true,
+            'termsVersion': 'v1.1',
+            'privacyVersion': 'v1.0',
+            'hasRequiredAgreements': true,
+          },
+        },
+      ),
+    );
+  }
 }
 
 class _ProfileRequestRecorder extends Interceptor {

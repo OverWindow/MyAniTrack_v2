@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AdminUserManager } from '../components/AdminUserManager'
+import { AdminProfileReportManager } from '../components/AdminProfileReportManager'
+import { AdminAnimeVisibilityManager } from '../components/AdminAnimeVisibilityManager'
+import { ErrorToast } from '../components/ErrorToast'
 import { useAuth } from '../contexts/AuthContext'
 import {
   fetchAnimeCastSyncStatus,
@@ -59,6 +62,8 @@ type AdminActionCardProps<TPayload> = {
 
 type AdminActionKey =
   | 'users'
+  | 'profile-reports'
+  | 'anime-visibility'
   | 'sync-tools'
   | 'special-sync'
   | 'translate-korean'
@@ -871,6 +876,20 @@ export function AdminPage() {
       content: <AdminUserManager />,
     },
     {
+      key: 'profile-reports' as const,
+      group: '콘텐츠 안전',
+      label: '프로필 신고',
+      description: '신고된 프로필 이미지를 검토하고 제거·정지 조치합니다.',
+      content: <AdminProfileReportManager />,
+    },
+    {
+      key: 'anime-visibility' as const,
+      group: '콘텐츠 안전',
+      label: '작품 노출 관리',
+      description: '정책 위험 작품을 앱 전체에서 즉시 숨깁니다.',
+      content: <AdminAnimeVisibilityManager />,
+    },
+    {
       key: 'sync-tools' as const,
       group: '동기화',
       label: '동기화 관리',
@@ -944,7 +963,8 @@ export function AdminPage() {
   if (!isAdmin) {
     return (
       <section className="admin-page">
-        <div className="feedback-card is-error">관리자 권한이 있는 계정만 접근할 수 있어요.</div>
+        <ErrorToast message="관리자 권한이 있는 계정만 접근할 수 있어요." />
+        <div className="feedback-card">이 화면에 접근할 수 없어요.</div>
       </section>
     )
   }
@@ -959,7 +979,7 @@ export function AdminPage() {
         </div>
       </div>
 
-      {error && <div className="feedback-card is-error">{error}</div>}
+      <ErrorToast message={error} />
 
       <div className="admin-summary-section">
         <div className="admin-summary-header">

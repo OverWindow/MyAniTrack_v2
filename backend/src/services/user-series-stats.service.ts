@@ -213,6 +213,10 @@ export async function getUserSeriesStats(userId: number): Promise<UserSeriesStat
       FROM anime_series seriesRow
       INNER JOIN anime_series_members memberRow
         ON memberRow.series_id = seriesRow.id
+      INNER JOIN anime visibleMember
+        ON visibleMember.id = memberRow.anime_id
+        AND visibleMember.is_adult = FALSE
+        AND visibleMember.app_visible = TRUE
       LEFT JOIN user_anime_lists ual
         ON ual.anime_id = memberRow.anime_id
         AND ual.user_id = ?
@@ -262,6 +266,8 @@ export async function getUserSeriesCollection(params: GetUserSeriesCollectionPar
           FROM anime_series_members searchMember
           INNER JOIN anime searchAnime
             ON searchAnime.id = searchMember.anime_id
+            AND searchAnime.is_adult = FALSE
+            AND searchAnime.app_visible = TRUE
           LEFT JOIN anime_korean_titles searchKoreanTitle
             ON searchKoreanTitle.anime_id = searchAnime.id
           WHERE searchMember.series_id = seriesRow.id
@@ -339,11 +345,17 @@ export async function getUserSeriesCollection(params: GetUserSeriesCollectionPar
     FROM anime_series seriesRow
     INNER JOIN anime_series_members memberRow
       ON memberRow.series_id = seriesRow.id
+    INNER JOIN anime visibleMember
+      ON visibleMember.id = memberRow.anime_id
+      AND visibleMember.is_adult = FALSE
+      AND visibleMember.app_visible = TRUE
     LEFT JOIN user_anime_lists ual
       ON ual.anime_id = memberRow.anime_id
       AND ual.user_id = ?
     LEFT JOIN anime canonicalAnime
       ON canonicalAnime.id = seriesRow.canonical_anime_id
+      AND canonicalAnime.is_adult = FALSE
+      AND canonicalAnime.app_visible = TRUE
     LEFT JOIN anime_korean_titles canonicalKoreanTitle
       ON canonicalKoreanTitle.anime_id = canonicalAnime.id
       AND canonicalKoreanTitle.is_primary = TRUE
@@ -354,6 +366,10 @@ export async function getUserSeriesCollection(params: GetUserSeriesCollectionPar
         INNER JOIN user_anime_lists ownedList
           ON ownedList.anime_id = ownedMember.anime_id
           AND ownedList.user_id = ?
+        INNER JOIN anime ownedAnime
+          ON ownedAnime.id = ownedMember.anime_id
+          AND ownedAnime.is_adult = FALSE
+          AND ownedAnime.app_visible = TRUE
         WHERE ownedMember.series_id = seriesRow.id
       )
       ${searchWhere}
@@ -412,6 +428,8 @@ export async function getUserSeriesCollection(params: GetUserSeriesCollectionPar
       FROM anime_series_members memberRow
       INNER JOIN anime animeRow
         ON animeRow.id = memberRow.anime_id
+        AND animeRow.is_adult = FALSE
+        AND animeRow.app_visible = TRUE
       LEFT JOIN anime_korean_titles koreanTitle
         ON koreanTitle.anime_id = animeRow.id
         AND koreanTitle.is_primary = TRUE

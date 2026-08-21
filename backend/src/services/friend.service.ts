@@ -100,7 +100,14 @@ export async function searchUsers(
     throw new Error('Cursor query does not match requested query');
   }
 
-  const params: Array<string | number> = [currentUserId, currentUserId, currentUserId, currentUserId];
+  const params: Array<string | number> = [
+    currentUserId,
+    currentUserId,
+    currentUserId,
+    currentUserId,
+    currentUserId,
+    currentUserId,
+  ];
   const cursorWhere = cursor
     ? 'AND (LOWER(u.username) > ? OR (LOWER(u.username) = ? AND u.id > ?))'
     : '';
@@ -131,6 +138,12 @@ export async function searchUsers(
     LEFT JOIN friend_requests outgoing
       ON outgoing.requester_id = ? AND outgoing.receiver_id = u.id AND outgoing.status = 'pending'
     WHERE u.id <> ?
+      AND u.moderation_status = 'ACTIVE'
+      AND NOT EXISTS (
+        SELECT 1 FROM user_blocks ub
+        WHERE (ub.blocker_user_id = ? AND ub.blocked_user_id = u.id)
+           OR (ub.blocker_user_id = u.id AND ub.blocked_user_id = ?)
+      )
       AND LOWER(u.username) LIKE ? ESCAPE '\\\\'
       ${cursorWhere}
     ORDER BY LOWER(u.username) ASC, u.id ASC
@@ -361,6 +374,12 @@ export async function sendFriendRequest(userId: number, input: SendFriendRequest
   if (userId === receiverId) {
     throw new Error('You cannot send a friend request to yourself');
   }
+
+  const [blockRows] = await pool.query<RowDataPacket[]>(
+    `SELECT 1 FROM user_blocks WHERE (blocker_user_id = ? AND blocked_user_id = ?) OR (blocker_user_id = ? AND blocked_user_id = ?) LIMIT 1`,
+    [userId, receiverId, receiverId, userId],
+  );
+  if (blockRows.length > 0) throw new Error('User not found');
 
   if (await areFriends(userId, receiverId)) {
     throw new Error('Users are already friends');
@@ -596,9 +615,15 @@ export async function getFriends(userId: number) {
     INNER JOIN users u
       ON u.id = f.friend_user_id
     WHERE f.user_id = ?
+      AND u.moderation_status = 'ACTIVE'
+      AND NOT EXISTS (
+        SELECT 1 FROM user_blocks ub
+        WHERE (ub.blocker_user_id = ? AND ub.blocked_user_id = u.id)
+           OR (ub.blocker_user_id = u.id AND ub.blocked_user_id = ?)
+      )
     ORDER BY f.created_at DESC, f.id DESC
     `,
-    [userId]
+    [userId, userId, userId]
   );
 
   return rows.map((row) => ({

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { ErrorToast } from '../components/ErrorToast'
 import { PRIVACY_CONTACT_EMAIL } from '../content/privacyPolicy'
 import { useAuth } from '../contexts/AuthContext'
 import { getAuthErrorStatus } from '../lib/auth'
@@ -206,7 +207,7 @@ export function AccountDeletionPage() {
                   disabled={isSubmitting}
                 />
               </label>
-              {error && <div className="policy-error" role="alert">{error}</div>}
+              <ErrorToast message={error} />
               <button
                 className="policy-danger-button"
                 type="button"

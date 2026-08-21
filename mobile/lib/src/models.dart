@@ -78,14 +78,21 @@ class AgreementStatus {
     required this.privacyAgreed,
     this.termsVersion,
     this.privacyVersion,
+    this.serverHasRequiredAgreements,
   });
 
   final bool termsAgreed;
   final bool privacyAgreed;
   final String? termsVersion;
   final String? privacyVersion;
+  final bool? serverHasRequiredAgreements;
 
-  bool get hasRequiredAgreements => termsAgreed && privacyAgreed;
+  bool get hasRequiredAgreements =>
+      serverHasRequiredAgreements ??
+      (termsAgreed &&
+          privacyAgreed &&
+          termsVersion == 'v1.1' &&
+          privacyVersion == 'v1.0');
 
   factory AgreementStatus.fromJson(JsonMap json) {
     final data = asJsonMap(json['data']);
@@ -96,6 +103,10 @@ class AgreementStatus {
       privacyAgreed: readBool(root['privacyAgreed']),
       termsVersion: readString(root['termsVersion']),
       privacyVersion: readString(root['privacyVersion']),
+      serverHasRequiredAgreements:
+          root.containsKey('hasRequiredAgreements')
+          ? readBool(root['hasRequiredAgreements'])
+          : null,
     );
   }
 }

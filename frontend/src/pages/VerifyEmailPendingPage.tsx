@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import { ErrorToast } from '../components/ErrorToast'
 import { resendVerificationEmail } from '../lib/auth'
 import '../styles/pages/AuthPage.css'
 
@@ -52,7 +53,7 @@ export function VerifyEmailPendingPage() {
           </label>
 
           {feedback && <div className="feedback-card">{feedback}</div>}
-          {error && <div className="feedback-card is-error">{error}</div>}
+          <ErrorToast message={error} />
 
           <div className="auth-action-row">
             <button className="primary-button auth-submit" type="button" onClick={() => { void handleResend() }} disabled={isSubmitting}>

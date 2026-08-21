@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AnalysisAnimeToast } from '../components/AnalysisAnimeToast'
 import { ConnectionErrorState } from '../components/ConnectionErrorState'
+import { ErrorToast } from '../components/ErrorToast'
 import { ReleaseDecadeProgress } from '../components/ReleaseDecadeProgress'
 import { VoiceActorRankingSection } from '../components/VoiceActorRankingSection'
 import { ViewingDnaCard } from '../components/ViewingDnaCard'
@@ -19,7 +20,7 @@ import {
 } from '../lib/analysisCache'
 import { getProfileImageSrc, handleProfileImageError } from '../lib/avatar'
 import { fetchMyCollection } from '../lib/collection'
-import { SERVER_CONNECTION_ERROR_MESSAGE, getFriendlyErrorMessage } from '../lib/errors'
+import { getFriendlyErrorMessage } from '../lib/errors'
 import { fetchSampleCollection, fetchSampleOverview, fetchSampleStudioRanking } from '../lib/sample'
 import {
   fetchFormatDistributionStats,
@@ -185,9 +186,14 @@ function toFiniteNumber(value: unknown) {
   return null
 }
 
-function renderEmptyMessage(message: string) {
-  if (message === SERVER_CONNECTION_ERROR_MESSAGE) {
-    return <ConnectionErrorState message={message} />
+function renderEmptyMessage(message: string, isError = false) {
+  if (isError) {
+    return (
+      <>
+        <ErrorToast message={message} />
+        <div className="analysis-empty-state">지금은 이 분석을 표시할 수 없어요.</div>
+      </>
+    )
   }
 
   return <div className="analysis-empty-state">{message}</div>
@@ -627,7 +633,7 @@ export function StudioRankingSection({
       </div>
 
       {rankingState.isLoading && <div className="analysis-empty-state">스튜디오 랭킹을 불러오는 중이에요.</div>}
-      {rankingState.error && !rankingState.isLoading && renderEmptyMessage(rankingState.error)}
+      {rankingState.error && !rankingState.isLoading && renderEmptyMessage(rankingState.error, true)}
       {!rankingState.isLoading && !rankingState.error && rankingState.items.length === 0 && (
         <div className="analysis-empty-state">표시할 스튜디오 데이터가 아직 없어요.</div>
       )}
@@ -684,7 +690,7 @@ export function StudioRankingSection({
             </div>
 
             {effectiveStudioAnimeState.isLoading && <div className="analysis-empty-state">작품 목록을 불러오는 중이에요.</div>}
-            {effectiveStudioAnimeState.error && !effectiveStudioAnimeState.isLoading && renderEmptyMessage(effectiveStudioAnimeState.error)}
+            {effectiveStudioAnimeState.error && !effectiveStudioAnimeState.isLoading && renderEmptyMessage(effectiveStudioAnimeState.error, true)}
             {!effectiveStudioAnimeState.isLoading && !effectiveStudioAnimeState.error && effectiveStudioAnimeState.items.length === 0 && (
               <div className="analysis-empty-state">이 스튜디오의 작품 목록이 아직 없어요.</div>
             )}
@@ -1692,9 +1698,7 @@ export function AnalysisPage() {
   if (state.error && !state.item) {
     return (
       <section className="analysis-page">
-        {state.error === SERVER_CONNECTION_ERROR_MESSAGE
-          ? <ConnectionErrorState message={state.error} />
-          : <div className="feedback-card is-error">{state.error}</div>}
+        <ConnectionErrorState message={state.error} />
       </section>
     )
   }
@@ -1795,9 +1799,7 @@ export function AnalysisPage() {
       </div>
 
       {!isGuestPreview && state.error && (
-        state.error === SERVER_CONNECTION_ERROR_MESSAGE
-          ? <ConnectionErrorState message={state.error} />
-          : <div className="feedback-card is-error">{state.error}</div>
+        <ConnectionErrorState message={state.error} />
       )}
 
       <section className="analysis-summary-card">
@@ -1887,7 +1889,7 @@ export function AnalysisPage() {
               <div className="analysis-chart-skeleton" />
             )}
             {formatDistributionError && !formatDistributionIsLoading && (
-              renderEmptyMessage(formatDistributionError)
+              renderEmptyMessage(formatDistributionError, true)
             )}
             {!formatDistributionIsLoading
               && !formatDistributionError
@@ -2068,7 +2070,7 @@ export function AnalysisPage() {
                   <p>평점이 있는 작품이 3편 이상인 연도만 모아 내 평균과 커뮤니티 평균을 비교해요.</p>
                 </div>
                 {yearlyScoreIsLoading && <div className="analysis-empty-state">연도별 평점 분석을 불러오는 중이에요.</div>}
-                {yearlyScoreError && !yearlyScoreIsLoading && renderEmptyMessage(yearlyScoreError)}
+                {yearlyScoreError && !yearlyScoreIsLoading && renderEmptyMessage(yearlyScoreError, true)}
                 {!yearlyScoreIsLoading && !yearlyScoreError && yearlyScoreItem && yearlyScoreItem.items.length > 0 && (
                   <>
                     <div className="analysis-year-score-summary">
@@ -2188,7 +2190,7 @@ export function AnalysisPage() {
           <p>내 평균과 커뮤니티 평균을 각각의 전체 평균 대비로 정규화해, 취향이 어느 쪽으로 기우는지 볼 수 있어요.</p>
         </div>
         {genreBubbleIsLoading && <div className="analysis-empty-state">장르 취향 차트를 불러오는 중이에요.</div>}
-        {genreBubbleError && !genreBubbleIsLoading && renderEmptyMessage(genreBubbleError)}
+        {genreBubbleError && !genreBubbleIsLoading && renderEmptyMessage(genreBubbleError, true)}
         {!genreBubbleIsLoading && !genreBubbleError && genreBubbleItem && genreBubbleItem.items.length > 0 && (
           <Suspense fallback={<div className="analysis-chart-skeleton analysis-chart-skeleton-wide" />}>
             <GenrePreferenceBubbleChart

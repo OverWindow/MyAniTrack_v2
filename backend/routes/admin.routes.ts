@@ -18,6 +18,11 @@ import {
   translateAnimeKoreanTitlesController,
   updateAnimeKoreanTitleController,
 } from '../src/controllers/admin.controller';
+import {
+  listProfileReportsController,
+  resolveProfileReportController,
+  setAnimeVisibilityController,
+} from '../src/controllers/content-moderation.controller';
 
 const router = Router();
 
@@ -25,6 +30,9 @@ router.use('/admin', requireAdmin);
 
 router.get('/admin/users', getAdminUsersController);
 router.get('/admin/users/:userId', getAdminUserController);
+router.get('/admin/profile-reports', listProfileReportsController);
+router.patch('/admin/profile-reports/:reportId', resolveProfileReportController);
+router.patch('/admin/anime/:animeId/visibility', setAnimeVisibilityController);
 router.post('/admin/anime/sync/full', requireAdmin, syncAllAnimeIntegratedController);
 router.post('/admin/anime/sync/relations', requireAdmin, syncAnimeRelationsController);
 router.post('/admin/anime/series/rebuild', requireAdmin, rebuildAnimeSeriesController);

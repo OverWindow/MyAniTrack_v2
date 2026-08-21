@@ -166,8 +166,12 @@ export async function getVoiceActorDetail(params: VoiceActorDetailParams) {
       COUNT(DISTINCT anime_id) AS animeCount,
       COUNT(DISTINCT character_id) AS characterCount,
       COUNT(*) AS creditCount
-    FROM anime_character_voice_actors
-    WHERE voice_actor_id = ?
+    FROM anime_character_voice_actors acva
+    INNER JOIN anime a
+      ON a.id = acva.anime_id
+      AND a.is_adult = FALSE
+      AND a.app_visible = TRUE
+    WHERE acva.voice_actor_id = ?
     `,
     [params.voiceActorId]
   );
@@ -238,6 +242,8 @@ export async function getVoiceActorDetail(params: VoiceActorDetailParams) {
     FROM anime_character_voice_actors acva
     INNER JOIN anime a
       ON a.id = acva.anime_id
+      AND a.is_adult = FALSE
+      AND a.app_visible = TRUE
     INNER JOIN characters c
       ON c.id = acva.character_id
     INNER JOIN anime_characters ac

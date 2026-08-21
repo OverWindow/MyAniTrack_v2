@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { GoogleIcon } from '../components/GoogleIcon'
+import { ErrorToast } from '../components/ErrorToast'
 import { useAuth } from '../contexts/AuthContext'
 import {
   getSafeAuthReturnPath,
@@ -124,7 +125,7 @@ export function LoginPage() {
             <Link to="/password-reset">비밀번호를 잊어버렸어요</Link>
           </div>
 
-          {error && <div className="feedback-card is-error">{error}</div>}
+          <ErrorToast message={error} />
 
           <button className="primary-button auth-submit" type="submit" disabled={isSubmitting}>
             {isSubmitting ? '로그인 중...' : '로그인'}

@@ -3,6 +3,35 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:myanitrack_mobile/src/models.dart';
 
 void main() {
+  group('약관 DTO', () {
+    test('이용약관 v1.1과 개인정보처리방침 v1.0에 모두 동의해야 한다', () {
+      final oldTerms = AgreementStatus.fromJson({
+        'termsAgreed': true,
+        'privacyAgreed': true,
+        'termsVersion': 'v1.0',
+        'privacyVersion': 'v1.0',
+      });
+      final currentTerms = AgreementStatus.fromJson({
+        'termsAgreed': true,
+        'privacyAgreed': true,
+        'termsVersion': 'v1.1',
+        'privacyVersion': 'v1.0',
+      });
+
+      expect(oldTerms.hasRequiredAgreements, isFalse);
+      expect(currentTerms.hasRequiredAgreements, isTrue);
+
+      final serverConfirmed = AgreementStatus.fromJson({
+        'termsAgreed': true,
+        'privacyAgreed': true,
+        'termsVersion': 'v1.1',
+        'privacyVersion': 'v1.0',
+        'hasRequiredAgreements': true,
+      });
+      expect(serverConfirmed.hasRequiredAgreements, isTrue);
+    });
+  });
+
   group('컬렉션 DTO', () {
     test('entry id와 anime id를 구분하고 nullable 값을 보존한다', () {
       final entry = CollectionEntry.fromJson({

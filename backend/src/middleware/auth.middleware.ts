@@ -11,6 +11,7 @@ interface AuthUserRow extends RowDataPacket {
   email: string;
   username: string;
   role: UserRole;
+  moderationStatus: 'ACTIVE' | 'SUSPENDED';
 }
 
 declare global {
@@ -34,6 +35,7 @@ async function findAuthUserById(userId: number) {
       email,
       username,
       role
+      , moderation_status AS moderationStatus
     FROM users
     WHERE id = ?
     LIMIT 1
@@ -42,6 +44,12 @@ async function findAuthUserById(userId: number) {
   );
 
   return rows[0] ?? null;
+}
+
+function rejectSuspended(user: AuthUserRow, res: Response) {
+  if (user.moderationStatus !== 'SUSPENDED') return false;
+  res.status(403).json({ success: false, message: 'Account suspended' });
+  return true;
 }
 
 function getSupabaseAuthFailureStatus(message: string) {
@@ -79,6 +87,8 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       });
     }
 
+    if (rejectSuspended(user, res)) return;
+
     req.authUser = {
       userId: user.id,
       email: user.email,
@@ -90,12 +100,15 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   } catch (error) {
     try {
       const user = await findOrCreateUserFromSupabaseToken(token);
+      const persistedUser = await findAuthUserById(user.id);
+      if (!persistedUser) throw new Error('User not found');
+      if (rejectSuspended(persistedUser, res)) return;
 
       req.authUser = {
-        userId: user.id,
-        email: user.email,
-        username: user.username,
-        role: user.role,
+        userId: persistedUser.id,
+        email: persistedUser.email,
+        username: persistedUser.username,
+        role: persistedUser.role,
       };
 
       return next();

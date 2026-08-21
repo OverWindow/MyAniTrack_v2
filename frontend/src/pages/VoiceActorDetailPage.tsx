@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ConnectionErrorState } from '../components/ConnectionErrorState'
+import { ErrorToast } from '../components/ErrorToast'
 import { VoiceActorCharacterWorks } from '../components/VoiceActorCharacterWorks'
 import { useAuth } from '../contexts/AuthContext'
 import { getProfileImageSrc, handleProfileImageError } from '../lib/avatar'
-import { getFriendlyErrorMessage, SERVER_CONNECTION_ERROR_MESSAGE } from '../lib/errors'
+import { getFriendlyErrorMessage } from '../lib/errors'
 import { fetchVoiceActorAnime } from '../lib/stats'
 import { groupVoiceActorCharacterWorks } from '../lib/voiceActorCharacterWorks'
 import {
@@ -321,9 +322,7 @@ export function VoiceActorDetailPage() {
   if (state.error || !state.item) {
     return (
       <section className="voice-actor-detail-page">
-        {state.error === SERVER_CONNECTION_ERROR_MESSAGE
-          ? <ConnectionErrorState message={state.error} />
-          : <div className="feedback-card">{state.error || '성우 정보를 표시할 수 없어요.'}</div>}
+        <ConnectionErrorState message={state.error || '성우 정보를 표시할 수 없어요.'} />
       </section>
     )
   }
@@ -452,9 +451,7 @@ export function VoiceActorDetailPage() {
         )}
 
         {creditFilter === 'completed' && watchedState.error && !watchedState.isLoading && (
-          watchedState.error === SERVER_CONNECTION_ERROR_MESSAGE
-            ? <ConnectionErrorState message={watchedState.error} />
-            : <div className="feedback-card">{watchedState.error}</div>
+          <ConnectionErrorState message={watchedState.error} />
         )}
 
         {creditFilter === 'completed' && !watchedState.isLoading && !watchedState.error && watchedCharacterGroups.length === 0 && (
@@ -476,9 +473,7 @@ export function VoiceActorDetailPage() {
         ))}
 
         {creditFilter === 'all' && state.moreError && (
-          state.moreError === SERVER_CONNECTION_ERROR_MESSAGE
-            ? <ConnectionErrorState message={state.moreError} />
-            : <div className="feedback-card">{state.moreError}</div>
+          <ErrorToast message={state.moreError} />
         )}
 
         {creditFilter === 'all' && state.item.pageInfo.hasNext && (
@@ -493,9 +488,7 @@ export function VoiceActorDetailPage() {
         )}
 
         {creditFilter === 'completed' && watchedState.moreError && (
-          watchedState.moreError === SERVER_CONNECTION_ERROR_MESSAGE
-            ? <ConnectionErrorState message={watchedState.moreError} />
-            : <div className="feedback-card">{watchedState.moreError}</div>
+          <ErrorToast message={watchedState.moreError} />
         )}
 
         {creditFilter === 'completed' && watchedState.pageInfo?.hasNext && (

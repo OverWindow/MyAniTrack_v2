@@ -1,4 +1,5 @@
 import { lazy, Suspense } from 'react'
+import { ErrorToast } from './ErrorToast'
 import { formatUpdatedAt } from '../lib/stats'
 import { getViewingDnaAxisDescription, SERIES_COMPLETION_EXCLUSION_NOTE } from '../lib/viewingDna'
 import type { ViewingDnaItem } from '../types/stats'
@@ -47,7 +48,12 @@ export function ViewingDnaCard({ item, isLoading, error, isGuestPreview = false 
         </div>
       )}
       {!isGuestPreview && isLoading && <div className="analysis-chart-skeleton analysis-viewing-dna-skeleton" />}
-      {!isGuestPreview && !isLoading && error && <div className="analysis-empty">{error}</div>}
+      {!isGuestPreview && !isLoading && error && (
+        <>
+          <ErrorToast message={error} />
+          <div className="analysis-empty">지금은 감상 DNA를 표시할 수 없어요.</div>
+        </>
+      )}
       {!isGuestPreview && !isLoading && !error && !item && (
         <div className="analysis-empty">아직 감상 DNA 분석 데이터가 없어요.</div>
       )}

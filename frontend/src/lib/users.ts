@@ -1,10 +1,17 @@
 import { authFetch } from './auth'
 import type { AnimeGenre } from '../types/anime'
 import type { AnimeStatsItem } from '../types/stats'
-import type { UserAnimeListItem, UserAnimeListSort } from '../types/collection'
+import type {
+  AnimeSeriesScope,
+  UserAnimeListItem,
+  UserAnimeListSort,
+  UserSeriesCollectionStatus,
+} from '../types/collection'
 import type {
   PublicUserAnimeListPage,
   PublicUserAnimeListResponse,
+  PublicUserSeriesCollectionPage,
+  PublicUserSeriesCollectionResponse,
   PublicUserAnimeStatsPage,
   PublicUserAnimeStatsResponse,
   PublicUserProfile,
@@ -195,6 +202,45 @@ export async function fetchPublicUserCollection(params: {
     items: filteredItems,
     pageInfo: data.pageInfo,
   } as PublicUserAnimeListPage
+}
+
+export async function fetchPublicUserSeriesCollection(params: {
+  userId: string
+  scope?: AnimeSeriesScope
+  status?: UserSeriesCollectionStatus
+  titleLanguage?: 'ko' | 'en' | 'ja'
+  query?: string
+  limit?: number
+  cursor?: string | null
+  signal?: AbortSignal
+}) {
+  const url = new URL(`/api/users/${params.userId}/anime-list/series`, getApiBaseUrl())
+  url.searchParams.set('scope', params.scope ?? 'mainline')
+  url.searchParams.set('status', params.status ?? 'all')
+  url.searchParams.set('titleLanguage', params.titleLanguage ?? 'ko')
+  url.searchParams.set('limit', String(params.limit ?? 20))
+
+  if (params.query?.trim()) {
+    url.searchParams.set('query', params.query.trim())
+  }
+
+  if (params.cursor) {
+    url.searchParams.set('cursor', params.cursor)
+  }
+
+  const response = await authFetch(url.toString(), { signal: params.signal })
+
+  if (!response.ok) {
+    throw new Error(getErrorMessage(response.status, '사용자 시리즈 컬렉션을 불러오지 못했어요.'))
+  }
+
+  const data = (await response.json()) as PublicUserSeriesCollectionResponse
+
+  return {
+    user: data.user,
+    items: data.items,
+    pageInfo: data.pageInfo,
+  } as PublicUserSeriesCollectionPage
 }
 
 export async function fetchPublicUserAnimeStats(userId: string, signal?: AbortSignal) {

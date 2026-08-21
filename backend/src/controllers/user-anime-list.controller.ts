@@ -199,6 +199,38 @@ export async function getMyAnimeSeriesCollection(req: Request, res: Response) {
   }
 }
 
+export async function getUserAnimeSeriesCollection(req: Request, res: Response) {
+  try {
+    const userId = parsePositiveInteger(req.params.userId, 'userId');
+    const user = await getPublicUserProfile(userId);
+    const scope = validateAnimeSeriesScope(req.query.scope);
+    const status = validateUserSeriesCollectionStatus(req.query.status);
+    const titleLanguage = validateUserAnimeListTitleLanguage(
+      typeof req.query.titleLanguage === 'string' ? req.query.titleLanguage : 'ko'
+    );
+    const query = validateUserSeriesQuery(req.query.query);
+    const limit = validateUserAnimeListLimit(req.query.limit);
+    const cursor = typeof req.query.cursor === 'string' ? req.query.cursor : undefined;
+    const result = await getUserSeriesCollection({
+      userId,
+      scope,
+      status,
+      titleLanguage,
+      query,
+      limit,
+      cursor,
+    });
+
+    return res.json({
+      success: true,
+      user,
+      ...result,
+    });
+  } catch (error) {
+    return sendError(res, error);
+  }
+}
+
 export async function getUserAnimeListController(req: Request, res: Response) {
   try {
     const userId = parsePositiveInteger(req.params.userId, 'userId');

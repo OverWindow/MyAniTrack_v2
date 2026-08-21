@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ConnectionErrorState } from '../components/ConnectionErrorState'
+import { ErrorToast } from '../components/ErrorToast'
 import { useAuth } from '../contexts/AuthContext'
 import { useFriends } from '../contexts/FriendsContext'
 import {
@@ -8,7 +9,6 @@ import {
   getFriendPreviewName,
 } from '../lib/friends'
 import { getProfileImageSrc, handleProfileImageError } from '../lib/avatar'
-import { SERVER_CONNECTION_ERROR_MESSAGE } from '../lib/errors'
 import type { FriendItem, FriendRequestAction, FriendRequestItem } from '../types/friends'
 import '../styles/pages/FriendsPage.css'
 
@@ -54,6 +54,7 @@ export function FriendsPage() {
   const [username, setUsername] = useState('')
   const [isSendingRequest, setIsSendingRequest] = useState(false)
   const [feedback, setFeedback] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
   const [activeRequestId, setActiveRequestId] = useState<number | null>(null)
   const [activeFriendId, setActiveFriendId] = useState<number | null>(null)
   const [openFriendMenuId, setOpenFriendMenuId] = useState<number | null>(null)
@@ -119,19 +120,20 @@ export function FriendsPage() {
     const normalizedUsername = username.trim()
 
     if (!normalizedUsername) {
-      setFeedback('보낼 username을 입력해주세요.')
+      setActionError('보낼 username을 입력해주세요.')
       return
     }
 
     setIsSendingRequest(true)
     setFeedback(null)
+    setActionError(null)
 
     try {
       const message = await sendRequest(normalizedUsername)
       setUsername('')
       setFeedback(message)
     } catch (requestError) {
-      setFeedback(
+      setActionError(
         requestError instanceof Error
           ? requestError.message
           : '친구 요청을 보내지 못했어요.',
@@ -144,12 +146,13 @@ export function FriendsPage() {
   const handleRequestAction = async (requestId: number, action: FriendRequestAction) => {
     setActiveRequestId(requestId)
     setFeedback(null)
+    setActionError(null)
 
     try {
       const message = await respondToRequest(requestId, action)
       setFeedback(message)
     } catch (actionError) {
-      setFeedback(
+      setActionError(
         actionError instanceof Error
           ? actionError.message
           : '친구 요청을 처리하지 못했어요.',
@@ -163,12 +166,13 @@ export function FriendsPage() {
     setActiveFriendId(friendUserId)
     setOpenFriendMenuId(null)
     setFeedback(null)
+    setActionError(null)
 
     try {
       await deleteFriend(friendUserId)
       setFeedback('친구를 목록에서 삭제했어요.')
     } catch (removeError) {
-      setFeedback(
+      setActionError(
         removeError instanceof Error
           ? removeError.message
           : '친구를 삭제하지 못했어요.',
@@ -215,10 +219,9 @@ export function FriendsPage() {
           {feedback}
         </div>
       )}
+      <ErrorToast message={actionError} />
       {error && (
-        error === SERVER_CONNECTION_ERROR_MESSAGE
-          ? <ConnectionErrorState message={error} />
-          : <div className="feedback-card is-error">{error}</div>
+        <ConnectionErrorState message={error} />
       )}
 
       <div className="friends-layout">

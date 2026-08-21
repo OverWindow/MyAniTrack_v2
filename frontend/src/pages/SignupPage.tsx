@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { AGREEMENT_SECTIONS, AGREEMENT_VERSION, type AgreementKey } from '../content/agreements'
+import { AGREEMENT_SECTIONS, TERMS_VERSION, type AgreementKey } from '../content/agreements'
+import { PRIVACY_POLICY_VERSION } from '../content/privacyPolicy'
 import { GoogleIcon } from '../components/GoogleIcon'
+import { ErrorToast } from '../components/ErrorToast'
 import { checkUsernameAvailability, savePendingAgreements, savePendingSupabaseAgreements } from '../lib/auth'
 import { useAuth } from '../contexts/AuthContext'
 import '../styles/pages/AuthPage.css'
@@ -160,9 +162,9 @@ export function SignupPage() {
 
       savePendingAgreements(normalizedEmail, {
         termsAgreed: true,
-        termsVersion: AGREEMENT_VERSION,
+        termsVersion: TERMS_VERSION,
         privacyAgreed: true,
-        privacyVersion: AGREEMENT_VERSION,
+        privacyVersion: PRIVACY_POLICY_VERSION,
       })
 
       navigate(`/verify-email/pending?email=${encodeURIComponent(normalizedEmail)}`, {
@@ -192,9 +194,9 @@ export function SignupPage() {
     try {
       savePendingSupabaseAgreements({
         termsAgreed: true,
-        termsVersion: AGREEMENT_VERSION,
+        termsVersion: TERMS_VERSION,
         privacyAgreed: true,
-        privacyVersion: AGREEMENT_VERSION,
+        privacyVersion: PRIVACY_POLICY_VERSION,
       })
       await loginWithGoogle('signup')
     } catch (submitError) {
@@ -364,7 +366,7 @@ export function SignupPage() {
 
             <div className="auth-divider auth-divider-compact"><span>또는 이메일로 가입</span></div>
 
-            {error && <div className="feedback-card is-error">{error}</div>}
+            <ErrorToast message={error} />
 
             <button className="primary-button auth-submit" type="submit" disabled={isSubmitting}>
               {isSubmitting ? '가입 중...' : '회원가입'}

@@ -12,6 +12,90 @@ import 'package:myanitrack_mobile/src/screens/collection_screens.dart';
 import 'package:myanitrack_mobile/src/theme.dart';
 import 'package:myanitrack_mobile/src/widgets.dart';
 
+const _profileReportReasons = <(String, String)>[
+  ('SEXUAL_CONTENT', '성적 콘텐츠'),
+  ('VIOLENT_CONTENT', '폭력적 콘텐츠'),
+  ('ALCOHOL_TOBACCO_DRUGS', '술·담배·약물'),
+  ('HATE_HARASSMENT', '혐오·괴롭힘'),
+  ('SPAM_IMPERSONATION', '스팸·사칭'),
+  ('OTHER', '기타'),
+];
+
+Future<bool> _showProfileSafetyActions(
+  BuildContext context,
+  WidgetRef ref,
+  PublicUser user,
+) async {
+  final action = await showCupertinoModalPopup<String>(
+    context: context,
+    builder: (context) => CupertinoActionSheet(
+      title: Text(user.username),
+      actions: [
+        CupertinoActionSheetAction(
+          onPressed: () => Navigator.pop(context, 'report'),
+          child: const Text('프로필 신고'),
+        ),
+        CupertinoActionSheetAction(
+          isDestructiveAction: true,
+          onPressed: () => Navigator.pop(context, 'block'),
+          child: const Text('사용자 차단'),
+        ),
+      ],
+      cancelButton: CupertinoActionSheetAction(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('취소'),
+      ),
+    ),
+  );
+  if (!context.mounted || action == null) return false;
+  try {
+    if (action == 'report') {
+      final reason = await showCupertinoModalPopup<String>(
+        context: context,
+        builder: (context) => CupertinoActionSheet(
+          title: const Text('신고 사유를 선택해주세요'),
+          actions: _profileReportReasons
+              .map(
+                (item) => CupertinoActionSheetAction(
+                  onPressed: () => Navigator.pop(context, item.$1),
+                  child: Text(item.$2),
+                ),
+              )
+              .toList(),
+          cancelButton: CupertinoActionSheetAction(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('취소'),
+          ),
+        ),
+      );
+      if (reason == null) return false;
+      await ref.read(friendsRepositoryProvider).reportProfile(user.id, reason);
+      if (context.mounted) showAppToast(context, '프로필 신고가 접수되었습니다.');
+      return false;
+    }
+    final confirmed = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: const Text('사용자를 차단할까요?'),
+        content: const Text('친구 관계와 대기 중인 요청이 종료되며 서로의 프로필과 활동이 숨겨집니다.'),
+        actions: [
+          CupertinoDialogAction(onPressed: () => Navigator.pop(context, false), child: const Text('취소')),
+          CupertinoDialogAction(isDestructiveAction: true, onPressed: () => Navigator.pop(context, true), child: const Text('차단')),
+        ],
+      ),
+    );
+    if (confirmed != true) return false;
+    await ref.read(friendsRepositoryProvider).blockUser(user.id);
+    ref.invalidate(friendSnapshotProvider);
+    ref.invalidate(userSearchProvider);
+    if (context.mounted) showAppToast(context, '사용자를 차단했습니다.');
+    return true;
+  } on ApiFailure catch (error) {
+    if (context.mounted) showAppToast(context, error.message, error: true);
+    return false;
+  }
+}
+
 class FriendsScreen extends ConsumerStatefulWidget {
   const FriendsScreen({super.key});
 
@@ -89,6 +173,11 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
                                   onTap: () =>
                                       context.push('/users/${item.user.id}'),
                                   action: _relationshipAction(item),
+                                  onMore: () => _showProfileSafetyActions(
+                                    context,
+                                    ref,
+                                    item.user,
+                                  ),
                                 ),
                               )
                               .toList(),
@@ -328,6 +417,29 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
                     CupertinoIcons.back,
                     color: AppColors.pointPressed,
                   ),
+                ),
+                trailing: profile.maybeWhen(
+                  data: (user) => Semantics(
+                    label: '프로필 신고 및 차단',
+                    button: true,
+                    child: CupertinoButton(
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size.square(44),
+                      onPressed: () async {
+                        final blocked = await _showProfileSafetyActions(
+                          context,
+                          ref,
+                          user,
+                        );
+                        if (blocked && context.mounted) context.pop();
+                      },
+                      child: const Icon(
+                        CupertinoIcons.ellipsis,
+                        color: AppColors.pointPressed,
+                      ),
+                    ),
+                  ),
+                  orElse: () => const SizedBox(width: 44),
                 ),
               ),
               SliverPadding(
@@ -882,10 +994,12 @@ class _UserRow extends StatelessWidget {
     required this.user,
     required this.onTap,
     required this.action,
+    this.onMore,
   });
   final PublicUser user;
   final VoidCallback onTap;
   final Widget action;
+  final VoidCallback? onMore;
 
   @override
   Widget build(BuildContext context) => CupertinoButton(
@@ -918,6 +1032,17 @@ class _UserRow extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 8),
+        if (onMore != null)
+          Semantics(
+            label: '프로필 신고 및 차단',
+            button: true,
+            child: CupertinoButton(
+              padding: EdgeInsets.zero,
+              minimumSize: const Size.square(44),
+              onPressed: onMore,
+              child: const Icon(CupertinoIcons.ellipsis, size: 18),
+            ),
+          ),
         action,
       ],
     ),

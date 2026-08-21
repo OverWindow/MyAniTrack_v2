@@ -1,4 +1,9 @@
-import type { UserAnimeListItem, UserAnimeListResponse, UserAnimeListSort } from './collection'
+import type {
+  UserAnimeListItem,
+  UserAnimeListResponse,
+  UserAnimeListSort,
+  UserSeriesCollectionResponse,
+} from './collection'
 import type { AnimeStatsItem } from './stats'
 
 export type PublicUserProfile = {
@@ -20,6 +25,10 @@ export type PublicUserAnimeListResponse = UserAnimeListResponse & {
   user: PublicUserProfile
 }
 
+export type PublicUserSeriesCollectionResponse = UserSeriesCollectionResponse & {
+  user: PublicUserProfile
+}
+
 export type PublicUserAnimeStatsResponse = {
   success: boolean
   user: PublicUserProfile
@@ -30,6 +39,12 @@ export type PublicUserAnimeListPage = {
   user: PublicUserProfile
   items: UserAnimeListItem[]
   pageInfo: PublicUserAnimeListResponse['pageInfo']
+}
+
+export type PublicUserSeriesCollectionPage = {
+  user: PublicUserProfile
+  items: PublicUserSeriesCollectionResponse['items']
+  pageInfo: PublicUserSeriesCollectionResponse['pageInfo']
 }
 
 export type PublicUserAnimeStatsPage = {

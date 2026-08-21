@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { ExternalLink } from 'lucide-react'
+import { ErrorToast } from './ErrorToast'
 import { fetchAdminUserDetail, fetchAdminUsers } from '../lib/admin'
 import { getProfileImageSrc, handleProfileImageError } from '../lib/avatar'
 import type {
@@ -195,7 +196,8 @@ export function AdminUserManager() {
           </div>
 
           {listState.isLoading && <div className="feedback-card">사용자 목록을 불러오는 중이에요.</div>}
-          {listState.error && !listState.isLoading && <div className="feedback-card is-error">{listState.error}</div>}
+          {!listState.isLoading && <ErrorToast message={listState.error} />}
+          {listState.error && !listState.isLoading && <div className="feedback-card">사용자 목록을 표시할 수 없어요.</div>}
           {!listState.isLoading && !listState.error && listState.data?.items.length === 0 && (
             <div className="feedback-card">조건에 맞는 사용자가 없어요.</div>
           )}
@@ -283,7 +285,8 @@ export function AdminUserManager() {
         <aside className="admin-user-detail-panel">
           {!selectedUserId && <div className="admin-user-detail-empty">사용자를 선택하면 상세 정보가 표시됩니다.</div>}
           {detailState.isLoading && <div className="admin-user-detail-empty">상세 정보를 불러오는 중이에요.</div>}
-          {detailState.error && !detailState.isLoading && <div className="feedback-card is-error">{detailState.error}</div>}
+          {!detailState.isLoading && <ErrorToast message={detailState.error} />}
+          {detailState.error && !detailState.isLoading && <div className="feedback-card">사용자 상세 정보를 표시할 수 없어요.</div>}
 
           {detail && selectedUserId && !detailState.isLoading && (
             <>

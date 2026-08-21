@@ -200,7 +200,10 @@ export async function getAnimeSeriesList(params: AnimeSeriesListParams) {
       OR EXISTS (
         SELECT 1
         FROM anime_series_members searchMember
-        INNER JOIN anime searchAnime ON searchAnime.id = searchMember.anime_id
+        INNER JOIN anime searchAnime
+          ON searchAnime.id = searchMember.anime_id
+          AND searchAnime.is_adult = FALSE
+          AND searchAnime.app_visible = TRUE
         LEFT JOIN anime_korean_titles searchKorean
           ON searchKorean.anime_id = searchAnime.id AND searchKorean.is_primary = TRUE
         WHERE searchMember.series_id = seriesRow.id
@@ -240,8 +243,8 @@ export async function getAnimeSeriesList(params: AnimeSeriesListParams) {
       ${SEASON_RANK_SQL} AS seasonRankValue
     FROM anime_series seriesRow
     INNER JOIN anime_series_members memberRow ON memberRow.series_id = seriesRow.id
-    INNER JOIN anime memberAnime ON memberAnime.id = memberRow.anime_id AND memberAnime.is_adult = FALSE
-    INNER JOIN anime canonicalAnime ON canonicalAnime.id = seriesRow.canonical_anime_id AND canonicalAnime.is_adult = FALSE
+    INNER JOIN anime memberAnime ON memberAnime.id = memberRow.anime_id AND memberAnime.is_adult = FALSE AND memberAnime.app_visible = TRUE
+    INNER JOIN anime canonicalAnime ON canonicalAnime.id = seriesRow.canonical_anime_id AND canonicalAnime.is_adult = FALSE AND canonicalAnime.app_visible = TRUE
     LEFT JOIN anime_korean_titles canonicalKorean
       ON canonicalKorean.anime_id = canonicalAnime.id AND canonicalKorean.is_primary = TRUE
     WHERE seriesRow.scope = ?
@@ -293,7 +296,7 @@ export async function getAnimeSeriesList(params: AnimeSeriesListParams) {
         animeRow.format,
         animeRow.status
       FROM anime_series_members memberRow
-      INNER JOIN anime animeRow ON animeRow.id = memberRow.anime_id AND animeRow.is_adult = FALSE
+      INNER JOIN anime animeRow ON animeRow.id = memberRow.anime_id AND animeRow.is_adult = FALSE AND animeRow.app_visible = TRUE
       LEFT JOIN anime_korean_titles koreanTitle
         ON koreanTitle.anime_id = animeRow.id AND koreanTitle.is_primary = TRUE
       WHERE memberRow.series_id IN (?)

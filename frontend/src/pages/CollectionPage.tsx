@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import collectionEmptyMoaImage from '../assets/collection-empty-moa.png'
 import { CollectionCarousel } from '../components/CollectionCarousel'
+import { CollectionViewSwitch } from '../components/CollectionViewSwitch'
 import { ConnectionErrorState } from '../components/ConnectionErrorState'
+import { SeriesCollectionGrid, SeriesCollectionSkeleton } from '../components/SeriesCollectionGrid'
 import { useAuth } from '../contexts/AuthContext'
 import {
   fetchMyCollection,
@@ -13,7 +15,7 @@ import {
   saveSeriesCollectionCache,
 } from '../lib/collection'
 import { genreOptions } from '../lib/anime'
-import { SERVER_CONNECTION_ERROR_MESSAGE, getFriendlyErrorMessage } from '../lib/errors'
+import { getFriendlyErrorMessage } from '../lib/errors'
 import { fetchSampleCollection } from '../lib/sample'
 import type { AnimeGenre } from '../types/anime'
 import type {
@@ -650,42 +652,7 @@ export function CollectionPage() {
         <div className="explore-toolbar">
           <div className="search-group">
             {isGuestPreview && <span className="sample-mode-chip">샘플 컬렉션</span>}
-            {!isGuestPreview && (
-              <div
-                className="collection-view-switch"
-                data-active-view={viewMode}
-                role="group"
-                aria-label="컬렉션 보기 방식"
-              >
-                <button
-                  type="button"
-                  className={viewMode === 'anime' ? 'is-active' : ''}
-                  aria-pressed={viewMode === 'anime'}
-                  onClick={() => setViewMode('anime')}
-                >
-                  <svg viewBox="0 0 20 20" aria-hidden="true">
-                    <rect x="3" y="3" width="5" height="5" rx="1.25" />
-                    <rect x="12" y="3" width="5" height="5" rx="1.25" />
-                    <rect x="3" y="12" width="5" height="5" rx="1.25" />
-                    <rect x="12" y="12" width="5" height="5" rx="1.25" />
-                  </svg>
-                  <span>작품별</span>
-                </button>
-                <button
-                  type="button"
-                  className={viewMode === 'series' ? 'is-active' : ''}
-                  aria-pressed={viewMode === 'series'}
-                  onClick={() => setViewMode('series')}
-                >
-                  <svg viewBox="0 0 20 20" aria-hidden="true">
-                    <rect x="4" y="3" width="12" height="5" rx="1.5" />
-                    <rect x="4" y="12" width="12" height="5" rx="1.5" />
-                    <path d="M7 8v4M13 8v4" />
-                  </svg>
-                  <span>시리즈별</span>
-                </button>
-              </div>
-            )}
+            {!isGuestPreview && <CollectionViewSwitch value={viewMode} onChange={setViewMode} />}
             <label className="search-field minimalist-search" htmlFor="collection-search">
               <input
                 id="collection-search"
@@ -769,98 +736,28 @@ export function CollectionPage() {
         </div>
 
       {viewMode === 'series' && !isGuestPreview && seriesState.error && (
-        seriesState.error === SERVER_CONNECTION_ERROR_MESSAGE
-          ? <ConnectionErrorState message={seriesState.error} />
-          : <div className="feedback-card is-error">{seriesState.error}</div>
+        <ConnectionErrorState message={seriesState.error} />
       )}
 
       {viewMode === 'series' && !isGuestPreview && !seriesState.error && seriesState.isLoading && (
-        <div className="series-collection-grid">
-          {Array.from({ length: 6 }).map((_, index) => (
-            <article className="series-collection-card skeleton-card" key={`series-skeleton-${index}`}>
-              <div className="skeleton-poster" />
-              <div className="skeleton-line short" />
-              <div className="skeleton-line long" />
-            </article>
-          ))}
-        </div>
+        <SeriesCollectionSkeleton />
       )}
 
       {viewMode === 'series' && !isGuestPreview && !seriesState.error && !seriesState.isLoading && (
         seriesState.items.length === 0 ? (
           <div className="feedback-card">조건에 맞는 시리즈가 없어요.</div>
         ) : (
-          <div className="series-collection-grid">
-            {seriesState.items.map((series) => {
-              const targetAnimeId = series.canonicalAnimeId ?? series.items[0]?.anime.id
-
-              return (
-                <article className="series-collection-card" key={series.seriesId}>
-                  {targetAnimeId ? (
-                    <Link
-                      className="series-collection-cover-link"
-                      to={`/anime/${targetAnimeId}`}
-                      state={{ fromPage: 'collection', backgroundLocation: location }}
-                    >
-                      {series.coverImageExtraLarge || series.coverImageLarge ? (
-                        <img
-                          className="series-collection-cover"
-                          src={series.coverImageExtraLarge || series.coverImageLarge || ''}
-                          alt={series.title || '시리즈 대표 이미지'}
-                          loading="lazy"
-                        />
-                      ) : (
-                        <div className="series-collection-cover-placeholder">No image</div>
-                      )}
-                    </Link>
-                  ) : null}
-                  <div className="series-collection-copy">
-                    <div className="series-collection-heading">
-                      <div>
-                        <span className="series-collection-scope">
-                          {series.scope === 'mainline' ? '본편 시리즈' : '관련 작품 전체'}
-                        </span>
-                        <h3>{series.title || '이름 없는 시리즈'}</h3>
-                      </div>
-                      <strong>{series.completionRate}%</strong>
-                    </div>
-                    <div className="series-collection-progress" aria-label={`완주율 ${series.completionRate}%`}>
-                      <span style={{ width: `${Math.min(100, Math.max(0, series.completionRate))}%` }} />
-                    </div>
-                    <p>
-                      {series.completedRequiredMemberCount}/{series.requiredMemberCount} 필수 작품 완주
-                      {' · '}
-                      내 컬렉션 {series.collectedMemberCount}개
-                    </p>
-                    <div className="series-member-strip">
-                      {series.items.map((member) => (
-                        <Link
-                          key={member.anime.id}
-                          className={member.userList ? 'series-member-item is-collected' : 'series-member-item'}
-                          to={`/anime/${member.anime.id}`}
-                          state={{ fromPage: 'collection', backgroundLocation: location }}
-                          title={`${member.anime.title}${member.userList ? ` · ${member.userList.status}` : ' · 미등록'}`}
-                        >
-                          {member.anime.coverImageLarge ? (
-                            <img src={member.anime.coverImageLarge} alt={member.anime.title} loading="lazy" />
-                          ) : (
-                            <span>{member.anime.title.slice(0, 1)}</span>
-                          )}
-                        </Link>
-                      ))}
-                    </div>
-                  </div>
-                </article>
-              )
-            })}
-          </div>
+          <SeriesCollectionGrid
+            items={seriesState.items}
+            location={location}
+            fromPage="collection"
+            collectionLabel="내 컬렉션"
+          />
         )
       )}
 
       {viewMode === 'anime' && !isGuestPreview && error && (
-        error === SERVER_CONNECTION_ERROR_MESSAGE
-          ? <ConnectionErrorState message={error} />
-          : <div className="feedback-card is-error">{error}</div>
+        <ConnectionErrorState message={error} />
       )}
 
       {viewMode === 'anime' && !isGuestPreview && !error && (isLoading || isRefreshingQuery) && (

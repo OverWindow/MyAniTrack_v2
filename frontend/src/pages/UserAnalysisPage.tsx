@@ -2,12 +2,13 @@ import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { AnalysisAnimeToast } from '../components/AnalysisAnimeToast'
 import { ConnectionErrorState } from '../components/ConnectionErrorState'
+import { ErrorToast } from '../components/ErrorToast'
 import { ReleaseDecadeProgress } from '../components/ReleaseDecadeProgress'
 import { VoiceActorRankingSection } from '../components/VoiceActorRankingSection'
 import { ViewingDnaCard } from '../components/ViewingDnaCard'
 import { StudioRankingSection, WatchTimeComparisonTicker } from './AnalysisPage'
 import { getProfileImageSrc, handleProfileImageError } from '../lib/avatar'
-import { SERVER_CONNECTION_ERROR_MESSAGE, getFriendlyErrorMessage } from '../lib/errors'
+import { getFriendlyErrorMessage } from '../lib/errors'
 import {
   fetchFormatDistributionStats,
   fetchGenreBubbleStats,
@@ -117,9 +118,14 @@ function toFiniteNumber(value: unknown) {
   return null
 }
 
-function renderEmptyMessage(message: string) {
-  if (message === SERVER_CONNECTION_ERROR_MESSAGE) {
-    return <ConnectionErrorState message={message} />
+function renderEmptyMessage(message: string, isError = false) {
+  if (isError) {
+    return (
+      <>
+        <ErrorToast message={message} />
+        <div className="analysis-empty-state">지금은 이 분석을 표시할 수 없어요.</div>
+      </>
+    )
   }
 
   return <div className="analysis-empty-state">{message}</div>
@@ -504,7 +510,8 @@ export function UserAnalysisPage() {
   if (!userId) {
     return (
       <section className="analysis-page">
-        <div className="feedback-card is-error">잘못된 사용자 경로예요.</div>
+        <ErrorToast message="잘못된 사용자 경로예요." />
+        <div className="feedback-card">요청한 분석 화면을 열 수 없어요.</div>
       </section>
     )
   }
@@ -527,9 +534,7 @@ export function UserAnalysisPage() {
   if (state.error || !state.item || !state.user) {
     return (
       <section className="analysis-page">
-        {state.error === SERVER_CONNECTION_ERROR_MESSAGE
-          ? <ConnectionErrorState message={state.error} />
-          : <div className="feedback-card is-error">{state.error ?? '분석 정보를 찾을 수 없어요.'}</div>}
+        <ConnectionErrorState message={state.error ?? '분석 정보를 찾을 수 없어요.'} />
       </section>
     )
   }
@@ -631,7 +636,7 @@ export function UserAnalysisPage() {
               <div className="analysis-chart-skeleton" />
             )}
             {formatDistributionState.error && !formatDistributionState.isLoading && (
-              renderEmptyMessage(formatDistributionState.error)
+              renderEmptyMessage(formatDistributionState.error, true)
             )}
             {!formatDistributionState.isLoading
               && !formatDistributionState.error
@@ -811,7 +816,7 @@ export function UserAnalysisPage() {
                   <p>평점이 있는 작품이 3편 이상인 연도만 모아 이 유저의 평균과 커뮤니티 평균을 비교해요.</p>
                 </div>
                 {yearlyScoreState.isLoading && <div className="analysis-empty-state">연도별 평점 분석을 불러오는 중이에요.</div>}
-                {yearlyScoreState.error && !yearlyScoreState.isLoading && renderEmptyMessage(yearlyScoreState.error)}
+                {yearlyScoreState.error && !yearlyScoreState.isLoading && renderEmptyMessage(yearlyScoreState.error, true)}
                 {!yearlyScoreState.isLoading && !yearlyScoreState.error && yearlyScoreState.item && yearlyScoreState.item.items.length > 0 && (
                   <>
                     <div className="analysis-year-score-summary">
@@ -931,7 +936,7 @@ export function UserAnalysisPage() {
           <p>이 유저의 평균과 커뮤니티 평균을 각각의 전체 평균 대비로 정규화해, 취향이 어느 쪽으로 기우는지 볼 수 있어요.</p>
         </div>
         {genreBubbleState.isLoading && <div className="analysis-empty-state">장르 취향 차트를 불러오는 중이에요.</div>}
-        {genreBubbleState.error && !genreBubbleState.isLoading && renderEmptyMessage(genreBubbleState.error)}
+        {genreBubbleState.error && !genreBubbleState.isLoading && renderEmptyMessage(genreBubbleState.error, true)}
         {!genreBubbleState.isLoading && !genreBubbleState.error && genreBubbleState.item && genreBubbleState.item.items.length > 0 && (
           <Suspense fallback={<div className="analysis-chart-skeleton analysis-chart-skeleton-wide" />}>
             <GenrePreferenceBubbleChart

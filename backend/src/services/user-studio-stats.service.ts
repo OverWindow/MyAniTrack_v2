@@ -409,6 +409,8 @@ export async function getUserStudioRanking(params: StudioRankingParams) {
       FROM user_anime_lists ual
       INNER JOIN anime a
         ON a.id = ual.anime_id
+        AND a.is_adult = FALSE
+        AND a.app_visible = TRUE
       INNER JOIN anime_studios ans
         ON ans.anime_id = a.id
       WHERE ual.user_id = ?
@@ -532,6 +534,8 @@ export async function getUserStudioAnime(params: StudioAnimeParams) {
     FROM user_anime_lists ual
     INNER JOIN anime a
       ON a.id = ual.anime_id
+      AND a.is_adult = FALSE
+      AND a.app_visible = TRUE
     INNER JOIN anime_studios ans
       ON ans.anime_id = a.id
       AND ans.studio_id = ?

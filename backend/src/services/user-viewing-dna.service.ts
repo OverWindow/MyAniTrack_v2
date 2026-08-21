@@ -136,6 +136,8 @@ export async function getUserViewingDna(userId: number) {
       FROM user_anime_lists ual
       INNER JOIN anime animeRow
         ON animeRow.id = ual.anime_id
+        AND animeRow.is_adult = FALSE
+        AND animeRow.app_visible = TRUE
       WHERE ual.user_id = ?
         AND ual.status <> 'planned'
         AND animeRow.season_year IS NOT NULL

@@ -4,6 +4,8 @@ import adminRoutes from './routes/admin.routes';
 import animeRoutes from './src/routes/anime.routes';
 import authRoutes from './src/routes/auth.routes';
 import friendRoutes from './src/routes/friend.routes';
+import contentModerationRoutes from './src/routes/content-moderation.routes';
+import { runMigrations } from './src/database/migrate';
 import guestSampleRoutes from './src/routes/guest-sample.routes';
 import platformStatsRoutes from './src/routes/platform-stats.routes';
 import recommendationRoutes from './src/routes/recommendation.routes';
@@ -106,6 +108,7 @@ app.use(adminRoutes);
 app.use('/api', animeRoutes);
 app.use('/api', authRoutes);
 app.use('/api', friendRoutes);
+app.use('/api', contentModerationRoutes);
 app.use('/api', guestSampleRoutes);
 app.use('/api', platformStatsRoutes);
 app.use('/api', recommendationRoutes);
@@ -116,6 +119,14 @@ app.use('/api', userVoiceActorStatsRoutes);
 
 const PORT = Number(process.env.PORT || 4000);
 
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+async function startServer() {
+  await runMigrations();
+  app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+  });
+}
+
+void startServer().catch((error) => {
+  console.error('Failed to start server', error);
+  process.exit(1);
 });

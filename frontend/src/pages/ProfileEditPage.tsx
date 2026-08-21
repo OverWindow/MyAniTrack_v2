@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { Pencil } from 'lucide-react'
+import { ErrorToast } from '../components/ErrorToast'
 import { ProfileImageCropper } from '../components/ProfileImageCropper'
 import { useAuth } from '../contexts/AuthContext'
 import { getProfileImageSrc, handleProfileImageError } from '../lib/avatar'
@@ -275,7 +276,7 @@ export function ProfileEditPage() {
             <span>현재 프로필 이미지를 삭제할게요.</span>
           </label>
 
-          {error && <div className="feedback-card is-error">{error}</div>}
+          <ErrorToast message={error} />
 
           <div className="profile-edit-actions">
             <button

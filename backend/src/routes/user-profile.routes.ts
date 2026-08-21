@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import multer from 'multer';
 import { NextFunction, Request, Response, Router } from 'express';
 import { requireAuth } from '../middleware/auth.middleware';
+import { optionalAuth, requireVisibleUser } from '../middleware/content-visibility.middleware';
 import { getUserProfile, updateMyProfile } from '../controllers/user-profile.controller';
 
 const router = Router();
@@ -55,7 +56,7 @@ function uploadProfileImage(
   });
 }
 
-router.get('/users/:userId/profile', getUserProfile);
+router.get('/users/:userId/profile', optionalAuth, requireVisibleUser, getUserProfile);
 router.patch('/me/profile', requireAuth, uploadProfileImage, updateMyProfile);
 
 export default router;

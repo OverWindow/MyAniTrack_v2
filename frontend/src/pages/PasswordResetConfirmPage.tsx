@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { ErrorToast } from '../components/ErrorToast'
 import { confirmPasswordReset } from '../lib/auth'
 import '../styles/pages/AuthPage.css'
 
@@ -87,7 +88,7 @@ export function PasswordResetConfirmPage() {
           </label>
 
           {successMessage && <div className="feedback-card">{successMessage}</div>}
-          {error && <div className="feedback-card is-error">{error}</div>}
+          <ErrorToast message={error} />
 
           <div className="auth-action-row">
             <button className="primary-button auth-submit" type="submit" disabled={isSubmitting || !token}>

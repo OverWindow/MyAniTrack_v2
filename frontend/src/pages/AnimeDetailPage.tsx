@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { CollectionEditor } from '../components/CollectionEditor'
+import { ConnectionErrorState } from '../components/ConnectionErrorState'
+import { ErrorToast } from '../components/ErrorToast'
 import { useAuth } from '../contexts/AuthContext'
 import { updateAnimeKoreanTitle } from '../lib/admin'
 import {
@@ -162,7 +164,7 @@ function AdminTitleEditor({ item, onTitleUpdated }: AdminTitleEditorProps) {
         </label>
 
         {adminTitleFeedback && <div className="feedback-card admin-title-feedback">{adminTitleFeedback}</div>}
-        {adminTitleError && <div className="feedback-card is-error admin-title-feedback">{adminTitleError}</div>}
+        <ErrorToast message={adminTitleError} />
 
         <button className="primary-button auth-submit" type="submit" disabled={isSavingAdminTitle}>
           {isSavingAdminTitle ? '저장 중...' : '제목 저장 및 잠금'}
@@ -448,7 +450,8 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
   if (!id) {
     return (
       <section className={detailPageClassName}>
-        <div className="feedback-card is-error">잘못된 경로로 접근했어요.</div>
+        <ErrorToast message="잘못된 경로로 접근했어요." />
+        <div className="feedback-card">요청한 작품 화면을 열 수 없어요.</div>
       </section>
     )
   }
@@ -480,7 +483,7 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
             ×
           </button>
         )}
-        <div className="feedback-card is-error">{error ?? '작품 정보를 찾을 수 없어요.'}</div>
+        <ConnectionErrorState message={error ?? '작품 정보를 찾을 수 없어요.'} />
       </section>
     )
   }
@@ -489,6 +492,8 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
 
   return (
     <section className={detailPageClassName}>
+      <ErrorToast message={relationState.error} />
+      <ErrorToast message={castState.error} />
       {isOverlay && (
         <button className="detail-overlay-close" type="button" onClick={handleOverlayClose} aria-label="상세 닫기">
           ×

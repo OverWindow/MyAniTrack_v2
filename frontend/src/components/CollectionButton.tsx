@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { ErrorToast } from './ErrorToast'
 import { useAuth } from '../contexts/AuthContext'
 import {
   addToCollection,
@@ -27,6 +28,7 @@ export function CollectionButton({
   const { isAuthenticated } = useAuth()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [localIsAdded, setLocalIsAdded] = useState<boolean | null>(null)
   const cacheIsAdded = isAuthenticated && useCacheState
     ? Boolean(getCachedCollectionEntry(animeId)) || initialIsAdded
@@ -53,6 +55,7 @@ export function CollectionButton({
 
       syncCachedState()
       setMessage(null)
+      setError(null)
     }
 
     window.addEventListener(COLLECTION_CACHE_UPDATED_EVENT, handleCollectionUpdated as EventListener)
@@ -69,6 +72,7 @@ export function CollectionButton({
 
     setIsSubmitting(true)
     setMessage(null)
+    setError(null)
 
     try {
       if (isAdded) {
@@ -87,7 +91,7 @@ export function CollectionButton({
         setMessage('컬렉션에 추가했어요.')
       }
     } catch (submitError) {
-      setMessage(
+      setError(
         submitError instanceof Error
           ? submitError.message
           : isAdded
@@ -121,6 +125,7 @@ export function CollectionButton({
         {isSubmitting ? (isAdded ? '삭제 중...' : '추가 중...') : isAdded ? '추가됨' : '+'}
       </button>
       {message && <span className="collection-mini-message">{message}</span>}
+      <ErrorToast message={error} />
     </div>
   )
 }

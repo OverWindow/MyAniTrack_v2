@@ -159,7 +159,7 @@ Response 예시:
 
 AniList의 전체 애니를 순서대로 조회하여 애니 기본 정보, 스튜디오, 캐릭터, 성우, 연관 작품을 통합 동기화합니다.
 
-최초 실행 전에 `sql_scripts/anime_relations.sql`을 DB에 적용해야 합니다.
+해당 스키마는 `sql_scripts/017_anime_relations.sql`에 정의되어 있으며, 백엔드 배포 시작 시 자동 마이그레이션으로 적용됩니다.
 
 Body 예시:
 
@@ -342,7 +342,7 @@ Response example:
 
 동시에 다른 시리즈 재계산이 실행 중이면 HTTP `409`와 `Anime series rebuild is already running`을 반환합니다. relation 동기화를 여러 청크로 실행할 때는 마지막 청크가 끝난 후 한 번 호출하는 것을 권장합니다.
 
-재계산 시 각 멤버의 완주 필수 여부도 함께 갱신됩니다. `MUSIC`, `SUMMARY`/`COMPILATION` 관계의 대상 작품, `NOT_YET_RELEASED`, `CANCELLED` 작품은 시리즈 구성에는 남아 있지만 사용자 시리즈 완주 계산에서는 제외됩니다. 이 기능을 처음 배포할 때는 최신 `sql_scripts/anime_series.sql`을 먼저 실행해 컬럼과 프로시저를 반영해야 합니다.
+재계산 시 각 멤버의 완주 필수 여부도 함께 갱신됩니다. `MUSIC`, `SUMMARY`/`COMPILATION` 관계의 대상 작품, `NOT_YET_RELEASED`, `CANCELLED` 작품은 시리즈 구성에는 남아 있지만 사용자 시리즈 완주 계산에서는 제외됩니다. 관련 컬럼과 프로시저는 `sql_scripts/018_anime_series.sql`에 정의되어 있으며, 백엔드 배포 시작 시 자동 마이그레이션으로 적용됩니다.
 
 ### `POST /admin/anime/sync/page`
 AniList 애니 데이터를 한 페이지 동기화합니다.

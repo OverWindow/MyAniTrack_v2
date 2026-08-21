@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { ErrorToast } from '../components/ErrorToast'
 import { AGREEMENT_ORDER, AGREEMENT_SECTIONS, type AgreementKey } from '../content/agreements'
 import { useAuth } from '../contexts/AuthContext'
 import { fetchMyAgreements, requestPasswordReset } from '../lib/auth'
@@ -251,7 +252,7 @@ export function SettingsPage() {
               </div>
             </div>
             {resetMailFeedback && <div className="feedback-card">{resetMailFeedback}</div>}
-            {resetMailError && <div className="feedback-card is-error">{resetMailError}</div>}
+            <ErrorToast message={resetMailError} />
             <div className="settings-danger-zone">
               <div>
                 <strong>계정 삭제</strong>
@@ -272,7 +273,7 @@ export function SettingsPage() {
                 {isLoadingAgreements ? '불러오는 중...' : '새로 불러오기'}
               </button>
             </div>
-            {agreementsError && <div className="feedback-card is-error">{agreementsError}</div>}
+            <ErrorToast message={agreementsError} />
             {agreements && (
               <div className="settings-info-grid settings-agreement-grid">
                 <article className="settings-info-card">

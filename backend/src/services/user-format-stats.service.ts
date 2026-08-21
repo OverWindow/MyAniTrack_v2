@@ -103,6 +103,8 @@ export async function getUserFormatStats(params: FormatStatsParams) {
     FROM user_anime_lists ual
     INNER JOIN anime a
       ON a.id = ual.anime_id
+      AND a.is_adult = FALSE
+      AND a.app_visible = TRUE
     WHERE ual.user_id = ?
       ${getStatusWhereClause(params.status)}
     GROUP BY COALESCE(a.format, 'UNKNOWN')

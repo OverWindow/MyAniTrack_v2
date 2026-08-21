@@ -405,6 +405,8 @@ export async function recalculateUserAnimeStats(userId: number) {
     FROM user_anime_lists ual
     INNER JOIN anime a
       ON a.id = ual.anime_id
+      AND a.is_adult = FALSE
+      AND a.app_visible = TRUE
     LEFT JOIN anime_genres ag
       ON ag.anime_id = a.id
     LEFT JOIN anime_korean_titles akt
@@ -788,6 +790,7 @@ export async function getRecommendedAnime(
       ON akt.anime_id = a.id
       AND akt.is_primary = TRUE
     WHERE a.is_adult = FALSE
+      AND a.app_visible = TRUE
       AND NOT EXISTS (
         SELECT 1
         FROM user_anime_lists ual
@@ -919,6 +922,8 @@ export async function getUserGenreBubbleChart(userId: number, params: GenreBubbl
     FROM user_anime_lists ual
     INNER JOIN anime a
       ON a.id = ual.anime_id
+      AND a.is_adult = FALSE
+      AND a.app_visible = TRUE
     INNER JOIN anime_genres ag
       ON ag.anime_id = a.id
     INNER JOIN (

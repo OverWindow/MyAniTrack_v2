@@ -8,7 +8,8 @@
   "main": "app.js",
   "scripts": {
     "server": "tsx server.ts",
-    "test": "tsx --test src/services/user-anime-list.service.test.ts src/services/user-profile.service.test.ts",
+    "migrate": "tsx src/database/migrate.ts",
+    "test": "tsx --test src/database/migrate.test.ts src/services/user-anime-list.service.test.ts src/services/user-profile.service.test.ts src/services/content-safety.service.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

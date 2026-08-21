@@ -332,6 +332,10 @@ export async function recalculateUserVoiceActorStats(userId: number) {
           ual.anime_id,
           ual.score
         FROM user_anime_lists ual
+        INNER JOIN anime a
+          ON a.id = ual.anime_id
+          AND a.is_adult = FALSE
+          AND a.app_visible = TRUE
         INNER JOIN anime_character_voice_actors acva
           ON acva.anime_id = ual.anime_id
         WHERE ual.user_id = ?
@@ -343,6 +347,10 @@ export async function recalculateUserVoiceActorStats(userId: number) {
           acva.voice_actor_id,
           COUNT(DISTINCT acva.character_id) AS characterCount
         FROM user_anime_lists ual
+        INNER JOIN anime a
+          ON a.id = ual.anime_id
+          AND a.is_adult = FALSE
+          AND a.app_visible = TRUE
         INNER JOIN anime_character_voice_actors acva
           ON acva.anime_id = ual.anime_id
         WHERE ual.user_id = ?
@@ -597,7 +605,10 @@ export async function getUserVoiceActorRanking(params: {
           END
         ) AS totalWatchMinutes
       FROM user_anime_lists ual
-      INNER JOIN anime a ON a.id = ual.anime_id
+      INNER JOIN anime a
+        ON a.id = ual.anime_id
+        AND a.is_adult = FALSE
+        AND a.app_visible = TRUE
       INNER JOIN (
         SELECT DISTINCT anime_id, voice_actor_id
         FROM anime_character_voice_actors
@@ -727,6 +738,8 @@ export async function getUserVoiceActorAnime(params: {
     FROM user_anime_lists ual
     INNER JOIN anime a
       ON a.id = ual.anime_id
+      AND a.is_adult = FALSE
+      AND a.app_visible = TRUE
     LEFT JOIN anime_korean_titles akt
       ON akt.anime_id = a.id
       AND akt.is_primary = TRUE

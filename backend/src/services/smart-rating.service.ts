@@ -112,6 +112,8 @@ async function ensureAnimeExists(animeId: number) {
     SELECT id
     FROM anime
     WHERE id = ?
+      AND is_adult = FALSE
+      AND app_visible = TRUE
     LIMIT 1
     `,
     [animeId]
@@ -144,6 +146,8 @@ async function getRatedAnimeRows(userId: number, animeIds: number[]) {
     FROM user_anime_lists ual
     INNER JOIN anime a
       ON a.id = ual.anime_id
+      AND a.is_adult = FALSE
+      AND a.app_visible = TRUE
     LEFT JOIN anime_korean_titles akt
       ON akt.anime_id = a.id
       AND akt.is_primary = TRUE
@@ -181,6 +185,8 @@ export async function getSmartRatingCandidates(params: {
     FROM user_anime_lists ual
     INNER JOIN anime a
       ON a.id = ual.anime_id
+      AND a.is_adult = FALSE
+      AND a.app_visible = TRUE
     LEFT JOIN anime_korean_titles akt
       ON akt.anime_id = a.id
       AND akt.is_primary = TRUE

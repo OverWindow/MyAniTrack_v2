@@ -38,7 +38,7 @@
   - 기존 앱 JWT와 Supabase access token을 모두 처리
 - `src/routes/auth.routes.ts`
   - auth route 정의
-- `sql_scripts/supabase_auth.sql`
+- `sql_scripts/016_supabase_auth.sql`
   - Supabase Auth 연결용 users 컬럼 추가 SQL
 
 프론트:

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { ErrorToast } from '../components/ErrorToast'
 import { useAuth } from '../contexts/AuthContext'
 import {
   consumePendingAuthReturnPath,
@@ -55,7 +56,8 @@ export function AuthCallbackPage() {
         <h1 className="auth-title">로그인 처리 중</h1>
         {error ? (
           <>
-            <div className="feedback-card is-error">{error}</div>
+            <ErrorToast message={error} />
+            <div className="feedback-card">로그인 연결을 완료하지 못했어요.</div>
             <Link className="secondary-button auth-submit" to="/login">
               로그인으로 돌아가기
             </Link>

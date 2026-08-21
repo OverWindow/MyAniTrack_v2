@@ -17,6 +17,21 @@ export interface UpdateUserAgreementsInput {
   privacyVersion?: unknown;
 }
 
+export const CURRENT_TERMS_VERSION = 'v1.1';
+export const CURRENT_PRIVACY_VERSION = 'v1.0';
+
+export function hasCurrentRequiredAgreements(status: {
+  termsAgreed: boolean;
+  privacyAgreed: boolean;
+  termsVersion: string | null;
+  privacyVersion: string | null;
+}) {
+  return status.termsAgreed
+    && status.privacyAgreed
+    && status.termsVersion === CURRENT_TERMS_VERSION
+    && status.privacyVersion === CURRENT_PRIVACY_VERSION;
+}
+
 function validateOptionalBoolean(value: unknown, fieldName: string) {
   if (value === undefined) {
     return undefined;
@@ -82,13 +97,23 @@ async function findUserAgreementStatus(userId: number) {
 }
 
 function mapUserAgreementStatus(row: UserAgreementStatusRow) {
+  const termsAgreed = Boolean(row.termsAgreed);
+  const privacyAgreed = Boolean(row.privacyAgreed);
   return {
     userId: row.userId,
-    termsAgreed: Boolean(row.termsAgreed),
-    privacyAgreed: Boolean(row.privacyAgreed),
+    termsAgreed,
+    privacyAgreed,
     agreedAt: row.agreedAt,
     termsVersion: row.termsVersion,
     privacyVersion: row.privacyVersion,
+    requiredTermsVersion: CURRENT_TERMS_VERSION,
+    requiredPrivacyVersion: CURRENT_PRIVACY_VERSION,
+    hasRequiredAgreements: hasCurrentRequiredAgreements({
+      termsAgreed,
+      privacyAgreed,
+      termsVersion: row.termsVersion,
+      privacyVersion: row.privacyVersion,
+    }),
   };
 }
 
@@ -133,9 +158,12 @@ export async function updateUserAgreements(userId: number, input: UpdateUserAgre
   const stateChanged =
     resolvedTermsAgreed !== currentTermsAgreed
     || resolvedPrivacyAgreed !== currentPrivacyAgreed;
+  const versionChanged =
+    (nextTermsAgreed === true && termsVersion !== currentStatus.termsVersion)
+    || (nextPrivacyAgreed === true && privacyVersion !== currentStatus.privacyVersion);
 
   if (shouldSetAgreedAt) {
-    nextAgreedAt = stateChanged || !currentStatus.agreedAt
+    nextAgreedAt = stateChanged || versionChanged || !currentStatus.agreedAt
       ? new Date().toISOString().slice(0, 19).replace('T', ' ')
       : currentStatus.agreedAt;
   } else {
@@ -160,7 +188,10 @@ export async function updateUserAgreements(userId: number, input: UpdateUserAgre
       [resolvedTermsAgreed, resolvedPrivacyAgreed, nextAgreedAt, userId]
     );
 
-    if (nextTermsAgreed !== undefined && nextTermsAgreed !== currentTermsAgreed) {
+    // Always append the submitted version. Older deployments only recorded a
+    // row when the boolean changed, which left already-agreed users stuck on
+    // the previous version and made the client ask again on every launch.
+    if (nextTermsAgreed !== undefined) {
       await connection.execute<ResultSetHeader>(
         `
         INSERT INTO user_agreements (
@@ -176,7 +207,7 @@ export async function updateUserAgreements(userId: number, input: UpdateUserAgre
       );
     }
 
-    if (nextPrivacyAgreed !== undefined && nextPrivacyAgreed !== currentPrivacyAgreed) {
+    if (nextPrivacyAgreed !== undefined) {
       await connection.execute<ResultSetHeader>(
         `
         INSERT INTO user_agreements (

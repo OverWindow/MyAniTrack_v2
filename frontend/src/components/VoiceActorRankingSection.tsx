@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { createPortal } from 'react-dom'
 import { ConnectionErrorState } from './ConnectionErrorState'
+import { ErrorToast } from './ErrorToast'
 import { VoiceActorCharacterWorks } from './VoiceActorCharacterWorks'
 import {
   getAnalysisCache,
@@ -9,7 +10,7 @@ import {
   setAnalysisCache,
 } from '../lib/analysisCache'
 import { getProfileImageSrc, handleProfileImageError } from '../lib/avatar'
-import { SERVER_CONNECTION_ERROR_MESSAGE, getFriendlyErrorMessage } from '../lib/errors'
+import { getFriendlyErrorMessage } from '../lib/errors'
 import { fetchVoiceActorAnime, fetchVoiceActorRanking } from '../lib/stats'
 import { groupVoiceActorCharacterWorks } from '../lib/voiceActorCharacterWorks'
 import type {
@@ -410,9 +411,7 @@ export function VoiceActorRankingSection({
 
       {rankingState.isLoading && <div className="analysis-empty-state">성우 랭킹을 불러오는 중이에요.</div>}
       {rankingState.error && !rankingState.isLoading && (
-        rankingState.error === SERVER_CONNECTION_ERROR_MESSAGE
-          ? <ConnectionErrorState message={rankingState.error} />
-          : <div className="analysis-empty-state">{rankingState.error}</div>
+        <ConnectionErrorState message={rankingState.error} />
       )}
 
       {!rankingState.isLoading && !rankingState.error && (
@@ -500,9 +499,7 @@ export function VoiceActorRankingSection({
               )}
 
               {animeState.error && !animeState.isLoading && (
-                animeState.error === SERVER_CONNECTION_ERROR_MESSAGE
-                  ? <ConnectionErrorState message={animeState.error} />
-                  : <div className="analysis-empty-state">{animeState.error}</div>
+                <ConnectionErrorState message={animeState.error} />
               )}
 
               {!animeState.isLoading && !animeState.error && selectedCharacterGroups.length === 0 && (
@@ -521,7 +518,7 @@ export function VoiceActorRankingSection({
               )}
 
               {animeState.moreError && (
-                <div className="analysis-empty-state">{animeState.moreError}</div>
+                <ErrorToast message={animeState.moreError} />
               )}
 
               {animeState.data?.pageInfo.hasNext && (

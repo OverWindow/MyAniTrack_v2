@@ -242,7 +242,20 @@ class SessionController extends Notifier<SessionState> {
       profileImageRemoved: profileImageRemoved,
     );
     try {
-      await ref.read(authRepositoryProvider).acceptAgreements();
+      final agreements = await ref
+          .read(authRepositoryProvider)
+          .acceptAgreements();
+      if (!agreements.hasRequiredAgreements) {
+        state = SessionState(
+          phase: SessionPhase.agreementsRequired,
+          user: user,
+          message: '약관 동의가 서버에 저장되지 않았습니다. 잠시 후 다시 시도해주세요.',
+          profileImageRevision: profileImageRevision,
+          profileImagePreview: profileImagePreview,
+          profileImageRemoved: profileImageRemoved,
+        );
+        return;
+      }
       state = SessionState(
         phase: SessionPhase.authenticated,
         user: user,

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { BadgeSection } from '../components/BadgeSection'
 import { ConnectionErrorState } from '../components/ConnectionErrorState'
+import { ErrorToast } from '../components/ErrorToast'
 import { getProfileImageSrc, handleProfileImageError } from '../lib/avatar'
 import { fetchPublicUserBadges } from '../lib/badges'
 import { SERVER_CONNECTION_ERROR_MESSAGE, getFriendlyErrorMessage } from '../lib/errors'
@@ -84,7 +85,8 @@ export function UserProfilePage() {
   if (!userId) {
     return (
       <section className="user-profile-page">
-        <div className="feedback-card is-error">잘못된 사용자 경로예요.</div>
+        <ErrorToast message="잘못된 사용자 경로예요." />
+        <div className="feedback-card">요청한 프로필을 열 수 없어요.</div>
       </section>
     )
   }
@@ -103,9 +105,7 @@ export function UserProfilePage() {
   if (state.error || !state.user) {
     return (
       <section className="user-profile-page">
-        {state.error === SERVER_CONNECTION_ERROR_MESSAGE
-          ? <ConnectionErrorState message={state.error} />
-          : <div className="feedback-card is-error">{state.error ?? '사용자 정보를 찾을 수 없어요.'}</div>}
+        <ConnectionErrorState message={state.error ?? '사용자 정보를 찾을 수 없어요.'} />
       </section>
     )
   }

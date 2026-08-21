@@ -72,6 +72,8 @@ export async function getUserYearlyScoreStats(params: YearlyScoreStatsParams) {
     FROM user_anime_lists ual
     INNER JOIN anime a
       ON a.id = ual.anime_id
+      AND a.is_adult = FALSE
+      AND a.app_visible = TRUE
     WHERE ual.user_id = ?
       AND a.season_year IS NOT NULL
       ${getStatusWhereClause(params.status)}

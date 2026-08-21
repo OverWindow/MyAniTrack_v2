@@ -148,6 +148,40 @@ export async function fetchAdminUserDetail(userId: number, signal?: AbortSignal)
   return ((await response.json()) as AdminUserDetailResponse).item
 }
 
+export interface AdminProfileReport {
+  id: number
+  reporterUserId: number
+  reportedUserId: number
+  reporterUsername: string
+  reportedUsername: string
+  profileImageUrl: string | null
+  reason: string
+  status: string
+  requestCount: number
+  createdAt: string
+}
+
+export async function fetchProfileReports() {
+  const response = await authFetch(createAdminUrl('/admin/profile-reports'))
+  if (!response.ok) throw new Error(getAdminErrorMessage(response.status, '프로필 신고를 불러오지 못했어요.'))
+  const data = await response.json() as { reports: AdminProfileReport[] }
+  return data.reports
+}
+
+export async function resolveProfileReport(id: number, action: 'DISMISS' | 'REMOVE_PROFILE' | 'SUSPEND_USER') {
+  const response = await authFetch(createAdminUrl(`/admin/profile-reports/${id}`), {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action }),
+  })
+  if (!response.ok) throw new Error(getAdminErrorMessage(response.status, '프로필 신고 처리에 실패했어요.'))
+}
+
+export async function setAnimeVisibility(animeId: number, visible: boolean, reason: string) {
+  const response = await authFetch(createAdminUrl(`/admin/anime/${animeId}/visibility`), {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ visible, reason }),
+  })
+  if (!response.ok) throw new Error(getAdminErrorMessage(response.status, '작품 노출 상태를 저장하지 못했어요.'))
+}
+
 export function syncAnimePage(payload: AdminSyncPagePayload) {
   return postAdminAction('/admin/anime/sync/page', payload, '애니 페이지 동기화에 실패했어요.')
 }

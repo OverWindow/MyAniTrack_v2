@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { ErrorToast } from './ErrorToast'
 import type { UserAnimeListItem } from '../types/collection'
 
 type AnalysisAnimeToastProps = {
@@ -51,7 +52,12 @@ export function AnalysisAnimeToast({
       </div>
 
       {isLoading && <div className="analysis-anime-toast-state">작품을 불러오는 중이에요.</div>}
-      {error && !isLoading && <div className="analysis-anime-toast-state">{error}</div>}
+      {error && !isLoading && (
+        <>
+          <ErrorToast message={error} />
+          <div className="analysis-anime-toast-state">지금은 작품을 표시할 수 없어요.</div>
+        </>
+      )}
       {!isLoading && !error && items.length === 0 && (
         <div className="analysis-anime-toast-state">표시할 작품이 없어요.</div>
       )}
