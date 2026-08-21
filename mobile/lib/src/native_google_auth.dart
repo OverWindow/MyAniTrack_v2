@@ -78,7 +78,10 @@ class NativeGoogleAuthGateway implements GoogleAuthGateway {
       if (attempt == null) return false;
       final account = await attempt;
       if (account == null) return false;
-      return _exchangeAccount(account, allowAuthorizationPrompt: false);
+      return await _exchangeAccount(
+        account,
+        allowAuthorizationPrompt: false,
+      );
     } on GoogleSignInException catch (error) {
       if (kDebugMode) {
         debugPrint(

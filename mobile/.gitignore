@@ -8,6 +8,7 @@ coverage/
 
 # Platform build output
 android/.gradle/
+android/.kotlin/
 android/app/build/
 ios/Pods/
 ios/.symlinks/

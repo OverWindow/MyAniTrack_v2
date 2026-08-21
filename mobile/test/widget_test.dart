@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:myanitrack_mobile/src/app.dart';
 import 'package:myanitrack_mobile/src/api.dart';
+import 'package:myanitrack_mobile/src/config.dart';
 import 'package:myanitrack_mobile/src/models.dart';
 import 'package:myanitrack_mobile/src/providers.dart';
 import 'package:myanitrack_mobile/src/screens/analysis_screen.dart';
@@ -47,6 +48,12 @@ void main() {
           ),
         ],
         child: const RepaintBoundary(key: goldenKey, child: MyAniTrackApp()),
+      ),
+    );
+    await tester.runAsync(
+      () => precacheImage(
+        const AssetImage(AppAssets.logo),
+        tester.element(find.byKey(goldenKey)),
       ),
     );
     await tester.pumpAndSettle();
