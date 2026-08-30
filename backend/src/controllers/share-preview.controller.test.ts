@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import sharp from 'sharp';
-import { renderSharePreviewImage } from './share-preview.controller';
+import { getShareOgImageUrl, renderSharePreviewImage } from './share-preview.controller';
+
+test('share OG image URL is an absolute HTTP URL', () => {
+  const url = new URL(getShareOgImageUrl());
+  assert.match(url.protocol, /^https?:$/);
+});
 
 test('share preview image is a 1200x630 PNG', async () => {
   const image = await renderSharePreviewImage({

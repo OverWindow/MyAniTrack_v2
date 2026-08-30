@@ -10,10 +10,15 @@ Share links are read-only, use the `ANYONE` audience, and are available without 
 SHARE_TOKEN_SECRET=<at-least-32-random-characters>
 SHARE_PUBLIC_ORIGIN=https://myanitrack.com
 SHARE_API_ORIGIN=https://api.myanitrack.com
+SHARE_OG_IMAGE_URL=https://your-public-storage.example/og/share-default-v2.png
 ```
 
 Changing `SHARE_TOKEN_SECRET` invalidates all existing URLs and opaque cursors. Keep the value in a
 server-side secret store and do not expose it to the frontend.
+
+`SHARE_OG_IMAGE_URL` is optional. It must be a publicly accessible HTTP(S) image URL and lets the
+social preview artwork be replaced without rebuilding the backend. Use a versioned object path when
+replacing it so messenger and CDN caches do not continue serving the previous image.
 
 ## Management API
 
