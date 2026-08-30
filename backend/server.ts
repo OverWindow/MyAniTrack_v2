@@ -14,7 +14,7 @@ import userAgreementRoutes from './src/routes/user-agreement.routes';
 import userAnimeListRoutes from './src/routes/user-anime-list.routes';
 import userProfileRoutes from './src/routes/user-profile.routes';
 import userVoiceActorStatsRoutes from './src/routes/user-voice-actor-stats.routes';
-import { getSharePreviewHtml, getSharePreviewImage } from './src/controllers/share-preview.controller';
+import { getSharePreviewHtml } from './src/controllers/share-preview.controller';
 
 validateSupabaseStorageEnv();
 
@@ -106,7 +106,6 @@ app.get('/health', (_req, res) => {
   res.json({ ok: true });
 });
 
-app.get('/share-preview/:token/image.png', getSharePreviewImage);
 app.get('/share-preview/:token', getSharePreviewHtml);
 
 app.use(adminRoutes);

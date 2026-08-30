@@ -43,7 +43,6 @@ and list IDs, and internal timestamps. Invalid, revoked, missing, or suspended-o
 ## Social preview
 
 - `GET /share-preview/:token`
-- `GET /share-preview/:token/image.png`
 
-The HTML contains Open Graph, Twitter card, canonical, and `noindex` metadata. The PNG renderer uses
-Sharp with the bundled Noto Sans KR font. Invalid links receive a generic preview without user data.
+The HTML contains Open Graph, Twitter card, canonical, and `noindex` metadata. Its image is served
+from the public `SHARE_OG_IMAGE_URL`; invalid links receive generic metadata without user data.
