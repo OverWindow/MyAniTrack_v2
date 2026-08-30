@@ -10,7 +10,7 @@ Migration history is stored in the `schema_migrations` table.
 3. Run `npm test` and `npm run typecheck` from `backend`.
 4. Use `npm run migrate` only when a manual migration run is intentionally required.
 
-The next migration after the current set is `020_description.sql`.
+The next migration after the current set is `021_description.sql`.
 
 ## Deployment behavior
 

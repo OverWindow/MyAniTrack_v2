@@ -101,9 +101,10 @@ function formatScore(score?: number | null) {
   return numericScore.toFixed(1)
 }
 
-export function UserCollectionPage() {
+export function UserCollectionPage({ shareToken }: { shareToken?: string } = {}) {
   const location = useLocation()
-  const { userId } = useParams<{ userId: string }>()
+  const { userId: routeUserId } = useParams<{ userId: string }>()
+  const userId = shareToken ? 'shared' : routeUserId
   const [sort, setSort] = useState<UserAnimeListSort>('latest')
   const [genre, setGenre] = useState<AnimeGenre | 'all'>('all')
   const [searchTerm, setSearchTerm] = useState('')
@@ -113,8 +114,9 @@ export function UserCollectionPage() {
   const [seriesScope, setSeriesScope] = useState<AnimeSeriesScope>('mainline')
   const [seriesStatus, setSeriesStatus] = useState<UserSeriesCollectionStatus>('all')
   const selectedGenre = genre === 'all' ? null : genre
-  const requestKey = `anime:${userId ?? 'unknown'}:${sort}:${genre}:${searchLanguage}`
-  const seriesRequestKey = `series:${userId ?? 'unknown'}:${seriesScope}:${seriesStatus}:${searchLanguage}:${debouncedSearchTerm.trim()}`
+  const requestOwnerKey = shareToken ? `share:${shareToken}` : userId ?? 'unknown'
+  const requestKey = `anime:${requestOwnerKey}:${sort}:${genre}:${searchLanguage}`
+  const seriesRequestKey = `series:${requestOwnerKey}:${seriesScope}:${seriesStatus}:${searchLanguage}:${debouncedSearchTerm.trim()}`
   const [state, setState] = useState<PublicCollectionState>(() => createInitialState(requestKey))
   const [seriesState, setSeriesState] = useState<PublicSeriesCollectionState>({
     items: [],
@@ -146,6 +148,15 @@ export function UserCollectionPage() {
   }, [searchTerm])
 
   useEffect(() => {
+    if (!shareToken) return
+
+    const main = document.querySelector('main.landing-page')
+    main?.classList.add('landing-page-user-collection')
+
+    return () => main?.classList.remove('landing-page-user-collection')
+  }, [shareToken])
+
+  useEffect(() => {
     if (!userId || viewMode !== 'anime') {
       return
     }
@@ -156,6 +167,7 @@ export function UserCollectionPage() {
       try {
         const data = await fetchPublicUserCollection({
           userId,
+          shareToken,
           sort,
           genre: selectedGenre,
           titleLanguage: searchLanguage,
@@ -194,7 +206,7 @@ export function UserCollectionPage() {
     void loadFirstPage()
 
     return () => controller.abort()
-  }, [genre, requestKey, searchLanguage, selectedGenre, sort, userId, viewMode])
+  }, [genre, requestKey, searchLanguage, selectedGenre, shareToken, sort, userId, viewMode])
 
   useEffect(() => {
     if (!userId || viewMode !== 'series') {
@@ -214,6 +226,7 @@ export function UserCollectionPage() {
       try {
         const firstPage = await fetchPublicUserSeriesCollection({
           userId,
+          shareToken,
           scope: seriesScope,
           status: seriesStatus,
           titleLanguage: searchLanguage,
@@ -231,6 +244,7 @@ export function UserCollectionPage() {
           seenCursors.add(cursor)
           const nextPage = await fetchPublicUserSeriesCollection({
             userId,
+            shareToken,
             scope: seriesScope,
             status: seriesStatus,
             titleLanguage: searchLanguage,
@@ -276,7 +290,7 @@ export function UserCollectionPage() {
     void loadSeries()
 
     return () => controller.abort()
-  }, [debouncedSearchTerm, searchLanguage, seriesRequestKey, seriesScope, seriesStatus, userId, viewMode])
+  }, [debouncedSearchTerm, searchLanguage, seriesRequestKey, seriesScope, seriesStatus, shareToken, userId, viewMode])
 
   useEffect(() => {
     if (!userId) {
@@ -291,6 +305,7 @@ export function UserCollectionPage() {
       try {
         const data = await fetchPublicUserCollection({
           userId,
+          shareToken,
           sort: 'score',
           score: 10,
           limit: 12,
@@ -318,7 +333,7 @@ export function UserCollectionPage() {
     void loadCarouselItems()
 
     return () => controller.abort()
-  }, [userId])
+  }, [shareToken, userId])
 
   useEffect(() => {
     const node = sentinelRef.current
@@ -350,6 +365,7 @@ export function UserCollectionPage() {
           try {
             const data = await fetchPublicUserCollection({
               userId,
+              shareToken,
               sort,
               genre: selectedGenre,
               titleLanguage: searchLanguage,
@@ -395,7 +411,7 @@ export function UserCollectionPage() {
     observer.observe(node)
 
     return () => observer.disconnect()
-  }, [hasNext, isLoading, isLoadingMore, isRefreshingQuery, nextCursor, searchLanguage, selectedGenre, sort, userId, viewMode])
+  }, [hasNext, isLoading, isLoadingMore, isRefreshingQuery, nextCursor, searchLanguage, selectedGenre, shareToken, sort, userId, viewMode])
 
   if (!userId) {
     return (
@@ -411,9 +427,15 @@ export function UserCollectionPage() {
     <section className="collection-page user-collection-page user-collection-page-header">
       <div className="user-catalog-header">
         <div className="user-catalog-title-group">
-          <Link className="detail-back-link" to={`/users/${userId}/profile`}>
-            프로필로 돌아가기
-          </Link>
+          {shareToken ? (
+            <Link className="detail-back-link" to="/">
+              홈으로 돌아가기
+            </Link>
+          ) : (
+            <Link className="detail-back-link" to={`/users/${userId}/profile`}>
+              프로필로 돌아가기
+            </Link>
+          )}
           {user && <h1>{user.username}님의 컬렉션</h1>}
         </div>
         <div className="user-collection-count-card">

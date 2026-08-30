@@ -4,6 +4,7 @@ import { AnalysisAnimeToast } from '../components/AnalysisAnimeToast'
 import { ConnectionErrorState } from '../components/ConnectionErrorState'
 import { ErrorToast } from '../components/ErrorToast'
 import { ReleaseDecadeProgress } from '../components/ReleaseDecadeProgress'
+import { ShareButton } from '../components/ShareButton'
 import { VoiceActorRankingSection } from '../components/VoiceActorRankingSection'
 import { ViewingDnaCard } from '../components/ViewingDnaCard'
 import { useAuth } from '../contexts/AuthContext'
@@ -336,6 +337,7 @@ export function WatchTimeComparisonTicker({ totalWatchMinutes }: { totalWatchMin
 
 type StudioRankingSectionProps = {
   apiUserId?: string
+  shareToken?: string
   cacheOwnerId?: number | string | null
   cacheVersion?: number
   isSample?: boolean
@@ -343,6 +345,7 @@ type StudioRankingSectionProps = {
 
 export function StudioRankingSection({
   apiUserId,
+  shareToken,
   cacheOwnerId,
   cacheVersion = 0,
   isSample = false,
@@ -429,6 +432,7 @@ export function StudioRankingSection({
           })
           : await fetchStudioRanking({
             userId: apiUserId,
+            shareToken,
             sort,
             limit: 12,
             minRatedAnimeCount: sort === 'score' ? 1 : undefined,
@@ -475,7 +479,7 @@ export function StudioRankingSection({
       isCancelled = true
       controller.abort()
     }
-  }, [apiUserId, cacheVersion, isSample, sort, storageOwnerId])
+  }, [apiUserId, cacheVersion, isSample, shareToken, sort, storageOwnerId])
 
   useEffect(() => {
     if (!selectedStudio || !storageOwnerId || isSample) {
@@ -505,6 +509,7 @@ export function StudioRankingSection({
 
         const response = await fetchStudioAnime({
           userId: apiUserId,
+          shareToken,
           studioId: selectedStudio.studio.id,
           limit: 50,
           signal: controller.signal,
@@ -523,6 +528,7 @@ export function StudioRankingSection({
           seenCursors.add(cursor)
           const nextResponse = await fetchStudioAnime({
             userId: apiUserId,
+            shareToken,
             studioId: selectedStudio.studio.id,
             limit: 50,
             cursor,
@@ -566,7 +572,7 @@ export function StudioRankingSection({
       isCancelled = true
       controller.abort()
     }
-  }, [apiUserId, cacheVersion, isSample, selectedStudio, storageOwnerId])
+  }, [apiUserId, cacheVersion, isSample, selectedStudio, shareToken, storageOwnerId])
 
   const visibleStudioItems = rankingState.items
   const effectiveStudioAnimeState = selectedStudio && storageOwnerId
@@ -1778,6 +1784,7 @@ export function AnalysisPage() {
             </>
           ) : (
             <>
+              <ShareButton resourceType="ANALYSIS" />
               <button
                 className="primary-button"
                 type="button"

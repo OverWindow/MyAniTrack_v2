@@ -5,6 +5,7 @@ import { CollectionCarousel } from '../components/CollectionCarousel'
 import { CollectionViewSwitch } from '../components/CollectionViewSwitch'
 import { ConnectionErrorState } from '../components/ConnectionErrorState'
 import { SeriesCollectionGrid, SeriesCollectionSkeleton } from '../components/SeriesCollectionGrid'
+import { ShareButton } from '../components/ShareButton'
 import { useAuth } from '../contexts/AuthContext'
 import {
   fetchMyCollection,
@@ -653,6 +654,7 @@ export function CollectionPage() {
           <div className="search-group">
             {isGuestPreview && <span className="sample-mode-chip">샘플 컬렉션</span>}
             {!isGuestPreview && <CollectionViewSwitch value={viewMode} onChange={setViewMode} />}
+            {!isGuestPreview && <ShareButton resourceType="COLLECTION" />}
             <label className="search-field minimalist-search" htmlFor="collection-search">
               <input
                 id="collection-search"

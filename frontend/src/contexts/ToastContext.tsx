@@ -9,25 +9,27 @@ import {
   useState,
 } from 'react'
 import type { ReactNode } from 'react'
-import { CircleAlert, X } from 'lucide-react'
+import { CircleAlert, CircleCheck, X } from 'lucide-react'
 
-type ErrorToast = {
+type ToastItem = {
   id: number
   message: string
+  variant: 'error' | 'success'
 }
 
 type ToastContextValue = {
   showError: (message: string) => void
+  showSuccess: (message: string) => void
   dismissToast: (id: number) => void
 }
 
-const TOAST_DURATION_MS = 6_000
+const TOAST_DURATION_MS = 3_000
 const MAX_VISIBLE_TOASTS = 3
 
 const ToastContext = createContext<ToastContextValue | null>(null)
 
 export function ToastProvider({ children }: { children: ReactNode }) {
-  const [toasts, setToasts] = useState<ErrorToast[]>([])
+  const [toasts, setToasts] = useState<ToastItem[]>([])
   const nextIdRef = useRef(1)
   const timersRef = useRef(new Map<number, number>())
 
@@ -42,21 +44,24 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     setToasts((current) => current.filter((toast) => toast.id !== id))
   }, [])
 
-  const showError = useCallback((message: string) => {
+  const showToast = useCallback((message: string, variant: ToastItem['variant']) => {
     const normalizedMessage = message.trim()
 
     if (!normalizedMessage) return
 
     setToasts((current) => {
-      if (current.some((toast) => toast.message === normalizedMessage)) {
+      if (current.some((toast) => toast.message === normalizedMessage && toast.variant === variant)) {
         return current
       }
 
-      const nextToast = { id: nextIdRef.current, message: normalizedMessage }
+      const nextToast = { id: nextIdRef.current, message: normalizedMessage, variant }
       nextIdRef.current += 1
       return [...current, nextToast].slice(-MAX_VISIBLE_TOASTS)
     })
   }, [])
+
+  const showError = useCallback((message: string) => showToast(message, 'error'), [showToast])
+  const showSuccess = useCallback((message: string) => showToast(message, 'success'), [showToast])
 
   useEffect(() => {
     const visibleIds = new Set(toasts.map((toast) => toast.id))
@@ -83,21 +88,23 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     timersRef.current.clear()
   }, [])
 
-  const value = useMemo(() => ({ showError, dismissToast }), [dismissToast, showError])
+  const value = useMemo(() => ({ showError, showSuccess, dismissToast }), [dismissToast, showError, showSuccess])
 
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <div className="toast-viewport" aria-label="오류 알림">
+      <div className="toast-viewport" aria-label="알림">
         {toasts.map((toast) => (
-          <div className="error-toast" role="alert" key={toast.id}>
-            <CircleAlert className="error-toast-icon" size={20} aria-hidden="true" />
+          <div className={`error-toast ${toast.variant === 'success' ? 'success-toast' : ''}`} role={toast.variant === 'error' ? 'alert' : 'status'} key={toast.id}>
+            {toast.variant === 'success'
+              ? <CircleCheck className="error-toast-icon" size={20} aria-hidden="true" />
+              : <CircleAlert className="error-toast-icon" size={20} aria-hidden="true" />}
             <p>{toast.message}</p>
             <button
               type="button"
               className="error-toast-close"
               onClick={() => dismissToast(toast.id)}
-              aria-label="오류 알림 닫기"
+              aria-label="알림 닫기"
             >
               <X size={17} aria-hidden="true" />
             </button>

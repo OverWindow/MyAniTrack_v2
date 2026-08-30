@@ -50,12 +50,25 @@ test('all high-risk user-facing anime services apply adult and manual visibility
     'voice-actor-detail.service.ts',
     'user-studio-stats.service.ts',
     'user-voice-actor-stats.service.ts',
+    'user-viewing-dna.service.ts',
   ];
   for (const file of files) {
     const source = readFileSync(join(process.cwd(), 'src', 'services', file), 'utf8');
     assert.match(source, /is_adult\s*=\s*FALSE/, `${file} must block adult anime`);
     assert.match(source, /app_visible\s*=\s*TRUE/, `${file} must honor operator visibility`);
   }
+});
+
+test('viewing DNA aggregates qualify user-list status and score columns', () => {
+  const source = readFileSync(
+    join(process.cwd(), 'src', 'services', 'user-viewing-dna.service.ts'),
+    'utf8',
+  );
+
+  assert.match(source, /SUM\(ual\.status <> 'planned'\)/);
+  assert.match(source, /SUM\(ual\.status = 'completed'\)/);
+  assert.match(source, /ual\.score IS NOT NULL/);
+  assert.doesNotMatch(source, /SUM\(status/);
 });
 
 test('public anime list routes enforce visible-user middleware', () => {

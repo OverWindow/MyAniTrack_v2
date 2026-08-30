@@ -145,8 +145,9 @@ function formatAnalysisScore(value?: number | null) {
   return typeof value === 'number' && Number.isFinite(value) ? value.toFixed(2) : '-'
 }
 
-export function UserAnalysisPage() {
-  const { userId } = useParams<{ userId: string }>()
+export function UserAnalysisPage({ shareToken }: { shareToken?: string } = {}) {
+  const { userId: routeUserId } = useParams<{ userId: string }>()
+  const userId = shareToken ? 'shared' : routeUserId
   const [state, setState] = useState<UserAnalysisState>({
     user: null,
     item: null,
@@ -218,7 +219,7 @@ export function UserAnalysisPage() {
 
     const loadStats = async () => {
       try {
-        const data = await fetchPublicUserAnimeStats(userId, controller.signal)
+        const data = await fetchPublicUserAnimeStats(userId, controller.signal, shareToken)
         setState({ user: data.user, item: data.item, isLoading: false, error: null })
       } catch (loadError) {
         if (loadError instanceof DOMException && loadError.name === 'AbortError') {
@@ -237,7 +238,7 @@ export function UserAnalysisPage() {
     void loadStats()
 
     return () => controller.abort()
-  }, [userId])
+  }, [shareToken, userId])
 
   useEffect(() => {
     if (!userId) {
@@ -250,7 +251,7 @@ export function UserAnalysisPage() {
       setViewingDnaState((current) => ({ ...current, isLoading: true, error: null }))
 
       try {
-        const item = await fetchViewingDnaStats({ userId, signal: controller.signal })
+        const item = await fetchViewingDnaStats({ userId, shareToken, signal: controller.signal })
         setViewingDnaState({ item, isLoading: false, error: null })
       } catch (loadError) {
         if (loadError instanceof DOMException && loadError.name === 'AbortError') {
@@ -268,7 +269,7 @@ export function UserAnalysisPage() {
     void loadViewingDna()
 
     return () => controller.abort()
-  }, [userId])
+  }, [shareToken, userId])
 
   useEffect(() => {
     if (!userId) {
@@ -281,7 +282,7 @@ export function UserAnalysisPage() {
       setFormatDistributionState((current) => ({ ...current, isLoading: true, error: null }))
 
       try {
-        const item = await fetchFormatDistributionStats({ userId, signal: controller.signal })
+        const item = await fetchFormatDistributionStats({ userId, shareToken, signal: controller.signal })
         setFormatDistributionState({ item, isLoading: false, error: null })
       } catch (loadError) {
         if (loadError instanceof DOMException && loadError.name === 'AbortError') {
@@ -299,7 +300,7 @@ export function UserAnalysisPage() {
     void loadFormatDistribution()
 
     return () => controller.abort()
-  }, [userId])
+  }, [shareToken, userId])
 
   useEffect(() => {
     if (!userId) {
@@ -312,7 +313,7 @@ export function UserAnalysisPage() {
       setYearlyScoreState((current) => ({ ...current, isLoading: true, error: null }))
 
       try {
-        const item = await fetchYearlyScoreStats({ userId, signal: controller.signal })
+        const item = await fetchYearlyScoreStats({ userId, shareToken, signal: controller.signal })
         setYearlyScoreState({ item, isLoading: false, error: null })
       } catch (loadError) {
         if (loadError instanceof DOMException && loadError.name === 'AbortError') {
@@ -330,7 +331,7 @@ export function UserAnalysisPage() {
     void loadYearlyScores()
 
     return () => controller.abort()
-  }, [userId])
+  }, [shareToken, userId])
 
   useEffect(() => {
     if (!userId) {
@@ -343,7 +344,7 @@ export function UserAnalysisPage() {
       setGenreBubbleState((current) => ({ ...current, isLoading: true, error: null }))
 
       try {
-        const item = await fetchGenreBubbleStats({ userId, signal: controller.signal })
+        const item = await fetchGenreBubbleStats({ userId, shareToken, signal: controller.signal })
         setGenreBubbleState({ item, isLoading: false, error: null })
       } catch (loadError) {
         if (loadError instanceof DOMException && loadError.name === 'AbortError') {
@@ -361,7 +362,7 @@ export function UserAnalysisPage() {
     void loadGenreBubble()
 
     return () => controller.abort()
-  }, [userId])
+  }, [shareToken, userId])
 
   const genreDistribution = useMemo(
     () => getTopEntries(state.item?.genreDistribution ?? {}),
@@ -418,6 +419,8 @@ export function UserAnalysisPage() {
     try {
       const response = await fetchPublicUserCollection({
         userId,
+        shareToken,
+        shareAnalysis: Boolean(shareToken),
         sort: 'score',
         limit: 50,
         genre: genre as AnimeGenre,
@@ -455,6 +458,8 @@ export function UserAnalysisPage() {
     try {
       const response = await fetchPublicUserCollection({
         userId,
+        shareToken,
+        shareAnalysis: Boolean(shareToken),
         sort: 'score',
         limit: 50,
         year: normalizedYear,
@@ -492,6 +497,8 @@ export function UserAnalysisPage() {
     try {
       const response = await fetchPublicUserCollection({
         userId,
+        shareToken,
+        shareAnalysis: Boolean(shareToken),
         sort: 'score',
         limit: 50,
         score: normalizedScore,
@@ -546,9 +553,13 @@ export function UserAnalysisPage() {
 
   return (
     <section className="analysis-page user-analysis-page">
-      <Link className="detail-back-link" to={`/users/${userId}/profile`}>
-        프로필로 돌아가기
-      </Link>
+      {shareToken ? (
+        <span className="detail-label">공유 리포트</span>
+      ) : (
+        <Link className="detail-back-link" to={`/users/${userId}/profile`}>
+          프로필로 돌아가기
+        </Link>
+      )}
 
       <div className="analysis-hero-card">
         <div className="analysis-hero-copy">
@@ -567,7 +578,7 @@ export function UserAnalysisPage() {
             )}
             <div>
               <h1>{user.username}</h1>
-              <p>사용자 ID {user.id}</p>
+              <p>{shareToken ? '읽기 전용 공유 분석' : `사용자 ID ${user.id}`}</p>
             </div>
           </div>
           <p className="analysis-profile-note">
@@ -576,11 +587,13 @@ export function UserAnalysisPage() {
           <span className="analysis-updated-at">마지막 계산 {formatUpdatedAt(item.updatedAt)}</span>
         </div>
 
-        <div className="analysis-hero-actions user-analysis-actions">
-          <Link className="secondary-button" to={`/users/${userId}/anime-list`}>
-            컬렉션 보기
-          </Link>
-        </div>
+        {!shareToken && (
+          <div className="analysis-hero-actions user-analysis-actions">
+            <Link className="secondary-button" to={`/users/${userId}/anime-list`}>
+              컬렉션 보기
+            </Link>
+          </div>
+        )}
       </div>
 
       <section className="analysis-summary-card">
@@ -954,9 +967,18 @@ export function UserAnalysisPage() {
         )}
       </section>
 
-      <StudioRankingSection apiUserId={userId} cacheOwnerId={`public:${userId}`} />
+      <StudioRankingSection
+        apiUserId={shareToken ? undefined : userId}
+        shareToken={shareToken}
+        cacheOwnerId={shareToken ? `share:${shareToken}` : `public:${userId}`}
+      />
 
-      <VoiceActorRankingSection userId={userId} ownerLabel={user.username} />
+      <VoiceActorRankingSection
+        userId={shareToken ? undefined : userId}
+        shareToken={shareToken}
+        cacheOwnerId={shareToken ? `share:${shareToken}` : undefined}
+        ownerLabel={user.username}
+      />
     </section>
   )
 }

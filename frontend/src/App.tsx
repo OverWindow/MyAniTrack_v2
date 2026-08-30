@@ -23,6 +23,7 @@ import { PrivacyPolicyPage } from './pages/PrivacyPolicyPage'
 import { ProfileEditPage } from './pages/ProfileEditPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { SettingsPage } from './pages/SettingsPage'
+import { SharePage } from './pages/SharePage'
 import { SignupPage } from './pages/SignupPage'
 import { UserAnalysisPage } from './pages/UserAnalysisPage'
 import { UserCollectionPage } from './pages/UserCollectionPage'
@@ -47,7 +48,7 @@ function App() {
   const isHomeRoute = activeRoute.pathname === '/'
   const isUserCollectionRoute = /^\/users\/[^/]+\/anime-list$/.test(activeRoute.pathname)
   const isPolicyRoute = ['/privacy', '/account-deletion'].includes(location.pathname)
-  const shouldShowFloatingCta = !backgroundLocation && !isPolicyRoute && !['/login', '/signup'].includes(location.pathname)
+  const shouldShowFloatingCta = !backgroundLocation && !isPolicyRoute && !location.pathname.startsWith('/s/') && !['/login', '/signup'].includes(location.pathname)
   const [isFriendsOpen, setIsFriendsOpen] = useState(false)
   const floatingPanelRef = useRef<HTMLDivElement | null>(null)
 
@@ -118,6 +119,7 @@ function App() {
           <Route path="/collection" element={<CollectionPage />} />
           <Route path="/friends" element={<FriendsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/s/:token" element={<SharePage />} />
           <Route path="/users/:userId/profile" element={<UserProfilePage />} />
           <Route path="/users/:userId/anime-list" element={<UserCollectionPage />} />
           <Route path="/users/:userId/anime-stats" element={<UserAnalysisPage />} />

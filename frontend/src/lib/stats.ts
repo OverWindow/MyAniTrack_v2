@@ -185,9 +185,12 @@ export async function fetchMyAnimeStats(signal?: AbortSignal) {
 
 export async function fetchViewingDnaStats(params: {
   userId?: string
+  shareToken?: string
   signal?: AbortSignal
 } = {}): Promise<ViewingDnaItem> {
-  const path = params.userId
+  const path = params.shareToken
+    ? `/api/shares/${encodeURIComponent(params.shareToken)}/viewing-dna`
+    : params.userId
     ? `/api/users/${params.userId}/anime-stats/viewing-dna`
     : '/api/me/anime-stats/viewing-dna'
   const response = await authFetch(new URL(path, getApiBaseUrl()).toString(), {
@@ -233,6 +236,7 @@ export async function recalculateMyAnimeStats() {
 
 type GenreBubbleParams = {
   userId?: string
+  shareToken?: string
   minCount?: number
   weighting?: 'fractional' | 'full'
   status?: 'completed' | 'all'
@@ -244,6 +248,7 @@ type GenreBubbleParams = {
 
 type YearlyScoreParams = {
   userId?: string
+  shareToken?: string
   status?: 'completed' | 'all'
   minRatedAnimeCount?: number
   signal?: AbortSignal
@@ -251,13 +256,16 @@ type YearlyScoreParams = {
 
 type FormatDistributionParams = {
   userId?: string
+  shareToken?: string
   status?: 'completed' | 'all'
   minCount?: number
   signal?: AbortSignal
 }
 
 function createGenreBubbleUrl(params: GenreBubbleParams = {}) {
-  const path = params.userId
+  const path = params.shareToken
+    ? `/api/shares/${encodeURIComponent(params.shareToken)}/genre-bubble`
+    : params.userId
     ? `/api/users/${params.userId}/anime-stats/genre-bubble`
     : '/api/me/anime-stats/genre-bubble'
   const url = new URL(path, getApiBaseUrl())
@@ -274,7 +282,9 @@ function createGenreBubbleUrl(params: GenreBubbleParams = {}) {
 }
 
 function createYearlyScoreUrl(params: YearlyScoreParams = {}) {
-  const path = params.userId
+  const path = params.shareToken
+    ? `/api/shares/${encodeURIComponent(params.shareToken)}/yearly-scores`
+    : params.userId
     ? `/api/users/${params.userId}/anime-stats/yearly-scores`
     : '/api/me/anime-stats/yearly-scores'
   const url = new URL(path, getApiBaseUrl())
@@ -286,7 +296,9 @@ function createYearlyScoreUrl(params: YearlyScoreParams = {}) {
 }
 
 function createFormatDistributionUrl(params: FormatDistributionParams = {}) {
-  const path = params.userId
+  const path = params.shareToken
+    ? `/api/shares/${encodeURIComponent(params.shareToken)}/format-distribution`
+    : params.userId
     ? `/api/users/${params.userId}/anime-stats/format-distribution`
     : '/api/me/anime-stats/format-distribution'
   const url = new URL(path, getApiBaseUrl())
@@ -353,6 +365,7 @@ export async function fetchFormatDistributionStats(params: FormatDistributionPar
 
 type VoiceActorRankingParams = {
   userId?: string
+  shareToken?: string
   sort: VoiceActorRankingSort
   limit?: number
   minRatedAnimeCount?: number
@@ -361,6 +374,7 @@ type VoiceActorRankingParams = {
 
 type VoiceActorAnimeParams = {
   userId?: string
+  shareToken?: string
   voiceActorId: number
   titleLanguage?: 'ko' | 'en' | 'ja'
   status?: 'all' | 'completed'
@@ -371,6 +385,7 @@ type VoiceActorAnimeParams = {
 
 type StudioRankingParams = {
   userId?: string
+  shareToken?: string
   status?: 'completed' | 'all'
   sort?: StudioRankingSort
   mainOnly?: boolean
@@ -383,6 +398,7 @@ type StudioRankingParams = {
 
 type StudioAnimeParams = {
   userId?: string
+  shareToken?: string
   studioId: number
   status?: 'completed' | 'all'
   mainOnly?: boolean
@@ -393,7 +409,9 @@ type StudioAnimeParams = {
 }
 
 function createVoiceActorRankingUrl(params: VoiceActorRankingParams) {
-  const path = params.userId
+  const path = params.shareToken
+    ? `/api/shares/${encodeURIComponent(params.shareToken)}/voice-actors/ranking`
+    : params.userId
     ? `/api/users/${params.userId}/voice-actors/ranking`
     : '/api/me/voice-actors/ranking'
   const url = new URL(path, getApiBaseUrl())
@@ -409,7 +427,9 @@ function createVoiceActorRankingUrl(params: VoiceActorRankingParams) {
 }
 
 function createVoiceActorAnimeUrl(params: VoiceActorAnimeParams) {
-  const path = params.userId
+  const path = params.shareToken
+    ? `/api/shares/${encodeURIComponent(params.shareToken)}/voice-actors/${params.voiceActorId}/anime`
+    : params.userId
     ? `/api/users/${params.userId}/voice-actors/${params.voiceActorId}/anime`
     : `/api/me/voice-actors/${params.voiceActorId}/anime`
   const url = new URL(path, getApiBaseUrl())
@@ -426,7 +446,9 @@ function createVoiceActorAnimeUrl(params: VoiceActorAnimeParams) {
 }
 
 function createStudioRankingUrl(params: StudioRankingParams = {}) {
-  const path = params.userId
+  const path = params.shareToken
+    ? `/api/shares/${encodeURIComponent(params.shareToken)}/studios`
+    : params.userId
     ? `/api/users/${params.userId}/anime-stats/studios`
     : '/api/me/anime-stats/studios'
   const url = new URL(path, getApiBaseUrl())
@@ -446,7 +468,9 @@ function createStudioRankingUrl(params: StudioRankingParams = {}) {
 }
 
 function createStudioAnimeUrl(params: StudioAnimeParams) {
-  const path = params.userId
+  const path = params.shareToken
+    ? `/api/shares/${encodeURIComponent(params.shareToken)}/studios/${params.studioId}/anime`
+    : params.userId
     ? `/api/users/${params.userId}/anime-stats/studios/${params.studioId}/anime`
     : `/api/me/anime-stats/studios/${params.studioId}/anime`
   const url = new URL(path, getApiBaseUrl())

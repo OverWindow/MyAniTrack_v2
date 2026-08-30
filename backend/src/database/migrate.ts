@@ -14,6 +14,7 @@ type MigrationFile = {
   filename: string;
   sql: string;
   checksum: string;
+  compatibleChecksums: ReadonlySet<string>;
 };
 
 type AppliedMigrationRow = RowDataPacket & { version: number; name: string; checksum: string };
@@ -30,6 +31,26 @@ type LegacyMigrationCheck = {
 };
 
 export type LegacyMigrationState = 'present' | 'absent' | 'partial';
+
+function sha256(source: string) {
+  return createHash('sha256').update(source).digest('hex');
+}
+
+export function calculateMigrationChecksums(source: string) {
+  const normalized = source.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n');
+  const checksum = sha256(normalized);
+
+  // New migrations use the canonical LF checksum. The alternatives keep
+  // databases created from older CRLF or raw-file checkouts compatible.
+  return {
+    checksum,
+    compatibleChecksums: new Set([
+      checksum,
+      sha256(normalized.replace(/\n/g, '\r\n')),
+      sha256(source),
+    ]),
+  };
+}
 
 const LEGACY_MIGRATION_CHECKS: LegacyMigrationCheck[] = [
   { version: 1, tables: ['anime', 'anime_genres', 'anime_tags', 'anime_synonyms', 'users', 'user_anime_lists'] },
@@ -133,12 +154,14 @@ async function loadMigrationFiles() {
     seenVersions.add(version);
 
     const sql = await fs.readFile(path.join(MIGRATION_DIRECTORY, filename), 'utf8');
+    const { checksum, compatibleChecksums } = calculateMigrationChecksums(sql);
     migrations.push({
       version,
       name: match[2],
       filename,
       sql,
-      checksum: createHash('sha256').update(sql).digest('hex'),
+      checksum,
+      compatibleChecksums,
     });
   }
 
@@ -291,7 +314,7 @@ export async function runMigrations() {
     for (const migration of migrations) {
       const existing = applied.get(migration.version);
       if (existing) {
-        if (existing.name !== migration.name || existing.checksum !== migration.checksum) {
+        if (existing.name !== migration.name || !migration.compatibleChecksums.has(existing.checksum)) {
           throw new Error(`Applied migration ${migration.version} differs from ${migration.filename}. Never edit an applied migration.`);
         }
         continue;

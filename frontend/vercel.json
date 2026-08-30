@@ -1,5 +1,25 @@
 {
+  "headers": [
+    {
+      "source": "/s/:path*",
+      "headers": [
+        { "key": "X-Robots-Tag", "value": "noindex, nofollow, noarchive" },
+        { "key": "Referrer-Policy", "value": "no-referrer" }
+      ]
+    }
+  ],
   "rewrites": [
+    {
+      "source": "/s/:token",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(facebookexternalhit|Twitterbot|Discordbot|Slackbot|LinkedInBot|TelegramBot|KAKAOTALK|kakaotalk-scrap).*"
+        }
+      ],
+      "destination": "https://api.myanitrack.com/share-preview/:token"
+    },
     {
       "source": "/((?!api/).*)",
       "destination": "/index.html"

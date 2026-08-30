@@ -17,6 +17,7 @@ import type {
   PublicUserProfile,
   PublicUserProfileResponse,
 } from '../types/users'
+import type { ShareOwner } from '../types/share'
 
 function getApiBaseUrl() {
   const baseUrl = import.meta.env.VITE_API_BASE_URL
@@ -135,6 +136,32 @@ function normalizePublicUserProfile(value: unknown) {
   } as PublicUserProfile
 }
 
+function normalizeShareOwner(value: unknown): PublicUserProfile | null {
+  if (!value || typeof value !== 'object') return null
+  const source = value as ShareOwner
+  if (typeof source.username !== 'string' || !source.username.trim()) return null
+  return {
+    id: 0,
+    username: source.username,
+    profileImageUrl: source.profileImageUrl ?? null,
+    bio: source.bio ?? null,
+    animeListCount: toFiniteNumber(source.animeListCount) ?? 0,
+    createdAt: '',
+    updatedAt: '',
+  }
+}
+
+function normalizeSharedListItem(item: UserAnimeListItem): UserAnimeListItem {
+  return {
+    ...item,
+    id: item.animeId,
+    userId: 0,
+    notes: null,
+    createdAt: '',
+    updatedAt: '',
+  }
+}
+
 export async function fetchPublicUserProfile(userId: string, signal?: AbortSignal) {
   const response = await authFetch(new URL(`/api/users/${userId}/profile`, getApiBaseUrl()).toString(), {
     signal,
@@ -156,6 +183,8 @@ export async function fetchPublicUserProfile(userId: string, signal?: AbortSigna
 
 export async function fetchPublicUserCollection(params: {
   userId: string
+  shareToken?: string
+  shareAnalysis?: boolean
   sort: UserAnimeListSort
   limit: number
   genre?: AnimeGenre | null
@@ -165,7 +194,10 @@ export async function fetchPublicUserCollection(params: {
   cursor?: string | null
   signal?: AbortSignal
 }) {
-  const url = new URL(`/api/users/${params.userId}/anime-list`, getApiBaseUrl())
+  const path = params.shareToken
+    ? `/api/shares/${encodeURIComponent(params.shareToken)}/${params.shareAnalysis ? 'analysis/anime-list' : 'anime-list'}`
+    : `/api/users/${params.userId}/anime-list`
+  const url = new URL(path, getApiBaseUrl())
   url.searchParams.set('sort', params.sort)
   url.searchParams.set('titleLanguage', params.titleLanguage ?? 'ko')
   url.searchParams.set('limit', String(params.limit))
@@ -192,13 +224,16 @@ export async function fetchPublicUserCollection(params: {
     throw new Error(getErrorMessage(response.status, '사용자 컬렉션을 불러오지 못했어요.'))
   }
 
-  const data = (await response.json()) as PublicUserAnimeListResponse
-  const filteredItems = data.items.filter(
+  const data = (await response.json()) as PublicUserAnimeListResponse & { owner?: ShareOwner }
+  const user = data.user ?? normalizeShareOwner(data.owner)
+  if (!user) throw new Error('공유 사용자 정보를 불러오지 못했어요.')
+  const normalizedItems = params.shareToken ? data.items.map(normalizeSharedListItem) : data.items
+  const filteredItems = normalizedItems.filter(
     (item: UserAnimeListItem) => item.anime.coverImageExtraLarge || item.anime.coverImageLarge,
   )
 
   return {
-    user: data.user,
+    user,
     items: filteredItems,
     pageInfo: data.pageInfo,
   } as PublicUserAnimeListPage
@@ -206,6 +241,7 @@ export async function fetchPublicUserCollection(params: {
 
 export async function fetchPublicUserSeriesCollection(params: {
   userId: string
+  shareToken?: string
   scope?: AnimeSeriesScope
   status?: UserSeriesCollectionStatus
   titleLanguage?: 'ko' | 'en' | 'ja'
@@ -214,7 +250,10 @@ export async function fetchPublicUserSeriesCollection(params: {
   cursor?: string | null
   signal?: AbortSignal
 }) {
-  const url = new URL(`/api/users/${params.userId}/anime-list/series`, getApiBaseUrl())
+  const path = params.shareToken
+    ? `/api/shares/${encodeURIComponent(params.shareToken)}/anime-list/series`
+    : `/api/users/${params.userId}/anime-list/series`
+  const url = new URL(path, getApiBaseUrl())
   url.searchParams.set('scope', params.scope ?? 'mainline')
   url.searchParams.set('status', params.status ?? 'all')
   url.searchParams.set('titleLanguage', params.titleLanguage ?? 'ko')
@@ -234,17 +273,34 @@ export async function fetchPublicUserSeriesCollection(params: {
     throw new Error(getErrorMessage(response.status, '사용자 시리즈 컬렉션을 불러오지 못했어요.'))
   }
 
-  const data = (await response.json()) as PublicUserSeriesCollectionResponse
+  const data = (await response.json()) as PublicUserSeriesCollectionResponse & { owner?: ShareOwner }
+  const user = data.user ?? normalizeShareOwner(data.owner)
+  if (!user) throw new Error('공유 사용자 정보를 불러오지 못했어요.')
+  const items = params.shareToken ? data.items.map((series) => ({
+    ...series,
+    lastActivityAt: '',
+    items: series.items.map((member) => ({
+      ...member,
+      userList: member.userList ? {
+        ...member.userList,
+        id: member.anime.id,
+        updatedAt: null,
+      } : null,
+    })),
+  })) : data.items
 
   return {
-    user: data.user,
-    items: data.items,
+    user,
+    items,
     pageInfo: data.pageInfo,
   } as PublicUserSeriesCollectionPage
 }
 
-export async function fetchPublicUserAnimeStats(userId: string, signal?: AbortSignal) {
-  const response = await authFetch(new URL(`/api/users/${userId}/anime-stats`, getApiBaseUrl()).toString(), {
+export async function fetchPublicUserAnimeStats(userId: string, signal?: AbortSignal, shareToken?: string) {
+  const path = shareToken
+    ? `/api/shares/${encodeURIComponent(shareToken)}/anime-stats`
+    : `/api/users/${userId}/anime-stats`
+  const response = await authFetch(new URL(path, getApiBaseUrl()).toString(), {
     signal,
   })
 
@@ -252,10 +308,12 @@ export async function fetchPublicUserAnimeStats(userId: string, signal?: AbortSi
     throw new Error(getErrorMessage(response.status, '사용자 분석 정보를 불러오지 못했어요.'))
   }
 
-  const data = (await response.json()) as PublicUserAnimeStatsResponse
+  const data = (await response.json()) as PublicUserAnimeStatsResponse & { owner?: ShareOwner }
+  const user = data.user ?? normalizeShareOwner(data.owner)
+  if (!user) throw new Error('공유 사용자 정보를 불러오지 못했어요.')
 
   return {
-    user: data.user,
+    user,
     item: normalizeStatsItem(data.item),
   } as PublicUserAnimeStatsPage
 }

@@ -106,11 +106,15 @@ export async function getUserViewingDna(userId: number) {
       `
       SELECT
         COUNT(*) AS totalAnimeCount,
-        COALESCE(SUM(status <> 'planned'), 0) AS startedAnimeCount,
-        COALESCE(SUM(status = 'completed'), 0) AS completedAnimeCount,
-        COALESCE(SUM(status <> 'planned' AND score IS NOT NULL), 0) AS ratedAnimeCount
-      FROM user_anime_lists
-      WHERE user_id = ?
+        COALESCE(SUM(ual.status <> 'planned'), 0) AS startedAnimeCount,
+        COALESCE(SUM(ual.status = 'completed'), 0) AS completedAnimeCount,
+        COALESCE(SUM(ual.status <> 'planned' AND ual.score IS NOT NULL), 0) AS ratedAnimeCount
+      FROM user_anime_lists ual
+      INNER JOIN anime animeRow
+        ON animeRow.id = ual.anime_id
+        AND animeRow.is_adult = FALSE
+        AND animeRow.app_visible = TRUE
+      WHERE ual.user_id = ?
       `,
       [userId]
     ),
@@ -120,6 +124,10 @@ export async function getUserViewingDna(userId: number) {
         genreRow.genre,
         COUNT(DISTINCT ual.anime_id) AS animeCount
       FROM user_anime_lists ual
+      INNER JOIN anime animeRow
+        ON animeRow.id = ual.anime_id
+        AND animeRow.is_adult = FALSE
+        AND animeRow.app_visible = TRUE
       INNER JOIN anime_genres genreRow
         ON genreRow.anime_id = ual.anime_id
       WHERE ual.user_id = ?

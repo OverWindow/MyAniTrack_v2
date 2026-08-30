@@ -24,6 +24,7 @@ type VoiceActorRankingSectionProps = {
   cacheOwnerId?: number | string | null
   cacheVersion?: number
   userId?: string
+  shareToken?: string
   ownerLabel?: string
 }
 
@@ -131,6 +132,7 @@ export function VoiceActorRankingSection({
   cacheOwnerId,
   cacheVersion = 0,
   userId,
+  shareToken,
   ownerLabel = '이 사용자',
 }: VoiceActorRankingSectionProps) {
   const [rankingState, setRankingState] = useState<RankingState>({
@@ -149,7 +151,7 @@ export function VoiceActorRankingSection({
   })
 
   useEffect(() => {
-    if (!cacheOwnerId && !userId) {
+    if (!cacheOwnerId && !userId && !shareToken) {
       return
     }
 
@@ -177,12 +179,14 @@ export function VoiceActorRankingSection({
         const [count, score] = await Promise.all([
           fetchVoiceActorRanking({
             userId,
+            shareToken,
             sort: 'count',
             limit: 20,
             signal: controller.signal,
           }),
           fetchVoiceActorRanking({
             userId,
+            shareToken,
             sort: 'score',
             minRatedAnimeCount: 3,
             limit: 20,
@@ -219,7 +223,7 @@ export function VoiceActorRankingSection({
       isCancelled = true
       controller.abort()
     }
-  }, [cacheOwnerId, cacheVersion, userId])
+  }, [cacheOwnerId, cacheVersion, shareToken, userId])
 
   useEffect(() => {
     if (!selectedVoiceActor) {
@@ -264,6 +268,7 @@ export function VoiceActorRankingSection({
 
         const data = await fetchVoiceActorAnime({
           userId,
+          shareToken,
           voiceActorId: selectedVoiceActor.id,
           titleLanguage: 'ko',
           status: 'completed',
@@ -307,7 +312,7 @@ export function VoiceActorRankingSection({
       isCancelled = true
       controller.abort()
     }
-  }, [cacheOwnerId, cacheVersion, selectedVoiceActor, userId])
+  }, [cacheOwnerId, cacheVersion, selectedVoiceActor, shareToken, userId])
 
   useEffect(() => {
     if (!selectedVoiceActor) {
@@ -345,6 +350,7 @@ export function VoiceActorRankingSection({
     try {
       const nextData = await fetchVoiceActorAnime({
         userId,
+        shareToken,
         voiceActorId: selectedVoiceActor.id,
         titleLanguage: animeState.data.pageInfo.titleLanguage,
         status: 'completed',

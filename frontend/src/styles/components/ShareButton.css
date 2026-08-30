@@ -1,0 +1,46 @@
+.share-trigger-button {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border: 1px solid #d6d3d1;
+  border-radius: 12px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  box-shadow: 0 6px 16px rgba(41, 37, 36, 0.08);
+  cursor: pointer;
+  transition:
+    transform var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out);
+}
+
+.share-trigger-button:hover:not(:disabled),
+.share-trigger-button:focus-visible {
+  transform: translateY(-1px);
+  border-color: var(--point-color);
+  background: var(--point-softest);
+}
+
+.share-trigger-button:focus-visible {
+  outline: 3px solid rgba(245, 158, 11, 0.25);
+  outline-offset: 2px;
+}
+
+.share-trigger-button:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.share-trigger-button[aria-busy='true'] svg {
+  animation: share-button-pulse 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes share-button-pulse {
+  to {
+    transform: scale(0.86);
+    opacity: 0.55;
+  }
+}

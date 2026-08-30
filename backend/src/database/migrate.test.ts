@@ -2,7 +2,28 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
-import { classifyLegacyMigrationState, splitSqlStatements } from './migrate';
+import { calculateMigrationChecksums, classifyLegacyMigrationState, splitSqlStatements } from './migrate';
+
+test('migration checksums are independent of line endings', () => {
+  const lfSql = 'CREATE TABLE example (id INT);\nINSERT INTO example VALUES (1);';
+  const crlfSql = lfSql.replace(/\n/g, '\r\n');
+  const lfChecksums = calculateMigrationChecksums(lfSql);
+  const crlfChecksums = calculateMigrationChecksums(crlfSql);
+
+  assert.equal(lfChecksums.checksum, crlfChecksums.checksum);
+  assert.deepEqual(
+    [...lfChecksums.compatibleChecksums].sort(),
+    [...crlfChecksums.compatibleChecksums].sort()
+  );
+});
+
+test('migration checksums still detect SQL content changes', () => {
+  const original = calculateMigrationChecksums('SELECT 1;');
+  const changed = calculateMigrationChecksums('SELECT 2;');
+
+  assert.notEqual(original.checksum, changed.checksum);
+  assert.equal(original.compatibleChecksums.has(changed.checksum), false);
+});
 
 test('legacy migration state distinguishes present, absent, and partial schemas', () => {
   assert.equal(classifyLegacyMigrationState([true, true]), 'present');
