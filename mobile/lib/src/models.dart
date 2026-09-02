@@ -1,3 +1,5 @@
+import 'package:myanitrack_mobile/src/agreements.dart';
+
 typedef JsonMap = Map<String, dynamic>;
 
 JsonMap asJsonMap(Object? value) {
@@ -91,8 +93,8 @@ class AgreementStatus {
       serverHasRequiredAgreements ??
       (termsAgreed &&
           privacyAgreed &&
-          termsVersion == 'v1.1' &&
-          privacyVersion == 'v1.0');
+          termsVersion == AppAgreements.termsVersion &&
+          privacyVersion == AppAgreements.privacyVersion);
 
   factory AgreementStatus.fromJson(JsonMap json) {
     final data = asJsonMap(json['data']);
@@ -103,8 +105,7 @@ class AgreementStatus {
       privacyAgreed: readBool(root['privacyAgreed']),
       termsVersion: readString(root['termsVersion']),
       privacyVersion: readString(root['privacyVersion']),
-      serverHasRequiredAgreements:
-          root.containsKey('hasRequiredAgreements')
+      serverHasRequiredAgreements: root.containsKey('hasRequiredAgreements')
           ? readBool(root['hasRequiredAgreements'])
           : null,
     );

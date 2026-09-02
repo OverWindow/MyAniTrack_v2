@@ -3,6 +3,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
     hide AuthUser, MultipartFile;
 
+import 'package:myanitrack_mobile/src/agreements.dart';
 import 'package:myanitrack_mobile/src/config.dart';
 import 'package:myanitrack_mobile/src/models.dart';
 
@@ -223,9 +224,9 @@ class AuthRepository {
       '/me/agreements',
       data: const {
         'termsAgreed': true,
-        'termsVersion': 'v1.1',
+        'termsVersion': AppAgreements.termsVersion,
         'privacyAgreed': true,
-        'privacyVersion': 'v1.0',
+        'privacyVersion': AppAgreements.privacyVersion,
       },
     );
     return AgreementStatus.fromJson(json);

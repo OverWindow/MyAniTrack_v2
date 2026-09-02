@@ -40,8 +40,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     initialLocation: '/home',
     redirect: (context, state) {
       final path = state.uri.path;
-      final isAuthPath =
-          path == '/login' || path == '/agreements' || path == '/loading';
+      final isAuthPath = path == '/login' || path == '/loading';
       if (session.phase == SessionPhase.bootstrapping ||
           session.phase == SessionPhase.backendLinking) {
         return path == '/loading' ? null : '/loading';
@@ -49,9 +48,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       if (session.phase == SessionPhase.signedOut ||
           session.phase == SessionPhase.googlePending) {
         return path == '/login' ? null : '/login';
-      }
-      if (session.phase == SessionPhase.agreementsRequired) {
-        return path == '/agreements' ? null : '/agreements';
       }
       if (session.isAuthenticated && isAuthPath) return '/home';
       return null;
@@ -64,10 +60,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/login',
         pageBuilder: (_, state) => _page(state, const LoginScreen()),
-      ),
-      GoRoute(
-        path: '/agreements',
-        pageBuilder: (_, state) => _page(state, const AgreementsScreen()),
       ),
       ShellRoute(
         builder: (context, state, child) => AppTabShell(child: child),

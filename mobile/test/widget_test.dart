@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:myanitrack_mobile/src/app.dart';
+import 'package:myanitrack_mobile/src/agreements.dart';
 import 'package:myanitrack_mobile/src/api.dart';
 import 'package:myanitrack_mobile/src/config.dart';
 import 'package:myanitrack_mobile/src/models.dart';
@@ -63,8 +64,23 @@ void main() {
     await pumpLogin(tester, surfaceSize: const Size(360, 800));
 
     expect(find.text('Google로 계속하기'), findsOneWidget);
+    expect(find.text(AppAgreements.termsTitle), findsOneWidget);
+    expect(find.text(AppAgreements.privacyTitle), findsOneWidget);
     expect(find.text('둘러보기'), findsNothing);
     expect(find.text('내 컬렉션'), findsNothing);
+  });
+
+  testWidgets('로그인 화면에서 필수 약관 전체 내용을 열람한다', (tester) async {
+    await pumpLogin(tester, surfaceSize: const Size(360, 800));
+
+    final termsLink = find.byKey(const ValueKey('terms-link'));
+    await tester.ensureVisible(termsLink);
+    await tester.tap(termsLink);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('agreement-modal')), findsOneWidget);
+    expect(find.text(AppAgreements.termsParagraphs.first), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('iPhone 화면에서도 로그인 UI가 넘치지 않는다', (tester) async {

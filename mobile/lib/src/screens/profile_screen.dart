@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import 'package:image/image.dart' as image_lib;
 import 'package:image_picker/image_picker.dart';
 
+import 'package:myanitrack_mobile/src/agreements.dart';
 import 'package:myanitrack_mobile/src/api.dart';
 import 'package:myanitrack_mobile/src/providers.dart';
 import 'package:myanitrack_mobile/src/theme.dart';
@@ -862,21 +863,20 @@ class LegalScreen extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(16, 20, 16, 28),
               children: const [
                 _LegalCard(
-                  title: '서비스 이용약관 v1.1',
-                  body:
-                      '마이애니트랙은 애니메이션 기록, 평점과 개인 분석 기능을 제공합니다. 계정 도용, 서비스 운영 방해와 자동화된 데이터 수집은 금지됩니다. 운영상 또는 기술상의 필요에 따라 기능이 변경될 수 있으며 추천 및 분석 결과는 참고 정보입니다.',
+                  title: AppAgreements.termsTitle,
+                  paragraphs: AppAgreements.termsParagraphs,
                 ),
                 SizedBox(height: 14),
                 _LegalCard(
-                  title: '개인정보처리방침 v1.0',
-                  body:
-                      'Google 계정 이메일과 사용자명, 시청 기록과 평점 정보를 서비스 제공 목적으로 처리합니다. 개인정보는 회원 탈퇴 시까지 보관되고 탈퇴 시 삭제됩니다. 법령상 요구를 제외하고 개인정보를 외부에 제공하지 않습니다.',
+                  title: AppAgreements.privacyTitle,
+                  paragraphs: AppAgreements.privacyParagraphs,
                 ),
                 SizedBox(height: 14),
                 _LegalCard(
                   title: '데이터 출처 및 고지',
-                  body:
-                      '애니메이션 정보는 AniList 등 외부 공개 API를 기반으로 하며 저작권은 각 제공자와 권리자에게 있습니다. 분석 결과는 내 기록을 바탕으로 생성되는 참고 정보입니다.',
+                  paragraphs: [
+                    '애니메이션 정보는 AniList 등 외부 공개 API를 기반으로 하며 저작권은 각 제공자와 권리자에게 있습니다. 분석 결과는 내 기록을 바탕으로 생성되는 참고 정보입니다.',
+                  ],
                 ),
               ],
             ),
@@ -888,9 +888,9 @@ class LegalScreen extends StatelessWidget {
 }
 
 class _LegalCard extends StatelessWidget {
-  const _LegalCard({required this.title, required this.body});
+  const _LegalCard({required this.title, required this.paragraphs});
   final String title;
-  final String body;
+  final List<String> paragraphs;
 
   @override
   Widget build(BuildContext context) {
@@ -900,15 +900,18 @@ class _LegalCard extends StatelessWidget {
         children: [
           Text(title, style: appTitleStyle(size: 18)),
           const SizedBox(height: 10),
-          Text(
-            body,
-            style: const TextStyle(
-              fontFamily: 'Pretendard',
-              fontSize: 13.5,
-              height: 1.65,
-              color: AppColors.secondaryText,
+          for (var index = 0; index < paragraphs.length; index++) ...[
+            if (index > 0) const SizedBox(height: 10),
+            Text(
+              paragraphs[index],
+              style: const TextStyle(
+                fontFamily: 'Pretendard',
+                fontSize: 13.5,
+                height: 1.65,
+                color: AppColors.secondaryText,
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );

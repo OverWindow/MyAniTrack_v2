@@ -23,6 +23,9 @@ final authRepositoryProvider = Provider<AuthRepository>(
 final googleAuthGatewayProvider = Provider<GoogleAuthGateway>(
   (_) => NativeGoogleAuthGateway(),
 );
+final supabaseSessionGatewayProvider = Provider<SupabaseSessionGateway>(
+  (_) => NativeSupabaseSessionGateway(),
+);
 final authConfigurationReadyProvider = Provider<bool>(
   (_) => AppConfig.hasSupabaseConfig,
 );
@@ -44,12 +47,36 @@ final profileRepositoryProvider = Provider<ProfileRepository>(
   (ref) => ProfileRepository(ref.watch(apiClientProvider)),
 );
 
+abstract interface class SupabaseSessionGateway {
+  bool get hasSession;
+  Stream<AuthState> get authStateChanges;
+  Future<bool> refreshSession();
+  Future<void> signOut();
+}
+
+class NativeSupabaseSessionGateway implements SupabaseSessionGateway {
+  @override
+  bool get hasSession => Supabase.instance.client.auth.currentSession != null;
+
+  @override
+  Stream<AuthState> get authStateChanges =>
+      Supabase.instance.client.auth.onAuthStateChange;
+
+  @override
+  Future<bool> refreshSession() async {
+    final response = await Supabase.instance.client.auth.refreshSession();
+    return response.session != null;
+  }
+
+  @override
+  Future<void> signOut() => Supabase.instance.client.auth.signOut();
+}
+
 enum SessionPhase {
   bootstrapping,
   signedOut,
   googlePending,
   backendLinking,
-  agreementsRequired,
   authenticated,
 }
 
@@ -90,6 +117,7 @@ final activeUserIdProvider = Provider<int?>((ref) {
 class SessionController extends Notifier<SessionState> {
   StreamSubscription<AuthState>? _subscription;
   bool _bootstrapping = false;
+  bool _googleSignInInProgress = false;
   bool _handlingSessionFailure = false;
 
   @override
@@ -109,25 +137,26 @@ class SessionController extends Notifier<SessionState> {
       );
       return;
     }
-    _subscription ??= Supabase.instance.client.auth.onAuthStateChange.listen((
-      event,
-    ) {
-      if (event.session == null) {
-        if (event.event == AuthChangeEvent.signedOut) {
-          state = const SessionState(phase: SessionPhase.signedOut);
-        }
-        return;
-      }
-      if (event.event == AuthChangeEvent.signedIn ||
-          event.event == AuthChangeEvent.tokenRefreshed ||
-          event.event == AuthChangeEvent.initialSession) {
-        unawaited(bootstrap());
-      }
-    });
+    _subscription ??= ref
+        .read(supabaseSessionGatewayProvider)
+        .authStateChanges
+        .listen((event) {
+          if (event.session == null) {
+            if (event.event == AuthChangeEvent.signedOut) {
+              state = const SessionState(phase: SessionPhase.signedOut);
+            }
+            return;
+          }
+          if (event.event == AuthChangeEvent.signedIn &&
+              state.phase != SessionPhase.googlePending) {
+            unawaited(bootstrap());
+          }
+        });
     await bootstrap();
   }
 
   Future<void> signInWithGoogle() async {
+    if (_googleSignInInProgress) return;
     if (!ref.read(authConfigurationReadyProvider)) {
       state = const SessionState(
         phase: SessionPhase.signedOut,
@@ -135,10 +164,11 @@ class SessionController extends Notifier<SessionState> {
       );
       return;
     }
+    _googleSignInInProgress = true;
     state = const SessionState(phase: SessionPhase.googlePending);
     try {
       await ref.read(googleAuthGatewayProvider).signIn();
-      await bootstrap();
+      await bootstrap(acceptCurrentAgreements: true);
     } on NativeGoogleAuthFailure catch (error) {
       state = SessionState(
         phase: SessionPhase.signedOut,
@@ -149,21 +179,20 @@ class SessionController extends Notifier<SessionState> {
         phase: SessionPhase.signedOut,
         message: 'Google 로그인을 완료하지 못했습니다.',
       );
+    } finally {
+      _googleSignInInProgress = false;
     }
   }
 
-  Future<void> bootstrap() async {
+  Future<void> bootstrap({bool acceptCurrentAgreements = false}) async {
     if (_bootstrapping || !ref.read(authConfigurationReadyProvider)) return;
     _bootstrapping = true;
     try {
-      var recoveryAttempted = false;
+      var refreshAttempted = false;
       while (true) {
-        if (Supabase.instance.client.auth.currentSession == null) {
-          if (recoveryAttempted || !await _restoreGoogleSession()) {
-            state = const SessionState(phase: SessionPhase.signedOut);
-            return;
-          }
-          recoveryAttempted = true;
+        if (!ref.read(supabaseSessionGatewayProvider).hasSession) {
+          state = const SessionState(phase: SessionPhase.signedOut);
+          return;
         }
 
         state = SessionState(
@@ -172,16 +201,31 @@ class SessionController extends Notifier<SessionState> {
           profileImagePreview: state.profileImagePreview,
           profileImageRemoved: state.profileImageRemoved,
         );
-        AuthUser? user;
         try {
           final repository = ref.read(authRepositoryProvider);
-          await repository.connectSupabase();
-          user = await repository.me();
-          final agreements = await repository.agreements();
+          final user = await repository.connectSupabase();
+          var agreements = await repository.agreements();
+          if (!agreements.hasRequiredAgreements) {
+            if (!acceptCurrentAgreements) {
+              await _supabaseSignOut();
+              state = const SessionState(
+                phase: SessionPhase.signedOut,
+                message: '약관이 업데이트되었습니다. 내용을 확인한 뒤 Google로 계속해주세요.',
+              );
+              return;
+            }
+            agreements = await repository.acceptAgreements();
+            if (!agreements.hasRequiredAgreements) {
+              await _supabaseSignOut();
+              state = const SessionState(
+                phase: SessionPhase.signedOut,
+                message: '약관 동의가 저장되지 않았습니다. 다시 시도해주세요.',
+              );
+              return;
+            }
+          }
           state = SessionState(
-            phase: agreements.hasRequiredAgreements
-                ? SessionPhase.authenticated
-                : SessionPhase.agreementsRequired,
+            phase: SessionPhase.authenticated,
             user: user,
             profileImageRevision: state.profileImageRevision,
             profileImagePreview: state.profileImagePreview,
@@ -189,34 +233,20 @@ class SessionController extends Notifier<SessionState> {
           );
           return;
         } on ApiFailure catch (error) {
-          if (error.needsAgreements) {
-            state = SessionState(
-              phase: SessionPhase.agreementsRequired,
-              user: user,
-              message: error.message,
-              profileImageRevision: state.profileImageRevision,
-              profileImagePreview: state.profileImagePreview,
-              profileImageRemoved: state.profileImageRemoved,
-            );
-            return;
+          if (error.isUnauthorized &&
+              !refreshAttempted &&
+              await _refreshSupabaseSession()) {
+            refreshAttempted = true;
+            continue;
           }
-          if (!error.isUnauthorized || recoveryAttempted) {
-            if (error.isUnauthorized) await _clearSupabaseSession();
-            state = SessionState(
-              phase: SessionPhase.signedOut,
-              message: error.message,
-            );
-            return;
-          }
-          recoveryAttempted = true;
-          if (!await _refreshOrRestoreSession()) {
-            state = SessionState(
-              phase: SessionPhase.signedOut,
-              message: error.message,
-            );
-            return;
-          }
+          await _supabaseSignOut();
+          state = SessionState(
+            phase: SessionPhase.signedOut,
+            message: error.message,
+          );
+          return;
         } on Object {
+          await _supabaseSignOut();
           state = const SessionState(
             phase: SessionPhase.signedOut,
             message: '계정 정보를 확인하지 못했습니다. 다시 시도해주세요.',
@@ -226,52 +256,6 @@ class SessionController extends Notifier<SessionState> {
       }
     } finally {
       _bootstrapping = false;
-    }
-  }
-
-  Future<void> acceptAgreements() async {
-    final user = state.user;
-    final profileImageRevision = state.profileImageRevision;
-    final profileImagePreview = state.profileImagePreview;
-    final profileImageRemoved = state.profileImageRemoved;
-    state = SessionState(
-      phase: SessionPhase.backendLinking,
-      user: user,
-      profileImageRevision: profileImageRevision,
-      profileImagePreview: profileImagePreview,
-      profileImageRemoved: profileImageRemoved,
-    );
-    try {
-      final agreements = await ref
-          .read(authRepositoryProvider)
-          .acceptAgreements();
-      if (!agreements.hasRequiredAgreements) {
-        state = SessionState(
-          phase: SessionPhase.agreementsRequired,
-          user: user,
-          message: '약관 동의가 서버에 저장되지 않았습니다. 잠시 후 다시 시도해주세요.',
-          profileImageRevision: profileImageRevision,
-          profileImagePreview: profileImagePreview,
-          profileImageRemoved: profileImageRemoved,
-        );
-        return;
-      }
-      state = SessionState(
-        phase: SessionPhase.authenticated,
-        user: user,
-        profileImageRevision: profileImageRevision,
-        profileImagePreview: profileImagePreview,
-        profileImageRemoved: profileImageRemoved,
-      );
-    } on ApiFailure catch (error) {
-      state = SessionState(
-        phase: SessionPhase.agreementsRequired,
-        user: user,
-        message: error.message,
-        profileImageRevision: profileImageRevision,
-        profileImagePreview: profileImagePreview,
-        profileImageRemoved: profileImageRemoved,
-      );
     }
   }
 
@@ -319,7 +303,7 @@ class SessionController extends Notifier<SessionState> {
   Future<void> _supabaseSignOut() async {
     if (!ref.read(authConfigurationReadyProvider)) return;
     try {
-      await Supabase.instance.client.auth.signOut();
+      await ref.read(supabaseSessionGatewayProvider).signOut();
     } on Object {
       // The local state still moves to signed out when the remote call fails.
     }
@@ -328,13 +312,10 @@ class SessionController extends Notifier<SessionState> {
 
   Future<void> handleApiFailure(ApiFailure failure) async {
     if (failure.needsAgreements) {
-      state = SessionState(
-        phase: SessionPhase.agreementsRequired,
-        user: state.user,
-        message: failure.message,
-        profileImageRevision: state.profileImageRevision,
-        profileImagePreview: state.profileImagePreview,
-        profileImageRemoved: state.profileImageRemoved,
+      await _supabaseSignOut();
+      state = const SessionState(
+        phase: SessionPhase.signedOut,
+        message: '약관이 업데이트되었습니다. 내용을 확인한 뒤 Google로 계속해주세요.',
       );
       return;
     }
@@ -342,42 +323,36 @@ class SessionController extends Notifier<SessionState> {
     if (_bootstrapping || _handlingSessionFailure) return;
     _handlingSessionFailure = true;
     try {
-      await bootstrap();
-      if (!state.isAuthenticated &&
-          state.phase != SessionPhase.agreementsRequired) {
-        state = const SessionState(
-          phase: SessionPhase.signedOut,
-          message: '로그인 세션이 만료되었습니다. 다시 로그인해주세요.',
-        );
+      if (await _refreshSupabaseSession()) {
+        await bootstrap();
+        if (state.isAuthenticated) return;
       }
+      await _supabaseSignOut();
+      state = const SessionState(
+        phase: SessionPhase.signedOut,
+        message: '로그인 세션이 만료되었습니다. 다시 로그인해주세요.',
+      );
     } finally {
       _handlingSessionFailure = false;
     }
   }
 
-  Future<bool> _refreshOrRestoreSession() async {
+  Future<bool> _refreshSupabaseSession() async {
     try {
-      final response = await Supabase.instance.client.auth.refreshSession();
-      if (response.session != null) return true;
+      if (await ref.read(supabaseSessionGatewayProvider).refreshSession()) {
+        return true;
+      }
     } on Object {
-      // Fall through to the non-interactive Google restoration path.
+      // A failed refresh requires an explicit Google sign-in.
     }
     await _clearSupabaseSession();
-    return _restoreGoogleSession();
-  }
-
-  Future<bool> _restoreGoogleSession() async {
-    try {
-      return await ref.read(googleAuthGatewayProvider).restorePreviousSession();
-    } on Object {
-      return false;
-    }
+    return false;
   }
 
   Future<void> _clearSupabaseSession() async {
     if (!ref.read(authConfigurationReadyProvider)) return;
     try {
-      await Supabase.instance.client.auth.signOut();
+      await ref.read(supabaseSessionGatewayProvider).signOut();
     } on Object {
       // Clearing local app state is sufficient when the auth service is offline.
     }
