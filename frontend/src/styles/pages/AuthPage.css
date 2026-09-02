@@ -77,6 +77,20 @@
   margin-top: 0;
 }
 
+.auth-consent-notice {
+  margin: 12px 0 0;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.auth-consent-notice a {
+  color: var(--point-hover);
+  font-weight: 700;
+  text-underline-offset: 3px;
+}
+
 .auth-divider {
   display: grid;
   grid-template-columns: 1fr auto 1fr;

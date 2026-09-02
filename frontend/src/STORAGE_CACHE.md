@@ -24,19 +24,6 @@
 - refresh 실패 또는 세션 만료 처리
 - 저장된 JSON 파싱 실패
 
-### `myanitrack.pending.agreements`
-
-저장 내용:
-- 회원가입/인증 흐름 중 임시로 보관하는 약관 동의 payload
-- 이메일과 약관 동의 값
-
-저장/수정 시점:
-- 이메일 인증 전 약관 동의 상태를 임시 보관해야 할 때 저장합니다.
-
-삭제 시점:
-- 같은 이메일로 약관 정보를 소비하면 삭제합니다.
-- 저장된 JSON 파싱 실패 시 삭제합니다.
-
 ### `myanitrack.collection.cache:{userId}`
 
 저장 내용:

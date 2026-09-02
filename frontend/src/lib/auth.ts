@@ -5,8 +5,6 @@ import type {
   LoginPayload,
   PasswordResetConfirmResponse,
   PasswordResetRequestResponse,
-  SignupPayload,
-  SignupResponse,
   StoredSession,
   UpdateAgreementsPayload,
   UpdateProfilePayload,
@@ -17,9 +15,6 @@ import type {
 import { isSupabaseConfigured, supabase } from './supabase'
 
 const SESSION_STORAGE_KEY = 'myanitrack.auth.session'
-const PENDING_AGREEMENTS_KEY = 'myanitrack.pending.agreements'
-const PENDING_SUPABASE_AGREEMENTS_KEY = 'myanitrack.pending.supabase.agreements'
-const PENDING_SUPABASE_AUTH_INTENT_KEY = 'myanitrack.pending.supabase.intent'
 const PENDING_AUTH_RETURN_PATH_KEY = 'myanitrack.pending.auth-return-path'
 const ACCESS_TOKEN_REFRESH_BUFFER_MS = 60_000
 const ALLOWED_AUTH_RETURN_PATHS = new Set(['/account-deletion'])
@@ -27,11 +22,6 @@ const ALLOWED_AUTH_RETURN_PATHS = new Set(['/account-deletion'])
 let refreshPromise: Promise<AuthTokens> | null = null
 let memoryAccessToken: string | null = null
 let memoryAccessTokenExpiresAt: number | null = null
-
-type PendingAgreementsState = {
-  email: string
-  payload: UpdateAgreementsPayload
-}
 
 type AuthApiError = Error & {
   code?: string
@@ -196,37 +186,6 @@ export function clearStoredSession() {
   window.localStorage.removeItem(SESSION_STORAGE_KEY)
 }
 
-export function savePendingAgreements(email: string, payload: UpdateAgreementsPayload) {
-  const nextValue: PendingAgreementsState = {
-    email: email.trim().toLowerCase(),
-    payload,
-  }
-
-  window.localStorage.setItem(PENDING_AGREEMENTS_KEY, JSON.stringify(nextValue))
-}
-
-export function consumePendingAgreements(email: string) {
-  const raw = window.localStorage.getItem(PENDING_AGREEMENTS_KEY)
-
-  if (!raw) {
-    return null
-  }
-
-  try {
-    const stored = JSON.parse(raw) as PendingAgreementsState
-
-    if (stored.email !== email.trim().toLowerCase()) {
-      return null
-    }
-
-    window.localStorage.removeItem(PENDING_AGREEMENTS_KEY)
-    return stored.payload
-  } catch {
-    window.localStorage.removeItem(PENDING_AGREEMENTS_KEY)
-    return null
-  }
-}
-
 export function isSessionExpiredError(error: unknown) {
   return error instanceof Error && error.message.includes('세션이 만료되었어요')
 }
@@ -235,11 +194,7 @@ export function isEmailVerificationRequiredError(error: unknown) {
   return Boolean(error && typeof error === 'object' && 'code' in error && (error as AuthApiError).code === 'EMAIL_VERIFICATION_REQUIRED')
 }
 
-export function isAgreementsRequiredError(error: unknown) {
-  return Boolean(error && typeof error === 'object' && 'code' in error && (error as AuthApiError).code === 'AGREEMENTS_REQUIRED')
-}
-
-function getErrorMessage(status: number, fallback: string) {
+function getErrorMessage(status: number, fallback: string, retryAfterHeader?: string | null) {
   if (status === 400) {
     return '요청 형식이 올바르지 않아요.'
   }
@@ -254,6 +209,21 @@ function getErrorMessage(status: number, fallback: string) {
 
   if (status === 404) {
     return '요청한 정보를 찾을 수 없어요.'
+  }
+
+  if (status === 429) {
+    const retryAfterSeconds = Number(retryAfterHeader)
+
+    if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
+      const retryAfterMinutes = Math.max(1, Math.ceil(retryAfterSeconds / 60))
+      return `요청이 너무 많아요. 약 ${retryAfterMinutes}분 후 다시 시도해주세요.`
+    }
+
+    return '요청이 너무 많아요. 잠시 후 다시 시도해주세요.'
+  }
+
+  if (status === 503) {
+    return '인증 서비스를 잠시 사용할 수 없어요. 잠시 후 다시 시도해주세요.'
   }
 
   if (status >= 500) {
@@ -277,7 +247,10 @@ function extractAuthUser(payload: unknown) {
 
 async function parseAuthResponse(response: Response, fallback: string) {
   if (!response.ok) {
-    throw createAuthError(getErrorMessage(response.status, fallback), response.status)
+    throw createAuthError(
+      getErrorMessage(response.status, fallback, response.headers.get('Retry-After')),
+      response.status,
+    )
   }
 
   return (await response.json()) as AuthResponse
@@ -289,23 +262,6 @@ async function parseJsonSafe<T>(response: Response) {
   } catch {
     return null
   }
-}
-
-export async function signup(payload: SignupPayload) {
-  const response = await fetch(createUrl('/api/auth/signup'), {
-    method: 'POST',
-    credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
-  })
-
-  if (!response.ok) {
-    throw createAuthError(getErrorMessage(response.status, '회원가입에 실패했어요.'), response.status)
-  }
-
-  return (await response.json()) as SignupResponse
 }
 
 export async function login(payload: LoginPayload) {
@@ -329,32 +285,10 @@ export async function login(payload: LoginPayload) {
   return parseAuthResponse(response, '로그인에 실패했어요.')
 }
 
-export function savePendingSupabaseAgreements(payload: UpdateAgreementsPayload) {
-  window.localStorage.setItem(PENDING_SUPABASE_AGREEMENTS_KEY, JSON.stringify(payload))
-}
-
-export function consumePendingSupabaseAgreements() {
-  const raw = window.localStorage.getItem(PENDING_SUPABASE_AGREEMENTS_KEY)
-
-  if (!raw) {
-    return null
-  }
-
-  try {
-    window.localStorage.removeItem(PENDING_SUPABASE_AGREEMENTS_KEY)
-    return JSON.parse(raw) as UpdateAgreementsPayload
-  } catch {
-    window.localStorage.removeItem(PENDING_SUPABASE_AGREEMENTS_KEY)
-    return null
-  }
-}
-
-export async function signInWithGoogle(intent: 'login' | 'signup' = 'login') {
+export async function signInWithGoogle() {
   if (!isSupabaseConfigured()) {
     throw createAuthError('Google 로그인을 위한 Supabase 환경변수가 설정되지 않았어요.')
   }
-
-  window.sessionStorage.setItem(PENDING_SUPABASE_AUTH_INTENT_KEY, intent)
 
   const { error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
@@ -369,15 +303,6 @@ export async function signInWithGoogle(intent: 'login' | 'signup' = 'login') {
   if (error) {
     throw createAuthError(error.message || 'Google 로그인에 실패했어요.')
   }
-}
-
-export function getPendingSupabaseAuthIntent() {
-  const value = window.sessionStorage.getItem(PENDING_SUPABASE_AUTH_INTENT_KEY)
-  return value === 'signup' ? 'signup' : 'login'
-}
-
-function clearPendingSupabaseAuthIntent() {
-  window.sessionStorage.removeItem(PENDING_SUPABASE_AUTH_INTENT_KEY)
 }
 
 async function getSupabaseSessionAccessToken() {
@@ -420,90 +345,60 @@ function getSupabaseAuthErrorMessage(serverMessage?: string | null) {
     return 'Google 계정의 이메일 인증이 필요해요.'
   }
 
+  if (serverMessage === 'Google OAuth session required') {
+    return 'Google 계정으로만 계속할 수 있어요.'
+  }
+
   return serverMessage || null
 }
 
-export async function completeSupabaseLogin(intent: 'login' | 'signup' = 'login') {
-  try {
-    const accessToken = await getSupabaseSessionAccessToken()
+export async function completeSupabaseLogin() {
+  const accessToken = await getSupabaseSessionAccessToken()
 
-    if (!accessToken) {
-      throw createAuthError('Google 로그인 세션을 확인하지 못했어요.')
-    }
-
-    const response = await fetch(createUrl('/api/auth/supabase'), {
-      method: 'POST',
-      credentials: 'include',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    })
-
-    if (!response.ok) {
-      const data = await parseJsonSafe<{ success?: boolean; message?: string }>(response)
-      const serverMessage = getSupabaseAuthErrorMessage(data?.message)
-      throw createAuthError(serverMessage || getErrorMessage(response.status, 'Google 로그인 연결에 실패했어요.'), response.status)
-    }
-
-    const dataJson = await response.json()
-    const user = extractAuthUser(dataJson)
-
-    if (!user) {
-      throw createAuthError('Google 로그인 사용자 정보를 불러오지 못했어요.')
-    }
-
-    saveStoredSession(createSupabaseStoredSession(user))
-
-    const pendingAgreements = consumePendingSupabaseAgreements()
-
-    if (pendingAgreements) {
-      try {
-        await updateMyAgreements(pendingAgreements)
-      } catch (agreementError) {
-        clearStoredSession()
-        await logoutSupabaseSession().catch(() => {})
-        throw createAuthError(
-          agreementError instanceof Error
-            ? agreementError.message
-            : '약관 동의 저장에 실패했어요.',
-          403,
-          'AGREEMENTS_REQUIRED',
-        )
-      }
-    } else {
-      let agreements: UserAgreements
-
-      try {
-        agreements = await fetchMyAgreements()
-      } catch {
-        clearStoredSession()
-        await logoutSupabaseSession().catch(() => {})
-        throw createAuthError(
-          intent === 'login'
-            ? '처음 사용하는 Google 계정이에요. 필수 약관에 동의한 뒤 회원가입을 완료해주세요.'
-            : '약관 동의 상태를 확인하지 못했어요. 필수 약관에 동의한 뒤 Google로 계속해주세요.',
-          403,
-          'AGREEMENTS_REQUIRED',
-        )
-      }
-
-      if (!agreements.termsAgreed || !agreements.privacyAgreed) {
-        clearStoredSession()
-        await logoutSupabaseSession().catch(() => {})
-        throw createAuthError(
-          intent === 'login'
-            ? '처음 사용하는 Google 계정이에요. 필수 약관에 동의한 뒤 회원가입을 완료해주세요.'
-            : '약관 동의가 필요해요. 필수 약관에 동의한 뒤 Google로 계속해주세요.',
-          403,
-          'AGREEMENTS_REQUIRED',
-        )
-      }
-    }
-
-    return user
-  } finally {
-    clearPendingSupabaseAuthIntent()
+  if (!accessToken) {
+    throw createAuthError('Google 로그인 세션을 확인하지 못했어요.')
   }
+
+  const response = await fetch(createUrl('/api/auth/supabase'), {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  })
+
+  if (!response.ok) {
+    const data = await parseJsonSafe<{ success?: boolean; message?: string }>(response)
+    const serverMessage = getSupabaseAuthErrorMessage(data?.message)
+
+    if (response.status === 401 || response.status === 403) {
+      await logoutSupabaseSession().catch(() => {})
+      clearStoredSession()
+    }
+
+    const responseMessage = getErrorMessage(
+        response.status,
+        'Google 로그인 연결에 실패했어요.',
+        response.headers.get('Retry-After'),
+      )
+
+    throw createAuthError(
+      response.status === 429 || response.status === 503
+        ? responseMessage
+        : serverMessage || responseMessage,
+      response.status,
+    )
+  }
+
+  const dataJson = await response.json()
+  const user = extractAuthUser(dataJson)
+
+  if (!user) {
+    throw createAuthError('Google 로그인 사용자 정보를 불러오지 못했어요.')
+  }
+
+  saveStoredSession(createSupabaseStoredSession(user))
+  return user
 }
 
 export async function resendVerificationEmail(email: string) {
@@ -517,7 +412,10 @@ export async function resendVerificationEmail(email: string) {
   })
 
   if (!response.ok) {
-    throw createAuthError(getErrorMessage(response.status, '인증 메일 재전송에 실패했어요.'), response.status)
+    throw createAuthError(
+      getErrorMessage(response.status, '인증 메일 재전송에 실패했어요.', response.headers.get('Retry-After')),
+      response.status,
+    )
   }
 
   return (await response.json()) as VerifyEmailResendResponse
@@ -551,7 +449,10 @@ export async function requestPasswordReset(email: string) {
   })
 
   if (!response.ok) {
-    throw createAuthError(getErrorMessage(response.status, '비밀번호 재설정 메일 요청에 실패했어요.'), response.status)
+    throw createAuthError(
+      getErrorMessage(response.status, '비밀번호 재설정 메일 요청에 실패했어요.', response.headers.get('Retry-After')),
+      response.status,
+    )
   }
 
   return (await response.json()) as PasswordResetRequestResponse
@@ -591,7 +492,16 @@ export async function confirmPasswordReset(token: string, newPassword: string) {
       throw createAuthError('재설정 링크가 만료됐어요. 새 메일을 다시 요청해주세요.', response.status)
     }
 
-    throw createAuthError(serverMessage || getErrorMessage(response.status, '비밀번호 재설정에 실패했어요.'), response.status)
+    throw createAuthError(
+      response.status === 429 || response.status === 503
+        ? getErrorMessage(
+          response.status,
+          '비밀번호 재설정에 실패했어요.',
+          response.headers.get('Retry-After'),
+        )
+        : serverMessage || getErrorMessage(response.status, '비밀번호 재설정에 실패했어요.'),
+      response.status,
+    )
   }
 
   return (await response.json()) as PasswordResetConfirmResponse

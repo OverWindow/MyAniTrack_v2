@@ -25,13 +25,6 @@ export type AuthResponse = AuthTokens & {
   user: AuthUser
 }
 
-export type SignupResponse = {
-  success: boolean
-  message: string
-  requiresEmailVerification: boolean
-  user: AuthUser
-}
-
 export type VerifyEmailResendResponse = {
   success: boolean
   message: string
@@ -61,14 +54,6 @@ export type PasswordResetConfirmResponse = {
 
 export type LoginPayload = {
   email: string
-  password: string
-  deviceType: DeviceType
-  deviceName: string
-}
-
-export type SignupPayload = {
-  email: string
-  username: string
   password: string
   deviceType: DeviceType
   deviceName: string

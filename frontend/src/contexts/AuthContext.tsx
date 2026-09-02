@@ -9,7 +9,6 @@ import {
 } from 'react'
 import {
   clearStoredSession,
-  consumePendingAgreements,
   createStoredSession,
   createSupabaseStoredSession,
   completeSupabaseLogin,
@@ -26,16 +25,12 @@ import {
   refreshStoredSession,
   saveStoredSession,
   signInWithGoogle,
-  signup,
-  updateMyAgreements,
   updateProfile,
 } from '../lib/auth'
 import type {
   AuthResponse,
   AuthUser,
   LoginPayload,
-  SignupPayload,
-  SignupResponse,
   UpdateProfilePayload,
 } from '../types/auth'
 
@@ -44,9 +39,8 @@ type AuthContextValue = {
   isAuthenticated: boolean
   isBootstrapping: boolean
   loginWithEmail: (payload: LoginPayload) => Promise<void>
-  loginWithGoogle: (intent?: 'login' | 'signup') => Promise<void>
-  completeGoogleLogin: (intent?: 'login' | 'signup') => Promise<void>
-  signupWithEmail: (payload: SignupPayload) => Promise<SignupResponse>
+  loginWithGoogle: () => Promise<void>
+  completeGoogleLogin: () => Promise<void>
   logout: () => Promise<void>
   logoutEverywhere: () => Promise<void>
   deleteAccount: () => Promise<void>
@@ -160,25 +154,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         persistSession(response)
         setUser(response.user)
 
-        const pendingAgreements = consumePendingAgreements(response.user.email)
-
-        if (pendingAgreements) {
-          try {
-            await updateMyAgreements(pendingAgreements)
-          } catch {
-            // Ignore agreement sync failures during login; the user can retry later.
-          }
-        }
       },
-      async loginWithGoogle(intent = 'login') {
-        await signInWithGoogle(intent)
+      async loginWithGoogle() {
+        await signInWithGoogle()
       },
-      async completeGoogleLogin(intent = 'login') {
-        const nextUser = await completeSupabaseLogin(intent)
+      async completeGoogleLogin() {
+        const nextUser = await completeSupabaseLogin()
         setUser(nextUser)
-      },
-      async signupWithEmail(payload) {
-        return signup(payload)
       },
       async logout() {
         try {

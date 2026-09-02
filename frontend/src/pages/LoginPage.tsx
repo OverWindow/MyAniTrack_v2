@@ -62,7 +62,7 @@ export function LoginPage() {
     savePendingAuthReturnPath(redirectTo)
 
     try {
-      await loginWithGoogle('login')
+      await loginWithGoogle()
     } catch (submitError) {
       savePendingAuthReturnPath(null)
       setError(
@@ -92,7 +92,12 @@ export function LoginPage() {
           {isGoogleSubmitting ? 'Google로 이동 중...' : 'Google로 계속하기'}
         </button>
 
-        <div className="auth-divider"><span>또는</span></div>
+        <p className="auth-consent-notice">
+          계속하면 <Link to="/terms">이용약관</Link> 및{' '}
+          <Link to="/privacy">개인정보처리방침</Link>에 동의한 것으로 간주합니다.
+        </p>
+
+        <div className="auth-divider"><span>기존 회원 이메일 로그인</span></div>
 
         <form className="auth-form" onSubmit={handleSubmit} autoComplete="on">
           <label className="auth-field">
@@ -136,6 +141,7 @@ export function LoginPage() {
           아직 계정이 없다면 <Link to="/signup">회원가입</Link>
         </p>
         <nav className="auth-policy-links" aria-label="정책 링크">
+          <Link to="/terms">이용약관</Link>
           <Link to="/privacy">개인정보처리방침</Link>
           <Link to="/account-deletion">계정 및 데이터 삭제</Link>
         </nav>

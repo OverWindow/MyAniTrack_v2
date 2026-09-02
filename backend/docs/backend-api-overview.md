@@ -809,40 +809,15 @@ Response example:
 ```
 
 ### `POST /auth/signup`
-회원가입 후 이메일 인증 대기 상태를 만듭니다.
-
-Body:
-
-```json
-{
-  "email": "user@example.com",
-  "username": "test_user",
-  "password": "password123",
-  "deviceType": "web",
-  "deviceName": "Chrome"
-}
-```
+일반 이메일 회원가입은 종료되었습니다. 신규 회원은 Google OAuth와
+`POST /auth/supabase`를 사용해야 합니다. 요청 본문과 관계없이 `410 Gone`을 반환합니다.
 
 Response example:
 
 ```json
 {
-  "success": true,
-  "message": "Sign up successful. Email verification required.",
-  "requiresEmailVerification": true,
-  "user": {
-    "id": 1,
-    "email": "user@example.com",
-    "username": "test_user",
-    "role": "USER",
-    "isAdmin": false,
-    "emailVerified": false,
-    "emailVerifiedAt": null,
-    "profileImageUrl": null,
-    "bio": null,
-    "createdAt": "2026-05-06 12:00:00",
-    "updatedAt": "2026-05-06 12:00:00"
-  }
+  "success": false,
+  "message": "Email sign up is no longer available. Continue with Google."
 }
 ```
 
@@ -904,6 +879,9 @@ Response example:
 ### `POST /auth/login`
 로그인입니다.
 
+IP 기준 15분당 30회, IP와 정규화 이메일 조합 기준 15분당 10회가 기본 제한입니다.
+초과하면 `429`와 `Retry-After` 헤더를 반환합니다.
+
 Body:
 
 ```json
@@ -940,6 +918,46 @@ Set-Cookie: refreshToken=...; HttpOnly; SameSite=Lax; Path=/api/auth; Max-Age=25
     "emailVerifiedAt": "2026-05-06 12:10:00"
   }
 }
+```
+
+### `POST /auth/supabase`
+Google OAuth로 발급된 Supabase access token을 내부 사용자와 교환합니다. `/auth/v1/user`로
+검증한 토큰의 JWT `sub`가 반환된 사용자 ID와 일치하고, `aud`에 `authenticated`, `amr`에
+`oauth`, `app_metadata.providers`에 `google`이 있어야 합니다. Google이 연결돼 있어도 현재
+세션이 password 또는 OTP 인증이면 허용하지 않습니다. 신규 사용자는 자동 생성하고 동일 이메일의
+기존 사용자는 연결하며, 두 경우 모두 현재 이용약관과 개인정보처리방침 동의를 원자적으로 기록합니다.
+
+IP 기준 기본 제한은 5분당 30회입니다. 위 검증 조건이 맞지 않으면 `403 Google OAuth session required`,
+제한 초과 시 `429`와 초 단위 `Retry-After`를 반환합니다. 인증 제한 MySQL 저장소를 사용할 수 없으면
+요청을 허용하지 않고 `503 Authentication temporarily unavailable`을 반환합니다.
+
+```http
+Authorization: Bearer SUPABASE_ACCESS_TOKEN
+```
+
+```json
+{
+  "success": true,
+  "message": "Supabase login successful",
+  "tokenType": "Bearer",
+  "authProvider": "supabase",
+  "user": {
+    "id": 1,
+    "email": "user@example.com",
+    "username": "test_user",
+    "role": "USER"
+  }
+}
+```
+
+`429` response example:
+
+```http
+HTTP/1.1 429 Too Many Requests
+Retry-After: 214
+Content-Type: application/json
+
+{"success":false,"message":"Too many requests. Please try again later."}
 ```
 
 ### `POST /auth/refresh`

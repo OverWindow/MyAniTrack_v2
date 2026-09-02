@@ -2,7 +2,7 @@ import { NextFunction, Request, Response } from 'express';
 import { RowDataPacket } from 'mysql2/promise';
 import { pool } from '../../config/db';
 import { verifyAccessToken } from '../lib/auth';
-import { findOrCreateUserFromSupabaseToken } from '../services/auth.service';
+import { findLinkedUserFromSupabaseToken } from '../services/auth.service';
 
 type UserRole = 'USER' | 'ADMIN';
 
@@ -57,7 +57,15 @@ function getSupabaseAuthFailureStatus(message: string) {
     return 403;
   }
 
-  if (message === 'Invalid Supabase token' || message === 'Invalid Supabase user') {
+  if (message === 'Google OAuth session required') {
+    return 403;
+  }
+
+  if (
+    message === 'Invalid Supabase token'
+    || message === 'Invalid Supabase user'
+    || message === 'Supabase account is not linked'
+  ) {
     return 401;
   }
 
@@ -99,7 +107,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     return next();
   } catch (error) {
     try {
-      const user = await findOrCreateUserFromSupabaseToken(token);
+      const user = await findLinkedUserFromSupabaseToken(token);
       const persistedUser = await findAuthUserById(user.id);
       if (!persistedUser) throw new Error('User not found');
       if (rejectSuspended(persistedUser, res)) return;

@@ -10,8 +10,17 @@ import {
   verifyPassword,
 } from '../lib/auth';
 import { sendPasswordResetEmail, sendVerifyEmail } from '../lib/mail';
-import { deleteSupabaseAuthUser, getSupabaseAuthUser, SupabaseAuthUser } from '../lib/supabase-auth';
+import {
+  deleteSupabaseAuthUser,
+  getSupabaseAuthUser,
+  hasGoogleOAuthSession,
+  SupabaseAuthUser,
+} from '../lib/supabase-auth';
 import { deleteProfileImageByUrl, normalizeProfileImageUrl } from '../lib/supabase-storage';
+import {
+  CURRENT_PRIVACY_VERSION,
+  CURRENT_TERMS_VERSION,
+} from './user-agreement.service';
 
 type UserRole = 'USER' | 'ADMIN';
 type EmailTokenPurpose = 'SIGNUP_VERIFY' | 'PASSWORD_RESET';
@@ -51,18 +60,6 @@ interface UserDeletionRow extends RowDataPacket {
   email: string;
   profileImageUrl: string | null;
   supabaseUserId: string | null;
-}
-
-export interface SignUpParams {
-  email: string;
-  username: string;
-  password: string;
-  profileImageUrl?: string | null;
-  bio?: string | null;
-  deviceType?: string | null;
-  deviceName?: string | null;
-  userAgent?: string | null;
-  ipAddress?: string | null;
 }
 
 export interface LoginParams {
@@ -411,20 +408,134 @@ function isSupabaseEmailVerified(user: SupabaseAuthUser) {
   return Boolean(user.emailConfirmedAt) || user.providers.includes('google');
 }
 
-async function linkExistingUserToSupabase(user: UserRow, supabaseUser: SupabaseAuthUser) {
-  await pool.execute(
+function requireGoogleProvider(user: SupabaseAuthUser) {
+  if (!hasGoogleOAuthSession(user)) {
+    throw new Error('Google OAuth session required');
+  }
+}
+
+interface AgreementHistoryRow extends RowDataPacket {
+  agreementType: 'TERMS' | 'PRIVACY';
+  version: string;
+  agreed: number | boolean;
+}
+
+interface AgreementFlagsRow extends RowDataPacket {
+  termsAgreed: number | boolean;
+  privacyAgreed: number | boolean;
+}
+
+async function ensureCurrentRequiredAgreements(conn: PoolConnection, userId: number) {
+  const [flagRows] = await conn.query<AgreementFlagsRow[]>(
+    `
+    SELECT
+      terms_agreed AS termsAgreed,
+      privacy_agreed AS privacyAgreed
+    FROM users
+    WHERE id = ?
+    LIMIT 1
+    FOR UPDATE
+    `,
+    [userId]
+  );
+  const [historyRows] = await conn.query<AgreementHistoryRow[]>(
+    `
+    SELECT
+      agreement_type AS agreementType,
+      version,
+      agreed
+    FROM user_agreements
+    WHERE user_id = ?
+      AND agreement_type IN ('TERMS', 'PRIVACY')
+    ORDER BY id DESC
+    `,
+    [userId]
+  );
+
+  const latestByType = new Map<'TERMS' | 'PRIVACY', AgreementHistoryRow>();
+  for (const row of historyRows) {
+    if (!latestByType.has(row.agreementType)) {
+      latestByType.set(row.agreementType, row);
+    }
+  }
+
+  const latestTerms = latestByType.get('TERMS');
+  const latestPrivacy = latestByType.get('PRIVACY');
+  const needsTermsRecord = !latestTerms
+    || !Boolean(latestTerms.agreed)
+    || latestTerms.version !== CURRENT_TERMS_VERSION;
+  const needsPrivacyRecord = !latestPrivacy
+    || !Boolean(latestPrivacy.agreed)
+    || latestPrivacy.version !== CURRENT_PRIVACY_VERSION;
+  const flags = flagRows[0];
+  const needsFlagUpdate = !flags
+    || !Boolean(flags.termsAgreed)
+    || !Boolean(flags.privacyAgreed);
+
+  if (!needsTermsRecord && !needsPrivacyRecord && !needsFlagUpdate) {
+    return;
+  }
+
+  await conn.execute(
     `
     UPDATE users
     SET
-      supabase_user_id = ?,
-      auth_provider = ?,
-      email_verified = TRUE,
-      email_verified_at = COALESCE(email_verified_at, CURRENT_TIMESTAMP),
+      terms_agreed = TRUE,
+      privacy_agreed = TRUE,
+      agreed_at = CURRENT_TIMESTAMP,
       updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
     `,
-    [supabaseUser.id, getSupabaseProvider(supabaseUser), user.id]
+    [userId]
   );
+
+  if (needsTermsRecord) {
+    await conn.execute(
+      `
+      INSERT INTO user_agreements (user_id, agreement_type, version, agreed, agreed_at)
+      VALUES (?, 'TERMS', ?, TRUE, CURRENT_TIMESTAMP)
+      `,
+      [userId, CURRENT_TERMS_VERSION]
+    );
+  }
+
+  if (needsPrivacyRecord) {
+    await conn.execute(
+      `
+      INSERT INTO user_agreements (user_id, agreement_type, version, agreed, agreed_at)
+      VALUES (?, 'PRIVACY', ?, TRUE, CURRENT_TIMESTAMP)
+      `,
+      [userId, CURRENT_PRIVACY_VERSION]
+    );
+  }
+}
+
+async function linkExistingUserToSupabase(user: UserRow, supabaseUser: SupabaseAuthUser) {
+  const conn = await pool.getConnection();
+
+  try {
+    await conn.beginTransaction();
+    await conn.execute(
+      `
+      UPDATE users
+      SET
+        supabase_user_id = ?,
+        auth_provider = ?,
+        email_verified = TRUE,
+        email_verified_at = COALESCE(email_verified_at, CURRENT_TIMESTAMP),
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+      `,
+      [supabaseUser.id, getSupabaseProvider(supabaseUser), user.id]
+    );
+    await ensureCurrentRequiredAgreements(conn, user.id);
+    await conn.commit();
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
+  }
 
   const linkedUser = await findUserById(user.id);
 
@@ -433,6 +544,23 @@ async function linkExistingUserToSupabase(user: UserRow, supabaseUser: SupabaseA
   }
 
   return linkedUser;
+}
+
+async function ensureAgreementsForExistingUser(user: UserRow) {
+  const conn = await pool.getConnection();
+
+  try {
+    await conn.beginTransaction();
+    await ensureCurrentRequiredAgreements(conn, user.id);
+    await conn.commit();
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
+  }
+
+  return user;
 }
 
 async function createUserFromSupabase(supabaseUser: SupabaseAuthUser) {
@@ -468,6 +596,7 @@ async function createUserFromSupabase(supabaseUser: SupabaseAuthUser) {
     );
 
     createdUserId = result.insertId;
+    await ensureCurrentRequiredAgreements(conn, createdUserId);
     await conn.commit();
   } catch (error) {
     await conn.rollback();
@@ -494,17 +623,36 @@ async function createUserFromSupabase(supabaseUser: SupabaseAuthUser) {
   return createdUser;
 }
 
-export async function findOrCreateUserFromSupabaseToken(accessToken: string) {
+async function getVerifiedGoogleSupabaseUser(accessToken: string) {
   const supabaseUser = await getSupabaseAuthUser(accessToken);
+
+  requireGoogleProvider(supabaseUser);
 
   if (!isSupabaseEmailVerified(supabaseUser)) {
     throw new Error('Supabase email verification required');
   }
 
+  return supabaseUser;
+}
+
+export async function findLinkedUserFromSupabaseToken(accessToken: string) {
+  const supabaseUser = await getVerifiedGoogleSupabaseUser(accessToken);
+  const user = await findUserBySupabaseUserId(supabaseUser.id);
+
+  if (!user) {
+    throw new Error('Supabase account is not linked');
+  }
+
+  return user;
+}
+
+async function findOrCreateGoogleUserFromSupabaseToken(accessToken: string) {
+  const supabaseUser = await getVerifiedGoogleSupabaseUser(accessToken);
+
   const existingLinkedUser = await findUserBySupabaseUserId(supabaseUser.id);
 
   if (existingLinkedUser) {
-    return existingLinkedUser;
+    return ensureAgreementsForExistingUser(existingLinkedUser);
   }
 
   const existingEmailUser = await findUserByEmail(supabaseUser.email);
@@ -523,7 +671,7 @@ export async function loginWithSupabaseAccessToken(accessToken: string) {
     throw new Error('accessToken is required');
   }
 
-  const user = await findOrCreateUserFromSupabaseToken(normalizedToken);
+  const user = await findOrCreateGoogleUserFromSupabaseToken(normalizedToken);
 
   return {
     tokenType: 'Bearer',
@@ -659,102 +807,6 @@ async function findRefreshTokenByTokenHash(tokenHash: string) {
   );
 
   return rows[0] ?? null;
-}
-
-export async function signUp(params: SignUpParams) {
-  const email = validateEmail(params.email);
-  const username = validateUsername(params.username);
-  const password = validatePassword(params.password);
-  const profileImageUrl = normalizeProfileImageUrl(normalizeOptionalText(params.profileImageUrl, 500));
-  const bio = normalizeOptionalText(params.bio, 500);
-
-  const passwordHash = await hashPassword(password);
-  const conn = await pool.getConnection();
-  let user: UserRow | null = null;
-  let verifyToken = '';
-
-  try {
-    await conn.beginTransaction();
-
-    const [result] = await conn.execute<ResultSetHeader>(
-      `
-      INSERT INTO users (
-        email,
-        username,
-        password_hash,
-        profile_image_url,
-        bio,
-        role,
-        email_verified,
-        email_verified_at
-      )
-      VALUES (?, ?, ?, ?, ?, 'USER', FALSE, NULL)
-      `,
-      [email, username, passwordHash, profileImageUrl, bio]
-    );
-
-    const [userRows] = await conn.query<UserRow[]>(
-      `
-      SELECT
-        id,
-        email,
-        username,
-        role,
-        password_hash AS passwordHash,
-        profile_image_url AS profileImageUrl,
-        bio,
-        email_verified AS emailVerified,
-        email_verified_at AS emailVerifiedAt,
-        created_at AS createdAt,
-        updated_at AS updatedAt
-      FROM users
-      WHERE id = ?
-      LIMIT 1
-      `,
-      [result.insertId]
-    );
-
-    user = userRows[0] ?? null;
-
-    if (!user) {
-      throw new Error('Failed to create user');
-    }
-
-    verifyToken = await createEmailTokenRecord(conn, {
-      userId: user.id,
-      email: user.email,
-      purpose: 'SIGNUP_VERIFY',
-      expiresAt: getSignupVerifyExpiresAt(),
-      ipAddress: params.ipAddress,
-      userAgent: params.userAgent,
-    });
-
-    await conn.commit();
-  } catch (error) {
-    await conn.rollback();
-
-    if ((error as { code?: string }).code === 'ER_DUP_ENTRY') {
-      throw new Error('Email or username already exists');
-    }
-
-    throw error;
-  } finally {
-    conn.release();
-  }
-
-  if (!user) {
-    throw new Error('Failed to create user');
-  }
-
-  await sendVerifyEmail({
-    to: user.email,
-    token: verifyToken,
-  });
-
-  return {
-    requiresEmailVerification: true,
-    user: mapUserProfile(user),
-  };
 }
 
 export async function login(params: LoginParams) {

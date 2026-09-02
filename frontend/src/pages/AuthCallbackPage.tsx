@@ -4,8 +4,6 @@ import { ErrorToast } from '../components/ErrorToast'
 import { useAuth } from '../contexts/AuthContext'
 import {
   consumePendingAuthReturnPath,
-  getPendingSupabaseAuthIntent,
-  isAgreementsRequiredError,
 } from '../lib/auth'
 import '../styles/pages/AuthPage.css'
 
@@ -14,33 +12,16 @@ export function AuthCallbackPage() {
   const navigate = useNavigate()
   const [error, setError] = useState<string | null>(null)
   const callbackPromiseRef = useRef<Promise<void> | null>(null)
-  const intent = getPendingSupabaseAuthIntent()
-
   useEffect(() => {
     if (callbackPromiseRef.current) {
       return
     }
 
-    callbackPromiseRef.current = completeGoogleLogin(intent)
+    callbackPromiseRef.current = completeGoogleLogin()
       .then(() => {
         navigate(consumePendingAuthReturnPath() ?? '/', { replace: true })
       })
       .catch((callbackError: unknown) => {
-        if (isAgreementsRequiredError(callbackError)) {
-          consumePendingAuthReturnPath()
-          navigate('/signup', {
-            replace: true,
-            state: {
-              message: intent === 'login'
-                ? '처음 사용하는 Google 계정이에요. 필수 약관에 동의한 뒤 Google로 계속해주세요.'
-                : callbackError instanceof Error
-                  ? callbackError.message
-                  : '필수 약관에 동의한 뒤 Google로 계속해주세요.',
-            },
-          })
-          return
-        }
-
         consumePendingAuthReturnPath()
         setError(
           callbackError instanceof Error
@@ -48,7 +29,7 @@ export function AuthCallbackPage() {
             : 'Google 로그인 처리에 실패했어요.',
         )
       })
-  }, [completeGoogleLogin, intent, navigate])
+  }, [completeGoogleLogin, navigate])
 
   return (
     <section className="auth-page">

@@ -20,6 +20,14 @@ validateSupabaseStorageEnv();
 
 const app = express();
 
+if (process.env.NODE_ENV === 'production') {
+  const configuredProxyHops = Number(process.env.TRUST_PROXY_HOPS || 1);
+  const proxyHops = Number.isInteger(configuredProxyHops) && configuredProxyHops > 0
+    ? configuredProxyHops
+    : 1;
+  app.set('trust proxy', proxyHops);
+}
+
 function getAllowedOrigins() {
   const developmentOrigins = process.env.NODE_ENV === 'production'
     ? []

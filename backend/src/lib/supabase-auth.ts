@@ -9,6 +9,17 @@ export interface SupabaseAuthUser {
   appMetadata: Record<string, unknown>;
   userMetadata: Record<string, unknown>;
   providers: string[];
+  authenticationMethods: string[];
+}
+
+export interface SupabaseAuthTokenClaims {
+  subject: string;
+  audience: string[];
+  authenticationMethods: string[];
+}
+
+export function hasGoogleOAuthSession(user: Pick<SupabaseAuthUser, 'providers' | 'authenticationMethods'>) {
+  return user.providers.includes('google') && user.authenticationMethods.includes('oauth');
 }
 
 function requireEnv(value: string | undefined, name: string) {
@@ -73,6 +84,74 @@ function normalizeProviders(appMetadata: Record<string, unknown>) {
     : [];
 }
 
+function normalizeAudience(value: unknown) {
+  if (typeof value === 'string' && value.trim()) {
+    return [value.trim().toLowerCase()];
+  }
+
+  if (Array.isArray(value)) {
+    return value
+      .filter((item): item is string => typeof item === 'string')
+      .map((item) => item.trim().toLowerCase())
+      .filter(Boolean);
+  }
+
+  return [];
+}
+
+function normalizeAuthenticationMethods(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((entry) => {
+      if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+        return '';
+      }
+
+      const method = (entry as Record<string, unknown>).method;
+      return typeof method === 'string' ? method.trim().toLowerCase() : '';
+    })
+    .filter(Boolean);
+}
+
+export function decodeSupabaseAuthTokenClaims(accessToken: string): SupabaseAuthTokenClaims {
+  const parts = accessToken.split('.');
+
+  if (parts.length !== 3 || !parts[1]) {
+    throw new Error('Invalid Supabase token');
+  }
+
+  try {
+    const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8')) as Record<string, unknown>;
+    const subject = typeof payload.sub === 'string' ? payload.sub.trim() : '';
+    const audience = normalizeAudience(payload.aud);
+
+    if (!subject || audience.length === 0) {
+      throw new Error('Invalid Supabase token');
+    }
+
+    return {
+      subject,
+      audience,
+      authenticationMethods: normalizeAuthenticationMethods(payload.amr),
+    };
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Invalid Supabase token') {
+      throw error;
+    }
+
+    throw new Error('Invalid Supabase token');
+  }
+}
+
+export function validateSupabaseTokenUser(claims: SupabaseAuthTokenClaims, userId: string) {
+  if (claims.subject !== userId || !claims.audience.includes('authenticated')) {
+    throw new Error('Invalid Supabase token');
+  }
+}
+
 export async function getSupabaseAuthUser(accessToken: string): Promise<SupabaseAuthUser> {
   const response = await fetch(`${getSupabaseUrl()}/auth/v1/user`, {
     method: 'GET',
@@ -95,6 +174,9 @@ export async function getSupabaseAuthUser(accessToken: string): Promise<Supabase
   }
 
   const appMetadata = normalizeMetadata(data.app_metadata);
+  const tokenClaims = decodeSupabaseAuthTokenClaims(accessToken);
+
+  validateSupabaseTokenUser(tokenClaims, id);
 
   return {
     id,
@@ -108,6 +190,7 @@ export async function getSupabaseAuthUser(accessToken: string): Promise<Supabase
     appMetadata,
     userMetadata: normalizeMetadata(data.user_metadata),
     providers: normalizeProviders(appMetadata),
+    authenticationMethods: tokenClaims.authenticationMethods,
   };
 }
 

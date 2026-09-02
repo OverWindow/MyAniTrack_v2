@@ -25,6 +25,7 @@ import { ProfilePage } from './pages/ProfilePage'
 import { SettingsPage } from './pages/SettingsPage'
 import { SharePage } from './pages/SharePage'
 import { SignupPage } from './pages/SignupPage'
+import { TermsPage } from './pages/TermsPage'
 import { UserAnalysisPage } from './pages/UserAnalysisPage'
 import { UserCollectionPage } from './pages/UserCollectionPage'
 import { UserProfilePage } from './pages/UserProfilePage'
@@ -47,7 +48,7 @@ function App() {
   const activeRoute = backgroundLocation ?? location
   const isHomeRoute = activeRoute.pathname === '/'
   const isUserCollectionRoute = /^\/users\/[^/]+\/anime-list$/.test(activeRoute.pathname)
-  const isPolicyRoute = ['/privacy', '/account-deletion'].includes(location.pathname)
+  const isPolicyRoute = ['/terms', '/privacy', '/account-deletion'].includes(location.pathname)
   const shouldShowFloatingCta = !backgroundLocation && !isPolicyRoute && !location.pathname.startsWith('/s/') && !['/login', '/signup'].includes(location.pathname)
   const [isFriendsOpen, setIsFriendsOpen] = useState(false)
   const floatingPanelRef = useRef<HTMLDivElement | null>(null)
@@ -107,6 +108,7 @@ function App() {
           <Route path="/verify-email/confirm" element={<VerifyEmailConfirmPage />} />
           <Route path="/password-reset" element={<PasswordResetRequestPage />} />
           <Route path="/password-reset/confirm" element={<PasswordResetConfirmPage />} />
+          <Route path="/terms" element={<TermsPage />} />
           <Route path="/privacy" element={<PrivacyPolicyPage />} />
           <Route path="/account-deletion" element={<AccountDeletionPage />} />
           <Route path="/explore" element={<ExplorePage />} />

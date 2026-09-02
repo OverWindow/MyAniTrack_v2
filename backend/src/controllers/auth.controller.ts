@@ -12,7 +12,6 @@ import {
   requestPasswordReset,
   resetPasswordWithEmailToken,
   sendSignupVerificationEmail,
-  signUp,
   verifySignupEmail,
 } from '../services/auth.service';
 
@@ -56,6 +55,10 @@ function getErrorStatus(message: string) {
   }
 
   if (message === 'Supabase email verification required') {
+    return 403;
+  }
+
+  if (message === 'Google OAuth session required') {
     return 403;
   }
 
@@ -194,24 +197,10 @@ export async function checkUsername(req: Request, res: Response) {
 }
 
 export async function signup(req: Request, res: Response) {
-  try {
-    const result = await signUp({
-      email: req.body.email,
-      username: req.body.username,
-      password: req.body.password,
-      profileImageUrl: req.body.profileImageUrl,
-      bio: req.body.bio,
-      ...getClientMetadata(req),
-    });
-
-    return res.status(201).json({
-      success: true,
-      message: 'Sign up successful. Email verification required.',
-      ...result,
-    });
-  } catch (error) {
-    return sendError(res, error);
-  }
+  return res.status(410).json({
+    success: false,
+    message: 'Email sign up is no longer available. Continue with Google.',
+  });
 }
 
 export async function resendVerificationEmail(req: Request, res: Response) {

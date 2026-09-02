@@ -1,71 +1,94 @@
 import { NextFunction, Request, Response } from 'express';
+import {
+  AuthRateLimitPolicy,
+  consumeAuthRateLimit,
+} from '../services/auth-rate-limit.service';
 
-interface RateLimitEntry {
-  count: number;
-  resetAt: number;
+interface RateLimitOptions extends AuthRateLimitPolicy {
+  key: (req: Request) => string;
 }
 
-interface RateLimitOptions {
-  windowMs: number;
-  maxRequests: number;
-  message: string;
+const tooManyRequestsMessage = 'Too many requests. Please try again later.';
+const unavailableMessage = 'Authentication temporarily unavailable';
+
+function getPositiveIntegerEnv(name: string, fallback: number) {
+  const value = Number(process.env[name]);
+  return Number.isInteger(value) && value > 0 ? value : fallback;
 }
 
-function createIpRateLimit(options: RateLimitOptions) {
-  const entries = new Map<string, RateLimitEntry>();
-  let requestsSinceCleanup = 0;
+function getClientIp(req: Request) {
+  return req.ip || req.socket.remoteAddress || 'unknown';
+}
 
-  return (req: Request, res: Response, next: NextFunction) => {
-    const now = Date.now();
-    const key = req.ip || req.socket.remoteAddress || 'unknown';
-    const existing = entries.get(key);
-    const entry = !existing || existing.resetAt <= now
-      ? { count: 0, resetAt: now + options.windowMs }
-      : existing;
+function getNormalizedEmail(req: Request) {
+  const email = req.body && typeof req.body.email === 'string'
+    ? req.body.email.trim().toLowerCase()
+    : '';
+  return email || 'invalid-email';
+}
 
-    entry.count += 1;
-    entries.set(key, entry);
+function createAuthRateLimit(options: RateLimitOptions) {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const result = await consumeAuthRateLimit(options, options.key(req));
 
-    requestsSinceCleanup += 1;
-    if (requestsSinceCleanup >= 1000) {
-      requestsSinceCleanup = 0;
-      for (const [storedKey, storedEntry] of entries) {
-        if (storedEntry.resetAt <= now) {
-          entries.delete(storedKey);
-        }
+      if (!result.allowed) {
+        res.setHeader('Retry-After', String(result.retryAfterSeconds));
+        return res.status(429).json({
+          success: false,
+          message: tooManyRequestsMessage,
+        });
       }
-    }
 
-    if (entry.count > options.maxRequests) {
-      const retryAfterSeconds = Math.max(1, Math.ceil((entry.resetAt - now) / 1000));
-      res.setHeader('Retry-After', String(retryAfterSeconds));
-
-      return res.status(429).json({
+      return next();
+    } catch (error) {
+      console.error('Authentication rate limit check failed', error);
+      return res.status(503).json({
         success: false,
-        message: options.message,
+        message: unavailableMessage,
       });
     }
-
-    return next();
   };
 }
 
-const genericMessage = 'Too many requests. Please try again later.';
+export const loginIpLimit = createAuthRateLimit({
+  scope: 'login_ip',
+  windowMs: getPositiveIntegerEnv('AUTH_LOGIN_WINDOW_SECONDS', 15 * 60) * 1000,
+  maxRequests: getPositiveIntegerEnv('AUTH_LOGIN_IP_MAX', 30),
+  key: getClientIp,
+});
 
-export const passwordEmailShortIpLimit = createIpRateLimit({
+export const loginIdentityLimit = createAuthRateLimit({
+  scope: 'login_ip_email',
+  windowMs: getPositiveIntegerEnv('AUTH_LOGIN_WINDOW_SECONDS', 15 * 60) * 1000,
+  maxRequests: getPositiveIntegerEnv('AUTH_LOGIN_IDENTITY_MAX', 10),
+  key: (req) => `${getClientIp(req)}\0${getNormalizedEmail(req)}`,
+});
+
+export const supabaseAuthIpLimit = createAuthRateLimit({
+  scope: 'supabase_auth_ip',
+  windowMs: getPositiveIntegerEnv('AUTH_SUPABASE_WINDOW_SECONDS', 5 * 60) * 1000,
+  maxRequests: getPositiveIntegerEnv('AUTH_SUPABASE_IP_MAX', 30),
+  key: getClientIp,
+});
+
+export const passwordEmailShortIpLimit = createAuthRateLimit({
+  scope: 'password_email_ip_short',
   windowMs: 15 * 60 * 1000,
   maxRequests: 10,
-  message: genericMessage,
+  key: getClientIp,
 });
 
-export const passwordEmailDailyIpLimit = createIpRateLimit({
+export const passwordEmailDailyIpLimit = createAuthRateLimit({
+  scope: 'password_email_ip_daily',
   windowMs: 24 * 60 * 60 * 1000,
   maxRequests: 50,
-  message: genericMessage,
+  key: getClientIp,
 });
 
-export const passwordResetConfirmIpLimit = createIpRateLimit({
+export const passwordResetConfirmIpLimit = createAuthRateLimit({
+  scope: 'password_reset_confirm_ip',
   windowMs: 15 * 60 * 1000,
   maxRequests: 30,
-  message: genericMessage,
+  key: getClientIp,
 });
