@@ -22,7 +22,12 @@ import {
 import { getProfileImageSrc, handleProfileImageError } from '../lib/avatar'
 import { fetchMyCollection } from '../lib/collection'
 import { getFriendlyErrorMessage } from '../lib/errors'
-import { fetchSampleCollection, fetchSampleOverview, fetchSampleStudioRanking } from '../lib/sample'
+import {
+  fetchSampleCollection,
+  fetchSampleOverview,
+  fetchSampleStudioRanking,
+  isStudioRankingResponse,
+} from '../lib/sample'
 import {
   fetchFormatDistributionStats,
   fetchMyAnimeStats,
@@ -407,7 +412,7 @@ export function StudioRankingSection({
           return
         }
 
-        if (cached) {
+        if (cached && isStudioRankingResponse(cached)) {
           setRankingState({
             items: cached.items,
             isLoading: false,

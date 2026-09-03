@@ -9,6 +9,9 @@
 }
 
 .detail-back-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
   width: fit-content;
   color: var(--point-hover);
   text-decoration: none;
@@ -29,8 +32,8 @@
   top: 16px;
   z-index: 5;
   justify-self: end;
-  width: 42px;
-  height: 42px;
+  width: 44px;
+  height: 44px;
   margin-bottom: -66px;
   border: 1px solid rgba(120, 113, 108, 0.18);
   border-radius: 50%;

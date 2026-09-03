@@ -2,6 +2,7 @@ import {
   UserAnimeListSortOption,
   UserAnimeListTitleLanguage,
 } from './user-anime-list.service';
+import type { StudioStatsSort } from './user-studio-stats.service';
 
 type SampleStatus = 'planned' | 'watching' | 'completed' | 'paused' | 'dropped';
 
@@ -669,56 +670,88 @@ export function getGuestSampleFormatStats(status: 'all' | 'completed' = 'complet
   };
 }
 
-export function getGuestSampleStudioRanking(limit = 20) {
+export function getGuestSampleStudioRanking(sort: StudioStatsSort = 'count', limit = 20) {
   const byStudio = new Map<number, SampleAnimeItem[]>();
 
   for (const item of sampleItems) {
     byStudio.set(item.studio.id, [...(byStudio.get(item.studio.id) ?? []), item]);
   }
 
-  const items = Array.from(byStudio.entries())
+  const allItems = Array.from(byStudio.entries())
     .map(([studioId, studioItems]) => {
       const ratedItems = studioItems.filter((item) => item.score !== null);
       const watchMinutes = studioItems.reduce((sum, item) => sum + getWatchMinutes(item), 0);
+      const releaseYears = studioItems
+        .map((item) => item.anime.seasonYear)
+        .filter((year): year is number => typeof year === 'number');
+      const scoreSum = ratedItems.length > 0
+        ? ratedItems.reduce((sum, item) => sum + (item.score ?? 0), 0)
+        : null;
 
       return {
-        studioId,
-        name: studioItems[0]?.studio.name ?? 'Unknown Studio',
+        studio: {
+          id: studioId,
+          anilistId: studioId,
+          name: studioItems[0]?.studio.name ?? 'Unknown Studio',
+          isAnimationStudio: true,
+          siteUrl: null,
+        },
         animeCount: studioItems.length,
-        completedCount: studioItems.filter((item) => item.status === 'completed').length,
+        completedAnimeCount: studioItems.filter((item) => item.status === 'completed').length,
         ratedAnimeCount: ratedItems.length,
+        scoreSum: roundMetric(scoreSum),
         averageScore: ratedItems.length > 0
-          ? roundMetric(ratedItems.reduce((sum, item) => sum + (item.score ?? 0), 0) / ratedItems.length)
+          ? roundMetric((scoreSum ?? 0) / ratedItems.length)
           : null,
-        watchedEpisodes: studioItems.reduce((sum, item) => sum + getWatchedEpisodes(item), 0),
-        watchMinutes,
-        watchHours: roundMetric(watchMinutes / 60),
-        topAnime: ratedItems
-          .slice()
-          .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
-          .slice(0, 3)
-          .map((item) => ({
-            animeId: item.animeId,
-            title: item.anime.title,
-            coverImageLarge: item.anime.coverImageLarge,
-            score: item.score,
-          })),
+        communityAverageScore: null,
+        totalWatchedEpisodes: studioItems.reduce((sum, item) => sum + getWatchedEpisodes(item), 0),
+        totalWatchMinutes: watchMinutes,
+        totalWatchHours: roundMetric(watchMinutes / 60),
+        firstReleaseYear: releaseYears.length > 0 ? Math.min(...releaseYears) : null,
+        latestReleaseYear: releaseYears.length > 0 ? Math.max(...releaseYears) : null,
       };
-    })
-    .sort((a, b) => (b.averageScore ?? -1) - (a.averageScore ?? -1) || b.animeCount - a.animeCount)
-    .slice(0, limit);
+    });
+
+  allItems.sort((a, b) => {
+    if (sort === 'score') {
+      return (
+        (b.averageScore ?? -1) - (a.averageScore ?? -1)
+        || b.ratedAnimeCount - a.ratedAnimeCount
+        || b.animeCount - a.animeCount
+        || b.studio.id - a.studio.id
+      );
+    }
+
+    if (sort === 'watchTime') {
+      return (
+        b.totalWatchMinutes - a.totalWatchMinutes
+        || b.animeCount - a.animeCount
+        || b.studio.id - a.studio.id
+      );
+    }
+
+    return b.animeCount - a.animeCount || b.studio.id - a.studio.id;
+  });
 
   return {
-    items,
+    success: true,
+    items: allItems.slice(0, limit),
     pageInfo: {
       hasNext: false,
       nextCursor: null,
       limit,
-      sort: 'averageScore',
+      sort,
       status: 'all',
       mainOnly: true,
       minAnimeCount: 1,
       minRatedAnimeCount: 1,
+    },
+    summary: {
+      studioCount: allItems.length,
+      source: {
+        status: 'all',
+        mainOnly: true,
+      },
     },
   };
 }
@@ -735,6 +768,6 @@ export function getGuestSampleOverview() {
     genreBubble: getGuestSampleGenreBubbleChart(),
     yearlyScores: getGuestSampleYearlyScoreStats('completed', 1),
     formatDistribution: getGuestSampleFormatStats('completed', 1),
-    studios: getGuestSampleStudioRanking(10),
+    studios: getGuestSampleStudioRanking('count', 10),
   };
 }

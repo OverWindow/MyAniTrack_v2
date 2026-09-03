@@ -466,6 +466,14 @@
   .policy-footer {
     display: grid;
   }
+
+  .policy-toc a,
+  .policy-footer > a,
+  .deletion-account-card > a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
 }
 
 @media (max-width: 420px) {

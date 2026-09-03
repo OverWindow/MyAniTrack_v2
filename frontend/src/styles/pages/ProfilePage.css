@@ -1,10 +1,12 @@
 .profile-page {
   display: grid;
   gap: 24px;
+  min-width: 0;
 }
 
 .profile-hero-card,
 .profile-badge-section {
+  min-width: 0;
   border: 1px solid rgba(120, 113, 108, 0.16);
   border-radius: 20px;
   box-shadow: var(--shadow-card);
@@ -23,6 +25,7 @@
   display: flex;
   align-items: center;
   gap: 22px;
+  min-width: 0;
 }
 
 .profile-hero-avatar {
@@ -47,6 +50,7 @@
 .profile-hero-copy {
   display: grid;
   gap: 8px;
+  min-width: 0;
 }
 
 .profile-hero-title {
@@ -171,15 +175,26 @@
   animation: badgeSpinner 780ms linear infinite;
 }
 
+.badge-card-shell {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  min-width: 0;
+}
+
 .badge-card {
   position: relative;
   display: grid;
+  width: 100%;
   justify-items: center;
   border-radius: 50%;
   padding: 0;
   background: transparent;
   border: 0;
+  color: inherit;
+  font: inherit;
   outline: none;
+  cursor: pointer;
 }
 
 .badge-card:not(.is-earned) {
@@ -270,10 +285,14 @@
     transform var(--duration-normal) var(--ease-out);
 }
 
-.badge-card:hover .badge-tooltip,
-.badge-card:focus-visible .badge-tooltip {
+.badge-card-shell:hover .badge-tooltip,
+.badge-card-shell:focus-within .badge-tooltip {
   opacity: 1;
   transform: translate(-50%, 0);
+}
+
+.badge-detail-backdrop {
+  display: none;
 }
 
 .badge-progress {
@@ -433,8 +452,8 @@
   display: grid;
   place-items: center;
   flex: 0 0 auto;
-  width: 38px;
-  height: 38px;
+  width: 44px;
+  height: 44px;
   padding: 0;
   border: 1px solid rgba(120, 113, 108, 0.18);
   border-radius: 50%;
@@ -573,6 +592,85 @@
   }
 }
 
+@media (max-width: 880px) {
+  .badge-tooltip {
+    display: none;
+  }
+
+  .badge-detail-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1300;
+    display: grid;
+    align-items: end;
+    padding: 0;
+    background: rgba(28, 25, 23, 0.58);
+    backdrop-filter: blur(4px);
+  }
+
+  .badge-detail-dialog {
+    width: 100%;
+    max-height: min(80svh, 620px);
+    padding: 20px max(20px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border: 1px solid rgba(120, 113, 108, 0.16);
+    border-bottom: 0;
+    border-radius: 24px 24px 0 0;
+    background: var(--bg-card);
+    box-shadow: 0 -18px 56px rgba(28, 25, 23, 0.24);
+  }
+
+  .badge-detail-dialog-heading {
+    display: grid;
+    grid-template-columns: 48px minmax(0, 1fr) 44px;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .badge-detail-dialog-icon {
+    display: grid;
+    width: 48px;
+    height: 48px;
+    place-items: center;
+    overflow: hidden;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--point-color), #fb7185);
+    color: var(--text-inverse);
+    font-weight: 900;
+  }
+
+  .badge-detail-dialog-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .badge-detail-close {
+    display: grid;
+    width: 44px;
+    height: 44px;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: var(--bg-neutral);
+    color: var(--text-primary);
+    cursor: pointer;
+  }
+
+  .badge-detail-content {
+    display: grid;
+    gap: 10px;
+    margin-top: 18px;
+  }
+
+  .badge-detail-content p {
+    color: var(--text-secondary);
+    line-height: 1.65;
+  }
+}
+
 @media (max-width: 760px) {
   .profile-cropper-modal-backdrop {
     align-items: end;
@@ -620,5 +718,17 @@
 
   .profile-cropper-actions > button {
     width: 100%;
+  }
+}
+
+@media (max-width: 420px) {
+  .badge-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px 12px;
+  }
+
+  .badge-icon {
+    width: 104px;
+    height: 104px;
   }
 }

@@ -29,6 +29,35 @@ function getItem<T>(payload: unknown): T {
   return payload as T
 }
 
+export function isStudioRankingResponse(value: unknown): value is StudioRankingResponse {
+  if (!value || typeof value !== 'object') {
+    return false
+  }
+
+  const response = value as Partial<StudioRankingResponse>
+  const sort = response.pageInfo?.sort
+
+  return (
+    response.success === true
+    && Array.isArray(response.items)
+    && Boolean(response.pageInfo)
+    && (sort === 'count' || sort === 'score' || sort === 'watchTime')
+    && Boolean(response.summary)
+    && Number.isFinite(response.summary?.studioCount)
+    && Boolean(response.summary?.source)
+  )
+}
+
+function parseStudioRankingResponse(payload: unknown) {
+  const response = getItem<unknown>(payload)
+
+  if (!isStudioRankingResponse(response)) {
+    throw new Error('샘플 스튜디오 응답 형식이 올바르지 않아요.')
+  }
+
+  return response
+}
+
 function createSampleCoverDataUri(title: string) {
   const safeTitle = title.replace(/[<&>]/g, '')
   const hue = Array.from(safeTitle).reduce((sum, character) => sum + character.charCodeAt(0), 0) % 360
@@ -186,7 +215,9 @@ export async function fetchSampleOverview(signal?: AbortSignal): Promise<SampleO
     genreBubble: getItem<GenreBubbleResponse['item']>(overview.genreBubble),
     yearlyScores: getItem<YearlyScoreStats>(overview.yearlyScores),
     formatDistribution: getItem<FormatDistributionStats>(overview.formatDistribution),
-    studios: overview.studios ? getItem<StudioRankingResponse>(overview.studios) : undefined,
+    studios: overview.studios && isStudioRankingResponse(getItem<unknown>(overview.studios))
+      ? getItem<StudioRankingResponse>(overview.studios)
+      : undefined,
   }
 }
 
@@ -244,7 +275,7 @@ export async function fetchSampleStudioRanking(params: {
     throw new Error(`샘플 스튜디오 랭킹을 불러오지 못했습니다. (${response.status})`)
   }
 
-  return getItem<StudioRankingResponse>(await response.json())
+  return parseStudioRankingResponse(await response.json())
 }
 
 export function createSampleAnimeDetail(item: UserAnimeListItem): AnimeDetailItem {

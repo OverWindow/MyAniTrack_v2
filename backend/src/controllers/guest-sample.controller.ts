@@ -24,6 +24,7 @@ import {
   validateYearlyScoreStatsMinimumCount,
   validateYearlyScoreStatsStatus,
 } from '../services/user-yearly-score-stats.service';
+import { validateStudioStatsSort } from '../services/user-studio-stats.service';
 
 function getErrorStatus(message: string) {
   if (message.includes('must be') || message.includes('required')) {
@@ -142,12 +143,12 @@ export async function getGuestSampleFormatStatsController(req: Request, res: Res
 
 export async function getGuestSampleStudioRankingController(req: Request, res: Response) {
   try {
-    const result = getGuestSampleStudioRanking(validateLimit(req.query.limit, 20, 50));
+    const result = getGuestSampleStudioRanking(
+      validateStudioStatsSort(req.query.sort),
+      validateLimit(req.query.limit, 20, 50)
+    );
 
-    return res.json({
-      success: true,
-      ...result,
-    });
+    return res.json(result);
   } catch (error) {
     return sendError(res, error);
   }

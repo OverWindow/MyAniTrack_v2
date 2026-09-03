@@ -7,6 +7,7 @@ import { Header } from './components/Header'
 import { ErrorToast } from './components/ErrorToast'
 import { useAuth } from './contexts/AuthContext'
 import { useFriends } from './contexts/FriendsContext'
+import { useBodyScrollLock } from './hooks/useBodyScrollLock'
 import { AdminPage } from './pages/AdminPage'
 import { AccountDeletionPage } from './pages/AccountDeletionPage'
 import { AnimeDetailPage } from './pages/AnimeDetailPage'
@@ -52,6 +53,8 @@ function App() {
   const shouldShowFloatingCta = !backgroundLocation && !isPolicyRoute && !location.pathname.startsWith('/s/') && !['/login', '/signup'].includes(location.pathname)
   const [isFriendsOpen, setIsFriendsOpen] = useState(false)
   const floatingPanelRef = useRef<HTMLDivElement | null>(null)
+
+  useBodyScrollLock(Boolean(backgroundLocation))
 
   useEffect(() => {
     if (!isFriendsOpen) {

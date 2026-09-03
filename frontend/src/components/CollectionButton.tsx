@@ -15,6 +15,8 @@ type CollectionButtonProps = {
   maxProgress?: number | null
   initialIsAdded?: boolean
   useCacheState?: boolean
+  loginLabel?: string
+  loginAriaLabel?: string
   onAddedChange?: (isAdded: boolean) => void
 }
 
@@ -23,6 +25,8 @@ export function CollectionButton({
   maxProgress,
   initialIsAdded = false,
   useCacheState = true,
+  loginLabel = '로그인 후 추가',
+  loginAriaLabel,
   onAddedChange,
 }: CollectionButtonProps) {
   const { isAuthenticated } = useAuth()
@@ -105,8 +109,12 @@ export function CollectionButton({
 
   if (!isAuthenticated) {
     return (
-      <Link className="collection-mini-button is-login" to="/login">
-        로그인 후 추가
+      <Link
+        className="collection-mini-button is-login"
+        to="/login"
+        aria-label={loginAriaLabel ?? loginLabel}
+      >
+        {loginLabel}
       </Link>
     )
   }

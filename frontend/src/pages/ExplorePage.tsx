@@ -225,28 +225,37 @@ type ExploreAnimeCardProps = {
 function ExploreAnimeCard({ item, location }: ExploreAnimeCardProps) {
   const [localCollection, setLocalCollection] = useState<AnimeListItem['myCollection']>(undefined)
   const collection = localCollection ?? item.myCollection
+  const detailPath = `/anime/${item.id}`
+  const detailState = { fromPage: 'explore', backgroundLocation: location }
 
   return (
-    <Link
-      className="anime-card anime-card-link"
-      key={item.id}
-      to={`/anime/${item.id}`}
-      state={{ fromPage: 'explore', backgroundLocation: location }}
-    >
+    <article className="anime-card" key={item.id}>
       <div
         className="anime-poster-wrap"
         onMouseEnter={() => logExploreCollectionOnHover(item, collection)}
         onFocus={() => logExploreCollectionOnHover(item, collection)}
       >
-        <div
-          className="anime-card-quick-action"
-          onClick={(event) => event.preventDefault()}
+        <Link
+          className="anime-poster-link"
+          to={detailPath}
+          state={detailState}
+          aria-label={`${getDisplayTitle(item)} 상세 페이지로 이동`}
         >
+          <img
+            className="anime-poster"
+            src={getPrimaryPoster(item)}
+            alt={getDisplayTitle(item)}
+            loading="lazy"
+          />
+        </Link>
+        <div className="anime-card-quick-action">
           <CollectionButton
             animeId={item.id}
             maxProgress={item.episodes}
             initialIsAdded={collection?.exists}
             useCacheState={false}
+            loginLabel="추가"
+            loginAriaLabel="로그인 후 컬렉션에 추가"
             onAddedChange={(exists) => {
               setLocalCollection((current) => ({
                 exists,
@@ -262,12 +271,6 @@ function ExploreAnimeCard({ item, location }: ExploreAnimeCardProps) {
             {formatTenPointScore(item.averageScore)}
           </div>
         )}
-        <img
-          className="anime-poster"
-          src={getPrimaryPoster(item)}
-          alt={getDisplayTitle(item)}
-          loading="lazy"
-        />
         <HoverRating
           animeId={item.id}
           maxProgress={item.episodes}
@@ -275,10 +278,10 @@ function ExploreAnimeCard({ item, location }: ExploreAnimeCardProps) {
           onCollectionChange={setLocalCollection}
         />
       </div>
-      <div className="anime-copy">
+      <Link className="anime-copy anime-card-link" to={detailPath} state={detailState}>
         <h3>{getDisplayTitle(item)}</h3>
-      </div>
-    </Link>
+      </Link>
+    </article>
   )
 }
 
