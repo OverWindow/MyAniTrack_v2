@@ -3,8 +3,10 @@ import { Link } from 'react-router-dom'
 import { AdminUserManager } from '../components/AdminUserManager'
 import { AdminProfileReportManager } from '../components/AdminProfileReportManager'
 import { AdminAnimeVisibilityManager } from '../components/AdminAnimeVisibilityManager'
+import { AdminMaintenanceManager } from '../components/AdminMaintenanceManager'
 import { ErrorToast } from '../components/ErrorToast'
 import { useAuth } from '../contexts/AuthContext'
+import { useMaintenance } from '../contexts/MaintenanceContext'
 import {
   fetchAnimeCastSyncStatus,
   fetchPlatformStats,
@@ -61,6 +63,7 @@ type AdminActionCardProps<TPayload> = {
 }
 
 type AdminActionKey =
+  | 'maintenance'
   | 'users'
   | 'profile-reports'
   | 'anime-visibility'
@@ -95,6 +98,13 @@ const seasonOptions: AdminSeason[] = ['WINTER', 'SPRING', 'SUMMER', 'FALL']
 const castLanguageOptions: AdminCastLanguage[] = ['JAPANESE', 'ENGLISH', 'KOREAN']
 const seriesRebuildScopeOptions: AdminSeriesRebuildScope[] = ['all', 'mainline', 'franchise']
 const RESPONSE_PREVIEW_LENGTH = 360
+
+type AdminSummaryCard = {
+  label: string
+  value: string
+  hint: string
+  tone?: 'success' | 'danger'
+}
 
 type AdminFullSyncFormValues = Omit<AdminFullSyncPayload, 'maxPages'> & {
   maxPages: number
@@ -206,6 +216,7 @@ function AdminActionCard<TPayload extends Record<string, string | number | boole
 
 export function AdminPage() {
   const { isAuthenticated, user } = useAuth()
+  const { settings: maintenanceSettings } = useMaintenance()
   const isAdmin = user?.isAdmin || user?.role === 'ADMIN'
 
   const [syncPageValues, setSyncPageValues] = useState<AdminSyncPagePayload>({
@@ -307,9 +318,26 @@ export function AdminPage() {
     return `${name} 관리자`
   }, [user?.email, user?.username])
 
-  const summaryCards = useMemo(() => {
+  const summaryCards = useMemo<AdminSummaryCard[]>(() => {
+    const maintenanceCard: AdminSummaryCard = maintenanceSettings
+      ? {
+          label: '웹 서비스',
+          value: maintenanceSettings.enabled ? '점검 중' : '정상 운영',
+          hint: `마지막 변경 ${new Intl.DateTimeFormat('ko-KR', {
+            dateStyle: 'short',
+            timeStyle: 'short',
+          }).format(new Date(maintenanceSettings.updatedAt))}`,
+          tone: maintenanceSettings.enabled ? 'danger' : 'success',
+        }
+      : {
+          label: '웹 서비스',
+          value: '확인 불가',
+          hint: '점검 모드 상태를 불러오지 못함',
+        }
+
     if (!platformStats) {
       return [
+        maintenanceCard,
         { label: '등록 유저', value: '-', hint: '플랫폼 통계 불러오기 전' },
         { label: '저장된 애니', value: '-', hint: '플랫폼 통계 불러오기 전' },
         { label: '번역 진행률', value: '-', hint: '플랫폼 통계 불러오기 전' },
@@ -347,6 +375,7 @@ export function AdminPage() {
         ? (relationSyncedAnimeCount / storedAnimeCount) * 100
         : 0)
     return [
+      maintenanceCard,
       {
         label: '등록 유저',
         value: formatNumber(platformStats.registeredUserCount),
@@ -395,7 +424,7 @@ export function AdminPage() {
         hint: 'AniList 캐릭터 및 성우 저장 수',
       },
     ]
-  }, [platformStats])
+  }, [maintenanceSettings, platformStats])
 
   const handlePlatformStatsRefresh = async () => {
     setIsLoadingPlatformStats(true)
@@ -869,6 +898,13 @@ export function AdminPage() {
     ?? specialSyncItems[0]
   const actionItems = [
     {
+      key: 'maintenance' as const,
+      group: '서비스 운영',
+      label: '점검 모드',
+      description: '웹 점검 화면의 노출 상태와 한국어·영어 안내 문구를 관리합니다.',
+      content: <AdminMaintenanceManager />,
+    },
+    {
       key: 'users' as const,
       group: '사용자',
       label: '사용자 검색',
@@ -974,7 +1010,7 @@ export function AdminPage() {
       <div className="admin-hero-card">
         <div className="admin-hero-copy">
           <h1>총 관리 페이지</h1>
-          <p>애니 동기화와 한국어 제목 번역 배치를 실행하는 관리자 전용 공간입니다. 상단 수치는 공개 플랫폼 통계 API와 연동됩니다.</p>
+          <p>웹 서비스 운영, 콘텐츠 안전, 애니 데이터 동기화를 관리하는 관리자 전용 공간입니다. 상단 수치는 공개 플랫폼 통계 API와 연동됩니다.</p>
           <span className="admin-hero-meta">현재 접속 계정: {greeting}</span>
         </div>
       </div>
@@ -994,7 +1030,10 @@ export function AdminPage() {
 
         <article className="admin-summary-card admin-summary-combined-card">
           {summaryCards.map((card) => (
-            <div className="admin-summary-item" key={card.label}>
+            <div
+              className={card.tone ? `admin-summary-item is-${card.tone}` : 'admin-summary-item'}
+              key={card.label}
+            >
               <span>{card.label}</span>
               <strong>{card.value}</strong>
               <p>{card.hint}</p>

@@ -14,6 +14,7 @@ import userAgreementRoutes from './src/routes/user-agreement.routes';
 import userAnimeListRoutes from './src/routes/user-anime-list.routes';
 import userProfileRoutes from './src/routes/user-profile.routes';
 import userVoiceActorStatsRoutes from './src/routes/user-voice-actor-stats.routes';
+import maintenanceRoutes from './src/routes/maintenance.routes';
 import { getSharePreviewHtml } from './src/controllers/share-preview.controller';
 
 validateSupabaseStorageEnv();
@@ -123,6 +124,7 @@ app.use('/api', friendRoutes);
 app.use('/api', contentModerationRoutes);
 app.use('/api', guestSampleRoutes);
 app.use('/api', platformStatsRoutes);
+app.use('/api', maintenanceRoutes);
 app.use('/api', recommendationRoutes);
 app.use('/api', shareRoutes);
 app.use('/api', userAgreementRoutes);

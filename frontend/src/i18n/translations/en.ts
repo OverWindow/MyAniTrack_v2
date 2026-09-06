@@ -1048,4 +1048,12 @@ export const enTranslations: Record<string, string> = {
   "사용자 프로필 | MyAniTrack": "User Profile | MyAniTrack",
   "프로필 | MyAniTrack": "Profile | MyAniTrack",
   "관리자 | MyAniTrack": "Admin | MyAniTrack",
+  "다시 확인": "Check again",
+  "관리자 로그인": "Admin sign in",
+  "안내 링크": "Information links",
+  "서비스 상태를 확인하지 못했어요.": "We couldn't check the service status.",
+  "제목과 안내 문구의 입력값을 확인해주세요.": "Please check the title and maintenance message.",
+  "관리자 인증이 필요해요. 다시 로그인해주세요.": "Administrator authentication is required. Please sign in again.",
+  "관리자 권한이 있는 계정만 사용할 수 있어요.": "Only an administrator account can use this feature.",
+  "점검 모드 설정을 저장하지 못했어요.": "We couldn't save the maintenance mode settings.",
 }

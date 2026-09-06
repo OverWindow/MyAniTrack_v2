@@ -108,6 +108,22 @@
   color: var(--point-hover);
 }
 
+.admin-summary-item.is-success {
+  background: rgba(220, 252, 231, 0.45);
+}
+
+.admin-summary-item.is-success strong {
+  color: var(--success);
+}
+
+.admin-summary-item.is-danger {
+  background: rgba(254, 226, 226, 0.55);
+}
+
+.admin-summary-item.is-danger strong {
+  color: var(--error);
+}
+
 .admin-summary-card p,
 .admin-overview-card p {
   margin: 0;
@@ -327,6 +343,101 @@
 .admin-action-footer {
   display: grid;
   gap: 14px;
+}
+
+.admin-maintenance-manager {
+  display: grid;
+  gap: 18px;
+}
+
+.admin-maintenance-status {
+  display: grid;
+  gap: 7px;
+  padding: 18px;
+  border: 1px solid rgba(22, 163, 74, 0.2);
+  border-radius: 16px;
+  background: var(--success-soft);
+}
+
+.admin-maintenance-status.is-active {
+  border-color: rgba(220, 38, 38, 0.2);
+  background: var(--error-soft);
+}
+
+.admin-maintenance-status > div {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.admin-maintenance-status p,
+.admin-maintenance-status small {
+  color: var(--text-secondary);
+}
+
+.admin-maintenance-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--success);
+  box-shadow: 0 0 0 5px rgba(22, 163, 74, 0.12);
+}
+
+.admin-maintenance-status.is-active .admin-maintenance-dot {
+  background: var(--error);
+  box-shadow: 0 0 0 5px rgba(220, 38, 38, 0.12);
+}
+
+.admin-maintenance-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.admin-maintenance-locale {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid rgba(120, 113, 108, 0.16);
+  border-radius: 16px;
+  background: var(--bg-neutral);
+}
+
+.admin-maintenance-locale h3 {
+  margin-top: 5px;
+}
+
+.admin-maintenance-locale textarea {
+  min-height: 132px;
+  resize: vertical;
+}
+
+.admin-maintenance-locale .field-label small {
+  justify-self: end;
+  color: var(--text-muted);
+  font-size: 0.74rem;
+}
+
+.admin-maintenance-success {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--success-soft);
+  color: #166534;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.admin-maintenance-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.admin-maintenance-disable {
+  border-color: rgba(220, 38, 38, 0.25);
+  color: var(--error);
 }
 
 .admin-response-card {
@@ -669,6 +780,10 @@
   .admin-sync-mode-list,
   .admin-cast-mode-list,
   .admin-user-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-maintenance-form {
     grid-template-columns: 1fr;
   }
 

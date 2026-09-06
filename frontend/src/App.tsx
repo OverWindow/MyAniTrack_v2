@@ -34,10 +34,14 @@ import { UserProfilePage } from './pages/UserProfilePage'
 import { VerifyEmailConfirmPage } from './pages/VerifyEmailConfirmPage'
 import { VerifyEmailPendingPage } from './pages/VerifyEmailPendingPage'
 import { VoiceActorDetailPage } from './pages/VoiceActorDetailPage'
+import { MaintenanceLoadingPage, MaintenancePage } from './pages/MaintenancePage'
+import { useMaintenance } from './contexts/MaintenanceContext'
+import { getMaintenanceGateState } from './lib/maintenance'
 import './styles/App.css'
 
 function App() {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, isBootstrapping, user } = useAuth()
+  const { settings: maintenanceSettings, isLoading: isMaintenanceLoading, refresh: refreshMaintenance } = useMaintenance()
   const {
     friends,
     isLoading: isLoadingFriends,
@@ -53,6 +57,7 @@ function App() {
   const isPolicyRoute = ['/terms', '/privacy', '/account-deletion'].includes(location.pathname)
   const shouldShowFloatingCta = !backgroundLocation && !isPolicyRoute && !location.pathname.startsWith('/s/') && !['/login', '/signup'].includes(location.pathname)
   const [isFriendsOpen, setIsFriendsOpen] = useState(false)
+  const [isRefreshingMaintenance, setIsRefreshingMaintenance] = useState(false)
   const floatingPanelRef = useRef<HTMLDivElement | null>(null)
 
   useBodyScrollLock(Boolean(backgroundLocation))
@@ -92,6 +97,37 @@ function App() {
     }
 
     await refreshFriends({ silent: true })
+  }
+
+  const handleMaintenanceRefresh = async () => {
+    setIsRefreshingMaintenance(true)
+    try {
+      await refreshMaintenance()
+    } finally {
+      setIsRefreshingMaintenance(false)
+    }
+  }
+
+  const maintenanceGateState = getMaintenanceGateState({
+    pathname: location.pathname,
+    settings: maintenanceSettings,
+    isMaintenanceLoading,
+    isAuthBootstrapping: isBootstrapping,
+    isAdmin: Boolean(user?.isAdmin || user?.role === 'ADMIN'),
+  })
+
+  if (maintenanceGateState === 'loading') {
+    return <MaintenanceLoadingPage />
+  }
+
+  if (maintenanceGateState === 'maintenance' && maintenanceSettings) {
+    return (
+      <MaintenancePage
+        settings={maintenanceSettings}
+        isRefreshing={isRefreshingMaintenance}
+        onRefresh={() => { void handleMaintenanceRefresh() }}
+      />
+    )
   }
 
   return (

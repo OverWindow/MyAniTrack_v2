@@ -23,6 +23,7 @@ import {
   resolveProfileReportController,
   setAnimeVisibilityController,
 } from '../src/controllers/content-moderation.controller';
+import { updateMaintenanceSettingsController } from '../src/controllers/maintenance.controller';
 
 const router = Router();
 
@@ -30,6 +31,7 @@ router.use('/admin', requireAdmin);
 
 router.get('/admin/users', getAdminUsersController);
 router.get('/admin/users/:userId', getAdminUserController);
+router.patch('/admin/maintenance', updateMaintenanceSettingsController);
 router.get('/admin/profile-reports', listProfileReportsController);
 router.patch('/admin/profile-reports/:reportId', resolveProfileReportController);
 router.patch('/admin/anime/:animeId/visibility', setAnimeVisibilityController);
