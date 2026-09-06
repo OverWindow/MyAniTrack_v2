@@ -1,3 +1,4 @@
+import { tr } from '../i18n'
 import { Film, Layers3 } from 'lucide-react'
 
 export type CollectionViewMode = 'anime' | 'series'
@@ -13,7 +14,7 @@ export function CollectionViewSwitch({ value, onChange }: CollectionViewSwitchPr
       className="collection-view-switch"
       data-active-view={value}
       role="group"
-      aria-label="컬렉션 보기 방식"
+      aria-label={tr("컬렉션 보기 방식")}
     >
       <button
         type="button"
@@ -22,7 +23,7 @@ export function CollectionViewSwitch({ value, onChange }: CollectionViewSwitchPr
         onClick={() => onChange('anime')}
       >
         <Film size={17} aria-hidden="true" />
-        <span>작품별</span>
+        <span>{tr("작품별")}</span>
       </button>
       <button
         type="button"
@@ -31,7 +32,7 @@ export function CollectionViewSwitch({ value, onChange }: CollectionViewSwitchPr
         onClick={() => onChange('series')}
       >
         <Layers3 size={17} aria-hidden="true" />
-        <span>시리즈별</span>
+        <span>{tr("시리즈별")}</span>
       </button>
     </div>
   )

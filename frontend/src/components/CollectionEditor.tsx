@@ -1,3 +1,4 @@
+import { tr } from '../i18n'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ErrorToast } from './ErrorToast'
@@ -20,11 +21,11 @@ import type {
 import '../styles/components/CollectionEditor.css'
 
 const statusOptions: Array<{ value: UserAnimeStatus; label: string }> = [
-  { value: 'planned', label: '볼 예정' },
-  { value: 'watching', label: '보는 중' },
-  { value: 'completed', label: '완료' },
-  { value: 'paused', label: '잠시 멈춤' },
-  { value: 'dropped', label: '중단' },
+  { value: 'planned', label: tr("볼 예정") },
+  { value: 'watching', label: tr("보는 중") },
+  { value: 'completed', label: tr("완료") },
+  { value: 'paused', label: tr("잠시 멈춤") },
+  { value: 'dropped', label: tr("중단") },
 ]
 
 type CollectionEditorProps = {
@@ -59,30 +60,30 @@ function getStarFillPercent(score: number, starIndex: number) {
 
 function getRelationLabel(relation: SmartRatingRelation) {
   if (relation === 'better') {
-    return '새 작품이 더 재밌음'
+    return tr("새 작품이 더 재밌음")
   }
 
   if (relation === 'worse') {
-    return '새 작품이 더 별로'
+    return tr("새 작품이 더 별로")
   }
 
-  return '비슷함'
+  return tr("비슷함")
 }
 
 function getConfidenceLabel(confidence?: string) {
   if (confidence === 'high') {
-    return '높음'
+    return tr("높음")
   }
 
   if (confidence === 'medium') {
-    return '보통'
+    return tr("보통")
   }
 
   if (confidence === 'low') {
-    return '낮음'
+    return tr("낮음")
   }
 
-  return confidence || '정보 없음'
+  return confidence || tr("정보 없음")
 }
 
 type SmartRatingModalProps = {
@@ -133,7 +134,7 @@ function SmartRatingModal({ animeId, targetAnime, onClose, onApplyScore }: Smart
           return
         }
 
-        setError(candidateError instanceof Error ? candidateError.message : '비교 후보를 불러오지 못했어요.')
+        setError(candidateError instanceof Error ? candidateError.message : tr("비교 후보를 불러오지 못했어요."))
       } finally {
         if (!controller.signal.aborted) {
           setIsLoading(false)
@@ -179,7 +180,7 @@ function SmartRatingModal({ animeId, targetAnime, onClose, onApplyScore }: Smart
       })
       setEstimate(response)
     } catch (estimateError) {
-      setError(estimateError instanceof Error ? estimateError.message : '스마트 평점을 계산하지 못했어요.')
+      setError(estimateError instanceof Error ? estimateError.message : tr("스마트 평점을 계산하지 못했어요."))
     } finally {
       setIsEstimating(false)
     }
@@ -197,7 +198,7 @@ function SmartRatingModal({ animeId, targetAnime, onClose, onApplyScore }: Smart
       await onApplyScore(estimate.estimatedScore)
       onClose()
     } catch (applyError) {
-      setError(applyError instanceof Error ? applyError.message : '추천 평점을 적용하지 못했어요.')
+      setError(applyError instanceof Error ? applyError.message : tr("추천 평점을 적용하지 못했어요."))
     } finally {
       setIsApplying(false)
     }
@@ -209,15 +210,15 @@ function SmartRatingModal({ animeId, targetAnime, onClose, onApplyScore }: Smart
         <div className="smart-rating-header">
           <div>
             <span className="detail-label">Smart rating</span>
-            <h3 id="smart-rating-title">스마트 별점 매기기</h3>
-            <p>기존에 평가한 작품과 비교하면 예상 별점을 계산해드려요.</p>
+            <h3 id="smart-rating-title">{tr("스마트 별점 매기기")}</h3>
+            <p>{tr("기존에 평가한 작품과 비교하면 예상 별점을 계산해드려요.")}</p>
           </div>
-          <button className="smart-rating-close" type="button" onClick={onClose} aria-label="닫기">
+          <button className="smart-rating-close" type="button" onClick={onClose} aria-label={tr("닫기")}>
             ×
           </button>
         </div>
 
-        {isLoading && <div className="feedback-inline">비교 후보를 불러오는 중이에요.</div>}
+        {isLoading && <div className="feedback-inline">{tr("비교 후보를 불러오는 중이에요.")}</div>}
         <ErrorToast message={error} />
 
         {!isLoading && activeCandidate && (
@@ -234,8 +235,8 @@ function SmartRatingModal({ animeId, targetAnime, onClose, onApplyScore }: Smart
                   <div className="smart-rating-candidate-cover" aria-hidden="true" />
                 )}
                 <div className="smart-rating-candidate-copy">
-                  <span>새로 평가할 작품</span>
-                  <strong>{targetAnime?.title ?? '현재 작품'}</strong>
+                  <span>{tr("새로 평가할 작품")}</span>
+                  <strong>{targetAnime?.title ?? tr("현재 작품")}</strong>
                 </div>
               </div>
               <div className="smart-rating-candidate">
@@ -249,7 +250,7 @@ function SmartRatingModal({ animeId, targetAnime, onClose, onApplyScore }: Smart
                   <div className="smart-rating-candidate-cover" aria-hidden="true" />
                 )}
                 <div className="smart-rating-candidate-copy">
-                  <span>비교 대상 · 내 평점 {activeCandidate.score.toFixed(1)}점</span>
+                  <span>{tr("비교 대상 · 내 평점")} {activeCandidate.score.toFixed(1)}{tr("점")}</span>
                   <strong>{activeCandidate.anime.title}</strong>
                 </div>
               </div>
@@ -257,7 +258,7 @@ function SmartRatingModal({ animeId, targetAnime, onClose, onApplyScore }: Smart
                 <span>
                   {activeCandidateIndex + 1} / {candidates.length}
                 </span>
-                <div className="smart-rating-choice-group" aria-label={`${activeCandidate.anime.title} 비교`}>
+                <div className="smart-rating-choice-group" aria-label={tr("{{v0}} 비교", { v0: activeCandidate.anime.title })}>
                   {(['better', 'similar', 'worse'] as SmartRatingRelation[]).map((relation) => (
                     <button
                       className={comparisons[activeCandidate.animeId] === relation ? 'smart-rating-choice is-active' : 'smart-rating-choice'}
@@ -275,16 +276,16 @@ function SmartRatingModal({ animeId, targetAnime, onClose, onApplyScore }: Smart
         )}
 
         {!isLoading && !error && candidates.length === 0 && (
-          <div className="feedback-inline">비교할 수 있는 평점 기록이 아직 없어요.</div>
+          <div className="feedback-inline">{tr("비교할 수 있는 평점 기록이 아직 없어요.")}</div>
         )}
 
         {estimate && (
           <div className="smart-rating-result">
-            <span>추천 평점</span>
-            <strong>{estimate.estimatedScore.toFixed(1)}점</strong>
+            <span>{tr("추천 평점")}</span>
+            <strong>{estimate.estimatedScore.toFixed(1)}{tr("점")}</strong>
             <p>{estimate.reason}</p>
             <small>
-              신뢰도 {getConfidenceLabel(estimate.confidence)} · 예상 범위 {estimate.range.min}~{estimate.range.max}점
+              {tr("신뢰도")} {getConfidenceLabel(estimate.confidence)} {tr("· 예상 범위")} {estimate.range.min}~{estimate.range.max}{tr("점")}
             </small>
           </div>
         )}
@@ -298,7 +299,7 @@ function SmartRatingModal({ animeId, targetAnime, onClose, onApplyScore }: Smart
             }}
             disabled={!canEstimate}
           >
-            {isEstimating ? '계산 중...' : '추천 평점 계산'}
+            {isEstimating ? tr("계산 중...") : tr("추천 평점 계산")}
           </button>
           <button
             className="primary-button"
@@ -308,7 +309,7 @@ function SmartRatingModal({ animeId, targetAnime, onClose, onApplyScore }: Smart
             }}
             disabled={!estimate || isApplying}
           >
-            {isApplying ? '적용 중...' : '추천 평점 적용'}
+            {isApplying ? tr("적용 중...") : tr("추천 평점 적용")}
           </button>
         </div>
       </section>
@@ -374,7 +375,7 @@ export function CollectionEditor({ animeId, maxProgress, targetAnime }: Collecti
           return
         }
 
-        setActionError(error instanceof Error ? error.message : '내 기록을 불러오지 못했어요.')
+        setActionError(error instanceof Error ? error.message : tr("내 기록을 불러오지 못했어요."))
       } finally {
         if (!controller.signal.aborted) {
           setIsLoadingEntry(false)
@@ -436,9 +437,9 @@ export function CollectionEditor({ animeId, maxProgress, targetAnime }: Collecti
       setStatus(nextStatus)
       setScore(nextScore)
       setProgress(nextProgress)
-      setFeedback(`${nextScore.toFixed(1)}점으로 저장했어요.`)
+      setFeedback(tr("{{v0}}점으로 저장했어요.", { v0: nextScore.toFixed(1) }))
     } catch (submitError) {
-      const message = submitError instanceof Error ? submitError.message : '별점을 저장하지 못했어요.'
+      const message = submitError instanceof Error ? submitError.message : tr("별점을 저장하지 못했어요.")
       setActionError(message)
       throw new Error(message)
     } finally {
@@ -465,20 +466,20 @@ export function CollectionEditor({ animeId, maxProgress, targetAnime }: Collecti
     try {
       if (isAdded) {
         await updateCollectionEntry(animeId, payload)
-        setFeedback('컬렉션 정보를 업데이트했어요.')
+        setFeedback(tr("컬렉션 정보를 업데이트했어요."))
       } else {
         await addToCollection({
           animeId,
           ...payload,
         })
         setIsAdded(true)
-        setFeedback('컬렉션에 추가했어요.')
+        setFeedback(tr("컬렉션에 추가했어요."))
       }
     } catch (submitError) {
       setActionError(
         submitError instanceof Error
           ? submitError.message
-          : '컬렉션 저장에 실패했어요.',
+          : tr("컬렉션 저장에 실패했어요."),
       )
     } finally {
       setIsSubmitting(false)
@@ -499,12 +500,12 @@ export function CollectionEditor({ animeId, maxProgress, targetAnime }: Collecti
       setStartedAt('')
       setCompletedAt('')
       setNotes('')
-      setFeedback('컬렉션에서 삭제했어요.')
+      setFeedback(tr("컬렉션에서 삭제했어요."))
     } catch (submitError) {
       setActionError(
         submitError instanceof Error
           ? submitError.message
-          : '컬렉션 삭제에 실패했어요.',
+          : tr("컬렉션 삭제에 실패했어요."),
       )
     } finally {
       setIsSubmitting(false)
@@ -515,12 +516,12 @@ export function CollectionEditor({ animeId, maxProgress, targetAnime }: Collecti
     return (
       <section className="detail-section collection-panel">
         <span className="detail-label">My collection</span>
-        <h3>로그인 후 내 컬렉션에 추가할 수 있어요</h3>
+        <h3>{tr("로그인 후 내 컬렉션에 추가할 수 있어요")}</h3>
         <p className="collection-helper">
-          감상 상태, 진행도, 별점, 메모를 남기려면 먼저 로그인해주세요.
+          {tr("감상 상태, 진행도, 별점, 메모를 남기려면 먼저 로그인해주세요.")}
         </p>
         <Link className="primary-button collection-login-button" to="/login">
-          로그인하러 가기
+          {tr("로그인하러 가기")}
         </Link>
       </section>
     )
@@ -529,27 +530,27 @@ export function CollectionEditor({ animeId, maxProgress, targetAnime }: Collecti
   return (
     <section className="detail-section collection-panel">
       <span className="detail-label">My collection</span>
-      <h3>{isAdded ? '내 컬렉션에서 관리 중' : '내 컬렉션에 추가'}</h3>
+      <h3>{isAdded ? tr("내 컬렉션에서 관리 중") : tr("내 컬렉션에 추가")}</h3>
       <p className="collection-helper">
-        상태, 진행도, 별점, 메모를 직접 남기고 내 기록을 한눈에 확인할 수 있어요.
+        {tr("상태, 진행도, 별점, 메모를 직접 남기고 내 기록을 한눈에 확인할 수 있어요.")}
       </p>
 
-      {isLoadingEntry && <div className="feedback-inline">내 기록을 불러오는 중이에요.</div>}
+      {isLoadingEntry && <div className="feedback-inline">{tr("내 기록을 불러오는 중이에요.")}</div>}
 
-      <div className="detail-rating-control" aria-label="내 별점 수정">
+      <div className="detail-rating-control" aria-label={tr("내 별점 수정")}>
         <div className="detail-rating-heading">
-          <span className="detail-rating-label">내 별점</span>
+          <span className="detail-rating-label">{tr("내 별점")}</span>
           <button
             className="smart-rating-open-button"
             type="button"
             onClick={() => setIsSmartRatingOpen(true)}
             disabled={isSubmitting || isLoadingEntry}
           >
-            스마트 별점 매기기
+            {tr("스마트 별점 매기기")}
           </button>
         </div>
         <div className="detail-rating-main">
-          <div className="detail-rating-stars" role="radiogroup" aria-label="별점 선택">
+          <div className="detail-rating-stars" role="radiogroup" aria-label={tr("별점 선택")}>
             {Array.from({ length: 5 }).map((_, index) => {
               const leftValue = index * 2 + 1
               const rightValue = index * 2 + 2
@@ -567,7 +568,7 @@ export function CollectionEditor({ animeId, maxProgress, targetAnime }: Collecti
                   <button
                     className="detail-rating-star-hit is-left"
                     type="button"
-                    aria-label={`${leftValue.toFixed(1)}점 주기`}
+                    aria-label={tr("{{v0}}점 주기", { v0: leftValue.toFixed(1) })}
                     onClick={(event) => {
                       void handleScoreSelect(leftValue, event)
                     }}
@@ -576,7 +577,7 @@ export function CollectionEditor({ animeId, maxProgress, targetAnime }: Collecti
                   <button
                     className="detail-rating-star-hit is-right"
                     type="button"
-                    aria-label={`${rightValue.toFixed(1)}점 주기`}
+                    aria-label={tr("{{v0}}점 주기", { v0: rightValue.toFixed(1) })}
                     onClick={(event) => {
                       void handleScoreSelect(rightValue, event)
                     }}
@@ -586,7 +587,7 @@ export function CollectionEditor({ animeId, maxProgress, targetAnime }: Collecti
               )
             })}
           </div>
-          <strong className="detail-rating-value">{score > 0 ? `${score.toFixed(1)}점` : '미평점'}</strong>
+          <strong className="detail-rating-value">{score > 0 ? tr("{{v0}}점", { v0: score.toFixed(1) }) : tr("미평점")}</strong>
         </div>
       </div>
 
@@ -601,7 +602,7 @@ export function CollectionEditor({ animeId, maxProgress, targetAnime }: Collecti
 
       <div className="collection-form-grid">
         <label className="auth-field">
-          <span>상태</span>
+          <span>{tr("상태")}</span>
           <select
             value={status}
             onChange={(event) => handleStatusChange(event.target.value as UserAnimeStatus)}
@@ -615,7 +616,7 @@ export function CollectionEditor({ animeId, maxProgress, targetAnime }: Collecti
         </label>
 
         <label className="auth-field collection-slider-field">
-          <span>진행도</span>
+          <span>{tr("진행도")}</span>
           <div className="collection-slider-row">
             <input
               className="collection-slider"
@@ -634,12 +635,12 @@ export function CollectionEditor({ animeId, maxProgress, targetAnime }: Collecti
         </label>
 
         <label className="auth-field">
-          <span>시작일</span>
+          <span>{tr("시작일")}</span>
           <input type="date" value={startedAt} onChange={(event) => setStartedAt(event.target.value)} />
         </label>
 
         <label className="auth-field">
-          <span>완료일</span>
+          <span>{tr("완료일")}</span>
           <input
             type="date"
             value={completedAt}
@@ -649,12 +650,12 @@ export function CollectionEditor({ animeId, maxProgress, targetAnime }: Collecti
       </div>
 
       <label className="auth-field">
-        <span>메모</span>
+        <span>{tr("메모")}</span>
         <textarea
           rows={4}
           value={notes}
           onChange={(event) => setNotes(event.target.value)}
-          placeholder="감상 메모를 남겨보세요. 비워둬도 괜찮아요."
+          placeholder={tr("감상 메모를 남겨보세요. 비워둬도 괜찮아요.")}
         />
       </label>
 
@@ -670,7 +671,7 @@ export function CollectionEditor({ animeId, maxProgress, targetAnime }: Collecti
           }}
           disabled={isSubmitting || isLoadingEntry}
         >
-          {isSubmitting ? '저장 중...' : isAdded ? '컬렉션 업데이트' : '컬렉션에 추가'}
+          {isSubmitting ? tr("저장 중...") : isAdded ? tr("컬렉션 업데이트") : tr("컬렉션에 추가")}
         </button>
 
         {isAdded && (
@@ -682,7 +683,7 @@ export function CollectionEditor({ animeId, maxProgress, targetAnime }: Collecti
             }}
             disabled={isSubmitting || isLoadingEntry}
           >
-            컬렉션에서 삭제
+            {tr("컬렉션에서 삭제")}
           </button>
         )}
       </div>

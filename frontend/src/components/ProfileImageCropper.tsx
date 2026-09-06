@@ -1,3 +1,4 @@
+import { tr } from '../i18n'
 import {
   useEffect,
   useMemo,
@@ -55,7 +56,7 @@ function canvasToBlob(canvas: HTMLCanvasElement, quality: number) {
       if (blob) {
         resolve(blob)
       } else {
-        reject(new Error('편집한 이미지를 생성하지 못했어요.'))
+        reject(new Error(tr("편집한 이미지를 생성하지 못했어요.")))
       }
     }, 'image/jpeg', quality)
   })
@@ -181,7 +182,7 @@ export function ProfileImageCropper({ onApply, onClose }: ProfileImageCropperPro
     }
 
     if (!ACCEPTED_IMAGE_TYPES.has(nextFile.type) && !ACCEPTED_IMAGE_EXTENSION.test(nextFile.name)) {
-      setError('PNG, JPG, JPEG 파일만 선택할 수 있어요.')
+      setError(tr("PNG, JPG, JPEG 파일만 선택할 수 있어요."))
       return
     }
 
@@ -191,14 +192,14 @@ export function ProfileImageCropper({ onApply, onClose }: ProfileImageCropperPro
 
     reader.onload = () => {
       if (typeof reader.result !== 'string') {
-        setError('선택한 이미지를 읽지 못했어요.')
+        setError(tr("선택한 이미지를 읽지 못했어요."))
         return
       }
 
       setFile(nextFile)
       setDataUrl(reader.result)
     }
-    reader.onerror = () => setError('선택한 이미지를 읽지 못했어요.')
+    reader.onerror = () => setError(tr("선택한 이미지를 읽지 못했어요."))
     reader.readAsDataURL(nextFile)
   }
 
@@ -207,7 +208,7 @@ export function ProfileImageCropper({ onApply, onClose }: ProfileImageCropperPro
     const nextImageSize = { width: image.naturalWidth, height: image.naturalHeight }
 
     if (!nextImageSize.width || !nextImageSize.height) {
-      setError('선택한 이미지의 크기를 확인하지 못했어요.')
+      setError(tr("선택한 이미지의 크기를 확인하지 못했어요."))
       return
     }
 
@@ -255,7 +256,7 @@ export function ProfileImageCropper({ onApply, onClose }: ProfileImageCropperPro
   const handleApply = async () => {
     const image = imageRef.current
     if (!file || !image || !geometry || !viewportSize) {
-      setError('PNG 또는 JPEG 이미지를 선택해주세요.')
+      setError(tr("PNG 또는 JPEG 이미지를 선택해주세요."))
       return
     }
 
@@ -269,7 +270,7 @@ export function ProfileImageCropper({ onApply, onClose }: ProfileImageCropperPro
       const context = canvas.getContext('2d')
 
       if (!context) {
-        throw new Error('이미지 편집 기능을 사용할 수 없는 브라우저예요.')
+        throw new Error(tr("이미지 편집 기능을 사용할 수 없는 브라우저예요."))
       }
 
       const sourceSize = viewportSize / geometry.scale
@@ -284,7 +285,7 @@ export function ProfileImageCropper({ onApply, onClose }: ProfileImageCropperPro
 
       let blob = await canvasToBlob(canvas, 0.92)
       if (blob.size > MAX_UPLOAD_SIZE) blob = await canvasToBlob(canvas, 0.82)
-      if (blob.size > MAX_UPLOAD_SIZE) throw new Error('편집한 이미지가 5MB를 초과해요.')
+      if (blob.size > MAX_UPLOAD_SIZE) throw new Error(tr("편집한 이미지가 5MB를 초과해요."))
 
       const baseName = file.name.replace(/\.[^.]+$/, '') || 'profile-image'
       onApply(new File([blob], `${baseName}-cropped.jpg`, {
@@ -292,7 +293,7 @@ export function ProfileImageCropper({ onApply, onClose }: ProfileImageCropperPro
         lastModified: Date.now(),
       }))
     } catch (applyError) {
-      setError(applyError instanceof Error ? applyError.message : '이미지를 편집하지 못했어요.')
+      setError(applyError instanceof Error ? applyError.message : tr("이미지를 편집하지 못했어요."))
     } finally {
       setIsApplying(false)
     }
@@ -315,14 +316,14 @@ export function ProfileImageCropper({ onApply, onClose }: ProfileImageCropperPro
       >
         <div className="profile-image-cropper-heading">
           <div>
-            <strong id="profile-cropper-title">프로필 이미지 수정</strong>
-            <span>PNG, JPG 또는 JPEG 이미지를 선택하고 프레임을 맞춰주세요.</span>
+            <strong id="profile-cropper-title">{tr("프로필 이미지 수정")}</strong>
+            <span>{tr("PNG, JPG 또는 JPEG 이미지를 선택하고 프레임을 맞춰주세요.")}</span>
           </div>
           <button
             ref={closeButtonRef}
             className="profile-cropper-icon-button"
             type="button"
-            aria-label="프로필 이미지 수정 닫기"
+            aria-label={tr("프로필 이미지 수정 닫기")}
             disabled={isApplying}
             onClick={onClose}
           >
@@ -336,7 +337,7 @@ export function ProfileImageCropper({ onApply, onClose }: ProfileImageCropperPro
           onClick={() => fileInputRef.current?.click()}
         >
           <ImagePlus size={18} aria-hidden="true" />
-          <span>{dataUrl ? '다른 이미지 선택' : '이미지 선택'}</span>
+          <span>{dataUrl ? tr("다른 이미지 선택") : tr("이미지 선택")}</span>
         </button>
         <input
           ref={fileInputRef}
@@ -352,7 +353,7 @@ export function ProfileImageCropper({ onApply, onClose }: ProfileImageCropperPro
             <div
               ref={viewportRef}
               className={`profile-cropper-viewport${isDragging ? ' is-dragging' : ''}`}
-              aria-label="프로필 이미지 위치 조절 영역"
+              aria-label={tr("프로필 이미지 위치 조절 영역")}
               onPointerDown={handlePointerDown}
               onPointerMove={handlePointerMove}
               onPointerUp={handlePointerEnd}
@@ -361,10 +362,10 @@ export function ProfileImageCropper({ onApply, onClose }: ProfileImageCropperPro
               <img
                 ref={imageRef}
                 src={dataUrl}
-                alt="선택한 프로필 이미지"
+                alt={tr("선택한 프로필 이미지")}
                 draggable={false}
                 onLoad={handleImageLoad}
-                onError={() => setError('선택한 PNG 또는 JPEG 이미지를 불러오지 못했어요.')}
+                onError={() => setError(tr("선택한 PNG 또는 JPEG 이미지를 불러오지 못했어요."))}
                 style={geometry ? {
                   width: imageSize.width,
                   height: imageSize.height,
@@ -376,7 +377,7 @@ export function ProfileImageCropper({ onApply, onClose }: ProfileImageCropperPro
             </div>
 
             <label className="profile-cropper-zoom">
-              <span>확대</span>
+              <span>{tr("확대")}</span>
               <input
                 type="range"
                 min={MIN_ZOOM}
@@ -397,11 +398,11 @@ export function ProfileImageCropper({ onApply, onClose }: ProfileImageCropperPro
           {dataUrl && (
             <button className="secondary-button" type="button" disabled={isApplying} onClick={resetCrop}>
               <RotateCcw size={17} aria-hidden="true" />
-              초기화
+              {tr("초기화")}
             </button>
           )}
           <button className="secondary-button" type="button" disabled={isApplying} onClick={onClose}>
-            취소
+            {tr("취소")}
           </button>
           <button
             className="primary-button"
@@ -409,7 +410,7 @@ export function ProfileImageCropper({ onApply, onClose }: ProfileImageCropperPro
             disabled={!geometry || Boolean(error) || isApplying}
             onClick={() => { void handleApply() }}
           >
-            {isApplying ? '적용 중...' : '프레임 적용'}
+            {isApplying ? tr("적용 중...") : tr("프레임 적용")}
           </button>
         </div>
       </div>

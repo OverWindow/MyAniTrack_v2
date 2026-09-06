@@ -1,3 +1,4 @@
+import { tr } from '../i18n'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ErrorToast } from '../components/ErrorToast'
@@ -19,7 +20,7 @@ export function PasswordResetRequestPage() {
       const response = await requestPasswordReset(email.trim())
       setSuccessMessage(response.message)
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : '재설정 메일 요청에 실패했어요.')
+      setError(submitError instanceof Error ? submitError.message : tr("재설정 메일 요청에 실패했어요."))
     } finally {
       setIsSubmitting(false)
     }
@@ -28,14 +29,14 @@ export function PasswordResetRequestPage() {
   return (
     <section className="auth-page">
       <div className="auth-card">
-        <h1 className="auth-title">비밀번호 찾기</h1>
+        <h1 className="auth-title">{tr("비밀번호 찾기")}</h1>
         <p className="auth-description">
-          가입한 이메일 주소를 입력하면 비밀번호를 다시 설정할 수 있는 메일을 보내드릴게요.
+          {tr("가입한 이메일 주소를 입력하면 비밀번호를 다시 설정할 수 있는 메일을 보내드릴게요.")}
         </p>
 
         <form className="auth-form" onSubmit={handleSubmit}>
           <label className="auth-field">
-            <span>이메일</span>
+            <span>{tr("이메일")}</span>
             <input
               type="email"
               value={email}
@@ -50,9 +51,9 @@ export function PasswordResetRequestPage() {
 
           <div className="auth-action-row">
             <button className="primary-button auth-submit" type="submit" disabled={isSubmitting}>
-              {isSubmitting ? '보내는 중...' : '재설정 메일 보내기'}
+              {isSubmitting ? tr("보내는 중...") : tr("재설정 메일 보내기")}
             </button>
-            <Link className="secondary-button" to="/login">로그인으로 돌아가기</Link>
+            <Link className="secondary-button" to="/login">{tr("로그인으로 돌아가기")}</Link>
           </div>
         </form>
       </div>

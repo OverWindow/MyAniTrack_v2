@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { getTitleLanguage } from '../i18n'
 
 type DocumentMetadata = {
   title: string
@@ -43,7 +44,7 @@ export function useDocumentMetadata({
     }
 
     document.title = title
-    document.documentElement.lang = 'ko'
+    document.documentElement.lang = getTitleLanguage()
     descriptionMeta.element.content = description
     robotsMeta.element.content = robots
     canonical.href = new URL(canonicalPath, window.location.origin).toString()

@@ -1,3 +1,4 @@
+import { tr } from '../i18n'
 import { Link } from 'react-router-dom'
 import landingDashboardImage from '../assets/landing-dashboard.png'
 import '../styles/pages/HomePage.css'
@@ -5,28 +6,28 @@ import '../styles/pages/HomePage.css'
 const LANDING_REVIEWS = [
   {
     name: 'minji.log',
-    role: '시즌 애니 기록 중',
-    comment: '봤던 작품이 쌓일수록 내 취향이 숫자로 보이는 게 좋아요.',
+    role: tr("시즌 애니 기록 중"),
+    comment: tr("봤던 작품이 쌓일수록 내 취향이 숫자로 보이는 게 좋아요."),
   },
   {
     name: 'junho_97',
-    role: '완결작 위주 감상',
-    comment: '별점만 남기는 앱보다 훨씬 정리된 느낌이에요.',
+    role: tr("완결작 위주 감상"),
+    comment: tr("별점만 남기는 앱보다 훨씬 정리된 느낌이에요."),
   },
   {
     name: 'hemin',
-    role: '평점 남기는 편',
-    comment: '내가 어떤 작품을 자주 보는지 한눈에 들어와요.',
+    role: tr("평점 남기는 편"),
+    comment: tr("내가 어떤 작품을 자주 보는지 한눈에 들어와요."),
   },
   {
     name: 'seungwoo.k',
-    role: '극장판 챙겨봄',
-    comment: '컬렉션에서 예전에 본 작품 찾기가 편해서 계속 쓰게 돼요.',
+    role: tr("극장판 챙겨봄"),
+    comment: tr("컬렉션에서 예전에 본 작품 찾기가 편해서 계속 쓰게 돼요."),
   },
   {
     name: 'nari_watch',
-    role: '장르별로 정리 중',
-    comment: '분석 탭 보는 맛이 있어요. 취향이 생각보다 뚜렷하더라고요.',
+    role: tr("장르별로 정리 중"),
+    comment: tr("분석 탭 보는 맛이 있어요. 취향이 생각보다 뚜렷하더라고요."),
   },
 ]
 
@@ -34,41 +35,41 @@ const HOW_TO_STEPS = [
   {
     number: '01',
     label: 'Start',
-    title: '로그인하기',
-    description: '내 감상 기록과 분석 결과를 안전하게 저장할 계정으로 시작해요.',
+    title: tr("로그인하기"),
+    description: tr("내 감상 기록과 분석 결과를 안전하게 저장할 계정으로 시작해요."),
     href: '/login',
-    action: '로그인하기',
+    action: tr("로그인하기"),
   },
   {
     number: '02',
     label: 'Explore',
-    title: '애니 탐색하기',
-    description: '탐색 탭에서 제목과 장르로 지금까지 본 작품을 찾아보세요.',
+    title: tr("애니 탐색하기"),
+    description: tr("탐색 탭에서 제목과 장르로 지금까지 본 작품을 찾아보세요."),
     href: '/explore',
-    action: '작품 찾기',
+    action: tr("작품 찾기"),
   },
   {
     number: '03',
     label: 'Collect',
-    title: '컬렉션에 기록하기',
-    description: '작품을 추가하고 감상 상태, 진행도와 내 평점을 함께 남겨요.',
+    title: tr("컬렉션에 기록하기"),
+    description: tr("작품을 추가하고 감상 상태, 진행도와 내 평점을 함께 남겨요."),
     href: '/collection',
-    action: '컬렉션 보기',
+    action: tr("컬렉션 보기"),
   },
   {
     number: '04',
     label: 'Analyze',
-    title: '자동 분석 확인하기',
-    description: '쌓인 기록을 바탕으로 장르, 연도, 포맷, 스튜디오와 성우 취향을 자동으로 분석해요.',
+    title: tr("자동 분석 확인하기"),
+    description: tr("쌓인 기록을 바탕으로 장르, 연도, 포맷, 스튜디오와 성우 취향을 자동으로 분석해요."),
     href: '/analysis',
-    action: '내 분석 보기',
+    action: tr("내 분석 보기"),
   },
 ]
 
 export function HomePage() {
   return (
     <div className="home-page">
-      <section className="home-immersive-hero" aria-label="MyAniTrack 소개">
+      <section className="home-immersive-hero" aria-label={tr("MyAniTrack 소개")}>
         <div
           className="home-immersive-backdrop"
           style={{ backgroundImage: `url(${landingDashboardImage})` }}
@@ -76,25 +77,24 @@ export function HomePage() {
         <div className="home-immersive-shade" />
 
         <div className="home-immersive-copy">
-          <h1>애니 취향을 <br/> 기록하고 분석하는 <br/>가장 선명한 창</h1>
+          <h1>{tr("애니 취향을")} <br/> {tr("기록하고 분석하는")} <br/>{tr("가장 선명한 창")}</h1>
           <p>
-            감상한 작품과 평점, 시청 시간을 모아 장르, 스튜디오, 성우, 포맷 흐름까지 한 화면에서
-            확인하세요.
+            {tr("감상한 작품과 평점, 시청 시간을 모아 장르, 스튜디오, 성우, 포맷 흐름까지 한 화면에서\n            확인하세요.")}
           </p>
           <div className="home-immersive-actions">
             <Link className="primary-button" to="/explore">
-              작품 둘러보기
+              {tr("작품 둘러보기")}
             </Link>
             <Link className="secondary-button" to="/collection">
-              내 컬렉션 보기
+              {tr("내 컬렉션 보기")}
             </Link>
           </div>
         </div>
 
-        <div className="home-immersive-signals" aria-label="주요 기능">
-          <span>컬렉션 기록</span>
-          <span>취향 분석</span>
-          <span>친구 비교</span>
+        <div className="home-immersive-signals" aria-label={tr("주요 기능")}>
+          <span>{tr("컬렉션 기록")}</span>
+          <span>{tr("취향 분석")}</span>
+          <span>{tr("친구 비교")}</span>
         </div>
       </section>
 
@@ -102,11 +102,10 @@ export function HomePage() {
         <div className="home-guide-heading">
           <div>
             <span className="detail-label">How it works</span>
-            <h2 id="home-guide-title">기록을 시작하면<br />취향이 보이기 시작해요</h2>
+            <h2 id="home-guide-title">{tr("기록을 시작하면")}<br />{tr("취향이 보이기 시작해요")}</h2>
           </div>
           <p>
-            작품을 일일이 정리할 필요 없이 본 애니를 컬렉션에 추가하세요.
-            기록이 쌓일수록 MyAniTrack이 나만의 감상 패턴을 자동으로 정리해줘요.
+            {tr("작품을 일일이 정리할 필요 없이 본 애니를 컬렉션에 추가하세요.\n            기록이 쌓일수록 MyAniTrack이 나만의 감상 패턴을 자동으로 정리해줘요.")}
           </p>
         </div>
 
@@ -132,35 +131,34 @@ export function HomePage() {
             <span>Together</span>
           </div>
           <div className="home-guide-social-copy">
-            <span className="detail-label">한 걸음 더</span>
-            <h3>친구의 취향까지 함께 발견하세요</h3>
+            <span className="detail-label">{tr("한 걸음 더")}</span>
+            <h3>{tr("친구의 취향까지 함께 발견하세요")}</h3>
             <p>
-              친구 요청을 보내고 연결되면 친구가 기록한 애니 컬렉션과 자동 분석 결과를 바로 둘러볼 수 있어요.
-              서로 어떤 작품을 좋아하는지 비교하며 다음 작품도 발견해보세요.
+              {tr("친구 요청을 보내고 연결되면 친구가 기록한 애니 컬렉션과 자동 분석 결과를 바로 둘러볼 수 있어요.\n              서로 어떤 작품을 좋아하는지 비교하며 다음 작품도 발견해보세요.")}
             </p>
           </div>
-          <div className="home-guide-social-flow" aria-label="친구 기능 이용 순서">
-            <span>친구 추가</span>
+          <div className="home-guide-social-flow" aria-label={tr("친구 기능 이용 순서")}>
+            <span>{tr("친구 추가")}</span>
             <i aria-hidden="true">→</i>
-            <span>컬렉션 보기</span>
+            <span>{tr("컬렉션 보기")}</span>
             <i aria-hidden="true">→</i>
-            <span>분석 보기</span>
+            <span>{tr("분석 보기")}</span>
           </div>
           <Link className="primary-button home-guide-friends-link" to="/friends">
-            친구 찾아보기
+            {tr("친구 찾아보기")}
           </Link>
         </div>
       </section>
 
       <section className="home-review-section" aria-labelledby="home-review-title">
         <div className="home-review-heading">
-          <h2 id="home-review-title">먼저 써본 사람들의 한마디</h2>
+          <h2 id="home-review-title">{tr("먼저 써본 사람들의 한마디")}</h2>
         </div>
 
-        <div className="home-review-track" aria-label="사용자 리뷰">
+        <div className="home-review-track" aria-label={tr("사용자 리뷰")}>
           {LANDING_REVIEWS.map((review) => (
             <article className="home-review-card" key={review.name}>
-              <div className="home-review-stars" aria-label="5점 만점">
+              <div className="home-review-stars" aria-label={tr("5점 만점")}>
                 <span>★</span>
                 <span>★</span>
                 <span>★</span>
@@ -183,27 +181,27 @@ export function HomePage() {
       <footer className="home-footer">
         <div className="home-footer-inner">
           <div className="home-footer-brand">
-            <Link to="/" aria-label="MyAniTrack 홈">MyAniTrack</Link>
-            <p>본 애니를 기록하고, 나만의 취향과 친구의 컬렉션을 함께 발견하세요.</p>
+            <Link to="/" aria-label={tr("MyAniTrack 홈")}>MyAniTrack</Link>
+            <p>{tr("본 애니를 기록하고, 나만의 취향과 친구의 컬렉션을 함께 발견하세요.")}</p>
           </div>
 
-          <nav className="home-footer-nav" aria-label="서비스 바로가기">
+          <nav className="home-footer-nav" aria-label={tr("서비스 바로가기")}>
             <div>
-              <strong>서비스</strong>
-              <Link to="/explore">애니 탐색</Link>
-              <Link to="/collection">내 컬렉션</Link>
-              <Link to="/analysis">취향 분석</Link>
+              <strong>{tr("서비스")}</strong>
+              <Link to="/explore">{tr("애니 탐색")}</Link>
+              <Link to="/collection">{tr("내 컬렉션")}</Link>
+              <Link to="/analysis">{tr("취향 분석")}</Link>
             </div>
             <div>
-              <strong>함께하기</strong>
-              <Link to="/friends">친구</Link>
-              <Link to="/login">로그인</Link>
-              <Link to="/signup">회원가입</Link>
+              <strong>{tr("함께하기")}</strong>
+              <Link to="/friends">{tr("친구")}</Link>
+              <Link to="/login">{tr("로그인")}</Link>
+              <Link to="/signup">{tr("회원가입")}</Link>
             </div>
             <div>
-              <strong>정책</strong>
-              <Link to="/privacy">개인정보처리방침</Link>
-              <Link to="/account-deletion">계정 및 데이터 삭제</Link>
+              <strong>{tr("정책")}</strong>
+              <Link to="/privacy">{tr("개인정보처리방침")}</Link>
+              <Link to="/account-deletion">{tr("계정 및 데이터 삭제")}</Link>
             </div>
           </nav>
         </div>

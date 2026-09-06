@@ -1,3 +1,4 @@
+import { getTitleLanguage, tr } from '../i18n'
 import type { AnimeGenre, AnimeListItem, AnimeListResponse } from '../types/anime'
 import type { AnimeDetailItem } from '../types/anime'
 import type { UserAnimeListItem, UserAnimeListResponse, UserAnimeListSort } from '../types/collection'
@@ -15,7 +16,7 @@ function getApiBaseUrl() {
   const baseUrl = import.meta.env.VITE_API_BASE_URL
 
   if (!baseUrl) {
-    throw new Error('VITE_API_BASE_URL이 설정되지 않았습니다.')
+    throw new Error(tr("VITE_API_BASE_URL이 설정되지 않았습니다."))
   }
 
   return baseUrl
@@ -52,7 +53,7 @@ function parseStudioRankingResponse(payload: unknown) {
   const response = getItem<unknown>(payload)
 
   if (!isStudioRankingResponse(response)) {
-    throw new Error('샘플 스튜디오 응답 형식이 올바르지 않아요.')
+    throw new Error(tr("샘플 스튜디오 응답 형식이 올바르지 않아요."))
   }
 
   return response
@@ -108,13 +109,13 @@ function getItemsResponse(payload: unknown): UserAnimeListResponse {
     }
   }
 
-  throw new Error('샘플 컬렉션 응답 형식이 올바르지 않아요.')
+  throw new Error(tr("샘플 컬렉션 응답 형식이 올바르지 않아요."))
 }
 
 async function fetchAnimeCatalogPage(cursor?: string | null) {
   const url = new URL('/api/anime', getApiBaseUrl())
   url.searchParams.set('sort', 'popularity')
-  url.searchParams.set('titleLanguage', 'ko')
+  url.searchParams.set('titleLanguage', getTitleLanguage())
   url.searchParams.set('limit', '50')
 
   if (cursor) {
@@ -124,7 +125,7 @@ async function fetchAnimeCatalogPage(cursor?: string | null) {
   const response = await fetch(url.toString())
 
   if (!response.ok) {
-    throw new Error(`애니 목록을 불러오지 못했습니다. (${response.status})`)
+    throw new Error(tr("애니 목록을 불러오지 못했습니다. ({{v0}})", { v0: response.status }))
   }
 
   return response.json() as Promise<AnimeListResponse>
@@ -188,7 +189,7 @@ async function fetchSampleJson(path: string, signal?: AbortSignal) {
   const response = await fetch(new URL(path, getApiBaseUrl()).toString(), { signal })
 
   if (!response.ok) {
-    throw new Error(`샘플 데이터를 불러오지 못했습니다. (${response.status})`)
+    throw new Error(tr("샘플 데이터를 불러오지 못했습니다. ({{v0}})", { v0: response.status }))
   }
 
   return response.json() as Promise<unknown>
@@ -232,7 +233,7 @@ export async function fetchSampleCollection(params: {
 } = {}) {
   const url = new URL('/api/sample/anime-list', getApiBaseUrl())
   url.searchParams.set('sort', params.sort ?? 'latest')
-  url.searchParams.set('titleLanguage', 'ko')
+  url.searchParams.set('titleLanguage', getTitleLanguage())
   url.searchParams.set('limit', String(params.limit ?? 50))
 
   if (params.genre) {
@@ -254,7 +255,7 @@ export async function fetchSampleCollection(params: {
   const response = await fetch(url.toString(), { signal: params.signal })
 
   if (!response.ok) {
-    throw new Error(`샘플 컬렉션을 불러오지 못했습니다. (${response.status})`)
+    throw new Error(tr("샘플 컬렉션을 불러오지 못했습니다. ({{v0}})", { v0: response.status }))
   }
 
   return enrichSampleResponse(getItemsResponse(await response.json()))
@@ -272,7 +273,7 @@ export async function fetchSampleStudioRanking(params: {
   const response = await fetch(url.toString(), { signal: params.signal })
 
   if (!response.ok) {
-    throw new Error(`샘플 스튜디오 랭킹을 불러오지 못했습니다. (${response.status})`)
+    throw new Error(tr("샘플 스튜디오 랭킹을 불러오지 못했습니다. ({{v0}})", { v0: response.status }))
   }
 
   return parseStudioRankingResponse(await response.json())
@@ -317,7 +318,7 @@ export function createSampleAnimeDetail(item: UserAnimeListItem): AnimeDetailIte
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,
     sourceUpdatedAt: item.updatedAt,
-    description: '샘플 컬렉션 미리보기에 사용되는 작품 정보입니다. 로그인하면 실제 컬렉션 기록과 함께 더 자세한 정보를 확인할 수 있어요.',
+    description: tr("샘플 컬렉션 미리보기에 사용되는 작품 정보입니다. 로그인하면 실제 컬렉션 기록과 함께 더 자세한 정보를 확인할 수 있어요."),
     genres: [],
     tags: [],
     synonyms: [item.anime.title, item.anime.titles?.english, item.anime.titles?.romaji].filter(Boolean) as string[],

@@ -1,3 +1,5 @@
+import { getLocaleTag } from '../i18n'
+import { tr } from '../i18n'
 import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from 'react'
 import { createPortal } from 'react-dom'
@@ -76,8 +78,8 @@ function getCenteredScrollLeft(carousel: HTMLElement, card: HTMLElement) {
 
 function CollectionCarouselContent({
   state,
-  title = '최애 애니',
-  ariaLabel = '최애 애니',
+  title = tr("최애 애니"),
+  ariaLabel = tr("최애 애니"),
   location,
 }: Omit<CollectionCarouselProps, 'portalRootId'>) {
   const carouselRef = useRef<HTMLDivElement | null>(null)
@@ -291,8 +293,8 @@ function CollectionCarouselContent({
         </div>
         <div className="perfect-score-carousel perfect-score-carousel-empty">
           <div className="perfect-score-empty-message">
-            아직 최애 애니가 없네요ㅠㅠ<br />
-            가장 좋아하는 애니에 10점을 줘서 최애 애니로 전시하세요
+            {tr("아직 최애 애니가 없네요ㅠㅠ")}<br />
+            {tr("가장 좋아하는 애니에 10점을 줘서 최애 애니로 전시하세요")}
           </div>
         </div>
       </section>
@@ -306,7 +308,7 @@ function CollectionCarouselContent({
           <h2>{title}</h2>
         </div>
         {state.items.length > 0 && (
-          <span>{state.items.length.toLocaleString()}편</span>
+          <span>{state.items.length.toLocaleString(getLocaleTag())}{tr("편")}</span>
         )}
       </div>
 
@@ -357,7 +359,7 @@ function CollectionCarouselContent({
                 key={item.id}
                 to={`/anime/${item.anime.id}`}
                 state={linkState}
-                aria-label={`${itemTitle} 상세 페이지로 이동`}
+                aria-label={tr("{{v0}} 상세 페이지로 이동", { v0: itemTitle })}
                 title={itemTitle}
                 style={{
                   zIndex: Math.round(displayItems.length * 10 - Math.abs(displayIndex - (displayItems.length - 1) / 2)),
@@ -386,7 +388,7 @@ function CollectionCarouselContent({
                 />
                 <div className="perfect-score-card-copy">
                   <strong>{itemTitle}</strong>
-                  <span className="perfect-score-stars" aria-label={`평점 ${formatScore(item.score)}점`}>
+                  <span className="perfect-score-stars" aria-label={tr("평점 {{v0}}점", { v0: formatScore(item.score) })}>
                     {Array.from({ length: 5 }).map((_, starIndex) => (
                       <span className="perfect-score-star" key={`${item.id}-perfect-star-${starIndex}`}>
                         <span className="perfect-score-star-base" aria-hidden="true">★</span>

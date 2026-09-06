@@ -1,3 +1,4 @@
+import { tr } from '../i18n'
 import { Link } from 'react-router-dom'
 import type { Location } from 'react-router-dom'
 import type { UserSeriesCollectionItem } from '../types/collection'
@@ -46,7 +47,7 @@ export function SeriesCollectionGrid({
                   <img
                     className="series-collection-cover"
                     src={series.coverImageExtraLarge || series.coverImageLarge || ''}
-                    alt={series.title || '시리즈 대표 이미지'}
+                    alt={series.title || tr("시리즈 대표 이미지")}
                     loading="lazy"
                   />
                 ) : (
@@ -58,19 +59,19 @@ export function SeriesCollectionGrid({
               <div className="series-collection-heading">
                 <div>
                   <span className="series-collection-scope">
-                    {series.scope === 'mainline' ? '본편 시리즈' : '관련 작품 전체'}
+                    {series.scope === 'mainline' ? tr("본편 시리즈") : tr("관련 작품 전체")}
                   </span>
-                  <h3>{series.title || '이름 없는 시리즈'}</h3>
+                  <h3>{series.title || tr("이름 없는 시리즈")}</h3>
                 </div>
                 <strong>{series.completionRate}%</strong>
               </div>
-              <div className="series-collection-progress" aria-label={`완주율 ${series.completionRate}%`}>
+              <div className="series-collection-progress" aria-label={tr("완주율 {{v0}}%", { v0: series.completionRate })}>
                 <span style={{ width: `${Math.min(100, Math.max(0, series.completionRate))}%` }} />
               </div>
               <p>
-                {series.completedRequiredMemberCount}/{series.requiredMemberCount} 필수 작품 완주
+                {series.completedRequiredMemberCount}/{series.requiredMemberCount} {tr("필수 작품 완주")}
                 {' · '}
-                {collectionLabel} {series.collectedMemberCount}개
+                {collectionLabel} {series.collectedMemberCount}{tr("개")}
               </p>
               <div className="series-member-strip">
                 {series.items.map((member) => (
@@ -79,7 +80,7 @@ export function SeriesCollectionGrid({
                     className={member.userList ? 'series-member-item is-collected' : 'series-member-item'}
                     to={`/anime/${member.anime.id}`}
                     state={{ fromPage, backgroundLocation: location }}
-                    title={`${member.anime.title}${member.userList ? ` · ${member.userList.status}` : ' · 미등록'}`}
+                    title={`${member.anime.title}${member.userList ? ` · ${member.userList.status}` : tr(" · 미등록")}`}
                   >
                     {member.anime.coverImageLarge ? (
                       <img src={member.anime.coverImageLarge} alt={member.anime.title} loading="lazy" />

@@ -1,3 +1,4 @@
+import { getTitleLanguage, tr } from '../i18n'
 import type {
   VoiceActorDetailResponse,
   VoiceActorTitleLanguage,
@@ -7,7 +8,7 @@ function getApiBaseUrl() {
   const baseUrl = import.meta.env.VITE_API_BASE_URL
 
   if (!baseUrl) {
-    throw new Error('VITE_API_BASE_URL이 설정되지 않았습니다.')
+    throw new Error(tr("VITE_API_BASE_URL이 설정되지 않았습니다."))
   }
 
   return baseUrl
@@ -18,7 +19,7 @@ export function getVoiceActorDisplayName(name?: {
   native?: string | null
   userPreferred?: string | null
 } | null) {
-  return name?.userPreferred || name?.full || name?.native || '이름 정보 없음'
+  return name?.userPreferred || name?.full || name?.native || tr("이름 정보 없음")
 }
 
 export function getVoiceActorImage(image?: { large?: string | null; medium?: string | null } | null) {
@@ -33,7 +34,7 @@ export async function fetchVoiceActorDetail(params: {
   signal?: AbortSignal
 }) {
   const url = new URL(`/api/voice-actors/${params.voiceActorId}`, getApiBaseUrl())
-  url.searchParams.set('titleLanguage', params.titleLanguage ?? 'ko')
+  url.searchParams.set('titleLanguage', params.titleLanguage ?? getTitleLanguage())
   url.searchParams.set('limit', String(params.limit ?? 20))
 
   if (params.cursor) {
@@ -43,11 +44,11 @@ export async function fetchVoiceActorDetail(params: {
   const response = await fetch(url.toString(), { signal: params.signal })
 
   if (response.status === 404) {
-    throw new Error('해당 성우를 찾을 수 없어요.')
+    throw new Error(tr("해당 성우를 찾을 수 없어요."))
   }
 
   if (!response.ok) {
-    throw new Error(`성우 상세 정보를 불러오지 못했습니다. (${response.status})`)
+    throw new Error(tr("성우 상세 정보를 불러오지 못했습니다. ({{v0}})", { v0: response.status }))
   }
 
   const payload = (await response.json()) as VoiceActorDetailResponse

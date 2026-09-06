@@ -1,3 +1,4 @@
+import { tr } from '../i18n'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ErrorToast } from './ErrorToast'
@@ -25,7 +26,7 @@ export function CollectionButton({
   maxProgress,
   initialIsAdded = false,
   useCacheState = true,
-  loginLabel = '로그인 후 추가',
+  loginLabel = tr("로그인 후 추가"),
   loginAriaLabel,
   onAddedChange,
 }: CollectionButtonProps) {
@@ -83,7 +84,7 @@ export function CollectionButton({
         await deleteCollectionEntry(animeId)
         setLocalIsAdded(false)
         onAddedChange?.(false)
-        setMessage('컬렉션에서 삭제했어요.')
+        setMessage(tr("컬렉션에서 삭제했어요."))
       } else {
         await addToCollection({
           animeId,
@@ -92,15 +93,15 @@ export function CollectionButton({
         })
         setLocalIsAdded(true)
         onAddedChange?.(true)
-        setMessage('컬렉션에 추가했어요.')
+        setMessage(tr("컬렉션에 추가했어요."))
       }
     } catch (submitError) {
       setError(
         submitError instanceof Error
           ? submitError.message
           : isAdded
-            ? '컬렉션에서 삭제하지 못했어요.'
-            : '컬렉션에 추가하지 못했어요.',
+            ? tr("컬렉션에서 삭제하지 못했어요.")
+            : tr("컬렉션에 추가하지 못했어요."),
       )
     } finally {
       setIsSubmitting(false)
@@ -124,13 +125,13 @@ export function CollectionButton({
       <button
         className={isAdded ? 'collection-mini-button is-added' : 'collection-mini-button'}
         type="button"
-        aria-label={isAdded ? '컬렉션에서 삭제' : '컬렉션에 추가'}
+        aria-label={isAdded ? tr("컬렉션에서 삭제") : tr("컬렉션에 추가")}
         onClick={() => {
           void handleToggle()
         }}
         disabled={isSubmitting}
       >
-        {isSubmitting ? (isAdded ? '삭제 중...' : '추가 중...') : isAdded ? '추가됨' : '+'}
+        {isSubmitting ? (isAdded ? tr("삭제 중...") : tr("추가 중...")) : isAdded ? tr("추가됨") : '+'}
       </button>
       {message && <span className="collection-mini-message">{message}</span>}
       <ErrorToast message={error} />

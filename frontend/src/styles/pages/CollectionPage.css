@@ -20,7 +20,7 @@
 }
 
 .collection-page.is-sample-preview .collection-card::after {
-  content: "샘플";
+  content: "SAMPLE";
   position: absolute;
   top: 9px;
   left: 9px;

@@ -1,3 +1,5 @@
+import { getLocaleTag } from '../i18n'
+import { tr } from '../i18n'
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AnalysisAnimeToast } from '../components/AnalysisAnimeToast'
@@ -104,15 +106,15 @@ type PieDatum = {
 type AnalysisTab = 'genre' | 'year' | 'score'
 
 const analysisTabs: Array<{ value: AnalysisTab; label: string }> = [
-  { value: 'genre', label: '장르별 분석' },
-  { value: 'year', label: '연도별 분석' },
-  { value: 'score', label: '평점별 분석' },
+  { value: 'genre', label: tr("장르별 분석") },
+  { value: 'year', label: tr("연도별 분석") },
+  { value: 'score', label: tr("평점별 분석") },
 ]
 
 const studioSortOptions: Array<{ value: StudioRankingSort; label: string; description: string }> = [
-  { value: 'count', label: '작품 수', description: '가장 많이 본 스튜디오' },
-  { value: 'score', label: '평균 점수', description: '내 평점이 높은 스튜디오' },
-  { value: 'watchTime', label: '시청 시간', description: '가장 오래 본 스튜디오' },
+  { value: 'count', label: tr("작품 수"), description: tr("가장 많이 본 스튜디오") },
+  { value: 'score', label: tr("평균 점수"), description: tr("내 평점이 높은 스튜디오") },
+  { value: 'watchTime', label: tr("시청 시간"), description: tr("가장 오래 본 스튜디오") },
 ]
 
 const GenreDistributionPieChart = lazy(async () => {
@@ -151,21 +153,21 @@ const WATCH_TIME_ROTATION_MS = 6800
 const WATCH_TIME_COMPARISONS = [
   {
     key: 'one-piece',
-    title: '《원피스》 TV 시리즈',
+    title: tr("《원피스》 TV 시리즈"),
     minutes: 1169 * 24,
-    template: (count: string) => `《원피스》 TV 시리즈를 처음부터 끝까지 ${count}번 볼 수 있는 시간입니다.`,
+    template: (count: string) => tr("《원피스》 TV 시리즈를 처음부터 끝까지 {{v0}}번 볼 수 있는 시간입니다.", { v0: count }),
   },
   {
     key: 'conan',
-    title: '《명탐정 코난》 TV 시리즈',
+    title: tr("《명탐정 코난》 TV 시리즈"),
     minutes: 1180 * 24,
-    template: (count: string) => `《명탐정 코난》 TV 시리즈를 처음부터 끝까지 ${count}번 볼 수 있는 시간입니다.`,
+    template: (count: string) => tr("《명탐정 코난》 TV 시리즈를 처음부터 끝까지 {{v0}}번 볼 수 있는 시간입니다.", { v0: count }),
   },
   {
     key: 'harry-potter',
-    title: '《해리 포터》 시리즈',
+    title: tr("《해리 포터》 시리즈"),
     minutes: 1083594 / 250,
-    template: (count: string) => `《해리 포터》 시리즈를 ${count}번 완독할 수 있는 시간입니다.`,
+    template: (count: string) => tr("《해리 포터》 시리즈를 {{v0}}번 완독할 수 있는 시간입니다.", { v0: count }),
   },
 ]
 
@@ -197,7 +199,7 @@ function renderEmptyMessage(message: string, isError = false) {
     return (
       <>
         <ErrorToast message={message} />
-        <div className="analysis-empty-state">지금은 이 분석을 표시할 수 없어요.</div>
+        <div className="analysis-empty-state">{tr("지금은 이 분석을 표시할 수 없어요.")}</div>
       </>
     )
   }
@@ -216,19 +218,19 @@ function getStarFillPercent(score: number, starIndex: number) {
 }
 
 function getStudioAnimeTitle(item: StudioAnimeItem) {
-  return item.anime.titles.korean || item.anime.titles.english || item.anime.title || item.anime.titles.romaji || '제목 없음'
+  return item.anime.titles.korean || item.anime.titles.english || item.anime.title || item.anime.titles.romaji || tr("제목 없음")
 }
 
 function formatStudioWatchTime(hours?: number | null, minutes?: number | null) {
   if (typeof hours === 'number' && Number.isFinite(hours) && hours > 0) {
-    return `${hours.toLocaleString(undefined, { maximumFractionDigits: 1 })}시간`
+    return tr("{{v0}}시간", { v0: hours.toLocaleString(getLocaleTag(), { maximumFractionDigits: 1 }) })
   }
 
   if (typeof minutes === 'number' && Number.isFinite(minutes) && minutes > 0) {
-    return `${Math.round(minutes / 60).toLocaleString()}시간`
+    return tr("{{v0}}시간", { v0: Math.round(minutes / 60).toLocaleString(getLocaleTag()) })
   }
 
-  return '0시간'
+  return tr("0시간")
 }
 
 function getStudioAnimeWatchMinutes(item: StudioAnimeItem) {
@@ -244,19 +246,19 @@ function formatStudioAnimeWatchTime(item: StudioAnimeItem) {
   const minutes = getStudioAnimeWatchMinutes(item)
 
   if (minutes <= 0) {
-    return '시청 시간 정보 없음'
+    return tr("시청 시간 정보 없음")
   }
 
   if (minutes < 60) {
-    return `${minutes.toLocaleString()}분`
+    return tr("{{v0}}분", { v0: minutes.toLocaleString(getLocaleTag()) })
   }
 
   const hours = Math.floor(minutes / 60)
   const restMinutes = minutes % 60
 
   return restMinutes > 0
-    ? `${hours.toLocaleString()}시간 ${restMinutes}분`
-    : `${hours.toLocaleString()}시간`
+    ? tr("{{v0}}시간 {{v1}}분", { v0: hours.toLocaleString(getLocaleTag()), v1: restMinutes })
+    : tr("{{v0}}시간", { v0: hours.toLocaleString(getLocaleTag()) })
 }
 
 function formatAnalysisScore(value?: number | null) {
@@ -272,7 +274,7 @@ function formatComparisonCount(value: number) {
     return value.toFixed(1)
   }
 
-  return Math.floor(value).toLocaleString()
+  return Math.floor(value).toLocaleString(getLocaleTag())
 }
 
 function getNextComparisonIndex(currentIndex: number) {
@@ -471,7 +473,7 @@ export function StudioRankingSection({
         setRankingState({
           items: [],
           isLoading: false,
-          error: getFriendlyErrorMessage(loadError, '스튜디오 랭킹을 불러오지 못했어요.'),
+          error: getFriendlyErrorMessage(loadError, tr("스튜디오 랭킹을 불러오지 못했어요.")),
           studioCount: 0,
         })
         setSelectedStudio(null)
@@ -566,7 +568,7 @@ export function StudioRankingSection({
         setAnimeState({
           items: [],
           isLoading: false,
-          error: getFriendlyErrorMessage(loadError, '스튜디오 작품을 불러오지 못했어요.'),
+          error: getFriendlyErrorMessage(loadError, tr("스튜디오 작품을 불러오지 못했어요.")),
         })
       }
     }
@@ -619,15 +621,15 @@ export function StudioRankingSection({
       <div className="analysis-panel-heading studio-ranking-title-row">
         <div>
           <span className="detail-label">Studio ranking</span>
-          <h2>스튜디오 분석</h2>
+          <h2>{tr("스튜디오 분석")}</h2>
               <p>{isSample
-                ? '샘플 컬렉션을 제작 스튜디오 기준으로 묶어 작품 수, 평균 점수, 시청 시간을 비교해요.'
-                : '내가 본 작품을 제작 스튜디오 기준으로 묶어 작품 수, 평균 점수, 시청 시간을 비교해요.'}</p>
+                ? tr("샘플 컬렉션을 제작 스튜디오 기준으로 묶어 작품 수, 평균 점수, 시청 시간을 비교해요.")
+                : tr("내가 본 작품을 제작 스튜디오 기준으로 묶어 작품 수, 평균 점수, 시청 시간을 비교해요.")}</p>
         </div>
-        <span className="studio-ranking-count">{rankingState.studioCount.toLocaleString()}개 스튜디오</span>
+        <span className="studio-ranking-count">{rankingState.studioCount.toLocaleString(getLocaleTag())}{tr("개 스튜디오")}</span>
       </div>
 
-      <div className="studio-ranking-tabs" role="tablist" aria-label="스튜디오 정렬 기준">
+      <div className="studio-ranking-tabs" role="tablist" aria-label={tr("스튜디오 정렬 기준")}>
         {studioSortOptions.map((option) => (
           <button
             className={sort === option.value ? 'studio-ranking-tab is-active' : 'studio-ranking-tab'}
@@ -643,10 +645,10 @@ export function StudioRankingSection({
         ))}
       </div>
 
-      {rankingState.isLoading && <div className="analysis-empty-state">스튜디오 랭킹을 불러오는 중이에요.</div>}
+      {rankingState.isLoading && <div className="analysis-empty-state">{tr("스튜디오 랭킹을 불러오는 중이에요.")}</div>}
       {rankingState.error && !rankingState.isLoading && renderEmptyMessage(rankingState.error, true)}
       {!rankingState.isLoading && !rankingState.error && rankingState.items.length === 0 && (
-        <div className="analysis-empty-state">표시할 스튜디오 데이터가 아직 없어요.</div>
+        <div className="analysis-empty-state">{tr("표시할 스튜디오 데이터가 아직 없어요.")}</div>
       )}
 
       {!rankingState.isLoading && !rankingState.error && rankingState.items.length > 0 && (
@@ -667,11 +669,11 @@ export function StudioRankingSection({
                   type="button"
                   onClick={() => setSelectedStudio(entry)}
                 >
-                  <span className="studio-ranking-rank">{rank}위</span>
+                  <span className="studio-ranking-rank">{rank}{tr("위")}</span>
                   <span className="studio-ranking-copy">
                     <strong>{entry.studio.name}</strong>
                     <small>
-                      {entry.animeCount.toLocaleString()}편 · 평균 {entry.averageScore !== null ? entry.averageScore.toFixed(1) : '-'}점
+                      {entry.animeCount.toLocaleString(getLocaleTag())}{tr("편 · 평균")} {entry.averageScore !== null ? entry.averageScore.toFixed(1) : '-'}{tr("점")}
                     </small>
                   </span>
                   <span className="studio-ranking-metric">
@@ -679,7 +681,7 @@ export function StudioRankingSection({
                       ? formatStudioWatchTime(entry.totalWatchHours, entry.totalWatchMinutes)
                       : sort === 'score'
                         ? `${entry.averageScore !== null ? entry.averageScore.toFixed(1) : '-'}`
-                        : `${entry.animeCount.toLocaleString()}편`}
+                        : tr("{{v0}}편", { v0: entry.animeCount.toLocaleString(getLocaleTag()) })}
                   </span>
                 </button>
               )
@@ -691,7 +693,7 @@ export function StudioRankingSection({
             <div className="studio-anime-heading">
               <div>
                 <span className="detail-label">Studio works</span>
-                <h3>{selectedStudio?.studio.name ?? '스튜디오'}</h3>
+                <h3>{selectedStudio?.studio.name ?? tr("스튜디오")}</h3>
               </div>
               {selectedStudio?.studio.siteUrl && (
                 <a href={selectedStudio.studio.siteUrl} target="_blank" rel="noreferrer">
@@ -700,14 +702,14 @@ export function StudioRankingSection({
               )}
             </div>
 
-            {effectiveStudioAnimeState.isLoading && <div className="analysis-empty-state">작품 목록을 불러오는 중이에요.</div>}
+            {effectiveStudioAnimeState.isLoading && <div className="analysis-empty-state">{tr("작품 목록을 불러오는 중이에요.")}</div>}
             {effectiveStudioAnimeState.error && !effectiveStudioAnimeState.isLoading && renderEmptyMessage(effectiveStudioAnimeState.error, true)}
             {!effectiveStudioAnimeState.isLoading && !effectiveStudioAnimeState.error && effectiveStudioAnimeState.items.length === 0 && (
-              <div className="analysis-empty-state">이 스튜디오의 작품 목록이 아직 없어요.</div>
+              <div className="analysis-empty-state">{tr("이 스튜디오의 작품 목록이 아직 없어요.")}</div>
             )}
             {!effectiveStudioAnimeState.isLoading && !effectiveStudioAnimeState.error && effectiveStudioAnimeState.items.length > 0 && (
               <div className="studio-anime-showcase">
-                <div className="studio-anime-carousel" aria-label="인기도 순 대표작">
+                <div className="studio-anime-carousel" aria-label={tr("인기도 순 대표작")}>
                   {representativeStudioAnimeCards.map(({ entry, rank, cardPosition }) => {
                   const title = getStudioAnimeTitle(entry)
 
@@ -726,7 +728,7 @@ export function StudioRankingSection({
                         <em>#{rank}</em>
                         <strong>{title}</strong>
                         <small>
-                          {entry.userList.score !== null ? `${entry.userList.score.toFixed(1)}점` : '평점 없음'} · {formatStudioAnimeWatchTime(entry)}
+                          {entry.userList.score !== null ? tr("{{v0}}점", { v0: entry.userList.score.toFixed(1) }) : tr("평점 없음")} · {formatStudioAnimeWatchTime(entry)}
                         </small>
                       </span>
                     </Link>
@@ -742,7 +744,7 @@ export function StudioRankingSection({
                       setIsStudioAnimeToastOpen(true)
                     }}
                   >
-                    더보기 {hiddenStudioAnimeCount}편
+                    {tr("더보기")} {hiddenStudioAnimeCount}{tr("편")}
                   </button>
                 )}
               </div>
@@ -755,14 +757,14 @@ export function StudioRankingSection({
         <aside className="analysis-anime-toast" aria-live="polite">
           <div className="analysis-anime-toast-heading">
             <div>
-              <strong>{selectedStudio.studio.name} 작품</strong>
-              <span>내가 본 이 스튜디오의 애니예요.</span>
+              <strong>{selectedStudio.studio.name} {tr("작품")}</strong>
+              <span>{tr("내가 본 이 스튜디오의 애니예요.")}</span>
             </div>
             <button
               className="analysis-anime-toast-close"
               type="button"
               onClick={() => setIsStudioAnimeToastOpen(false)}
-              aria-label="스튜디오 작품 닫기"
+              aria-label={tr("스튜디오 작품 닫기")}
             >
               ×
             </button>
@@ -786,7 +788,7 @@ export function StudioRankingSection({
                       loading="lazy"
                     />
                     <small>
-                      {entry.userList.score !== null ? `${entry.userList.score.toFixed(1)}점` : '평점 없음'} · {formatStudioAnimeWatchTime(entry)}
+                      {entry.userList.score !== null ? tr("{{v0}}점", { v0: entry.userList.score.toFixed(1) }) : tr("평점 없음")} · {formatStudioAnimeWatchTime(entry)}
                     </small>
                   </span>
                   <strong>{title}</strong>
@@ -795,13 +797,13 @@ export function StudioRankingSection({
             })}
           </div>
           {studioAnimeToastTotalPages > 1 && (
-            <div className="analysis-anime-toast-pagination" aria-label="스튜디오 작품 페이지">
+            <div className="analysis-anime-toast-pagination" aria-label={tr("스튜디오 작품 페이지")}>
               <button
                 type="button"
                 onClick={() => setStudioAnimeToastPage((current) => Math.max(1, Math.min(current, studioAnimeToastTotalPages) - 1))}
                 disabled={safeStudioAnimeToastPage === 1}
               >
-                이전
+                {tr("이전")}
               </button>
               <span>{safeStudioAnimeToastPage} / {studioAnimeToastTotalPages}</span>
               <button
@@ -809,7 +811,7 @@ export function StudioRankingSection({
                 onClick={() => setStudioAnimeToastPage((current) => Math.min(studioAnimeToastTotalPages, Math.min(current, studioAnimeToastTotalPages) + 1))}
                 disabled={safeStudioAnimeToastPage === studioAnimeToastTotalPages}
               >
-                다음
+                {tr("다음")}
               </button>
             </div>
           )}
@@ -968,7 +970,7 @@ export function AnalysisPage() {
           return
         }
 
-        const message = getFriendlyErrorMessage(loadError, '샘플 분석 정보를 불러오지 못했어요.')
+        const message = getFriendlyErrorMessage(loadError, tr("샘플 분석 정보를 불러오지 못했어요."))
         setState({
           item: null,
           isLoading: false,
@@ -1119,7 +1121,7 @@ export function AnalysisPage() {
           item: null,
           isLoading: false,
           error:
-            getFriendlyErrorMessage(loadError, '분석 정보를 불러오지 못했어요.'),
+            getFriendlyErrorMessage(loadError, tr("분석 정보를 불러오지 못했어요.")),
         })
       }
     }
@@ -1173,7 +1175,7 @@ export function AnalysisPage() {
         setGenreBubbleState({
           item: null,
           isLoading: false,
-          error: getFriendlyErrorMessage(loadError, '장르 취향 버블 차트를 불러오지 못했어요.'),
+          error: getFriendlyErrorMessage(loadError, tr("장르 취향 버블 차트를 불러오지 못했어요.")),
         })
       }
     }
@@ -1226,7 +1228,7 @@ export function AnalysisPage() {
         setViewingDnaState({
           item: null,
           isLoading: false,
-          error: getFriendlyErrorMessage(loadError, '감상 DNA 분석을 불러오지 못했어요.'),
+          error: getFriendlyErrorMessage(loadError, tr("감상 DNA 분석을 불러오지 못했어요.")),
         })
       }
     }
@@ -1280,7 +1282,7 @@ export function AnalysisPage() {
         setFormatDistributionState({
           item: null,
           isLoading: false,
-          error: getFriendlyErrorMessage(loadError, '포맷별 분석을 불러오지 못했어요.'),
+          error: getFriendlyErrorMessage(loadError, tr("포맷별 분석을 불러오지 못했어요.")),
         })
       }
     }
@@ -1334,7 +1336,7 @@ export function AnalysisPage() {
         setYearlyScoreState({
           item: null,
           isLoading: false,
-          error: getFriendlyErrorMessage(loadError, '연도별 평점 분석을 불러오지 못했어요.'),
+          error: getFriendlyErrorMessage(loadError, tr("연도별 평점 분석을 불러오지 못했어요.")),
         })
       }
     }
@@ -1403,7 +1405,7 @@ export function AnalysisPage() {
     [state.item?.scoreDistribution],
   )
   const scoreDistributionChartData = useMemo<ScoreDistributionChartDatum[]>(
-    () => scoreDistribution.map(([score, count]) => ({ score, label: `${score}점대`, count })),
+    () => scoreDistribution.map(([score, count]) => ({ score, label: tr("{{v0}}점대", { v0: score }), count })),
     [scoreDistribution],
   )
 
@@ -1415,7 +1417,7 @@ export function AnalysisPage() {
         selectedYear: year,
         items: [],
         isLoading: false,
-        error: '이 항목은 단일 연도가 아니라 기간이라서 작품 목록을 불러올 수 없어요.',
+        error: tr("이 항목은 단일 연도가 아니라 기간이라서 작품 목록을 불러올 수 없어요."),
       })
       return
     }
@@ -1441,7 +1443,7 @@ export function AnalysisPage() {
           selectedYear: year,
           items: [],
           isLoading: false,
-          error: getFriendlyErrorMessage(yearError, '해당 연도 샘플 작품을 불러오지 못했어요.'),
+          error: getFriendlyErrorMessage(yearError, tr("해당 연도 샘플 작품을 불러오지 못했어요.")),
         })
       }
       return
@@ -1490,7 +1492,7 @@ export function AnalysisPage() {
         items: [],
         isLoading: false,
         error:
-          getFriendlyErrorMessage(yearError, '해당 연도 작품을 불러오지 못했어요.'),
+          getFriendlyErrorMessage(yearError, tr("해당 연도 작품을 불러오지 못했어요.")),
       })
     }
   }
@@ -1517,7 +1519,7 @@ export function AnalysisPage() {
           selectedGenre: genre,
           items: [],
           isLoading: false,
-          error: getFriendlyErrorMessage(genreError, '해당 장르 샘플 작품을 불러오지 못했어요.'),
+          error: getFriendlyErrorMessage(genreError, tr("해당 장르 샘플 작품을 불러오지 못했어요.")),
         })
       }
       return
@@ -1566,7 +1568,7 @@ export function AnalysisPage() {
         items: [],
         isLoading: false,
         error:
-          getFriendlyErrorMessage(genreError, '해당 장르 작품을 불러오지 못했어요.'),
+          getFriendlyErrorMessage(genreError, tr("해당 장르 작품을 불러오지 못했어요.")),
       })
     }
   }
@@ -1579,7 +1581,7 @@ export function AnalysisPage() {
         selectedScore: score,
         items: [],
         isLoading: false,
-        error: '선택한 평점 형식이 올바르지 않아요.',
+        error: tr("선택한 평점 형식이 올바르지 않아요."),
       })
       return
     }
@@ -1605,7 +1607,7 @@ export function AnalysisPage() {
           selectedScore: score,
           items: [],
           isLoading: false,
-          error: getFriendlyErrorMessage(scoreError, '해당 평점 샘플 작품을 불러오지 못했어요.'),
+          error: getFriendlyErrorMessage(scoreError, tr("해당 평점 샘플 작품을 불러오지 못했어요.")),
         })
       }
       return
@@ -1654,7 +1656,7 @@ export function AnalysisPage() {
         items: [],
         isLoading: false,
         error:
-          getFriendlyErrorMessage(scoreError, '해당 평점 작품을 불러오지 못했어요.'),
+          getFriendlyErrorMessage(scoreError, tr("해당 평점 작품을 불러오지 못했어요.")),
       })
     }
   }
@@ -1684,7 +1686,7 @@ export function AnalysisPage() {
       setState((current) => ({
         ...current,
         error:
-          getFriendlyErrorMessage(refreshError, '분석을 다시 계산하지 못했어요.'),
+          getFriendlyErrorMessage(refreshError, tr("분석을 다시 계산하지 못했어요.")),
       }))
     } finally {
       setIsRecalculating(false)
@@ -1727,13 +1729,13 @@ export function AnalysisPage() {
   const genreBubbleIsLoading = genreBubbleState.isLoading
   const genreBubbleError = genreBubbleState.error
   const displayName = isGuestPreview
-    ? '샘플 취향 노트'
+    ? tr("샘플 취향 노트")
     : user?.username?.trim() || user?.email?.split('@')[0] || 'MyAniTrack User'
 
   if (!item) {
     return (
       <section className="analysis-page">
-        <div className="feedback-card">분석 정보가 아직 없어요.</div>
+        <div className="feedback-card">{tr("분석 정보가 아직 없어요.")}</div>
       </section>
     )
   }
@@ -1744,12 +1746,12 @@ export function AnalysisPage() {
         <div className="guest-preview-banner">
           <div>
             <span className="guest-preview-eyebrow">Sample mode</span>
-            <strong>샘플 분석 리포트를 보고 있어요</strong>
-            <p>이 통계와 차트는 체험용 컬렉션으로 계산된 예시입니다. 로그인하면 내 기록으로 다시 계산됩니다.</p>
+            <strong>{tr("샘플 분석 리포트를 보고 있어요")}</strong>
+            <p>{tr("이 통계와 차트는 체험용 컬렉션으로 계산된 예시입니다. 로그인하면 내 기록으로 다시 계산됩니다.")}</p>
           </div>
           <div className="guest-preview-actions">
-            <Link className="primary-button" to="/signup">시작하기</Link>
-            <Link className="secondary-button" to="/login">로그인</Link>
+            <Link className="primary-button" to="/signup">{tr("시작하기")}</Link>
+            <Link className="secondary-button" to="/login">{tr("로그인")}</Link>
           </div>
         </div>
       )}
@@ -1766,26 +1768,26 @@ export function AnalysisPage() {
             <div>
               <h1>
                 {displayName}
-                {isGuestPreview && <span className="sample-title-badge">샘플</span>}
+                {isGuestPreview && <span className="sample-title-badge">{tr("샘플")}</span>}
               </h1>
-              <p>{isGuestPreview ? '샘플 사용자' : `사용자 ID ${user?.id ?? '-'}`}</p>
+              <p>{isGuestPreview ? tr("샘플 사용자") : tr("사용자 ID {{v0}}", { v0: user?.id ?? '-' })}</p>
             </div>
           </div>
           <p className="analysis-profile-note">
             {isGuestPreview
-              ? '샘플 컬렉션에 담긴 작품, 평점, 시청 기록으로 MyAniTrack의 분석 흐름을 미리 보여드려요.'
-              : '내 컬렉션에 담긴 작품, 평점, 시청 기록을 바탕으로 취향 흐름을 정리했어요.'}
+              ? tr("샘플 컬렉션에 담긴 작품, 평점, 시청 기록으로 MyAniTrack의 분석 흐름을 미리 보여드려요.")
+              : tr("내 컬렉션에 담긴 작품, 평점, 시청 기록을 바탕으로 취향 흐름을 정리했어요.")}
           </p>
           <span className="analysis-updated-at">
-            마지막 계산 {formatUpdatedAt(item.updatedAt)}
+            {tr("마지막 계산")} {formatUpdatedAt(item.updatedAt)}
           </span>
         </div>
 
         <div className="analysis-hero-actions">
           {isGuestPreview ? (
             <>
-              <Link className="primary-button" to="/signup">내 기록으로 분석하기</Link>
-              <span className="analysis-refresh-note">샘플 데이터는 고정되어 있어요.</span>
+              <Link className="primary-button" to="/signup">{tr("내 기록으로 분석하기")}</Link>
+              <span className="analysis-refresh-note">{tr("샘플 데이터는 고정되어 있어요.")}</span>
             </>
           ) : (
             <>
@@ -1799,12 +1801,12 @@ export function AnalysisPage() {
                 disabled={isRecalculating || cooldownLeft > 0}
               >
                 {isRecalculating
-                  ? '계산 중...'
+                  ? tr("계산 중...")
                   : cooldownLeft > 0
-                    ? `${cooldownLeft}초 후 다시 계산`
-                    : '분석 새로고침'}
+                    ? tr("{{v0}}초 후 다시 계산", { v0: cooldownLeft })
+                    : tr("분석 새로고침")}
               </button>
-              <span className="analysis-refresh-note">연속 계산은 30초마다 한 번만 가능해요.</span>
+              <span className="analysis-refresh-note">{tr("연속 계산은 30초마다 한 번만 가능해요.")}</span>
             </>
           )}
         </div>
@@ -1817,24 +1819,24 @@ export function AnalysisPage() {
       <section className="analysis-summary-card">
         <div className="analysis-summary-grid">
           <article className="analysis-summary-item">
-            <span>선호 장르</span>
+            <span>{tr("선호 장르")}</span>
             <strong>{getGenreLabel(item.favoriteGenre)}</strong>
           </article>
           <article className="analysis-summary-item">
-            <span>총 작품 수</span>
-            <strong>{item.totalCount.toLocaleString()}편</strong>
+            <span>{tr("총 작품 수")}</span>
+            <strong>{item.totalCount.toLocaleString(getLocaleTag())}{tr("편")}</strong>
           </article>
           <article className="analysis-summary-item">
-            <span>본 시리즈</span>
-            <strong>{(item.seriesStats?.watchedSeriesCount ?? 0).toLocaleString()}개</strong>
+            <span>{tr("본 시리즈")}</span>
+            <strong>{(item.seriesStats?.watchedSeriesCount ?? 0).toLocaleString(getLocaleTag())}{tr("개")}</strong>
           </article>
           <article className="analysis-summary-item">
-            <span>평균 점수</span>
-            <strong>{averageScore !== null ? `${averageScore.toFixed(1)} / 10` : '미집계'}</strong>
+            <span>{tr("평균 점수")}</span>
+            <strong>{averageScore !== null ? `${averageScore.toFixed(1)} / 10` : tr("미집계")}</strong>
           </article>
           <article className="analysis-summary-item">
-            <span>총 시청 시간</span>
-            <strong>{(item.totalWatchMinutes / 60).toFixed(1)}시간</strong>
+            <span>{tr("총 시청 시간")}</span>
+            <strong>{(item.totalWatchMinutes / 60).toFixed(1)}{tr("시간")}</strong>
           </article>
         </div>
         <WatchTimeComparisonTicker totalWatchMinutes={item.totalWatchMinutes} />
@@ -1844,47 +1846,47 @@ export function AnalysisPage() {
         <section className="analysis-panel analysis-overview-panel">
           <div className="analysis-panel-heading">
             <span className="detail-label">Overview</span>
-            <h2>기본 통계</h2>
+            <h2>{tr("기본 통계")}</h2>
           </div>
           <div className="analysis-facts-grid">
             <article>
-              <span>총 작품 수</span>
-              <strong>{item.totalCount.toLocaleString()}</strong>
+              <span>{tr("총 작품 수")}</span>
+              <strong>{item.totalCount.toLocaleString(getLocaleTag())}</strong>
             </article>
             <article>
-              <span>완주 작품</span>
-              <strong>{item.completedCount.toLocaleString()}</strong>
+              <span>{tr("완주 작품")}</span>
+              <strong>{item.completedCount.toLocaleString(getLocaleTag())}</strong>
             </article>
             <article>
-              <span>보는 중</span>
-              <strong>{item.watchingCount.toLocaleString()}</strong>
+              <span>{tr("보는 중")}</span>
+              <strong>{item.watchingCount.toLocaleString(getLocaleTag())}</strong>
             </article>
             <article>
-              <span>중단 작품</span>
-              <strong>{item.droppedCount.toLocaleString()}</strong>
+              <span>{tr("중단 작품")}</span>
+              <strong>{item.droppedCount.toLocaleString(getLocaleTag())}</strong>
             </article>
             <article>
-              <span>총 시청 화수</span>
-              <strong>{item.totalWatchedEpisodes.toLocaleString()}화</strong>
+              <span>{tr("총 시청 화수")}</span>
+              <strong>{item.totalWatchedEpisodes.toLocaleString(getLocaleTag())}{tr("화")}</strong>
             </article>
             <article>
-              <span>가장 많이 본 연도</span>
-              <strong>{item.favoriteReleasePeriod || '정보 없음'}</strong>
+              <span>{tr("가장 많이 본 연도")}</span>
+              <strong>{item.favoriteReleasePeriod || tr("정보 없음")}</strong>
             </article>
             <article>
-              <span>평균 방영 연도</span>
-              <strong>{averageReleaseYear !== null ? averageReleaseYear.toFixed(1) : '정보 없음'}</strong>
+              <span>{tr("평균 방영 연도")}</span>
+              <strong>{averageReleaseYear !== null ? averageReleaseYear.toFixed(1) : tr("정보 없음")}</strong>
             </article>
             <article>
-              <span>본 시리즈</span>
-              <strong>{(item.seriesStats?.watchedSeriesCount ?? 0).toLocaleString()}개</strong>
+              <span>{tr("본 시리즈")}</span>
+              <strong>{(item.seriesStats?.watchedSeriesCount ?? 0).toLocaleString(getLocaleTag())}{tr("개")}</strong>
             </article>
             <article>
-              <span>완주 시리즈</span>
-              <strong>{(item.seriesStats?.completedSeriesCount ?? 0).toLocaleString()}개</strong>
+              <span>{tr("완주 시리즈")}</span>
+              <strong>{(item.seriesStats?.completedSeriesCount ?? 0).toLocaleString(getLocaleTag())}{tr("개")}</strong>
             </article>
             <article>
-              <span>시리즈 완주율</span>
+              <span>{tr("시리즈 완주율")}</span>
               <strong>{(item.seriesStats?.seriesCompletionRate ?? 0).toFixed(1)}%</strong>
             </article>
           </div>
@@ -1894,8 +1896,8 @@ export function AnalysisPage() {
           <section className="analysis-panel analysis-format-panel">
             <div className="analysis-panel-heading">
               <span className="detail-label">Format distribution</span>
-              <h2>포맷별 감상 분포</h2>
-              <p>TV, 영화, OVA 같은 포맷별로 감상 비중과 시청 시간을 비교해요.</p>
+              <h2>{tr("포맷별 감상 분포")}</h2>
+              <p>{tr("TV, 영화, OVA 같은 포맷별로 감상 비중과 시청 시간을 비교해요.")}</p>
             </div>
             {formatDistributionIsLoading && (
               <div className="analysis-chart-skeleton" />
@@ -1913,22 +1915,22 @@ export function AnalysisPage() {
                   </Suspense>
                   <div className="analysis-format-summary">
                     <article>
-                      <span>대표 포맷</span>
-                      <strong>{formatDistributionItem.summary.topFormatLabel ?? '정보 없음'}</strong>
+                      <span>{tr("대표 포맷")}</span>
+                      <strong>{formatDistributionItem.summary.topFormatLabel ?? tr("정보 없음")}</strong>
                     </article>
                     <article>
-                      <span>포맷 수</span>
-                      <strong>{formatDistributionItem.summary.formatCount.toLocaleString()}개</strong>
+                      <span>{tr("포맷 수")}</span>
+                      <strong>{formatDistributionItem.summary.formatCount.toLocaleString(getLocaleTag())}{tr("개")}</strong>
                     </article>
                     <article>
-                      <span>총 작품 수</span>
-                      <strong>{formatDistributionItem.totalAnimeCount.toLocaleString()}편</strong>
+                      <span>{tr("총 작품 수")}</span>
+                      <strong>{formatDistributionItem.totalAnimeCount.toLocaleString(getLocaleTag())}{tr("편")}</strong>
                     </article>
                     <article>
-                      <span>총 시청 시간</span>
+                      <span>{tr("총 시청 시간")}</span>
                       <strong>{formatDistributionItem.totalWatchHours !== null
-                        ? `${formatDistributionItem.totalWatchHours.toLocaleString(undefined, { maximumFractionDigits: 1 })}시간`
-                        : `${Math.round(formatDistributionItem.totalWatchMinutes / 60).toLocaleString()}시간`}</strong>
+                        ? tr("{{v0}}시간", { v0: formatDistributionItem.totalWatchHours.toLocaleString(getLocaleTag(), { maximumFractionDigits: 1 }) })
+                        : tr("{{v0}}시간", { v0: Math.round(formatDistributionItem.totalWatchMinutes / 60).toLocaleString(getLocaleTag()) })}</strong>
                     </article>
                   </div>
                 </div>
@@ -1936,7 +1938,7 @@ export function AnalysisPage() {
             {!formatDistributionIsLoading
               && !formatDistributionError
               && (!formatDistributionItem || formatDistributionItem.items.length === 0)
-              && renderEmptyMessage('아직 포맷별 분석 데이터가 없어요.')}
+              && renderEmptyMessage(tr("아직 포맷별 분석 데이터가 없어요."))}
           </section>
 
           <ViewingDnaCard
@@ -1946,7 +1948,7 @@ export function AnalysisPage() {
             isGuestPreview={isGuestPreview}
           />
 
-          <div className="analysis-segmented-control" role="tablist" aria-label="분석 종류 선택">
+          <div className="analysis-segmented-control" role="tablist" aria-label={tr("분석 종류 선택")}>
             {analysisTabs.map((tab) => (
               <button
                 className={activeTab === tab.value ? 'analysis-segment is-active' : 'analysis-segment'}
@@ -1966,7 +1968,7 @@ export function AnalysisPage() {
               <section className="analysis-panel analysis-genre-chart-panel">
                 <div className="analysis-panel-heading">
                   <span className="detail-label">Genre</span>
-                  <h2>장르 분포</h2>
+                  <h2>{tr("장르 분포")}</h2>
                 </div>
                 {genreDistributionChartData.length > 0 ? (
                   <Suspense fallback={<div className="analysis-chart-skeleton" />}>
@@ -1978,13 +1980,13 @@ export function AnalysisPage() {
                       }}
                     />
                   </Suspense>
-                ) : renderEmptyMessage('아직 장르 분포 데이터가 없어요.')}
+                ) : renderEmptyMessage(tr("아직 장르 분포 데이터가 없어요."))}
               </section>
 
               <section className="analysis-panel analysis-genre-chart-panel">
                 <div className="analysis-panel-heading">
                   <span className="detail-label">Watch time</span>
-                  <h2>장르별 시청 시간</h2>
+                  <h2>{tr("장르별 시청 시간")}</h2>
                 </div>
                 {genreWatchMinutesChartData.length > 0 ? (
                   <Suspense fallback={<div className="analysis-chart-skeleton" />}>
@@ -1996,13 +1998,13 @@ export function AnalysisPage() {
                       }}
                     />
                   </Suspense>
-                ) : renderEmptyMessage('아직 장르별 시청 시간 데이터가 없어요.')}
+                ) : renderEmptyMessage(tr("아직 장르별 시청 시간 데이터가 없어요."))}
               </section>
 
               <section className="analysis-panel analysis-genre-score-panel">
                 <div className="analysis-panel-heading">
                   <span className="detail-label">Genre score</span>
-                  <h2>장르별 평균 점수</h2>
+                  <h2>{tr("장르별 평균 점수")}</h2>
                 </div>
                 <div className="analysis-list">
                   {genreAvgScore.length > 0 ? genreAvgScore.map(([genre, rawScore], index) => {
@@ -2024,10 +2026,10 @@ export function AnalysisPage() {
                           void handleSelectGenre(genre)
                         }}
                       >
-                        <span className="analysis-genre-score-rank">{rank}위</span>
+                        <span className="analysis-genre-score-rank">{rank}{tr("위")}</span>
                         <div className="analysis-genre-score-copy">
                           <span>{getGenreLabel(genre)}</span>
-                          <small>{genreAnimeCount.toLocaleString()}편</small>
+                          <small>{genreAnimeCount.toLocaleString(getLocaleTag())}{tr("편")}</small>
                           <div className="analysis-score-stars" aria-hidden="true">
                             {Array.from({ length: 5 }).map((_, index) => (
                               <div className="analysis-score-star-shell" key={`${genre}-${index}`}>
@@ -2045,7 +2047,7 @@ export function AnalysisPage() {
                         <strong>{normalizedScore.toFixed(1)} / 10</strong>
                       </button>
                     )
-                  }) : renderEmptyMessage('아직 장르별 평균 점수 데이터가 없어요.')}
+                  }) : renderEmptyMessage(tr("아직 장르별 평균 점수 데이터가 없어요."))}
                 </div>
               </section>
 
@@ -2057,7 +2059,7 @@ export function AnalysisPage() {
               <section className="analysis-panel analysis-panel-wide">
                 <div className="analysis-panel-heading">
                   <span className="detail-label">Release year</span>
-                  <h2>연도별 감상 작품 수</h2>
+                  <h2>{tr("연도별 감상 작품 수")}</h2>
                 </div>
                 {releaseYearChartData.length > 0 ? (
                   <>
@@ -2072,35 +2074,35 @@ export function AnalysisPage() {
                     </Suspense>
                     <ReleaseDecadeProgress entries={releaseDistribution} />
                   </>
-                ) : renderEmptyMessage('아직 연도별 감상 데이터가 없어요.')}
+                ) : renderEmptyMessage(tr("아직 연도별 감상 데이터가 없어요."))}
               </section>
 
               <section className="analysis-panel analysis-panel-wide">
                 <div className="analysis-panel-heading">
                   <span className="detail-label">Year score</span>
-                  <h2>연도별 평균 평점</h2>
-                  <p>평점이 있는 작품이 3편 이상인 연도만 모아 내 평균과 커뮤니티 평균을 비교해요.</p>
+                  <h2>{tr("연도별 평균 평점")}</h2>
+                  <p>{tr("평점이 있는 작품이 3편 이상인 연도만 모아 내 평균과 커뮤니티 평균을 비교해요.")}</p>
                 </div>
-                {yearlyScoreIsLoading && <div className="analysis-empty-state">연도별 평점 분석을 불러오는 중이에요.</div>}
+                {yearlyScoreIsLoading && <div className="analysis-empty-state">{tr("연도별 평점 분석을 불러오는 중이에요.")}</div>}
                 {yearlyScoreError && !yearlyScoreIsLoading && renderEmptyMessage(yearlyScoreError, true)}
                 {!yearlyScoreIsLoading && !yearlyScoreError && yearlyScoreItem && yearlyScoreItem.items.length > 0 && (
                   <>
                     <div className="analysis-year-score-summary">
                       <article>
-                        <span>최고 연도</span>
+                        <span>{tr("최고 연도")}</span>
                         <strong>{yearlyScoreItem.summary.bestYear ?? '-'}</strong>
                       </article>
                       <article>
-                        <span>최저 연도</span>
+                        <span>{tr("최저 연도")}</span>
                         <strong>{yearlyScoreItem.summary.worstYear ?? '-'}</strong>
                       </article>
                       <article>
-                        <span>전체 평균</span>
-                        <strong>{formatAnalysisScore(yearlyScoreItem.summary.averageScore)}점</strong>
+                        <span>{tr("전체 평균")}</span>
+                        <strong>{formatAnalysisScore(yearlyScoreItem.summary.averageScore)}{tr("점")}</strong>
                       </article>
                       <article>
-                        <span>분석 연도</span>
-                        <strong>{yearlyScoreItem.summary.yearCount.toLocaleString()}개</strong>
+                        <span>{tr("분석 연도")}</span>
+                        <strong>{yearlyScoreItem.summary.yearCount.toLocaleString(getLocaleTag())}{tr("개")}</strong>
                       </article>
                     </div>
                     <Suspense fallback={<div className="analysis-chart-skeleton analysis-chart-skeleton-wide" />}>
@@ -2115,7 +2117,7 @@ export function AnalysisPage() {
                   </>
                 )}
                 {!yearlyScoreIsLoading && !yearlyScoreError && (!yearlyScoreItem || yearlyScoreItem.items.length === 0) && (
-                  <div className="analysis-empty-state">연도별 평점 분석에 표시할 데이터가 아직 없어요.</div>
+                  <div className="analysis-empty-state">{tr("연도별 평점 분석에 표시할 데이터가 아직 없어요.")}</div>
                 )}
               </section>
 
@@ -2127,7 +2129,7 @@ export function AnalysisPage() {
               <section className="analysis-panel analysis-panel-wide">
                 <div className="analysis-panel-heading">
                   <span className="detail-label">Score distribution</span>
-                  <h2>평점 분포</h2>
+                  <h2>{tr("평점 분포")}</h2>
                 </div>
                 {scoreDistributionChartData.length > 0 ? (
                   <Suspense fallback={<div className="analysis-chart-skeleton analysis-chart-skeleton-wide" />}>
@@ -2139,7 +2141,7 @@ export function AnalysisPage() {
                       }}
                     />
                   </Suspense>
-                ) : renderEmptyMessage('아직 평점 분포 데이터가 없어요.')}
+                ) : renderEmptyMessage(tr("아직 평점 분포 데이터가 없어요."))}
               </section>
 
             </div>
@@ -2150,12 +2152,12 @@ export function AnalysisPage() {
       <AnalysisAnimeToast
         title={
           activeTab === 'genre'
-            ? `${getGenreLabel(genreAnimeState.selectedGenre)} 감상 작품`
+            ? tr("{{v0}} 감상 작품", { v0: getGenreLabel(genreAnimeState.selectedGenre) })
             : activeTab === 'year'
-              ? `${yearAnimeState.selectedYear}년 감상 작품`
-              : `${scoreAnimeState.selectedScore}점대 감상 작품`
+              ? tr("{{v0}}년 감상 작품", { v0: yearAnimeState.selectedYear })
+              : tr("{{v0}}점대 감상 작품", { v0: scoreAnimeState.selectedScore })
         }
-        description="선택한 분석 항목에 해당하는 애니예요."
+        description={tr("선택한 분석 항목에 해당하는 애니예요.")}
         items={
           activeTab === 'genre'
             ? genreAnimeState.items
@@ -2198,10 +2200,10 @@ export function AnalysisPage() {
       <section className="analysis-panel analysis-bubble-panel">
         <div className="analysis-panel-heading">
           <span className="detail-label">Genre preference</span>
-          <h2>장르 취향 버블 차트</h2>
-          <p>내 평균과 커뮤니티 평균을 각각의 전체 평균 대비로 정규화해, 취향이 어느 쪽으로 기우는지 볼 수 있어요.</p>
+          <h2>{tr("장르 취향 버블 차트")}</h2>
+          <p>{tr("내 평균과 커뮤니티 평균을 각각의 전체 평균 대비로 정규화해, 취향이 어느 쪽으로 기우는지 볼 수 있어요.")}</p>
         </div>
-        {genreBubbleIsLoading && <div className="analysis-empty-state">장르 취향 차트를 불러오는 중이에요.</div>}
+        {genreBubbleIsLoading && <div className="analysis-empty-state">{tr("장르 취향 차트를 불러오는 중이에요.")}</div>}
         {genreBubbleError && !genreBubbleIsLoading && renderEmptyMessage(genreBubbleError, true)}
         {!genreBubbleIsLoading && !genreBubbleError && genreBubbleItem && genreBubbleItem.items.length > 0 && (
           <Suspense fallback={<div className="analysis-chart-skeleton analysis-chart-skeleton-wide" />}>
@@ -2216,7 +2218,7 @@ export function AnalysisPage() {
           </Suspense>
         )}
         {!genreBubbleIsLoading && !genreBubbleError && (!genreBubbleItem || genreBubbleItem.items.length === 0) && (
-          <div className="analysis-empty-state">표시할 장르 취향 데이터가 아직 없어요.</div>
+          <div className="analysis-empty-state">{tr("표시할 장르 취향 데이터가 아직 없어요.")}</div>
         )}
       </section>
 
@@ -2226,7 +2228,7 @@ export function AnalysisPage() {
         <>
           <StudioRankingSection cacheOwnerId={userId} cacheVersion={cacheVersion} />
 
-          <VoiceActorRankingSection cacheOwnerId={userId} cacheVersion={cacheVersion} ownerLabel="내" />
+          <VoiceActorRankingSection cacheOwnerId={userId} cacheVersion={cacheVersion} ownerLabel={tr("내")} />
         </>
       )}
     </section>

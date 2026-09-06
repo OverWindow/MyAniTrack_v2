@@ -1,3 +1,5 @@
+import { getLocaleTag } from '../i18n'
+import { getTitleLanguage, tr } from '../i18n'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
 import { CollectionCarousel } from '../components/CollectionCarousel'
@@ -46,9 +48,9 @@ type PublicSeriesCollectionState = {
 }
 
 const sortOptions: Array<{ value: UserAnimeListSort; label: string }> = [
-  { value: 'latest', label: '최근 수정순' },
-  { value: 'added', label: '추가 최신순' },
-  { value: 'score', label: '내 점수 높은 순' },
+  { value: 'latest', label: tr("최근 수정순") },
+  { value: 'added', label: tr("추가 최신순") },
+  { value: 'score', label: tr("내 점수 높은 순") },
 ]
 
 const createInitialState = (requestKey: string): PublicCollectionState => ({
@@ -84,7 +86,7 @@ function renderStars(score?: number | null) {
   const numericScore = typeof score === 'number' ? score : typeof score === 'string' ? Number(score) : NaN
 
   if (!Number.isFinite(numericScore) || numericScore <= 0) {
-    return '평점 없음'
+    return tr("평점 없음")
   }
 
   const filled = Math.round(numericScore / 2)
@@ -109,7 +111,7 @@ export function UserCollectionPage({ shareToken }: { shareToken?: string } = {})
   const [genre, setGenre] = useState<AnimeGenre | 'all'>('all')
   const [searchTerm, setSearchTerm] = useState('')
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
-  const [searchLanguage, setSearchLanguage] = useState<'ko' | 'en'>('ko')
+  const searchLanguage = getTitleLanguage()
   const [viewMode, setViewMode] = useState<'anime' | 'series'>('anime')
   const [seriesScope, setSeriesScope] = useState<AnimeSeriesScope>('mainline')
   const [seriesStatus, setSeriesStatus] = useState<UserSeriesCollectionStatus>('all')
@@ -197,7 +199,7 @@ export function UserCollectionPage({ shareToken }: { shareToken?: string } = {})
           hasNext: false,
           isLoading: false,
           isLoadingMore: false,
-          error: getFriendlyErrorMessage(fetchError, '컬렉션을 불러오지 못했어요.'),
+          error: getFriendlyErrorMessage(fetchError, tr("컬렉션을 불러오지 못했어요.")),
           requestKey,
         })
       }
@@ -281,7 +283,7 @@ export function UserCollectionPage({ shareToken }: { shareToken?: string } = {})
         setSeriesState({
           items: [],
           isLoading: false,
-          error: getFriendlyErrorMessage(fetchError, '시리즈 컬렉션을 불러오지 못했어요.'),
+          error: getFriendlyErrorMessage(fetchError, tr("시리즈 컬렉션을 불러오지 못했어요.")),
           requestKey: seriesRequestKey,
         })
       }
@@ -325,7 +327,7 @@ export function UserCollectionPage({ shareToken }: { shareToken?: string } = {})
         setCarouselState({
           items: [],
           isLoading: false,
-          error: getFriendlyErrorMessage(fetchError, '최애 애니를 불러오지 못했어요.'),
+          error: getFriendlyErrorMessage(fetchError, tr("최애 애니를 불러오지 못했어요.")),
         })
       }
     }
@@ -398,7 +400,7 @@ export function UserCollectionPage({ shareToken }: { shareToken?: string } = {})
             setState((current) => ({
               ...current,
               isLoadingMore: false,
-              error: getFriendlyErrorMessage(fetchError, '추가 컬렉션을 불러오지 못했어요.'),
+              error: getFriendlyErrorMessage(fetchError, tr("추가 컬렉션을 불러오지 못했어요.")),
             }))
           }
         }
@@ -416,8 +418,8 @@ export function UserCollectionPage({ shareToken }: { shareToken?: string } = {})
   if (!userId) {
     return (
       <section className="collection-page">
-        <ErrorToast message="잘못된 사용자 경로예요." />
-        <div className="feedback-card">요청한 컬렉션을 열 수 없어요.</div>
+        <ErrorToast message={tr("잘못된 사용자 경로예요.")} />
+        <div className="feedback-card">{tr("요청한 컬렉션을 열 수 없어요.")}</div>
       </section>
     )
   }
@@ -429,27 +431,27 @@ export function UserCollectionPage({ shareToken }: { shareToken?: string } = {})
         <div className="user-catalog-title-group">
           {shareToken ? (
             <Link className="detail-back-link" to="/">
-              홈으로 돌아가기
+              {tr("홈으로 돌아가기")}
             </Link>
           ) : (
             <Link className="detail-back-link" to={`/users/${userId}/profile`}>
-              프로필로 돌아가기
+              {tr("프로필로 돌아가기")}
             </Link>
           )}
-          {user && <h1>{user.username}님의 컬렉션</h1>}
+          {user && <h1>{user.username}{tr("님의 컬렉션")}</h1>}
         </div>
         <div className="user-collection-count-card">
-          <span className="summary-label">공개 컬렉션</span>
-          <strong>{totalAnimeCount.toLocaleString()}</strong>
-          <span className="summary-label">편</span>
+          <span className="summary-label">{tr("공개 컬렉션")}</span>
+          <strong>{totalAnimeCount.toLocaleString(getLocaleTag())}</strong>
+          <span className="summary-label">{tr("편")}</span>
         </div>
       </div>
     </section>
 
     <CollectionCarousel
       state={carouselState}
-      title={`${user?.username ?? '친구'}님의 최애 애니`}
-      ariaLabel={`${user?.username ?? '친구'}님의 최애 애니`}
+      title={tr("{{v0}}님의 최애 애니", { v0: user?.username ?? '친구' })}
+      ariaLabel={tr("{{v0}}님의 최애 애니", { v0: user?.username ?? '친구' })}
     />
 
     <section className="collection-page user-collection-page user-collection-page-content">
@@ -461,27 +463,11 @@ export function UserCollectionPage({ shareToken }: { shareToken?: string } = {})
               <input
                 id="user-collection-search"
                 type="search"
-                placeholder={viewMode === 'series' ? '시리즈 또는 작품 제목 검색' : '컬렉션에서 검색하기'}
+                placeholder={viewMode === 'series' ? tr("시리즈 또는 작품 제목 검색") : tr("컬렉션에서 검색하기")}
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
               />
             </label>
-            <div className="search-language-switch" aria-label="검색 언어 선택">
-              <button
-                className={searchLanguage === 'ko' ? 'search-language-button is-active' : 'search-language-button'}
-                type="button"
-                onClick={() => setSearchLanguage('ko')}
-              >
-                한
-              </button>
-              <button
-                className={searchLanguage === 'en' ? 'search-language-button is-active' : 'search-language-button'}
-                type="button"
-                onClick={() => setSearchLanguage('en')}
-              >
-                EN
-              </button>
-            </div>
           </div>
 
           <div className="catalog-control-group">
@@ -493,8 +479,8 @@ export function UserCollectionPage({ shareToken }: { shareToken?: string } = {})
                     value={seriesScope}
                     onChange={(event) => setSeriesScope(event.target.value as AnimeSeriesScope)}
                   >
-                    <option value="mainline">본편 시리즈</option>
-                    <option value="franchise">관련 작품 전체</option>
+                    <option value="mainline">{tr("본편 시리즈")}</option>
+                    <option value="franchise">{tr("관련 작품 전체")}</option>
                   </select>
                 </label>
                 <label className="sort-field" htmlFor="user-collection-series-status">
@@ -503,10 +489,10 @@ export function UserCollectionPage({ shareToken }: { shareToken?: string } = {})
                     value={seriesStatus}
                     onChange={(event) => setSeriesStatus(event.target.value as UserSeriesCollectionStatus)}
                   >
-                    <option value="all">전체 시리즈</option>
-                    <option value="started">시작한 시리즈</option>
-                    <option value="watched">본 시리즈</option>
-                    <option value="completed">완주한 시리즈</option>
+                    <option value="all">{tr("전체 시리즈")}</option>
+                    <option value="started">{tr("시작한 시리즈")}</option>
+                    <option value="watched">{tr("본 시리즈")}</option>
+                    <option value="completed">{tr("완주한 시리즈")}</option>
                   </select>
                 </label>
               </>
@@ -514,7 +500,7 @@ export function UserCollectionPage({ shareToken }: { shareToken?: string } = {})
               <>
                 <label className="sort-field" htmlFor="user-collection-genre">
                   <select id="user-collection-genre" value={genre} onChange={(event) => setGenre(event.target.value as AnimeGenre | 'all')}>
-                    <option value="all">전체 장르</option>
+                    <option value="all">{tr("전체 장르")}</option>
                     {genreOptions.map((option) => (
                       <option key={option.value} value={option.value}>{option.label}</option>
                     ))}
@@ -553,7 +539,7 @@ export function UserCollectionPage({ shareToken }: { shareToken?: string } = {})
       {viewMode === 'anime' && !isLoading && !isRefreshingQuery && !error && (
         <>
           {filteredItems.length === 0 ? (
-            <div className="feedback-card">아직 공개된 컬렉션이 없거나, 검색 결과가 없어요.</div>
+            <div className="feedback-card">{tr("아직 공개된 컬렉션이 없거나, 검색 결과가 없어요.")}</div>
           ) : (
             <div className="collection-grid">
               {filteredItems.map((item) => (
@@ -580,8 +566,8 @@ export function UserCollectionPage({ shareToken }: { shareToken?: string } = {})
 
           <div ref={sentinelRef} className="scroll-sentinel" aria-hidden="true" />
 
-          {isLoadingMore && <div className="feedback-inline">컬렉션을 더 불러오는 중이에요.</div>}
-          {!hasNext && items.length > 0 && <div className="feedback-inline">마지막 작품까지 모두 확인했어요.</div>}
+          {isLoadingMore && <div className="feedback-inline">{tr("컬렉션을 더 불러오는 중이에요.")}</div>}
+          {!hasNext && items.length > 0 && <div className="feedback-inline">{tr("마지막 작품까지 모두 확인했어요.")}</div>}
         </>
       )}
 
@@ -595,13 +581,13 @@ export function UserCollectionPage({ shareToken }: { shareToken?: string } = {})
 
       {viewMode === 'series' && !seriesState.error && !seriesState.isLoading && !isRefreshingSeriesQuery && (
         seriesState.items.length === 0 ? (
-          <div className="feedback-card">조건에 맞는 시리즈가 없어요.</div>
+          <div className="feedback-card">{tr("조건에 맞는 시리즈가 없어요.")}</div>
         ) : (
           <SeriesCollectionGrid
             items={seriesState.items}
             location={location}
             fromPage="user-collection"
-            collectionLabel="컬렉션"
+            collectionLabel={tr("컬렉션")}
           />
         )
       )}

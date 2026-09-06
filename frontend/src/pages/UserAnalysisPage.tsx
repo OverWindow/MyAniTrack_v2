@@ -1,3 +1,5 @@
+import { getLocaleTag } from '../i18n'
+import { tr } from '../i18n'
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { AnalysisAnimeToast } from '../components/AnalysisAnimeToast'
@@ -61,9 +63,9 @@ type PieDatum = {
 type AnalysisTab = 'genre' | 'year' | 'score'
 
 const analysisTabs: Array<{ value: AnalysisTab; label: string }> = [
-  { value: 'genre', label: '장르별 분석' },
-  { value: 'year', label: '연도별 분석' },
-  { value: 'score', label: '평점별 분석' },
+  { value: 'genre', label: tr("장르별 분석") },
+  { value: 'year', label: tr("연도별 분석") },
+  { value: 'score', label: tr("평점별 분석") },
 ]
 
 const GenreDistributionPieChart = lazy(async () => {
@@ -123,7 +125,7 @@ function renderEmptyMessage(message: string, isError = false) {
     return (
       <>
         <ErrorToast message={message} />
-        <div className="analysis-empty-state">지금은 이 분석을 표시할 수 없어요.</div>
+        <div className="analysis-empty-state">{tr("지금은 이 분석을 표시할 수 없어요.")}</div>
       </>
     )
   }
@@ -230,7 +232,7 @@ export function UserAnalysisPage({ shareToken }: { shareToken?: string } = {}) {
           user: null,
           item: null,
           isLoading: false,
-          error: getFriendlyErrorMessage(loadError, '분석 정보를 불러오지 못했어요.'),
+          error: getFriendlyErrorMessage(loadError, tr("분석 정보를 불러오지 못했어요.")),
         })
       }
     }
@@ -261,7 +263,7 @@ export function UserAnalysisPage({ shareToken }: { shareToken?: string } = {}) {
         setViewingDnaState({
           item: null,
           isLoading: false,
-          error: getFriendlyErrorMessage(loadError, '감상 DNA 분석을 불러오지 못했어요.'),
+          error: getFriendlyErrorMessage(loadError, tr("감상 DNA 분석을 불러오지 못했어요.")),
         })
       }
     }
@@ -292,7 +294,7 @@ export function UserAnalysisPage({ shareToken }: { shareToken?: string } = {}) {
         setFormatDistributionState({
           item: null,
           isLoading: false,
-          error: getFriendlyErrorMessage(loadError, '포맷별 분석을 불러오지 못했어요.'),
+          error: getFriendlyErrorMessage(loadError, tr("포맷별 분석을 불러오지 못했어요.")),
         })
       }
     }
@@ -323,7 +325,7 @@ export function UserAnalysisPage({ shareToken }: { shareToken?: string } = {}) {
         setYearlyScoreState({
           item: null,
           isLoading: false,
-          error: getFriendlyErrorMessage(loadError, '연도별 평점 분석을 불러오지 못했어요.'),
+          error: getFriendlyErrorMessage(loadError, tr("연도별 평점 분석을 불러오지 못했어요.")),
         })
       }
     }
@@ -354,7 +356,7 @@ export function UserAnalysisPage({ shareToken }: { shareToken?: string } = {}) {
         setGenreBubbleState({
           item: null,
           isLoading: false,
-          error: getFriendlyErrorMessage(loadError, '장르 취향 버블 차트를 불러오지 못했어요.'),
+          error: getFriendlyErrorMessage(loadError, tr("장르 취향 버블 차트를 불러오지 못했어요.")),
         })
       }
     }
@@ -405,7 +407,7 @@ export function UserAnalysisPage({ shareToken }: { shareToken?: string } = {}) {
     [releaseDistribution],
   )
   const scoreDistributionChartData = useMemo<ScoreDistributionChartDatum[]>(
-    () => scoreDistribution.map(([score, count]) => ({ score, label: `${score}점대`, count })),
+    () => scoreDistribution.map(([score, count]) => ({ score, label: tr("{{v0}}점대", { v0: score }), count })),
     [scoreDistribution],
   )
 
@@ -431,7 +433,7 @@ export function UserAnalysisPage({ shareToken }: { shareToken?: string } = {}) {
         selectedValue: genre,
         items: [],
         isLoading: false,
-        error: getFriendlyErrorMessage(error, '해당 장르 작품을 불러오지 못했어요.'),
+        error: getFriendlyErrorMessage(error, tr("해당 장르 작품을 불러오지 못했어요.")),
       })
     }
   }
@@ -448,7 +450,7 @@ export function UserAnalysisPage({ shareToken }: { shareToken?: string } = {}) {
         selectedValue: year,
         items: [],
         isLoading: false,
-        error: '이 항목은 단일 연도가 아니라 기간이라서 작품 목록을 불러올 수 없어요.',
+        error: tr("이 항목은 단일 연도가 아니라 기간이라서 작품 목록을 불러올 수 없어요."),
       })
       return
     }
@@ -470,7 +472,7 @@ export function UserAnalysisPage({ shareToken }: { shareToken?: string } = {}) {
         selectedValue: year,
         items: [],
         isLoading: false,
-        error: getFriendlyErrorMessage(error, '해당 연도 작품을 불러오지 못했어요.'),
+        error: getFriendlyErrorMessage(error, tr("해당 연도 작품을 불러오지 못했어요.")),
       })
     }
   }
@@ -487,7 +489,7 @@ export function UserAnalysisPage({ shareToken }: { shareToken?: string } = {}) {
         selectedValue: score,
         items: [],
         isLoading: false,
-        error: '선택한 평점 형식이 올바르지 않아요.',
+        error: tr("선택한 평점 형식이 올바르지 않아요."),
       })
       return
     }
@@ -509,7 +511,7 @@ export function UserAnalysisPage({ shareToken }: { shareToken?: string } = {}) {
         selectedValue: score,
         items: [],
         isLoading: false,
-        error: getFriendlyErrorMessage(error, '해당 평점 작품을 불러오지 못했어요.'),
+        error: getFriendlyErrorMessage(error, tr("해당 평점 작품을 불러오지 못했어요.")),
       })
     }
   }
@@ -517,8 +519,8 @@ export function UserAnalysisPage({ shareToken }: { shareToken?: string } = {}) {
   if (!userId) {
     return (
       <section className="analysis-page">
-        <ErrorToast message="잘못된 사용자 경로예요." />
-        <div className="feedback-card">요청한 분석 화면을 열 수 없어요.</div>
+        <ErrorToast message={tr("잘못된 사용자 경로예요.")} />
+        <div className="feedback-card">{tr("요청한 분석 화면을 열 수 없어요.")}</div>
       </section>
     )
   }
@@ -541,7 +543,7 @@ export function UserAnalysisPage({ shareToken }: { shareToken?: string } = {}) {
   if (state.error || !state.item || !state.user) {
     return (
       <section className="analysis-page">
-        <ConnectionErrorState message={state.error ?? '분석 정보를 찾을 수 없어요.'} />
+        <ConnectionErrorState message={state.error ?? tr("분석 정보를 찾을 수 없어요.")} />
       </section>
     )
   }
@@ -554,10 +556,10 @@ export function UserAnalysisPage({ shareToken }: { shareToken?: string } = {}) {
   return (
     <section className="analysis-page user-analysis-page">
       {shareToken ? (
-        <span className="detail-label">공유 리포트</span>
+        <span className="detail-label">{tr("공유 리포트")}</span>
       ) : (
         <Link className="detail-back-link" to={`/users/${userId}/profile`}>
-          프로필로 돌아가기
+          {tr("프로필로 돌아가기")}
         </Link>
       )}
 
@@ -578,19 +580,19 @@ export function UserAnalysisPage({ shareToken }: { shareToken?: string } = {}) {
             )}
             <div>
               <h1>{user.username}</h1>
-              <p>{shareToken ? '읽기 전용 공유 분석' : `사용자 ID ${user.id}`}</p>
+              <p>{shareToken ? tr("읽기 전용 공유 분석") : tr("사용자 ID {{v0}}", { v0: user.id })}</p>
             </div>
           </div>
           <p className="analysis-profile-note">
-            이 유저의 공개 컬렉션, 평점, 시청 기록을 바탕으로 취향 흐름을 정리했어요.
+            {tr("이 유저의 공개 컬렉션, 평점, 시청 기록을 바탕으로 취향 흐름을 정리했어요.")}
           </p>
-          <span className="analysis-updated-at">마지막 계산 {formatUpdatedAt(item.updatedAt)}</span>
+          <span className="analysis-updated-at">{tr("마지막 계산")} {formatUpdatedAt(item.updatedAt)}</span>
         </div>
 
         {!shareToken && (
           <div className="analysis-hero-actions user-analysis-actions">
             <Link className="secondary-button" to={`/users/${userId}/anime-list`}>
-              컬렉션 보기
+              {tr("컬렉션 보기")}
             </Link>
           </div>
         )}
@@ -599,19 +601,19 @@ export function UserAnalysisPage({ shareToken }: { shareToken?: string } = {}) {
       <section className="analysis-summary-card">
         <div className="analysis-summary-grid">
           <article className="analysis-summary-item">
-            <span>선호 장르</span>
+            <span>{tr("선호 장르")}</span>
             <strong>{getGenreLabel(item.favoriteGenre)}</strong>
           </article>
           <article className="analysis-summary-item">
-            <span>총 작품 수</span>
-            <strong>{item.totalCount.toLocaleString()}편</strong>
+            <span>{tr("총 작품 수")}</span>
+            <strong>{item.totalCount.toLocaleString(getLocaleTag())}{tr("편")}</strong>
           </article>
           <article className="analysis-summary-item">
-            <span>평균 점수</span>
-            <strong>{averageScore !== null ? `${averageScore.toFixed(1)} / 10` : '미집계'}</strong>
+            <span>{tr("평균 점수")}</span>
+            <strong>{averageScore !== null ? `${averageScore.toFixed(1)} / 10` : tr("미집계")}</strong>
           </article>
           <article className="analysis-summary-item">
-            <span>총 시청 시간</span>
+            <span>{tr("총 시청 시간")}</span>
             <strong>{formatWatchHours(item.totalWatchMinutes)}</strong>
           </article>
         </div>
@@ -622,19 +624,19 @@ export function UserAnalysisPage({ shareToken }: { shareToken?: string } = {}) {
         <section className="analysis-panel analysis-overview-panel">
           <div className="analysis-panel-heading">
             <span className="detail-label">Overview</span>
-            <h2>기본 통계</h2>
+            <h2>{tr("기본 통계")}</h2>
           </div>
           <div className="analysis-facts-grid">
-            <article><span>총 작품 수</span><strong>{item.totalCount.toLocaleString()}</strong></article>
-            <article><span>완주 작품</span><strong>{item.completedCount.toLocaleString()}</strong></article>
-            <article><span>보는 중</span><strong>{item.watchingCount.toLocaleString()}</strong></article>
-            <article><span>중단 작품</span><strong>{item.droppedCount.toLocaleString()}</strong></article>
-            <article><span>총 시청 화수</span><strong>{item.totalWatchedEpisodes.toLocaleString()}화</strong></article>
-            <article><span>선호 시기</span><strong>{item.favoriteReleasePeriod || '정보 없음'}</strong></article>
-            <article><span>평균 방영 연도</span><strong>{averageReleaseYear !== null ? averageReleaseYear.toFixed(1) : '정보 없음'}</strong></article>
-            <article><span>본 시리즈</span><strong>{(item.seriesStats?.watchedSeriesCount ?? 0).toLocaleString()}개</strong></article>
-            <article><span>완주 시리즈</span><strong>{(item.seriesStats?.completedSeriesCount ?? 0).toLocaleString()}개</strong></article>
-            <article><span>시리즈 완주율</span><strong>{(item.seriesStats?.seriesCompletionRate ?? 0).toFixed(1)}%</strong></article>
+            <article><span>{tr("총 작품 수")}</span><strong>{item.totalCount.toLocaleString(getLocaleTag())}</strong></article>
+            <article><span>{tr("완주 작품")}</span><strong>{item.completedCount.toLocaleString(getLocaleTag())}</strong></article>
+            <article><span>{tr("보는 중")}</span><strong>{item.watchingCount.toLocaleString(getLocaleTag())}</strong></article>
+            <article><span>{tr("중단 작품")}</span><strong>{item.droppedCount.toLocaleString(getLocaleTag())}</strong></article>
+            <article><span>{tr("총 시청 화수")}</span><strong>{item.totalWatchedEpisodes.toLocaleString(getLocaleTag())}{tr("화")}</strong></article>
+            <article><span>{tr("선호 시기")}</span><strong>{item.favoriteReleasePeriod || tr("정보 없음")}</strong></article>
+            <article><span>{tr("평균 방영 연도")}</span><strong>{averageReleaseYear !== null ? averageReleaseYear.toFixed(1) : tr("정보 없음")}</strong></article>
+            <article><span>{tr("본 시리즈")}</span><strong>{(item.seriesStats?.watchedSeriesCount ?? 0).toLocaleString(getLocaleTag())}{tr("개")}</strong></article>
+            <article><span>{tr("완주 시리즈")}</span><strong>{(item.seriesStats?.completedSeriesCount ?? 0).toLocaleString(getLocaleTag())}{tr("개")}</strong></article>
+            <article><span>{tr("시리즈 완주율")}</span><strong>{(item.seriesStats?.seriesCompletionRate ?? 0).toFixed(1)}%</strong></article>
           </div>
         </section>
 
@@ -642,8 +644,8 @@ export function UserAnalysisPage({ shareToken }: { shareToken?: string } = {}) {
           <section className="analysis-panel analysis-format-panel">
             <div className="analysis-panel-heading">
               <span className="detail-label">Format distribution</span>
-              <h2>포맷별 감상 분포</h2>
-              <p>TV, 영화, OVA 같은 포맷별로 감상 비중과 시청 시간을 비교해요.</p>
+              <h2>{tr("포맷별 감상 분포")}</h2>
+              <p>{tr("TV, 영화, OVA 같은 포맷별로 감상 비중과 시청 시간을 비교해요.")}</p>
             </div>
             {formatDistributionState.isLoading && (
               <div className="analysis-chart-skeleton" />
@@ -661,22 +663,22 @@ export function UserAnalysisPage({ shareToken }: { shareToken?: string } = {}) {
                   </Suspense>
                   <div className="analysis-format-summary">
                     <article>
-                      <span>대표 포맷</span>
-                      <strong>{formatDistributionState.item.summary.topFormatLabel ?? '정보 없음'}</strong>
+                      <span>{tr("대표 포맷")}</span>
+                      <strong>{formatDistributionState.item.summary.topFormatLabel ?? tr("정보 없음")}</strong>
                     </article>
                     <article>
-                      <span>포맷 수</span>
-                      <strong>{formatDistributionState.item.summary.formatCount.toLocaleString()}개</strong>
+                      <span>{tr("포맷 수")}</span>
+                      <strong>{formatDistributionState.item.summary.formatCount.toLocaleString(getLocaleTag())}{tr("개")}</strong>
                     </article>
                     <article>
-                      <span>총 작품 수</span>
-                      <strong>{formatDistributionState.item.totalAnimeCount.toLocaleString()}편</strong>
+                      <span>{tr("총 작품 수")}</span>
+                      <strong>{formatDistributionState.item.totalAnimeCount.toLocaleString(getLocaleTag())}{tr("편")}</strong>
                     </article>
                     <article>
-                      <span>총 시청 시간</span>
+                      <span>{tr("총 시청 시간")}</span>
                       <strong>{formatDistributionState.item.totalWatchHours !== null
-                        ? `${formatDistributionState.item.totalWatchHours.toLocaleString(undefined, { maximumFractionDigits: 1 })}시간`
-                        : `${Math.round(formatDistributionState.item.totalWatchMinutes / 60).toLocaleString()}시간`}</strong>
+                        ? tr("{{v0}}시간", { v0: formatDistributionState.item.totalWatchHours.toLocaleString(getLocaleTag(), { maximumFractionDigits: 1 }) })
+                        : tr("{{v0}}시간", { v0: Math.round(formatDistributionState.item.totalWatchMinutes / 60).toLocaleString(getLocaleTag()) })}</strong>
                     </article>
                   </div>
                 </div>
@@ -684,7 +686,7 @@ export function UserAnalysisPage({ shareToken }: { shareToken?: string } = {}) {
             {!formatDistributionState.isLoading
               && !formatDistributionState.error
               && (!formatDistributionState.item || formatDistributionState.item.items.length === 0)
-              && renderEmptyMessage('아직 포맷별 분석 데이터가 없어요.')}
+              && renderEmptyMessage(tr("아직 포맷별 분석 데이터가 없어요."))}
           </section>
 
           <ViewingDnaCard
@@ -693,7 +695,7 @@ export function UserAnalysisPage({ shareToken }: { shareToken?: string } = {}) {
             error={viewingDnaState.error}
           />
 
-          <div className="analysis-segmented-control" role="tablist" aria-label="분석 종류 선택">
+          <div className="analysis-segmented-control" role="tablist" aria-label={tr("분석 종류 선택")}>
             {analysisTabs.map((tab) => (
               <button
                 className={activeTab === tab.value ? 'analysis-segment is-active' : 'analysis-segment'}
@@ -713,7 +715,7 @@ export function UserAnalysisPage({ shareToken }: { shareToken?: string } = {}) {
               <section className="analysis-panel analysis-genre-chart-panel">
                 <div className="analysis-panel-heading">
                   <span className="detail-label">Genre</span>
-                  <h2>장르 분포</h2>
+                  <h2>{tr("장르 분포")}</h2>
                 </div>
                 {genreDistributionChartData.length > 0 ? (
                   <Suspense fallback={<div className="analysis-chart-skeleton" />}>
@@ -725,13 +727,13 @@ export function UserAnalysisPage({ shareToken }: { shareToken?: string } = {}) {
                       }}
                     />
                   </Suspense>
-                ) : renderEmptyMessage('아직 장르 분포 데이터가 없어요.')}
+                ) : renderEmptyMessage(tr("아직 장르 분포 데이터가 없어요."))}
               </section>
 
               <section className="analysis-panel analysis-genre-chart-panel">
                 <div className="analysis-panel-heading">
                   <span className="detail-label">Watch time</span>
-                  <h2>장르별 시청 시간</h2>
+                  <h2>{tr("장르별 시청 시간")}</h2>
                 </div>
                 {genreWatchMinutesChartData.length > 0 ? (
                   <Suspense fallback={<div className="analysis-chart-skeleton" />}>
@@ -743,13 +745,13 @@ export function UserAnalysisPage({ shareToken }: { shareToken?: string } = {}) {
                       }}
                     />
                   </Suspense>
-                ) : renderEmptyMessage('아직 장르별 시청 시간 데이터가 없어요.')}
+                ) : renderEmptyMessage(tr("아직 장르별 시청 시간 데이터가 없어요."))}
               </section>
 
               <section className="analysis-panel analysis-genre-score-panel">
                 <div className="analysis-panel-heading">
                   <span className="detail-label">Genre score</span>
-                  <h2>장르별 평균 점수</h2>
+                  <h2>{tr("장르별 평균 점수")}</h2>
                 </div>
                 <div className="analysis-list">
                   {genreAvgScore.length > 0 ? genreAvgScore.map(([genre, rawScore], index) => {
@@ -771,10 +773,10 @@ export function UserAnalysisPage({ shareToken }: { shareToken?: string } = {}) {
                           void handleSelectGenre(genre)
                         }}
                       >
-                        <span className="analysis-genre-score-rank">{rank}위</span>
+                        <span className="analysis-genre-score-rank">{rank}{tr("위")}</span>
                         <div className="analysis-genre-score-copy">
                           <span>{getGenreLabel(genre)}</span>
-                          <small>{genreAnimeCount.toLocaleString()}편</small>
+                          <small>{genreAnimeCount.toLocaleString(getLocaleTag())}{tr("편")}</small>
                           <div className="analysis-score-stars" aria-hidden="true">
                             {Array.from({ length: 5 }).map((_, index) => (
                               <div className="analysis-score-star-shell" key={`${genre}-${index}`}>
@@ -792,7 +794,7 @@ export function UserAnalysisPage({ shareToken }: { shareToken?: string } = {}) {
                         <strong>{normalizedScore.toFixed(1)} / 10</strong>
                       </button>
                     )
-                  }) : renderEmptyMessage('아직 장르별 평균 점수 데이터가 없어요.')}
+                  }) : renderEmptyMessage(tr("아직 장르별 평균 점수 데이터가 없어요."))}
                 </div>
               </section>
 
@@ -804,7 +806,7 @@ export function UserAnalysisPage({ shareToken }: { shareToken?: string } = {}) {
               <section className="analysis-panel analysis-panel-wide">
                 <div className="analysis-panel-heading">
                   <span className="detail-label">Release year</span>
-                  <h2>연도별 감상 작품 수</h2>
+                  <h2>{tr("연도별 감상 작품 수")}</h2>
                 </div>
                 {releaseYearChartData.length > 0 ? (
                   <>
@@ -819,35 +821,35 @@ export function UserAnalysisPage({ shareToken }: { shareToken?: string } = {}) {
                     </Suspense>
                     <ReleaseDecadeProgress entries={releaseDistribution} />
                   </>
-                ) : renderEmptyMessage('아직 연도별 감상 데이터가 없어요.')}
+                ) : renderEmptyMessage(tr("아직 연도별 감상 데이터가 없어요."))}
               </section>
 
               <section className="analysis-panel analysis-panel-wide">
                 <div className="analysis-panel-heading">
                   <span className="detail-label">Year score</span>
-                  <h2>연도별 평균 평점</h2>
-                  <p>평점이 있는 작품이 3편 이상인 연도만 모아 이 유저의 평균과 커뮤니티 평균을 비교해요.</p>
+                  <h2>{tr("연도별 평균 평점")}</h2>
+                  <p>{tr("평점이 있는 작품이 3편 이상인 연도만 모아 이 유저의 평균과 커뮤니티 평균을 비교해요.")}</p>
                 </div>
-                {yearlyScoreState.isLoading && <div className="analysis-empty-state">연도별 평점 분석을 불러오는 중이에요.</div>}
+                {yearlyScoreState.isLoading && <div className="analysis-empty-state">{tr("연도별 평점 분석을 불러오는 중이에요.")}</div>}
                 {yearlyScoreState.error && !yearlyScoreState.isLoading && renderEmptyMessage(yearlyScoreState.error, true)}
                 {!yearlyScoreState.isLoading && !yearlyScoreState.error && yearlyScoreState.item && yearlyScoreState.item.items.length > 0 && (
                   <>
                     <div className="analysis-year-score-summary">
                       <article>
-                        <span>최고 연도</span>
+                        <span>{tr("최고 연도")}</span>
                         <strong>{yearlyScoreState.item.summary.bestYear ?? '-'}</strong>
                       </article>
                       <article>
-                        <span>최저 연도</span>
+                        <span>{tr("최저 연도")}</span>
                         <strong>{yearlyScoreState.item.summary.worstYear ?? '-'}</strong>
                       </article>
                       <article>
-                        <span>전체 평균</span>
-                        <strong>{formatAnalysisScore(yearlyScoreState.item.summary.averageScore)}점</strong>
+                        <span>{tr("전체 평균")}</span>
+                        <strong>{formatAnalysisScore(yearlyScoreState.item.summary.averageScore)}{tr("점")}</strong>
                       </article>
                       <article>
-                        <span>분석 연도</span>
-                        <strong>{yearlyScoreState.item.summary.yearCount.toLocaleString()}개</strong>
+                        <span>{tr("분석 연도")}</span>
+                        <strong>{yearlyScoreState.item.summary.yearCount.toLocaleString(getLocaleTag())}{tr("개")}</strong>
                       </article>
                     </div>
                     <Suspense fallback={<div className="analysis-chart-skeleton analysis-chart-skeleton-wide" />}>
@@ -862,7 +864,7 @@ export function UserAnalysisPage({ shareToken }: { shareToken?: string } = {}) {
                   </>
                 )}
                 {!yearlyScoreState.isLoading && !yearlyScoreState.error && (!yearlyScoreState.item || yearlyScoreState.item.items.length === 0) && (
-                  <div className="analysis-empty-state">연도별 평점 분석에 표시할 데이터가 아직 없어요.</div>
+                  <div className="analysis-empty-state">{tr("연도별 평점 분석에 표시할 데이터가 아직 없어요.")}</div>
                 )}
               </section>
 
@@ -874,7 +876,7 @@ export function UserAnalysisPage({ shareToken }: { shareToken?: string } = {}) {
               <section className="analysis-panel analysis-panel-wide">
                 <div className="analysis-panel-heading">
                   <span className="detail-label">Score distribution</span>
-                  <h2>평점 분포</h2>
+                  <h2>{tr("평점 분포")}</h2>
                 </div>
                 {scoreDistributionChartData.length > 0 ? (
                   <Suspense fallback={<div className="analysis-chart-skeleton analysis-chart-skeleton-wide" />}>
@@ -886,7 +888,7 @@ export function UserAnalysisPage({ shareToken }: { shareToken?: string } = {}) {
                       }}
                     />
                   </Suspense>
-                ) : renderEmptyMessage('아직 평점 분포 데이터가 없어요.')}
+                ) : renderEmptyMessage(tr("아직 평점 분포 데이터가 없어요."))}
               </section>
 
             </div>
@@ -897,12 +899,12 @@ export function UserAnalysisPage({ shareToken }: { shareToken?: string } = {}) {
       <AnalysisAnimeToast
         title={
           activeTab === 'genre'
-            ? `${getGenreLabel(genreAnimeState.selectedValue)} 감상 작품`
+            ? tr("{{v0}} 감상 작품", { v0: getGenreLabel(genreAnimeState.selectedValue) })
             : activeTab === 'year'
-              ? `${yearAnimeState.selectedValue}년 감상 작품`
-              : `${scoreAnimeState.selectedValue}점대 감상 작품`
+              ? tr("{{v0}}년 감상 작품", { v0: yearAnimeState.selectedValue })
+              : tr("{{v0}}점대 감상 작품", { v0: scoreAnimeState.selectedValue })
         }
-        description="선택한 분석 항목에 해당하는 애니예요."
+        description={tr("선택한 분석 항목에 해당하는 애니예요.")}
         items={
           activeTab === 'genre'
             ? genreAnimeState.items
@@ -945,10 +947,10 @@ export function UserAnalysisPage({ shareToken }: { shareToken?: string } = {}) {
       <section className="analysis-panel analysis-bubble-panel">
         <div className="analysis-panel-heading">
           <span className="detail-label">Genre preference</span>
-          <h2>장르 취향 버블 차트</h2>
-          <p>이 유저의 평균과 커뮤니티 평균을 각각의 전체 평균 대비로 정규화해, 취향이 어느 쪽으로 기우는지 볼 수 있어요.</p>
+          <h2>{tr("장르 취향 버블 차트")}</h2>
+          <p>{tr("이 유저의 평균과 커뮤니티 평균을 각각의 전체 평균 대비로 정규화해, 취향이 어느 쪽으로 기우는지 볼 수 있어요.")}</p>
         </div>
-        {genreBubbleState.isLoading && <div className="analysis-empty-state">장르 취향 차트를 불러오는 중이에요.</div>}
+        {genreBubbleState.isLoading && <div className="analysis-empty-state">{tr("장르 취향 차트를 불러오는 중이에요.")}</div>}
         {genreBubbleState.error && !genreBubbleState.isLoading && renderEmptyMessage(genreBubbleState.error, true)}
         {!genreBubbleState.isLoading && !genreBubbleState.error && genreBubbleState.item && genreBubbleState.item.items.length > 0 && (
           <Suspense fallback={<div className="analysis-chart-skeleton analysis-chart-skeleton-wide" />}>
@@ -963,7 +965,7 @@ export function UserAnalysisPage({ shareToken }: { shareToken?: string } = {}) {
           </Suspense>
         )}
         {!genreBubbleState.isLoading && !genreBubbleState.error && (!genreBubbleState.item || genreBubbleState.item.items.length === 0) && (
-          <div className="analysis-empty-state">표시할 장르 취향 데이터가 아직 없어요.</div>
+          <div className="analysis-empty-state">{tr("표시할 장르 취향 데이터가 아직 없어요.")}</div>
         )}
       </section>
 

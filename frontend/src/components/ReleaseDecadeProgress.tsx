@@ -1,3 +1,5 @@
+import { getLocaleTag } from '../i18n'
+import { tr } from '../i18n'
 type ReleaseDecadeProgressProps = {
   entries: Array<[string, number]>
 }
@@ -5,7 +7,7 @@ type ReleaseDecadeProgressProps = {
 const decadeColors = ['#f59e0b', '#fb7185', '#38bdf8', '#84cc16', '#a78bfa', '#14b8a6', '#f97316']
 
 function getDecadeLabel(year: number) {
-  return `${Math.floor(year / 10) * 10}년대`
+  return tr("{{v0}}년대", { v0: Math.floor(year / 10) * 10 })
 }
 
 function getShortDecadeLabel(label: string) {
@@ -16,7 +18,7 @@ function getShortDecadeLabel(label: string) {
   }
 
   const shortYear = decade % 100
-  return `${shortYear.toString().padStart(2, '0')}년대`
+  return tr("{{v0}}년대", { v0: shortYear.toString().padStart(2, '0') })
 }
 
 export function ReleaseDecadeProgress({ entries }: ReleaseDecadeProgressProps) {
@@ -42,11 +44,11 @@ export function ReleaseDecadeProgress({ entries }: ReleaseDecadeProgressProps) {
   return (
       <div className="release-decade-panel">
         <div className="release-decade-heading">
-        <strong>세대별 작품 비중</strong>
-        <span>총 {totalCount.toLocaleString()}편</span>
+        <strong>{tr("세대별 작품 비중")}</strong>
+        <span>{tr("총")} {totalCount.toLocaleString(getLocaleTag())}{tr("편")}</span>
       </div>
 
-      <div className="release-decade-bar" aria-label="10년대별 작품 수 비중">
+      <div className="release-decade-bar" aria-label={tr("10년대별 작품 수 비중")}>
         {sortedEntries.map(([label, count], index) => {
           const percent = (count / totalCount) * 100
 
@@ -57,7 +59,7 @@ export function ReleaseDecadeProgress({ entries }: ReleaseDecadeProgressProps) {
                 width: `${percent}%`,
                 background: decadeColors[index % decadeColors.length],
               }}
-              title={`${label} 작품 수: ${count.toLocaleString()}, ${percent.toFixed(1)}%`}
+              title={tr("{{v0}} 작품 수: {{v1}}, {{v2}}%", { v0: label, v1: count.toLocaleString(getLocaleTag()), v2: percent.toFixed(1) })}
             >
               {percent >= 11 ? getShortDecadeLabel(label) : ''}
             </span>
@@ -73,7 +75,7 @@ export function ReleaseDecadeProgress({ entries }: ReleaseDecadeProgressProps) {
             <div className="release-decade-item" key={label}>
               <span style={{ background: decadeColors[index % decadeColors.length] }} />
               <strong>{label}: {percent.toFixed(1)}%</strong>
-              <small>({count.toLocaleString()}편)</small>
+              <small>({count.toLocaleString(getLocaleTag())}{tr("편)")}</small>
             </div>
           )
         })}

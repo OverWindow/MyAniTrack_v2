@@ -1,3 +1,4 @@
+import { getTitleLanguage, tr } from '../i18n'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import collectionEmptyMoaImage from '../assets/collection-empty-moa.png'
@@ -52,10 +53,10 @@ type SeriesCollectionState = {
 }
 
 const sortOptions: Array<{ value: UserAnimeListSort; label: string }> = [
-  { value: 'latest', label: '최근 수정순' },
-  { value: 'added', label: '추가 최신순' },
-  { value: 'score', label: '내 점수 높은 순' },
-  { value: 'scoreAsc', label: '내 점수 낮은 순' },
+  { value: 'latest', label: tr("최근 수정순") },
+  { value: 'added', label: tr("추가 최신순") },
+  { value: 'score', label: tr("내 점수 높은 순") },
+  { value: 'scoreAsc', label: tr("내 점수 낮은 순") },
 ]
 
 const createInitialCollectionState = (requestKey: string): CollectionState => ({
@@ -95,7 +96,7 @@ function renderStars(score?: number | null) {
         : NaN
 
   if (!Number.isFinite(numericScore) || numericScore <= 0) {
-    return '평점 없음'
+    return tr("평점 없음")
   }
 
   const filled = Math.round(numericScore / 2)
@@ -221,7 +222,7 @@ export function CollectionPage() {
       const cacheParams = {
         scope: seriesScope,
         status: seriesStatus,
-        titleLanguage: 'ko' as const,
+        titleLanguage: getTitleLanguage(),
         query: debouncedSearchTerm,
       }
       const shouldFetchFromApi = reloadKey !== consumedSeriesReloadKeyRef.current
@@ -293,7 +294,7 @@ export function CollectionPage() {
         setSeriesState({
           items: [],
           isLoading: false,
-          error: getFriendlyErrorMessage(fetchError, '시리즈 컬렉션을 불러오지 못했어요.'),
+          error: getFriendlyErrorMessage(fetchError, tr("시리즈 컬렉션을 불러오지 못했어요.")),
         })
       }
     }
@@ -339,7 +340,7 @@ export function CollectionPage() {
           items: [],
           isLoading: false,
           error:
-            getFriendlyErrorMessage(fetchError, '만점 작품을 불러오지 못했어요.'),
+            getFriendlyErrorMessage(fetchError, tr("만점 작품을 불러오지 못했어요.")),
         })
       }
     }
@@ -485,7 +486,7 @@ export function CollectionPage() {
           isLoading: false,
           isLoadingMore: false,
           error:
-            getFriendlyErrorMessage(fetchError, '컬렉션을 불러오지 못했어요.'),
+            getFriendlyErrorMessage(fetchError, tr("컬렉션을 불러오지 못했어요.")),
           requestKey,
         })
       }
@@ -582,7 +583,7 @@ export function CollectionPage() {
                 ...current,
                 isLoadingMore: false,
                 error:
-                  getFriendlyErrorMessage(fetchError, '추가 컬렉션을 불러오지 못했어요.'),
+                  getFriendlyErrorMessage(fetchError, tr("추가 컬렉션을 불러오지 못했어요.")),
               }
             })
           } finally {
@@ -639,12 +640,12 @@ export function CollectionPage() {
           <div className="guest-preview-banner">
             <div>
               <span className="guest-preview-eyebrow">Sample mode</span>
-              <strong>샘플 컬렉션을 둘러보고 있어요</strong>
-              <p>이 화면의 작품, 평점, 기록은 체험용 데이터입니다. 로그인하면 내 컬렉션으로 즉시 바뀝니다.</p>
+              <strong>{tr("샘플 컬렉션을 둘러보고 있어요")}</strong>
+              <p>{tr("이 화면의 작품, 평점, 기록은 체험용 데이터입니다. 로그인하면 내 컬렉션으로 즉시 바뀝니다.")}</p>
             </div>
             <div className="guest-preview-actions">
-              <Link className="primary-button" to="/signup">시작하기</Link>
-              <Link className="secondary-button" to="/login">로그인</Link>
+              <Link className="primary-button" to="/signup">{tr("시작하기")}</Link>
+              <Link className="secondary-button" to="/login">{tr("로그인")}</Link>
             </div>
           </div>
         )}
@@ -652,14 +653,14 @@ export function CollectionPage() {
         <div className="explore-toolbar-shell">
         <div className="explore-toolbar">
           <div className="search-group">
-            {isGuestPreview && <span className="sample-mode-chip">샘플 컬렉션</span>}
+            {isGuestPreview && <span className="sample-mode-chip">{tr("샘플 컬렉션")}</span>}
             {!isGuestPreview && <CollectionViewSwitch value={viewMode} onChange={setViewMode} />}
             {!isGuestPreview && <ShareButton resourceType="COLLECTION" />}
             <label className="search-field minimalist-search" htmlFor="collection-search">
               <input
                 id="collection-search"
                 type="search"
-                placeholder={viewMode === 'series' ? '시리즈 또는 작품 제목 검색' : '컬렉션에서 검색하기'}
+                placeholder={viewMode === 'series' ? tr("시리즈 또는 작품 제목 검색") : tr("컬렉션에서 검색하기")}
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
               />
@@ -667,7 +668,7 @@ export function CollectionPage() {
             <button
               className="refresh-button"
               type="button"
-              aria-label={isGuestPreview ? '샘플 컬렉션은 새로고침할 수 없어요' : '컬렉션 새로고침'}
+              aria-label={isGuestPreview ? tr("샘플 컬렉션은 새로고침할 수 없어요") : tr("컬렉션 새로고침")}
               onClick={() => setReloadKey((value) => value + 1)}
               disabled={isGuestPreview}
             >
@@ -684,8 +685,8 @@ export function CollectionPage() {
                     value={seriesScope}
                     onChange={(event) => setSeriesScope(event.target.value as AnimeSeriesScope)}
                   >
-                    <option value="mainline">본편 시리즈</option>
-                    <option value="franchise">관련 작품 전체</option>
+                    <option value="mainline">{tr("본편 시리즈")}</option>
+                    <option value="franchise">{tr("관련 작품 전체")}</option>
                   </select>
                 </label>
                 <label className="sort-field" htmlFor="collection-series-status">
@@ -694,10 +695,10 @@ export function CollectionPage() {
                     value={seriesStatus}
                     onChange={(event) => setSeriesStatus(event.target.value as UserSeriesCollectionStatus)}
                   >
-                    <option value="all">전체 시리즈</option>
-                    <option value="started">시작한 시리즈</option>
-                    <option value="watched">본 시리즈</option>
-                    <option value="completed">완주한 시리즈</option>
+                    <option value="all">{tr("전체 시리즈")}</option>
+                    <option value="started">{tr("시작한 시리즈")}</option>
+                    <option value="watched">{tr("본 시리즈")}</option>
+                    <option value="completed">{tr("완주한 시리즈")}</option>
                   </select>
                 </label>
               </>
@@ -709,7 +710,7 @@ export function CollectionPage() {
                     value={genre}
                     onChange={(event) => setGenre(event.target.value as AnimeGenre | 'all')}
                   >
-                    <option value="all">전체 장르</option>
+                    <option value="all">{tr("전체 장르")}</option>
                     {genreOptions.map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}
@@ -747,13 +748,13 @@ export function CollectionPage() {
 
       {viewMode === 'series' && !isGuestPreview && !seriesState.error && !seriesState.isLoading && (
         seriesState.items.length === 0 ? (
-          <div className="feedback-card">조건에 맞는 시리즈가 없어요.</div>
+          <div className="feedback-card">{tr("조건에 맞는 시리즈가 없어요.")}</div>
         ) : (
           <SeriesCollectionGrid
             items={seriesState.items}
             location={location}
             fromPage="collection"
-            collectionLabel="내 컬렉션"
+            collectionLabel={tr("내 컬렉션")}
           />
         )
       )}
@@ -779,14 +780,14 @@ export function CollectionPage() {
           {filteredItems.length === 0 ? (
             isCollectionEmpty ? (
               <div className="collection-empty-state">
-                <img src={collectionEmptyMoaImage} alt="컬렉션에 담길 작품을 기다리는 모아" />
-                <p>아직 컬렉션에 담긴 작품이 없어요.</p>
+                <img src={collectionEmptyMoaImage} alt={tr("컬렉션에 담길 작품을 기다리는 모아")} />
+                <p>{tr("아직 컬렉션에 담긴 작품이 없어요.")}</p>
               </div>
             ) : (
               <div className="feedback-card">
                 {isGuestPreview
-                  ? '샘플 컬렉션에서 검색 결과가 없어요.'
-                  : '조건에 맞는 작품이 없어요.'}
+                  ? tr("샘플 컬렉션에서 검색 결과가 없어요.")
+                  : tr("조건에 맞는 작품이 없어요.")}
               </div>
             )
           ) : (
@@ -832,15 +833,15 @@ export function CollectionPage() {
           <div ref={sentinelRef} className="scroll-sentinel" aria-hidden="true" />
 
           {!isGuestPreview && isLoadingMore && (
-            <div className="feedback-inline">컬렉션을 더 불러오는 중이에요.</div>
+            <div className="feedback-inline">{tr("컬렉션을 더 불러오는 중이에요.")}</div>
           )}
 
           {!isGuestPreview && !hasNext && items.length > 0 && (
-            <div className="feedback-inline">컬렉션의 마지막 작품까지 모두 확인했어요.</div>
+            <div className="feedback-inline">{tr("컬렉션의 마지막 작품까지 모두 확인했어요.")}</div>
           )}
 
           {isGuestPreview && (
-            <div className="feedback-inline">샘플 컬렉션의 마지막 작품까지 모두 확인했어요.</div>
+            <div className="feedback-inline">{tr("샘플 컬렉션의 마지막 작품까지 모두 확인했어요.")}</div>
           )}
         </>
       )}

@@ -5,16 +5,6 @@
   min-width: 0;
 }
 
-.search-language-switch {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px;
-  border-radius: var(--radius-pill);
-  background: var(--point-softest);
-  /* border: 1px solid var(--point-border); */
-}
-
 .explore-view-switch {
   display: inline-flex;
   flex: 0 0 auto;
@@ -46,25 +36,6 @@
   background: var(--point-color);
   color: var(--text-inverse);
   box-shadow: 0 3px 10px rgba(245, 158, 11, 0.22);
-}
-
-.search-language-button {
-  min-width: 44px;
-  min-height: 44px;
-  padding: 0 12px;
-  border: 0;
-  border-radius: var(--radius-pill);
-  background: transparent;
-  color: var(--text-secondary);
-  font: inherit;
-  font-size: 0.8rem;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.search-language-button.is-active {
-  background: var(--point-color);
-  color: var(--text-inverse);
 }
 
 .anime-grid {

@@ -1,3 +1,5 @@
+import { getLocaleTag } from '../i18n'
+import { tr } from '../i18n'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getProfileImageSrc, handleProfileImageError } from '../lib/avatar'
@@ -61,14 +63,14 @@ export function VoiceActorCharacterWorks({
             </Link>
 
             <div className="voice-character-work-actions">
-              <span>{group.works.length.toLocaleString()}편</span>
+              <span>{group.works.length.toLocaleString(getLocaleTag())}{tr("편")}</span>
               {additionalWorks.length > 0 && (
                 <button
                   className="voice-character-work-kebab"
                   type="button"
                   aria-expanded={isExpanded}
                   aria-controls={`voice-character-more-${variant}-${group.character.id}`}
-                  aria-label={`${group.character.name}의 다른 출연 작품 ${additionalWorks.length}편 ${isExpanded ? '접기' : '보기'}`}
+                  aria-label={tr("{{v0}}의 다른 출연 작품 {{v1}}편 {{v2}}", { v0: group.character.name, v1: additionalWorks.length, v2: isExpanded ? '접기' : '보기' })}
                   onClick={() => setExpandedCharacterId((current) => (
                     current === group.character.id ? null : group.character.id
                   ))}
@@ -84,8 +86,8 @@ export function VoiceActorCharacterWorks({
                 id={`voice-character-more-${variant}-${group.character.id}`}
               >
                 <div className="voice-character-more-heading">
-                  <strong>다른 출연 작품</strong>
-                  <span>{additionalWorks.length.toLocaleString()}편</span>
+                  <strong>{tr("다른 출연 작품")}</strong>
+                  <span>{additionalWorks.length.toLocaleString(getLocaleTag())}{tr("편")}</span>
                 </div>
                 <div className="voice-character-more-list">
                   {additionalWorks.map((work) => (

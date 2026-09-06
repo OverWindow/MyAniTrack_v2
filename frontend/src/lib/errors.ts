@@ -1,4 +1,5 @@
-export const SERVER_CONNECTION_ERROR_MESSAGE = '서버와의 연결을 실패 했어요ㅠㅠ'
+import { localizeExternalMessage, tr } from '../i18n'
+export const SERVER_CONNECTION_ERROR_MESSAGE = tr("서버와의 연결을 실패 했어요ㅠㅠ")
 
 export function isServerConnectionError(error: unknown) {
   if (!(error instanceof Error)) {
@@ -20,5 +21,7 @@ export function getFriendlyErrorMessage(error: unknown, fallback: string) {
     return SERVER_CONNECTION_ERROR_MESSAGE
   }
 
-  return error instanceof Error ? error.message : fallback
+  return error instanceof Error
+    ? localizeExternalMessage(error.message, fallback)
+    : fallback
 }

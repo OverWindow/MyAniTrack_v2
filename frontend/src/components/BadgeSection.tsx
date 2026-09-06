@@ -1,3 +1,5 @@
+import { getLocaleTag } from '../i18n'
+import { tr } from '../i18n'
 import { useEffect, useId, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import type { UserBadge } from '../types/badges'
@@ -28,7 +30,7 @@ function formatEarnedAt(value?: string | null) {
     return value
   }
 
-  return parsedDate.toLocaleDateString('ko-KR', {
+  return parsedDate.toLocaleDateString(getLocaleTag(), {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -46,16 +48,16 @@ function BadgeDetails({ badge, showProgress }: { badge: UserBadge; showProgress:
         <span>{badge.rarity}</span>
       </div>
 
-      <p>{badge.description || '획득 조건을 달성하면 배지가 표시돼요.'}</p>
+      <p>{badge.description || tr("획득 조건을 달성하면 배지가 표시돼요.")}</p>
 
       {showProgress && badge.progress && (
-        <div className="badge-progress" aria-label={`${badge.progress.percent}% 달성`}>
+        <div className="badge-progress" aria-label={tr("{{v0}}% 달성", { v0: badge.progress.percent })}>
           <span style={{ width: `${progressPercent}%` }} />
         </div>
       )}
 
       <div className="badge-card-meta">
-        <span>{badge.earned ? '획득 완료' : '진행 중'}</span>
+        <span>{badge.earned ? tr("획득 완료") : tr("진행 중")}</span>
         {earnedDate && <span>{earnedDate}</span>}
       </div>
     </>
@@ -120,19 +122,19 @@ export function BadgeSection({
     <section className="profile-badge-section">
       {newlyEarned.length > 0 && (
         <div className="badge-newly-earned" role="status">
-          새 배지 {newlyEarned.length.toLocaleString()}개를 획득했어요.
+          {tr("새 배지")} {newlyEarned.length.toLocaleString(getLocaleTag())}{tr("개를 획득했어요.")}
         </div>
       )}
 
       {isLoading ? (
-        <div className="badge-loading-state" role="status" aria-label="배지를 불러오는 중">
+        <div className="badge-loading-state" role="status" aria-label={tr("배지를 불러오는 중")}>
           <span className="badge-loading-spinner" aria-hidden="true" />
-          <strong>배지를 불러오는 중이에요.</strong>
+          <strong>{tr("배지를 불러오는 중이에요.")}</strong>
         </div>
       ) : error ? (
         <>
           <ErrorToast message={error} />
-          <div className="badge-empty-state">지금은 배지를 표시할 수 없어요.</div>
+          <div className="badge-empty-state">{tr("지금은 배지를 표시할 수 없어요.")}</div>
         </>
       ) : badges.length === 0 ? (
         <div className="badge-empty-state">{emptyMessage}</div>
@@ -188,12 +190,12 @@ export function BadgeSection({
                   <span>{getBadgeInitial(selectedBadge.name)}</span>
                 )}
               </div>
-              <strong id={dialogTitleId}>배지 상세</strong>
+              <strong id={dialogTitleId}>{tr("배지 상세")}</strong>
               <button
                 ref={closeButtonRef}
                 className="badge-detail-close"
                 type="button"
-                aria-label="배지 상세 닫기"
+                aria-label={tr("배지 상세 닫기")}
                 onClick={() => setSelectedBadge(null)}
               >
                 <X size={20} aria-hidden="true" />

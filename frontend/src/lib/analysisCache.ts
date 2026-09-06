@@ -1,3 +1,4 @@
+import { getTitleLanguage, tr } from '../i18n'
 import type {
   AnimeStatsItem,
   FormatDistributionStats,
@@ -66,7 +67,7 @@ function openAnalysisDb() {
     }
 
     request.onsuccess = () => resolve(request.result)
-    request.onerror = () => reject(request.error ?? new Error('분석 캐시를 열지 못했어요.'))
+    request.onerror = () => reject(request.error ?? new Error(tr("분석 캐시를 열지 못했어요.")))
   })
 
   return dbPromise
@@ -88,11 +89,11 @@ function runEntryStoreTransaction<T>(
           request.onsuccess = () => {
             result = request.result
           }
-          request.onerror = () => reject(request.error ?? new Error('분석 캐시 작업에 실패했어요.'))
+          request.onerror = () => reject(request.error ?? new Error(tr("분석 캐시 작업에 실패했어요.")))
         }
 
         transaction.oncomplete = () => resolve(result)
-        transaction.onerror = () => reject(transaction.error ?? new Error('분석 캐시 작업에 실패했어요.'))
+        transaction.onerror = () => reject(transaction.error ?? new Error(tr("분석 캐시 작업에 실패했어요.")))
       }),
   )
 }
@@ -155,9 +156,9 @@ export async function deleteAnalysisCachePrefix(prefix: string) {
         cursor.continue()
       }
 
-      request.onerror = () => reject(request.error ?? new Error('분석 캐시 삭제에 실패했어요.'))
+      request.onerror = () => reject(request.error ?? new Error(tr("분석 캐시 삭제에 실패했어요.")))
       transaction.oncomplete = () => resolve()
-      transaction.onerror = () => reject(transaction.error ?? new Error('분석 캐시 삭제에 실패했어요.'))
+      transaction.onerror = () => reject(transaction.error ?? new Error(tr("분석 캐시 삭제에 실패했어요.")))
     })
   } catch {
     // Best-effort cache maintenance.
@@ -165,7 +166,7 @@ export async function deleteAnalysisCachePrefix(prefix: string) {
 }
 
 export function getAnalysisCacheKey(userId: number | string, name: keyof AnalysisCachePayloadMap, params = '') {
-  return `my:${userId}:${name}${params ? `:${params}` : ''}`
+  return `my:${userId}:${getTitleLanguage()}:${name}${params ? `:${params}` : ''}`
 }
 
 export function getAnalysisCachePrefix(userId: number | string) {

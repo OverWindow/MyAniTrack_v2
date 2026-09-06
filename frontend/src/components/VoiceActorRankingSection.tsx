@@ -1,3 +1,5 @@
+import { getLocaleTag } from '../i18n'
+import { getTitleLanguage, tr } from '../i18n'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { createPortal } from 'react-dom'
@@ -44,7 +46,7 @@ type VoiceActorAnimeState = {
 }
 
 function getPersonName(name?: VoiceActorPersonName | null) {
-  return name?.userPreferred || name?.full || name?.native || '이름 정보 없음'
+  return name?.userPreferred || name?.full || name?.native || tr("이름 정보 없음")
 }
 
 function getVoiceActorImage(item: VoiceActorRankingItem) {
@@ -53,10 +55,10 @@ function getVoiceActorImage(item: VoiceActorRankingItem) {
 
 function getRankingMeta(item: VoiceActorRankingItem, sort: VoiceActorRankingSort) {
   if (sort === 'score') {
-    return `평균 ${item.averageScore !== null ? item.averageScore.toFixed(2) : '-'}점 · 평가 ${item.ratedAnimeCount}편`
+    return tr("평균 {{v0}}점 · 평가 {{v1}}편", { v0: item.averageScore !== null ? item.averageScore.toFixed(2) : '-', v1: item.ratedAnimeCount })
   }
 
-  return `${item.animeCount}편 · 캐릭터 ${item.characterCount}명`
+  return tr("{{v0}}편 · 캐릭터 {{v1}}명", { v0: item.animeCount, v1: item.characterCount })
 }
 
 function getCharacterImage(character: VoiceActorAnimeResponse['items'][number]['characters'][number]) {
@@ -72,8 +74,8 @@ function getAnimeMeta(item: VoiceActorAnimeResponse['items'][number]) {
     item.anime.seasonYear ? String(item.anime.seasonYear) : null,
     item.anime.format,
     item.userList?.score !== null && item.userList?.score !== undefined
-      ? `내 평점 ${item.userList.score}점`
-      : '평점 없음',
+      ? tr("내 평점 {{v0}}점", { v0: item.userList.score })
+      : tr("평점 없음"),
   ].filter(Boolean).join(' · ')
 }
 
@@ -89,7 +91,7 @@ function VoiceActorRankingList({
   onSelect: (item: VoiceActorRankingItem) => void
 }) {
   if (items.length === 0) {
-    return <div className="analysis-empty-state">아직 표시할 성우 랭킹이 없어요.</div>
+    return <div className="analysis-empty-state">{tr("아직 표시할 성우 랭킹이 없어요.")}</div>
   }
 
   return (
@@ -106,10 +108,10 @@ function VoiceActorRankingList({
             key={`${sort}-${item.voiceActor.id}`}
             type="button"
             aria-haspopup="dialog"
-            aria-label={`${name} 내가 본 작품 보기`}
+            aria-label={tr("{{v0}} 내가 본 작품 보기", { v0: name })}
             onClick={() => onSelect(item)}
           >
-            <span className="voice-actor-rank">{rank}위</span>
+            <span className="voice-actor-rank">{rank}{tr("위")}</span>
             <img
               className="voice-actor-avatar"
               src={getProfileImageSrc(getVoiceActorImage(item))}
@@ -133,7 +135,7 @@ export function VoiceActorRankingSection({
   cacheVersion = 0,
   userId,
   shareToken,
-  ownerLabel = '이 사용자',
+  ownerLabel = tr("이 사용자"),
 }: VoiceActorRankingSectionProps) {
   const [rankingState, setRankingState] = useState<RankingState>({
     count: [],
@@ -212,7 +214,7 @@ export function VoiceActorRankingSection({
           count: [],
           score: [],
           isLoading: false,
-          error: getFriendlyErrorMessage(loadError, '성우 랭킹을 불러오지 못했어요.'),
+          error: getFriendlyErrorMessage(loadError, tr("성우 랭킹을 불러오지 못했어요.")),
         })
       }
     }
@@ -270,7 +272,7 @@ export function VoiceActorRankingSection({
           userId,
           shareToken,
           voiceActorId: selectedVoiceActor.id,
-          titleLanguage: 'ko',
+          titleLanguage: getTitleLanguage(),
           status: 'completed',
           limit: 20,
           signal: controller.signal,
@@ -300,7 +302,7 @@ export function VoiceActorRankingSection({
           data: null,
           isLoading: false,
           isLoadingMore: false,
-          error: getFriendlyErrorMessage(loadError, '성우의 작품 목록을 불러오지 못했어요.'),
+          error: getFriendlyErrorMessage(loadError, tr("성우의 작품 목록을 불러오지 못했어요.")),
           moreError: null,
         })
       }
@@ -381,7 +383,7 @@ export function VoiceActorRankingSection({
       setAnimeState((current) => ({
         ...current,
         isLoadingMore: false,
-        moreError: getFriendlyErrorMessage(loadError, '작품을 더 불러오지 못했어요.'),
+        moreError: getFriendlyErrorMessage(loadError, tr("작품을 더 불러오지 못했어요.")),
       }))
     }
   }
@@ -411,11 +413,11 @@ export function VoiceActorRankingSection({
     <section className="analysis-panel voice-actor-section">
       <div className="analysis-panel-heading">
         <span className="detail-label">Voice actors</span>
-        <h2>성우 취향 랭킹</h2>
-        <p>{ownerLabel} 컬렉션 기준으로 가장 많이 본 성우와 평균 평점이 높은 성우를 보여줘요.</p>
+        <h2>{tr("성우 취향 랭킹")}</h2>
+        <p>{ownerLabel} {tr("컬렉션 기준으로 가장 많이 본 성우와 평균 평점이 높은 성우를 보여줘요.")}</p>
       </div>
 
-      {rankingState.isLoading && <div className="analysis-empty-state">성우 랭킹을 불러오는 중이에요.</div>}
+      {rankingState.isLoading && <div className="analysis-empty-state">{tr("성우 랭킹을 불러오는 중이에요.")}</div>}
       {rankingState.error && !rankingState.isLoading && (
         <ConnectionErrorState message={rankingState.error} />
       )}
@@ -424,8 +426,8 @@ export function VoiceActorRankingSection({
         <div className="voice-actor-ranking-grid">
           <div>
             <div className="voice-actor-ranking-heading">
-              <strong>가장 많이 본 성우</strong>
-              <span>출연 애니 수 기준</span>
+              <strong>{tr("가장 많이 본 성우")}</strong>
+              <span>{tr("출연 애니 수 기준")}</span>
             </div>
             <VoiceActorRankingList
               items={rankingState.count}
@@ -437,8 +439,8 @@ export function VoiceActorRankingSection({
 
           <div>
             <div className="voice-actor-ranking-heading">
-              <strong>평점이 높은 성우</strong>
-              <span>평가 작품 3편 이상 기준</span>
+              <strong>{tr("평점이 높은 성우")}</strong>
+              <span>{tr("평가 작품 3편 이상 기준")}</span>
             </div>
             <VoiceActorRankingList
               items={rankingState.score}
@@ -470,7 +472,7 @@ export function VoiceActorRankingSection({
               <Link
                 className="voice-actor-modal-profile-link"
                 to={`/voice-actors/${selectedVoiceActor.id}`}
-                aria-label={`${selectedVoiceActorName} 성우 상세 페이지로 이동`}
+                aria-label={tr("{{v0}} 성우 상세 페이지로 이동", { v0: selectedVoiceActorName })}
                 onClick={() => setSelectedVoiceActor(null)}
               >
                 <img
@@ -483,15 +485,15 @@ export function VoiceActorRankingSection({
                   <h3 id="voice-actor-modal-title">{selectedVoiceActorName}</h3>
                   <p>
                     {animeState.data
-                      ? `${ownerLabel}가 본 작품 ${animeState.data.items.length.toLocaleString()}편 · 캐릭터 ${selectedCharacterCount.toLocaleString()}명`
-                      : `${ownerLabel}가 본 작품에서 맡은 캐릭터를 모아봐요.`}
+                      ? tr("{{v0}}가 본 작품 {{v1}}편 · 캐릭터 {{v2}}명", { v0: ownerLabel, v1: animeState.data.items.length.toLocaleString(getLocaleTag()), v2: selectedCharacterCount.toLocaleString(getLocaleTag()) })
+                      : tr("{{v0}}가 본 작품에서 맡은 캐릭터를 모아봐요.", { v0: ownerLabel })}
                   </p>
                 </div>
               </Link>
               <button
                 className="voice-actor-modal-close"
                 type="button"
-                aria-label="성우 작품 모달 닫기"
+                aria-label={tr("성우 작품 모달 닫기")}
                 autoFocus
                 onClick={() => setSelectedVoiceActor(null)}
               >
@@ -501,7 +503,7 @@ export function VoiceActorRankingSection({
 
             <div className="voice-actor-modal-body">
               {animeState.isLoading && (
-                <div className="analysis-empty-state">내가 본 작품을 불러오는 중이에요.</div>
+                <div className="analysis-empty-state">{tr("내가 본 작품을 불러오는 중이에요.")}</div>
               )}
 
               {animeState.error && !animeState.isLoading && (
@@ -509,7 +511,7 @@ export function VoiceActorRankingSection({
               )}
 
               {!animeState.isLoading && !animeState.error && selectedCharacterGroups.length === 0 && (
-                <div className="analysis-empty-state">이 성우가 출연한 완주 작품이 아직 없어요.</div>
+                <div className="analysis-empty-state">{tr("이 성우가 출연한 완주 작품이 아직 없어요.")}</div>
               )}
 
               {!animeState.isLoading && !animeState.error && selectedCharacterGroups.length > 0 && (
@@ -534,7 +536,7 @@ export function VoiceActorRankingSection({
                   disabled={animeState.isLoadingMore}
                   onClick={() => { void handleLoadMore() }}
                 >
-                  {animeState.isLoadingMore ? '불러오는 중...' : '작품 더 보기'}
+                  {animeState.isLoadingMore ? tr("불러오는 중...") : tr("작품 더 보기")}
                 </button>
               )}
             </div>

@@ -1,3 +1,5 @@
+import { getLocaleTag } from '../i18n'
+import { tr } from '../i18n'
 import {
   Bar,
   BarChart,
@@ -47,18 +49,18 @@ type ScoreDistributionChartDatum = {
 type YearlyScoreChartDatum = YearlyScoreStatsItem
 
 const VIEWING_DNA_RAW_LABELS: Record<string, string> = {
-  startedAnimeCount: '감상 시작 작품',
-  completedAnimeCount: '완주 작품',
-  watchedSeriesCount: '완주를 시작한 시리즈',
-  completedSeriesCount: '필수 작품 완주 시리즈',
-  distinctGenreCount: '감상 장르',
-  maximumGenreCount: '전체 장르',
-  distinctEraCount: '감상 시대 구간',
-  maximumEraCount: '전체 시대 구간',
-  ratedAnimeCount: '평가 작품',
-  totalWatchMinutes: '총 시청 분',
-  totalWatchHours: '총 시청 시간',
-  communityUserCount: '비교 사용자',
+  startedAnimeCount: tr("감상 시작 작품"),
+  completedAnimeCount: tr("완주 작품"),
+  watchedSeriesCount: tr("완주를 시작한 시리즈"),
+  completedSeriesCount: tr("필수 작품 완주 시리즈"),
+  distinctGenreCount: tr("감상 장르"),
+  maximumGenreCount: tr("전체 장르"),
+  distinctEraCount: tr("감상 시대 구간"),
+  maximumEraCount: tr("전체 시대 구간"),
+  ratedAnimeCount: tr("평가 작품"),
+  totalWatchMinutes: tr("총 시청 분"),
+  totalWatchHours: tr("총 시청 시간"),
+  communityUserCount: tr("비교 사용자"),
 }
 
 type NormalizedGenreBubbleItem = GenreBubbleItem & {
@@ -293,7 +295,7 @@ function formatPercent(value: number, total: number) {
 }
 
 function formatAnimeCount(count?: number) {
-  return `${Math.max(0, count ?? 0).toLocaleString()}편`
+  return tr("{{v0}}편", { v0: Math.max(0, count ?? 0).toLocaleString(getLocaleTag()) })
 }
 
 function getGenreColor(key: string, index: number) {
@@ -378,7 +380,7 @@ function AnalysisGenrePieChart({
                 <div className="analysis-chart-tooltip">
                   <strong>{entry.label}</strong>
                   <span>{formatTooltipValue(entry.value)} · {formatPercent(entry.value, total)}</span>
-                  <span>작품 {formatAnimeCount(entry.count ?? entry.value)}</span>
+                  <span>{tr("작품")} {formatAnimeCount(entry.count ?? entry.value)}</span>
                 </div>
               )
             }}
@@ -403,7 +405,7 @@ export function GenreDistributionPieChart({
       data={data}
       selectedKey={selectedKey}
       onSelectGenre={onSelectGenre}
-      formatTooltipValue={(value) => `${value.toLocaleString()}편 감상`}
+      formatTooltipValue={(value) => tr("{{v0}}편 감상", { v0: value.toLocaleString(getLocaleTag()) })}
     />
   )
 }
@@ -437,8 +439,8 @@ export function FormatDistributionPieChart({
 
   return (
     <div className="analysis-format-chart-grid">
-      <FormatMetricPieChart title="작품 수 기준" data={countData} metric="count" />
-      <FormatMetricPieChart title="시청 시간 기준" data={watchTimeData} metric="watchTime" />
+      <FormatMetricPieChart title={tr("작품 수 기준")} data={countData} metric="count" />
+      <FormatMetricPieChart title={tr("시청 시간 기준")} data={watchTimeData} metric="watchTime" />
     </div>
   )
 }
@@ -492,7 +494,7 @@ function getFormatPieData(data: FormatDistributionItem[], metric: FormatPieMetri
     ...visible,
     {
       format: 'OTHER',
-      label: '기타',
+      label: tr("기타"),
       value: otherValue,
       percentage: otherValue / total * 100,
       animeCount: otherAnimeCount,
@@ -536,7 +538,7 @@ function FormatMetricPieChart({
               const y = centerY + radius * Math.sin(-midAngle * RADIAN)
               const textAnchor = x >= centerX ? 'start' : 'end'
               const detail = metric === 'count'
-                ? `${payload.animeCount.toLocaleString()}편`
+                ? tr("{{v0}}편", { v0: payload.animeCount.toLocaleString(getLocaleTag()) })
                 : formatWatchHours(payload.watchMinutes)
 
               return (
@@ -568,11 +570,11 @@ function FormatMetricPieChart({
               return (
                 <div className="analysis-chart-tooltip">
                   <strong>{entry.label}</strong>
-                  <span>{metric === 'count' ? '작품 수' : '시청 시간'} 비중 {entry.percentage.toFixed(1)}%</span>
-                  <span>작품 {entry.animeCount.toLocaleString()}편</span>
-                  <span>시청 시간 {formatWatchHours(entry.watchMinutes)}</span>
-                  <span>평균 {entry.averageScore !== null ? `${entry.averageScore.toFixed(1)}점` : '평점 없음'}</span>
-                  {entry.isOther && <span>작은 비중의 포맷을 묶었어요.</span>}
+                  <span>{metric === 'count' ? tr("작품 수") : tr("시청 시간")} {tr("비중")} {entry.percentage.toFixed(1)}%</span>
+                  <span>{tr("작품")} {entry.animeCount.toLocaleString(getLocaleTag())}{tr("편")}</span>
+                  <span>{tr("시청 시간")} {formatWatchHours(entry.watchMinutes)}</span>
+                  <span>{tr("평균")} {entry.averageScore !== null ? tr("{{v0}}점", { v0: entry.averageScore.toFixed(1) }) : tr("평점 없음")}</span>
+                  {entry.isOther && <span>{tr("작은 비중의 포맷을 묶었어요.")}</span>}
                 </div>
               )
             }}
@@ -595,7 +597,7 @@ export function ViewingDnaRadarChart({ item }: { item: ViewingDnaItem }) {
     <div
       className="analysis-viewing-dna-chart"
       role="img"
-      aria-label={`감상 DNA 육각형 차트. ${chartData.map((axis) => `${axis.subject} ${axis.value}점`).join(', ')}`}
+      aria-label={tr("감상 DNA 육각형 차트. {{v0}}", { v0: chartData.map((axis) => `${axis.subject} ${axis.value}점`).join(', ') })}
     >
       <ResponsiveContainer width="100%" height={360}>
         <RadarChart data={chartData} cx="50%" cy="50%" outerRadius="72%">
@@ -612,7 +614,7 @@ export function ViewingDnaRadarChart({ item }: { item: ViewingDnaItem }) {
             axisLine={false}
           />
           <Radar
-            name="감상 DNA"
+            name={tr("감상 DNA")}
             dataKey="value"
             stroke="#d97706"
             strokeWidth={3}
@@ -630,14 +632,14 @@ export function ViewingDnaRadarChart({ item }: { item: ViewingDnaItem }) {
 
               return (
                 <div className="analysis-chart-tooltip analysis-viewing-dna-tooltip">
-                  <strong>{axis.subject} · {axis.value.toFixed(1)}점</strong>
-                  <span>{axis.available ? getViewingDnaAxisDescription(axis) : '데이터가 아직 부족해요.'}</span>
+                  <strong>{axis.subject} · {axis.value.toFixed(1)}{tr("점")}</strong>
+                  <span>{axis.available ? getViewingDnaAxisDescription(axis) : tr("데이터가 아직 부족해요.")}</span>
                   {axis.key === 'seriesCompletion' && axis.available && (
                     <span>{SERIES_COMPLETION_EXCLUSION_NOTE}</span>
                   )}
                   {Object.entries(axis.raw).map(([key, value]) => (
                     <span key={key}>
-                      {VIEWING_DNA_RAW_LABELS[key] ?? key} {Number(value).toLocaleString()}
+                      {VIEWING_DNA_RAW_LABELS[key] ?? key} {Number(value).toLocaleString(getLocaleTag())}
                     </span>
                   ))}
                 </div>
@@ -689,8 +691,8 @@ export function ReleaseYearBarChart({
 
               return (
                 <div className="analysis-chart-tooltip">
-                  <strong>{label}년</strong>
-                  <span>{count.toLocaleString()}편 감상</span>
+                  <strong>{label}{tr("년")}</strong>
+                  <span>{count.toLocaleString(getLocaleTag())}{tr("편 감상")}</span>
                 </div>
               )
             }}
@@ -773,7 +775,7 @@ export function ScoreDistributionBarChart({
               return (
                 <div className="analysis-chart-tooltip">
                   <strong>{label}</strong>
-                  <span>{count.toLocaleString()}편</span>
+                  <span>{count.toLocaleString(getLocaleTag())}{tr("편")}</span>
                 </div>
               )
             }}
@@ -862,16 +864,16 @@ export function YearlyScoreLineChart({
 
               const entry = payload[0]?.payload as YearlyScoreChartDatum
               const formatScore = (value?: number | null) => (
-                typeof value === 'number' ? `${value.toFixed(2)}점` : '정보 없음'
+                typeof value === 'number' ? tr("{{v0}}점", { v0: value.toFixed(2) }) : tr("정보 없음")
               )
 
               return (
                 <div className="analysis-chart-tooltip">
-                  <strong>{label}년</strong>
-                  <span>내 평균 {formatScore(entry.averageScore)}</span>
-                  <span>커뮤니티 평균 {formatScore(entry.communityAverageScore)}</span>
-                  <span>차이 {typeof entry.preferenceDelta === 'number' ? `${entry.preferenceDelta >= 0 ? '+' : ''}${entry.preferenceDelta.toFixed(2)}점` : '정보 없음'}</span>
-                  <span>감상 {entry.animeCount.toLocaleString()}편 / 평가 {entry.ratedAnimeCount.toLocaleString()}편</span>
+                  <strong>{label}{tr("년")}</strong>
+                  <span>{tr("내 평균")} {formatScore(entry.averageScore)}</span>
+                  <span>{tr("커뮤니티 평균")} {formatScore(entry.communityAverageScore)}</span>
+                  <span>{tr("차이")} {typeof entry.preferenceDelta === 'number' ? tr("{{v0}}{{v1}}점", { v0: entry.preferenceDelta >= 0 ? '+' : '', v1: entry.preferenceDelta.toFixed(2) }) : tr("정보 없음")}</span>
+                  <span>{tr("감상")} {entry.animeCount.toLocaleString(getLocaleTag())}{tr("편 / 평가")} {entry.ratedAnimeCount.toLocaleString(getLocaleTag())}{tr("편")}</span>
                 </div>
               )
             }}
@@ -879,7 +881,7 @@ export function YearlyScoreLineChart({
           <Bar
             yAxisId="count"
             dataKey="animeCount"
-            name="감상 작품 수"
+            name={tr("감상 작품 수")}
             radius={[10, 10, 4, 4]}
             maxBarSize={34}
             cursor={onSelectYear ? 'pointer' : 'default'}
@@ -902,7 +904,7 @@ export function YearlyScoreLineChart({
             yAxisId="score"
             type="monotone"
             dataKey="averageScore"
-            name="내 평균"
+            name={tr("내 평균")}
             stroke="#f59e0b"
             strokeWidth={3}
             dot={{ r: 4, fill: '#f59e0b', stroke: '#fff7ed', strokeWidth: 2 }}
@@ -920,7 +922,7 @@ export function YearlyScoreLineChart({
             yAxisId="score"
             type="monotone"
             dataKey="communityAverageScore"
-            name="커뮤니티 평균"
+            name={tr("커뮤니티 평균")}
             stroke="#2563eb"
             strokeWidth={2.5}
             strokeDasharray="6 5"
@@ -937,9 +939,9 @@ export function YearlyScoreLineChart({
         </ComposedChart>
       </ResponsiveContainer>
       <div className="analysis-year-score-legend">
-        <span><i className="is-count" />감상 작품 수</span>
-        <span><i className="is-mine" />내 평균</span>
-        <span><i className="is-community" />커뮤니티 평균</span>
+        <span><i className="is-count" />{tr("감상 작품 수")}</span>
+        <span><i className="is-mine" />{tr("내 평균")}</span>
+        <span><i className="is-community" />{tr("커뮤니티 평균")}</span>
       </div>
     </div>
   )
@@ -990,12 +992,12 @@ export function GenrePreferenceBubbleChart({
   return (
     <div className="analysis-bubble-chart-shell">
       <div className="analysis-bubble-corner-guide is-top-left">
-        <strong>내 취향이 더 강함</strong>
-        <span>커뮤니티보다 내가 더 좋아하는 장르</span>
+        <strong>{tr("내 취향이 더 강함")}</strong>
+        <span>{tr("커뮤니티보다 내가 더 좋아하는 장르")}</span>
       </div>
       <div className="analysis-bubble-corner-guide is-bottom-right">
-        <strong>대중 평가 우세</strong>
-        <span>대중 평가는 높지만 내 취향은 덜한 장르</span>
+        <strong>{tr("대중 평가 우세")}</strong>
+        <span>{tr("대중 평가는 높지만 내 취향은 덜한 장르")}</span>
       </div>
       <ResponsiveContainer width="100%" height={470}>
         <ScatterChart margin={{ top: 32, right: 38, bottom: 46, left: 18 }}>
@@ -1003,7 +1005,7 @@ export function GenrePreferenceBubbleChart({
           <XAxis
             type="number"
             dataKey="displayCommunityAverage"
-            name="커뮤니티 평균 대비"
+            name={tr("커뮤니티 평균 대비")}
             domain={sharedDomain}
             tickLine={false}
             axisLine={false}
@@ -1012,7 +1014,7 @@ export function GenrePreferenceBubbleChart({
               return compression.formatTick(Number(value))
             }}
             label={{
-              value: '커뮤니티 평균 대비',
+              value: tr("커뮤니티 평균 대비"),
               position: 'insideBottom',
               offset: -26,
               fill: '#57534e',
@@ -1023,7 +1025,7 @@ export function GenrePreferenceBubbleChart({
           <YAxis
             type="number"
             dataKey="displayMyAverage"
-            name="내 평균 대비"
+            name={tr("내 평균 대비")}
             domain={sharedDomain}
             tickLine={false}
             axisLine={false}
@@ -1033,7 +1035,7 @@ export function GenrePreferenceBubbleChart({
             }}
             width={52}
             label={{
-              value: '내 평균 대비',
+              value: tr("내 평균 대비"),
               angle: -90,
               position: 'insideLeft',
               fill: '#57534e',
@@ -1062,22 +1064,22 @@ export function GenrePreferenceBubbleChart({
               return (
                 <div className="analysis-chart-tooltip analysis-bubble-tooltip">
                   <strong>{getGenreLabel(entry.genre)}</strong>
-                  <span>내 평균 대비 {entry.normalizedMyAverage >= 0 ? '+' : ''}{entry.normalizedMyAverage.toFixed(2)}</span>
-                  <span>커뮤니티 평균 대비 {entry.normalizedCommunityAverage >= 0 ? '+' : ''}{entry.normalizedCommunityAverage.toFixed(2)}</span>
-                  {entry.hasCompressedValue && <span>≈ 축에서 압축 표시된 아웃라이어</span>}
-                  <span>내 평균 {entry.myAverageScore.toFixed(2)}점</span>
-                  <span>커뮤니티 평균 {entry.communityAverageScore.toFixed(2)}점</span>
-                  <span>차이 {entry.preferenceScore >= 0 ? '+' : ''}{entry.preferenceScore.toFixed(2)}</span>
-                  <span>시청 작품 {entry.animeCount.toLocaleString()}편</span>
-                  <span>총 시청시간 {formatWatchHours(entry.totalWatchMinutes)}</span>
-                  {topAnime?.title && <span>가장 높게 평가한 작품 {topAnime.title}</span>}
+                  <span>{tr("내 평균 대비")} {entry.normalizedMyAverage >= 0 ? '+' : ''}{entry.normalizedMyAverage.toFixed(2)}</span>
+                  <span>{tr("커뮤니티 평균 대비")} {entry.normalizedCommunityAverage >= 0 ? '+' : ''}{entry.normalizedCommunityAverage.toFixed(2)}</span>
+                  {entry.hasCompressedValue && <span>{tr("≈ 축에서 압축 표시된 아웃라이어")}</span>}
+                  <span>{tr("내 평균")} {entry.myAverageScore.toFixed(2)}{tr("점")}</span>
+                  <span>{tr("커뮤니티 평균")} {entry.communityAverageScore.toFixed(2)}{tr("점")}</span>
+                  <span>{tr("차이")} {entry.preferenceScore >= 0 ? '+' : ''}{entry.preferenceScore.toFixed(2)}</span>
+                  <span>{tr("시청 작품")} {entry.animeCount.toLocaleString(getLocaleTag())}{tr("편")}</span>
+                  <span>{tr("총 시청시간")} {formatWatchHours(entry.totalWatchMinutes)}</span>
+                  {topAnime?.title && <span>{tr("가장 높게 평가한 작품")} {topAnime.title}</span>}
                 </div>
               )
             }}
           />
           <Scatter
             data={normalizedData}
-            name="장르 취향"
+            name={tr("장르 취향")}
             shape={renderBubbleShape}
             cursor={onSelectGenre ? 'pointer' : 'default'}
             onClick={(entry) => {
@@ -1104,7 +1106,7 @@ export function GenrePreferenceBubbleChart({
       </ResponsiveContainer>
 
       {compression.hasCompression && (
-        <div className="analysis-bubble-compression-note">≈ 표시는 아웃라이어를 물결 구간으로 압축한 값</div>
+        <div className="analysis-bubble-compression-note">{tr("≈ 표시는 아웃라이어를 물결 구간으로 압축한 값")}</div>
       )}
     </div>
   )

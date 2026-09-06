@@ -123,6 +123,46 @@
   flex-wrap: nowrap;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  justify-self: end;
+  gap: 10px;
+  min-width: 0;
+}
+
+.language-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid rgba(120, 113, 108, 0.18);
+  border-radius: var(--radius-pill);
+  background: var(--bg-neutral);
+}
+
+.language-switcher button {
+  min-width: 34px;
+  min-height: 32px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.language-switcher button:hover,
+.language-switcher button:focus-visible,
+.language-switcher button.is-active {
+  background: var(--bg-card);
+  color: var(--point-hover);
+  box-shadow: var(--shadow-soft);
+}
+
 .mobile-menu-button {
   display: none;
   width: 46px;
@@ -1145,6 +1185,21 @@
   .profile-dropdown {
     width: 100%;
     justify-self: stretch;
+  }
+
+  .header-actions {
+    width: 100%;
+    display: grid;
+    justify-self: stretch;
+    gap: 12px;
+  }
+
+  .language-switcher {
+    width: 100%;
+  }
+
+  .language-switcher button {
+    flex: 1;
   }
 
   .profile-chip {

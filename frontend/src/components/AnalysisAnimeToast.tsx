@@ -1,3 +1,4 @@
+import { tr } from '../i18n'
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ErrorToast } from './ErrorToast'
@@ -46,20 +47,20 @@ export function AnalysisAnimeToast({
           <strong>{title}</strong>
           <span>{description}</span>
         </div>
-        <button className="analysis-anime-toast-close" type="button" onClick={onClose} aria-label="감상 작품 닫기">
+        <button className="analysis-anime-toast-close" type="button" onClick={onClose} aria-label={tr("감상 작품 닫기")}>
           ×
         </button>
       </div>
 
-      {isLoading && <div className="analysis-anime-toast-state">작품을 불러오는 중이에요.</div>}
+      {isLoading && <div className="analysis-anime-toast-state">{tr("작품을 불러오는 중이에요.")}</div>}
       {error && !isLoading && (
         <>
           <ErrorToast message={error} />
-          <div className="analysis-anime-toast-state">지금은 작품을 표시할 수 없어요.</div>
+          <div className="analysis-anime-toast-state">{tr("지금은 작품을 표시할 수 없어요.")}</div>
         </>
       )}
       {!isLoading && !error && items.length === 0 && (
-        <div className="analysis-anime-toast-state">표시할 작품이 없어요.</div>
+        <div className="analysis-anime-toast-state">{tr("표시할 작품이 없어요.")}</div>
       )}
       {!isLoading && !error && items.length > 0 && (
         <>
@@ -78,8 +79,8 @@ export function AnalysisAnimeToast({
                   />
                   <small>
                     {entry.score !== null && entry.score !== undefined
-                      ? `${Number(entry.score).toFixed(1)}점`
-                      : entry.anime.seasonYear ?? '정보 없음'}
+                      ? tr("{{v0}}점", { v0: Number(entry.score).toFixed(1) })
+                      : entry.anime.seasonYear ?? tr("정보 없음")}
                   </small>
                 </span>
                 <strong>{entry.anime.title}</strong>
@@ -87,7 +88,7 @@ export function AnalysisAnimeToast({
             ))}
           </div>
           {totalPages > 1 && (
-            <div className="analysis-anime-toast-pagination" aria-label="감상 작품 페이지">
+            <div className="analysis-anime-toast-pagination" aria-label={tr("감상 작품 페이지")}>
               <button
                 type="button"
                 onClick={() => setPageState((current) => ({
@@ -96,7 +97,7 @@ export function AnalysisAnimeToast({
                 }))}
                 disabled={page === 1}
               >
-                이전
+                {tr("이전")}
               </button>
               <span>{page} / {totalPages}</span>
               <button
@@ -107,7 +108,7 @@ export function AnalysisAnimeToast({
                 }))}
                 disabled={page === totalPages}
               >
-                다음
+                {tr("다음")}
               </button>
             </div>
           )}

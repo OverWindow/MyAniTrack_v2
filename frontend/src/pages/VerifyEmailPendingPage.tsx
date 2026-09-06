@@ -1,3 +1,4 @@
+import { tr } from '../i18n'
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { ErrorToast } from '../components/ErrorToast'
@@ -15,7 +16,7 @@ export function VerifyEmailPendingPage() {
     const normalizedEmail = email.trim()
 
     if (!normalizedEmail) {
-      setError('인증 메일을 다시 보내려면 이메일을 입력해주세요.')
+      setError(tr("인증 메일을 다시 보내려면 이메일을 입력해주세요."))
       return
     }
 
@@ -26,7 +27,7 @@ export function VerifyEmailPendingPage() {
       const response = await resendVerificationEmail(normalizedEmail)
       setFeedback(response.message)
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : '인증 메일 재전송에 실패했어요.')
+      setError(submitError instanceof Error ? submitError.message : tr("인증 메일 재전송에 실패했어요."))
     } finally {
       setIsSubmitting(false)
     }
@@ -35,14 +36,14 @@ export function VerifyEmailPendingPage() {
   return (
     <section className="auth-page">
       <div className="auth-card">
-        <h1 className="auth-title">이메일 인증이 필요해요</h1>
+        <h1 className="auth-title">{tr("이메일 인증이 필요해요")}</h1>
         <p className="auth-description">
-          회원가입은 완료됐지만 아직 로그인할 수는 없어요. 받은 편지함에서 인증 메일을 열고 링크를 눌러주세요.
+          {tr("회원가입은 완료됐지만 아직 로그인할 수는 없어요. 받은 편지함에서 인증 메일을 열고 링크를 눌러주세요.")}
         </p>
 
         <div className="auth-form">
           <label className="auth-field">
-            <span>인증 메일 받을 이메일</span>
+            <span>{tr("인증 메일 받을 이메일")}</span>
             <input
               type="email"
               value={email}
@@ -57,9 +58,9 @@ export function VerifyEmailPendingPage() {
 
           <div className="auth-action-row">
             <button className="primary-button auth-submit" type="button" onClick={() => { void handleResend() }} disabled={isSubmitting}>
-              {isSubmitting ? '보내는 중...' : '메일 다시 보내기'}
+              {isSubmitting ? tr("보내는 중...") : tr("메일 다시 보내기")}
             </button>
-            <Link className="secondary-button" to="/login">로그인으로 이동</Link>
+            <Link className="secondary-button" to="/login">{tr("로그인으로 이동")}</Link>
           </div>
         </div>
       </div>

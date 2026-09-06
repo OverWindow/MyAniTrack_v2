@@ -1,3 +1,5 @@
+import { getLocaleTag } from '../i18n'
+import { tr } from '../i18n'
 import { authFetch, getStoredSession } from './auth'
 import type {
   FriendItem,
@@ -31,7 +33,7 @@ function getApiBaseUrl() {
   const baseUrl = import.meta.env.VITE_API_BASE_URL
 
   if (!baseUrl) {
-    throw new Error('VITE_API_BASE_URL이 설정되지 않았습니다.')
+    throw new Error(tr("VITE_API_BASE_URL이 설정되지 않았습니다."))
   }
 
   return baseUrl
@@ -43,23 +45,23 @@ function createUrl(path: string) {
 
 function getErrorMessage(status: number, fallback: string) {
   if (status === 400) {
-    return '요청 값이 올바르지 않아요. 자기 자신에게 요청을 보냈는지 확인해주세요.'
+    return tr("요청 값이 올바르지 않아요. 자기 자신에게 요청을 보냈는지 확인해주세요.")
   }
 
   if (status === 401) {
-    return '로그인이 필요하거나 세션이 만료되었어요.'
+    return tr("로그인이 필요하거나 세션이 만료되었어요.")
   }
 
   if (status === 404) {
-    return '요청한 사용자나 친구 관계를 찾을 수 없어요.'
+    return tr("요청한 사용자나 친구 관계를 찾을 수 없어요.")
   }
 
   if (status === 409) {
-    return '이미 친구이거나 요청을 보낸 상태예요.'
+    return tr("이미 친구이거나 요청을 보낸 상태예요.")
   }
 
   if (status >= 500) {
-    return '서버 오류가 발생했어요. 잠시 후 다시 시도해주세요.'
+    return tr("서버 오류가 발생했어요. 잠시 후 다시 시도해주세요.")
   }
 
   return fallback
@@ -94,13 +96,13 @@ export async function sendFriendRequest(payload: FriendRequestPayload) {
   })
 
   if (!response.ok) {
-    throw new Error(getErrorMessage(response.status, '친구 요청을 보내지 못했어요.'))
+    throw new Error(getErrorMessage(response.status, tr("친구 요청을 보내지 못했어요.")))
   }
 
   const data = (await response.json()) as SendFriendRequestResponse
 
   return {
-    message: data.message,
+    message: tr("친구 요청을 보냈어요."),
     item: {
       id: data.item.id,
       requesterId: 0,
@@ -115,7 +117,7 @@ export async function fetchFriendRequests(signal?: AbortSignal) {
   const response = await authFetch(createUrl('/api/friends/requests'), { signal })
 
   if (!response.ok) {
-    throw new Error(getErrorMessage(response.status, '친구 요청 목록을 불러오지 못했어요.'))
+    throw new Error(getErrorMessage(response.status, tr("친구 요청 목록을 불러오지 못했어요.")))
   }
 
   const data = (await response.json()) as FriendRequestsResponse
@@ -136,7 +138,7 @@ export async function updateFriendRequest(requestId: number, action: FriendReque
   })
 
   if (!response.ok) {
-    throw new Error(getErrorMessage(response.status, '친구 요청 상태를 변경하지 못했어요.'))
+    throw new Error(getErrorMessage(response.status, tr("친구 요청 상태를 변경하지 못했어요.")))
   }
 
   const data = (await response.json()) as UpdateFriendRequestResponse
@@ -147,7 +149,7 @@ export async function fetchFriends(signal?: AbortSignal) {
   const response = await authFetch(createUrl('/api/friends'), { signal })
 
   if (!response.ok) {
-    throw new Error(getErrorMessage(response.status, '친구 목록을 불러오지 못했어요.'))
+    throw new Error(getErrorMessage(response.status, tr("친구 목록을 불러오지 못했어요.")))
   }
 
   const data = (await response.json()) as FriendsResponse
@@ -160,7 +162,7 @@ export async function removeFriend(friendUserId: number) {
   })
 
   if (!response.ok) {
-    throw new Error(getErrorMessage(response.status, '친구를 삭제하지 못했어요.'))
+    throw new Error(getErrorMessage(response.status, tr("친구를 삭제하지 못했어요.")))
   }
 }
 
@@ -178,7 +180,7 @@ export function getFriendInitials(user?: { username?: string | null; id?: number
 }
 
 export function formatFriendAnimeCount(count?: number | null) {
-  return `${(count ?? 0).toLocaleString()}개 작품`
+  return tr("{{v0}}개 작품", { v0: (count ?? 0).toLocaleString(getLocaleTag()) })
 }
 
 export function sortFriendsByNewest(items: FriendItem[]) {

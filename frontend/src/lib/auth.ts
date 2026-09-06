@@ -1,3 +1,4 @@
+import { localizeExternalMessage, tr } from '../i18n'
 import type {
   AuthResponse,
   AuthTokens,
@@ -29,7 +30,11 @@ type AuthApiError = Error & {
 }
 
 function createAuthError(message: string, status?: number, code?: string) {
-  return Object.assign(new Error(message), { status, code }) as AuthApiError
+  const safeMessage = localizeExternalMessage(
+    message,
+    tr("인증 서비스를 잠시 사용할 수 없어요. 잠시 후 다시 시도해주세요."),
+  )
+  return Object.assign(new Error(safeMessage), { status, code }) as AuthApiError
 }
 
 export function getAuthErrorStatus(error: unknown) {
@@ -67,7 +72,7 @@ function getApiBaseUrl() {
   const baseUrl = import.meta.env.VITE_API_BASE_URL
 
   if (!baseUrl) {
-    throw new Error('VITE_API_BASE_URL이 설정되지 않았습니다.')
+    throw new Error(tr("VITE_API_BASE_URL이 설정되지 않았습니다."))
   }
 
   return baseUrl
@@ -187,7 +192,7 @@ export function clearStoredSession() {
 }
 
 export function isSessionExpiredError(error: unknown) {
-  return error instanceof Error && error.message.includes('세션이 만료되었어요')
+  return error instanceof Error && error.message.includes(tr("세션이 만료되었어요"))
 }
 
 export function isEmailVerificationRequiredError(error: unknown) {
@@ -196,19 +201,19 @@ export function isEmailVerificationRequiredError(error: unknown) {
 
 function getErrorMessage(status: number, fallback: string, retryAfterHeader?: string | null) {
   if (status === 400) {
-    return '요청 형식이 올바르지 않아요.'
+    return tr("요청 형식이 올바르지 않아요.")
   }
 
   if (status === 401) {
-    return '인증 정보가 올바르지 않거나 만료되었어요.'
+    return tr("인증 정보가 올바르지 않거나 만료되었어요.")
   }
 
   if (status === 403) {
-    return '이 작업을 수행할 권한이 없어요.'
+    return tr("이 작업을 수행할 권한이 없어요.")
   }
 
   if (status === 404) {
-    return '요청한 정보를 찾을 수 없어요.'
+    return tr("요청한 정보를 찾을 수 없어요.")
   }
 
   if (status === 429) {
@@ -216,18 +221,18 @@ function getErrorMessage(status: number, fallback: string, retryAfterHeader?: st
 
     if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
       const retryAfterMinutes = Math.max(1, Math.ceil(retryAfterSeconds / 60))
-      return `요청이 너무 많아요. 약 ${retryAfterMinutes}분 후 다시 시도해주세요.`
+      return tr("요청이 너무 많아요. 약 {{v0}}분 후 다시 시도해주세요.", { v0: retryAfterMinutes })
     }
 
-    return '요청이 너무 많아요. 잠시 후 다시 시도해주세요.'
+    return tr("요청이 너무 많아요. 잠시 후 다시 시도해주세요.")
   }
 
   if (status === 503) {
-    return '인증 서비스를 잠시 사용할 수 없어요. 잠시 후 다시 시도해주세요.'
+    return tr("인증 서비스를 잠시 사용할 수 없어요. 잠시 후 다시 시도해주세요.")
   }
 
   if (status >= 500) {
-    return '서버 오류가 발생했어요. 잠시 후 다시 시도해주세요.'
+    return tr("서버 오류가 발생했어요. 잠시 후 다시 시도해주세요.")
   }
 
   return fallback
@@ -278,16 +283,16 @@ export async function login(payload: LoginPayload) {
     const data = await parseJsonSafe<{ success?: boolean; message?: string }>(response)
 
     if (data?.message === 'Email verification required') {
-      throw createAuthError('이메일 인증이 필요해요. 메일 인증 후 다시 로그인해주세요.', 403, 'EMAIL_VERIFICATION_REQUIRED')
+      throw createAuthError(tr("이메일 인증이 필요해요. 메일 인증 후 다시 로그인해주세요."), 403, 'EMAIL_VERIFICATION_REQUIRED')
     }
   }
 
-  return parseAuthResponse(response, '로그인에 실패했어요.')
+  return parseAuthResponse(response, tr("로그인에 실패했어요."))
 }
 
 export async function signInWithGoogle() {
   if (!isSupabaseConfigured()) {
-    throw createAuthError('Google 로그인을 위한 Supabase 환경변수가 설정되지 않았어요.')
+    throw createAuthError(tr("Google 로그인을 위한 Supabase 환경변수가 설정되지 않았어요."))
   }
 
   const { error } = await supabase.auth.signInWithOAuth({
@@ -301,7 +306,7 @@ export async function signInWithGoogle() {
   })
 
   if (error) {
-    throw createAuthError(error.message || 'Google 로그인에 실패했어요.')
+    throw createAuthError(error.message || tr("Google 로그인에 실패했어요."))
   }
 }
 
@@ -317,7 +322,7 @@ async function getSupabaseSessionAccessToken() {
 
   if (!authCode) {
     if (initialSession.error) {
-      throw createAuthError(initialSession.error.message || 'Google 로그인 세션을 확인하지 못했어요.')
+      throw createAuthError(initialSession.error.message || tr("Google 로그인 세션을 확인하지 못했어요."))
     }
 
     return null
@@ -326,7 +331,7 @@ async function getSupabaseSessionAccessToken() {
   const exchangedSession = await supabase.auth.exchangeCodeForSession(authCode)
 
   if (exchangedSession.error) {
-    throw createAuthError(exchangedSession.error.message || 'Google 로그인 세션 교환에 실패했어요.')
+    throw createAuthError(exchangedSession.error.message || tr("Google 로그인 세션 교환에 실패했어요."))
   }
 
   return exchangedSession.data.session?.access_token ?? null
@@ -334,19 +339,19 @@ async function getSupabaseSessionAccessToken() {
 
 function getSupabaseAuthErrorMessage(serverMessage?: string | null) {
   if (serverMessage === 'Invalid Supabase token') {
-    return 'Google 로그인 토큰을 백엔드가 검증하지 못했어요. 프론트 VITE_SUPABASE_URL과 백엔드 SUPABASE_URL이 같은 Supabase 프로젝트인지 확인해주세요.'
+    return tr("Google 로그인 토큰을 백엔드가 검증하지 못했어요. 프론트 VITE_SUPABASE_URL과 백엔드 SUPABASE_URL이 같은 Supabase 프로젝트인지 확인해주세요.")
   }
 
   if (serverMessage === 'Invalid Supabase user') {
-    return 'Google 계정 정보를 확인하지 못했어요. 다른 Google 계정으로 다시 시도해주세요.'
+    return tr("Google 계정 정보를 확인하지 못했어요. 다른 Google 계정으로 다시 시도해주세요.")
   }
 
   if (serverMessage === 'Supabase email verification required') {
-    return 'Google 계정의 이메일 인증이 필요해요.'
+    return tr("Google 계정의 이메일 인증이 필요해요.")
   }
 
   if (serverMessage === 'Google OAuth session required') {
-    return 'Google 계정으로만 계속할 수 있어요.'
+    return tr("Google 계정으로만 계속할 수 있어요.")
   }
 
   return serverMessage || null
@@ -356,7 +361,7 @@ export async function completeSupabaseLogin() {
   const accessToken = await getSupabaseSessionAccessToken()
 
   if (!accessToken) {
-    throw createAuthError('Google 로그인 세션을 확인하지 못했어요.')
+    throw createAuthError(tr("Google 로그인 세션을 확인하지 못했어요."))
   }
 
   const response = await fetch(createUrl('/api/auth/supabase'), {
@@ -378,7 +383,7 @@ export async function completeSupabaseLogin() {
 
     const responseMessage = getErrorMessage(
         response.status,
-        'Google 로그인 연결에 실패했어요.',
+        tr("Google 로그인 연결에 실패했어요."),
         response.headers.get('Retry-After'),
       )
 
@@ -394,7 +399,7 @@ export async function completeSupabaseLogin() {
   const user = extractAuthUser(dataJson)
 
   if (!user) {
-    throw createAuthError('Google 로그인 사용자 정보를 불러오지 못했어요.')
+    throw createAuthError(tr("Google 로그인 사용자 정보를 불러오지 못했어요."))
   }
 
   saveStoredSession(createSupabaseStoredSession(user))
@@ -413,12 +418,13 @@ export async function resendVerificationEmail(email: string) {
 
   if (!response.ok) {
     throw createAuthError(
-      getErrorMessage(response.status, '인증 메일 재전송에 실패했어요.', response.headers.get('Retry-After')),
+      getErrorMessage(response.status, tr("인증 메일 재전송에 실패했어요."), response.headers.get('Retry-After')),
       response.status,
     )
   }
 
-  return (await response.json()) as VerifyEmailResendResponse
+  const data = (await response.json()) as VerifyEmailResendResponse
+  return { ...data, message: tr("인증 메일을 다시 보냈어요. 받은 편지함을 확인해주세요.") }
 }
 
 export async function confirmEmailVerification(token: string) {
@@ -432,10 +438,11 @@ export async function confirmEmailVerification(token: string) {
   })
 
   if (!response.ok) {
-    throw createAuthError(getErrorMessage(response.status, '이메일 인증 확인에 실패했어요.'), response.status)
+    throw createAuthError(getErrorMessage(response.status, tr("이메일 인증 확인에 실패했어요.")), response.status)
   }
 
-  return (await response.json()) as VerifyEmailConfirmResponse
+  const data = (await response.json()) as VerifyEmailConfirmResponse
+  return { ...data, message: tr("이메일 인증이 완료되었어요.") }
 }
 
 export async function requestPasswordReset(email: string) {
@@ -450,12 +457,13 @@ export async function requestPasswordReset(email: string) {
 
   if (!response.ok) {
     throw createAuthError(
-      getErrorMessage(response.status, '비밀번호 재설정 메일 요청에 실패했어요.', response.headers.get('Retry-After')),
+      getErrorMessage(response.status, tr("비밀번호 재설정 메일 요청에 실패했어요."), response.headers.get('Retry-After')),
       response.status,
     )
   }
 
-  return (await response.json()) as PasswordResetRequestResponse
+  const data = (await response.json()) as PasswordResetRequestResponse
+  return { ...data, message: tr("비밀번호 재설정 메일을 보냈어요. 받은 편지함을 확인해주세요.") }
 }
 
 export async function confirmPasswordReset(token: string, newPassword: string) {
@@ -473,38 +481,39 @@ export async function confirmPasswordReset(token: string, newPassword: string) {
     const serverMessage = data?.message
 
     if (serverMessage === 'token is required') {
-      throw createAuthError('재설정 토큰이 없어 비밀번호를 변경할 수 없어요.', response.status)
+      throw createAuthError(tr("재설정 토큰이 없어 비밀번호를 변경할 수 없어요."), response.status)
     }
 
     if (serverMessage === 'password must be between 8 and 72 characters') {
-      throw createAuthError('비밀번호는 8자 이상 72자 이하로 입력해주세요.', response.status)
+      throw createAuthError(tr("비밀번호는 8자 이상 72자 이하로 입력해주세요."), response.status)
     }
 
     if (serverMessage === 'Invalid password reset token') {
-      throw createAuthError('재설정 링크가 올바르지 않아요. 새 메일을 다시 요청해주세요.', response.status)
+      throw createAuthError(tr("재설정 링크가 올바르지 않아요. 새 메일을 다시 요청해주세요."), response.status)
     }
 
     if (serverMessage === 'Password reset token has already been used') {
-      throw createAuthError('이미 사용된 재설정 링크예요. 새 메일을 다시 요청해주세요.', response.status)
+      throw createAuthError(tr("이미 사용된 재설정 링크예요. 새 메일을 다시 요청해주세요."), response.status)
     }
 
     if (serverMessage === 'Password reset token has expired') {
-      throw createAuthError('재설정 링크가 만료됐어요. 새 메일을 다시 요청해주세요.', response.status)
+      throw createAuthError(tr("재설정 링크가 만료됐어요. 새 메일을 다시 요청해주세요."), response.status)
     }
 
     throw createAuthError(
       response.status === 429 || response.status === 503
         ? getErrorMessage(
           response.status,
-          '비밀번호 재설정에 실패했어요.',
+          tr("비밀번호 재설정에 실패했어요."),
           response.headers.get('Retry-After'),
         )
-        : serverMessage || getErrorMessage(response.status, '비밀번호 재설정에 실패했어요.'),
+        : serverMessage || getErrorMessage(response.status, tr("비밀번호 재설정에 실패했어요.")),
       response.status,
     )
   }
 
-  return (await response.json()) as PasswordResetConfirmResponse
+  const data = (await response.json()) as PasswordResetConfirmResponse
+  return { ...data, message: tr("비밀번호가 변경되었어요. 새 비밀번호로 로그인해주세요.") }
 }
 
 export async function checkUsernameAvailability(username: string) {
@@ -515,11 +524,11 @@ export async function checkUsernameAvailability(username: string) {
 
   if (response.status === 400) {
     const data = (await response.json()) as { success: false; message: string }
-    throw new Error(data.message)
+    throw createAuthError(data.message, response.status)
   }
 
   if (!response.ok) {
-    throw new Error(getErrorMessage(response.status, '닉네임 중복 확인에 실패했어요.'))
+    throw new Error(getErrorMessage(response.status, tr("닉네임 중복 확인에 실패했어요.")))
   }
 
   return (await response.json()) as {
@@ -537,10 +546,10 @@ export async function refreshAuth() {
 
   if (!response.ok) {
     if (response.status === 401) {
-      throw new Error('세션이 만료되었어요. 다시 로그인해주세요.')
+      throw new Error(tr("세션이 만료되었어요. 다시 로그인해주세요."))
     }
 
-    throw new Error(getErrorMessage(response.status, '토큰 갱신에 실패했어요.'))
+    throw new Error(getErrorMessage(response.status, tr("토큰 갱신에 실패했어요.")))
   }
 
   const tokens = (await response.json()) as AuthTokens
@@ -558,14 +567,14 @@ export async function fetchMe(accessToken?: string) {
     : await authFetch(createUrl('/api/auth/me'))
 
   if (!response.ok) {
-    throw new Error(getErrorMessage(response.status, '내 정보를 불러오지 못했어요.'))
+    throw new Error(getErrorMessage(response.status, tr("내 정보를 불러오지 못했어요.")))
   }
 
   const data = await response.json()
   const user = extractAuthUser(data)
 
   if (!user) {
-    throw new Error('내 정보를 불러오지 못했어요.')
+    throw new Error(tr("내 정보를 불러오지 못했어요."))
   }
 
   return user
@@ -575,7 +584,7 @@ export async function fetchMyAgreements() {
   const response = await authFetch(createUrl('/api/me/agreements'))
 
   if (!response.ok) {
-    throw new Error(getErrorMessage(response.status, '약관 동의 상태를 불러오지 못했어요.'))
+    throw new Error(getErrorMessage(response.status, tr("약관 동의 상태를 불러오지 못했어요.")))
   }
 
   const data = (await response.json()) as {
@@ -596,7 +605,7 @@ export async function updateMyAgreements(payload: UpdateAgreementsPayload) {
   })
 
   if (!response.ok) {
-    throw new Error(getErrorMessage(response.status, '약관 동의 저장에 실패했어요.'))
+    throw new Error(getErrorMessage(response.status, tr("약관 동의 저장에 실패했어요.")))
   }
 
   const data = (await response.json()) as {
@@ -614,7 +623,7 @@ export async function logoutCurrentDevice() {
   })
 
   if (!response.ok) {
-    throw new Error(getErrorMessage(response.status, '로그아웃에 실패했어요.'))
+    throw new Error(getErrorMessage(response.status, tr("로그아웃에 실패했어요.")))
   }
 }
 
@@ -633,7 +642,7 @@ export async function logoutAllDevices() {
   })
 
   if (!response.ok) {
-    throw new Error(getErrorMessage(response.status, '모든 기기 로그아웃에 실패했어요.'))
+    throw new Error(getErrorMessage(response.status, tr("모든 기기 로그아웃에 실패했어요.")))
   }
 }
 
@@ -645,7 +654,7 @@ export async function deleteMyAccount() {
   if (!response.ok) {
     const data = await parseJsonSafe<{ message?: string }>(response)
     throw createAuthError(
-      data?.message || getErrorMessage(response.status, '계정 삭제에 실패했어요.'),
+      data?.message || getErrorMessage(response.status, tr("계정 삭제에 실패했어요.")),
       response.status,
     )
   }
@@ -684,10 +693,10 @@ export async function updateProfile(payload: UpdateProfilePayload) {
     const data = await parseJsonSafe<{ success?: boolean; message?: string }>(response)
 
     if (data?.message === 'Username already exists') {
-      throw createAuthError('이미 사용 중인 닉네임이에요.', response.status)
+      throw createAuthError(tr("이미 사용 중인 닉네임이에요."), response.status)
     }
 
-    throw new Error(getErrorMessage(response.status, '프로필 수정에 실패했어요.'))
+    throw new Error(getErrorMessage(response.status, tr("프로필 수정에 실패했어요.")))
   }
 
   const data = (await response.json()) as {
@@ -775,7 +784,7 @@ export async function authFetch(input: string, init: RequestInit = {}) {
     })
   } catch {
     clearStoredSession()
-    throw new Error('세션이 만료되었어요. 다시 로그인해주세요.')
+    throw new Error(tr("세션이 만료되었어요. 다시 로그인해주세요."))
   }
 
   return response

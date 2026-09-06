@@ -1,3 +1,5 @@
+import { getLocaleTag } from '../i18n'
+import { getTitleLanguage, tr } from '../i18n'
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ConnectionErrorState } from '../components/ConnectionErrorState'
@@ -60,7 +62,7 @@ function getAnimeMeta(item: VoiceActorDetailItem) {
     item.anime.seasonYear ? String(item.anime.seasonYear) : null,
     item.anime.format,
     item.anime.averageScore !== null && item.anime.averageScore !== undefined
-      ? `평균 ${item.anime.averageScore}점`
+      ? tr("평균 {{v0}}점", { v0: item.anime.averageScore })
       : null,
   ].filter(Boolean).join(' · ')
 }
@@ -77,7 +79,7 @@ function getWatchedAnimeMeta(item: VoiceActorAnimeItem) {
     item.anime.seasonYear ? String(item.anime.seasonYear) : null,
     item.anime.format,
     item.userList?.score !== null && item.userList?.score !== undefined
-      ? `내 평점 ${item.userList.score}점`
+      ? tr("내 평점 {{v0}}점", { v0: item.userList.score })
       : null,
   ].filter(Boolean).join(' · ')
 }
@@ -109,7 +111,7 @@ export function VoiceActorDetailPage() {
         item: null,
         isLoading: false,
         isLoadingMore: false,
-        error: '성우 ID가 올바르지 않아요.',
+        error: tr("성우 ID가 올바르지 않아요."),
         moreError: null,
       })
       return
@@ -129,7 +131,7 @@ export function VoiceActorDetailPage() {
       try {
         const item = await fetchVoiceActorDetail({
           voiceActorId,
-          titleLanguage: 'ko',
+          titleLanguage: getTitleLanguage(),
           limit: DETAIL_LIMIT,
           signal: controller.signal,
         })
@@ -154,7 +156,7 @@ export function VoiceActorDetailPage() {
           item: null,
           isLoading: false,
           isLoadingMore: false,
-          error: getFriendlyErrorMessage(error, '성우 상세 정보를 불러오지 못했어요.'),
+          error: getFriendlyErrorMessage(error, tr("성우 상세 정보를 불러오지 못했어요.")),
           moreError: null,
         })
       }
@@ -185,7 +187,7 @@ export function VoiceActorDetailPage() {
       try {
         const result = await fetchVoiceActorAnime({
           voiceActorId: Number(voiceActorId),
-          titleLanguage: 'ko',
+          titleLanguage: getTitleLanguage(),
           status: 'completed',
           limit: DETAIL_LIMIT,
           signal: controller.signal,
@@ -213,7 +215,7 @@ export function VoiceActorDetailPage() {
           pageInfo: null,
           isLoading: false,
           isLoadingMore: false,
-          error: getFriendlyErrorMessage(error, '내가 본 작품을 불러오지 못했어요.'),
+          error: getFriendlyErrorMessage(error, tr("내가 본 작품을 불러오지 못했어요.")),
           moreError: null,
         })
       }
@@ -265,7 +267,7 @@ export function VoiceActorDetailPage() {
       setState((current) => ({
         ...current,
         isLoadingMore: false,
-        moreError: getFriendlyErrorMessage(error, '더 많은 출연 정보를 불러오지 못했어요.'),
+        moreError: getFriendlyErrorMessage(error, tr("더 많은 출연 정보를 불러오지 못했어요.")),
       }))
     }
   }
@@ -285,7 +287,7 @@ export function VoiceActorDetailPage() {
     try {
       const result = await fetchVoiceActorAnime({
         voiceActorId: Number(voiceActorId),
-        titleLanguage: 'ko',
+        titleLanguage: getTitleLanguage(),
         status: 'completed',
         limit: watchedState.pageInfo.limit || DETAIL_LIMIT,
         cursor: watchedState.pageInfo.nextCursor,
@@ -303,7 +305,7 @@ export function VoiceActorDetailPage() {
       setWatchedState((current) => ({
         ...current,
         isLoadingMore: false,
-        moreError: getFriendlyErrorMessage(error, '내가 본 작품을 더 불러오지 못했어요.'),
+        moreError: getFriendlyErrorMessage(error, tr("내가 본 작품을 더 불러오지 못했어요.")),
       }))
     }
   }
@@ -322,7 +324,7 @@ export function VoiceActorDetailPage() {
   if (state.error || !state.item) {
     return (
       <section className="voice-actor-detail-page">
-        <ConnectionErrorState message={state.error || '성우 정보를 표시할 수 없어요.'} />
+        <ConnectionErrorState message={state.error || tr("성우 정보를 표시할 수 없어요.")} />
       </section>
     )
   }
@@ -371,7 +373,7 @@ export function VoiceActorDetailPage() {
   return (
     <section className="voice-actor-detail-page">
       <button className="detail-back-link detail-back-button" type="button" onClick={() => navigate(-1)}>
-        ← 이전 화면
+        {tr("← 이전 화면")}
       </button>
 
       <section className="voice-actor-hero">
@@ -399,55 +401,55 @@ export function VoiceActorDetailPage() {
         </div>
       </section>
 
-      <div className="voice-actor-summary-grid" aria-label="성우 요약">
+      <div className="voice-actor-summary-grid" aria-label={tr("성우 요약")}>
         <div>
-          <span>출연 애니</span>
-          <strong>{state.item.summary.animeCount.toLocaleString()}편</strong>
+          <span>{tr("출연 애니")}</span>
+          <strong>{state.item.summary.animeCount.toLocaleString(getLocaleTag())}{tr("편")}</strong>
         </div>
         <div>
-          <span>캐릭터</span>
-          <strong>{state.item.summary.characterCount.toLocaleString()}명</strong>
+          <span>{tr("캐릭터")}</span>
+          <strong>{state.item.summary.characterCount.toLocaleString(getLocaleTag())}{tr("명")}</strong>
         </div>
         <div>
-          <span>크레딧</span>
-          <strong>{state.item.summary.creditCount.toLocaleString()}개</strong>
+          <span>{tr("크레딧")}</span>
+          <strong>{state.item.summary.creditCount.toLocaleString(getLocaleTag())}{tr("개")}</strong>
         </div>
       </div>
 
       <section className="voice-actor-credit-section">
         <div className="voice-actor-credit-heading">
           <div>
-            <h2>출연 캐릭터와 작품</h2>
+            <h2>{tr("출연 캐릭터와 작품")}</h2>
             <p>
               {creditFilter === 'completed'
-                ? `${watchedState.items.length.toLocaleString()}편 · 캐릭터 ${watchedCharacterGroups.length.toLocaleString()}명을 표시 중이에요.`
-                : `캐릭터 ${allCharacterGroups.length.toLocaleString()}명을 표시 중이에요.`}
+                ? tr("{{v0}}편 · 캐릭터 {{v1}}명을 표시 중이에요.", { v0: watchedState.items.length.toLocaleString(getLocaleTag()), v1: watchedCharacterGroups.length.toLocaleString(getLocaleTag()) })
+                : tr("캐릭터 {{v0}}명을 표시 중이에요.", { v0: allCharacterGroups.length.toLocaleString(getLocaleTag()) })}
             </p>
           </div>
-          <div className="voice-actor-credit-filters" role="group" aria-label="출연작 필터">
+          <div className="voice-actor-credit-filters" role="group" aria-label={tr("출연작 필터")}>
             <button
               className={creditFilter === 'all' ? 'is-active' : ''}
               type="button"
               aria-pressed={creditFilter === 'all'}
               onClick={() => setCreditFilter('all')}
             >
-              전체 출연작
+              {tr("전체 출연작")}
             </button>
             <button
               className={creditFilter === 'completed' ? 'is-active' : ''}
               type="button"
               aria-pressed={creditFilter === 'completed'}
               disabled={isBootstrapping || !isAuthenticated}
-              title={!isBootstrapping && !isAuthenticated ? '로그인 후 이용할 수 있어요.' : undefined}
+              title={!isBootstrapping && !isAuthenticated ? tr("로그인 후 이용할 수 있어요.") : undefined}
               onClick={() => setCreditFilter('completed')}
             >
-              내가 본 작품
+              {tr("내가 본 작품")}
             </button>
           </div>
         </div>
 
         {creditFilter === 'completed' && watchedState.isLoading && (
-          <div className="feedback-card">내가 본 작품을 불러오는 중이에요.</div>
+          <div className="feedback-card">{tr("내가 본 작품을 불러오는 중이에요.")}</div>
         )}
 
         {creditFilter === 'completed' && watchedState.error && !watchedState.isLoading && (
@@ -455,7 +457,7 @@ export function VoiceActorDetailPage() {
         )}
 
         {creditFilter === 'completed' && !watchedState.isLoading && !watchedState.error && watchedCharacterGroups.length === 0 && (
-          <div className="feedback-card">이 성우가 출연한 완주 작품이 아직 없어요.</div>
+          <div className="feedback-card">{tr("이 성우가 출연한 완주 작품이 아직 없어요.")}</div>
         )}
 
         {creditFilter === 'completed' && !watchedState.isLoading && !watchedState.error && watchedCharacterGroups.length > 0 && (
@@ -465,7 +467,7 @@ export function VoiceActorDetailPage() {
         )}
 
         {creditFilter === 'all' && (visibleCharacterGroups.length === 0 ? (
-          <div className="feedback-card">표시할 출연 정보가 없어요.</div>
+          <div className="feedback-card">{tr("표시할 출연 정보가 없어요.")}</div>
         ) : (
           <div className="voice-actor-credit-grid">
             <VoiceActorCharacterWorks key="all" groups={allCharacterGroups} variant="detail" />
@@ -483,7 +485,7 @@ export function VoiceActorDetailPage() {
             disabled={state.isLoadingMore}
             onClick={() => { void handleLoadMore() }}
           >
-            {state.isLoadingMore ? '불러오는 중...' : '더 보기'}
+            {state.isLoadingMore ? tr("불러오는 중...") : tr("더 보기")}
           </button>
         )}
 
@@ -498,7 +500,7 @@ export function VoiceActorDetailPage() {
             disabled={watchedState.isLoadingMore}
             onClick={() => { void handleLoadMoreWatched() }}
           >
-            {watchedState.isLoadingMore ? '불러오는 중...' : '더 보기'}
+            {watchedState.isLoadingMore ? tr("불러오는 중...") : tr("더 보기")}
           </button>
         )}
       </section>

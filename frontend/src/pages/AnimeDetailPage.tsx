@@ -1,3 +1,5 @@
+import { getLocaleTag } from '../i18n'
+import { getTitleLanguage, tr } from '../i18n'
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { CollectionEditor } from '../components/CollectionEditor'
@@ -41,19 +43,19 @@ type RelationState = {
 }
 
 const relationTypeLabels: Record<AnimeRelationType, string> = {
-  PREQUEL: '이전 이야기',
-  SEQUEL: '후속작',
-  PARENT: '본편',
-  SIDE_STORY: '외전',
-  SPIN_OFF: '스핀오프',
-  ADAPTATION: '각색작',
-  SOURCE: '원작',
-  SUMMARY: '총집편',
-  ALTERNATIVE: '다른 버전',
-  CHARACTER: '캐릭터 연관',
-  COMPILATION: '모음집',
-  CONTAINS: '포함 작품',
-  OTHER: '기타 관계',
+  PREQUEL: tr("이전 이야기"),
+  SEQUEL: tr("후속작"),
+  PARENT: tr("본편"),
+  SIDE_STORY: tr("외전"),
+  SPIN_OFF: tr("스핀오프"),
+  ADAPTATION: tr("각색작"),
+  SOURCE: tr("원작"),
+  SUMMARY: tr("총집편"),
+  ALTERNATIVE: tr("다른 버전"),
+  CHARACTER: tr("캐릭터 연관"),
+  COMPILATION: tr("모음집"),
+  CONTAINS: tr("포함 작품"),
+  OTHER: tr("기타 관계"),
 }
 
 const createInitialDetailState = (requestKey: string): DetailState => ({
@@ -65,18 +67,18 @@ const createInitialDetailState = (requestKey: string): DetailState => ({
 
 function getQuarterLabel(season?: string | null, seasonYear?: number | null) {
   const labelMap: Record<string, string> = {
-    SPRING: '1분기',
-    SUMMER: '2분기',
-    FALL: '3분기',
-    WINTER: '4분기',
+    SPRING: tr("1분기"),
+    SUMMER: tr("2분기"),
+    FALL: tr("3분기"),
+    WINTER: tr("4분기"),
   }
 
   const seasonLabel = season ? labelMap[season] ?? season : null
-  return [seasonYear, seasonLabel].filter(Boolean).join(' ') || '정보 없음'
+  return [seasonYear, seasonLabel].filter(Boolean).join(' ') || tr("정보 없음")
 }
 
 function getCastDisplayName(name: { full?: string | null; native?: string | null; userPreferred?: string | null }) {
-  return name.userPreferred || name.full || name.native || '이름 정보 없음'
+  return name.userPreferred || name.full || name.native || tr("이름 정보 없음")
 }
 
 type AdminTitleEditorProps = {
@@ -107,7 +109,7 @@ function AdminTitleEditor({ item, onTitleUpdated }: AdminTitleEditorProps) {
     const nextSubtitle = adminSubtitle.trim()
 
     if (!nextTitle) {
-      setAdminTitleError('한국어 제목을 입력해주세요.')
+      setAdminTitleError(tr("한국어 제목을 입력해주세요."))
       return
     }
 
@@ -129,9 +131,9 @@ function AdminTitleEditor({ item, onTitleUpdated }: AdminTitleEditorProps) {
       })
       setAdminTitle(updatedTitle.title)
       setAdminSubtitle(updatedTitle.subtitle ?? '')
-      setAdminTitleFeedback('한국어 제목을 저장하고 잠금 처리했어요.')
+      setAdminTitleFeedback(tr("한국어 제목을 저장하고 잠금 처리했어요."))
     } catch (saveError) {
-      setAdminTitleError(saveError instanceof Error ? saveError.message : '한국어 제목 수정에 실패했어요.')
+      setAdminTitleError(saveError instanceof Error ? saveError.message : tr("한국어 제목 수정에 실패했어요."))
     } finally {
       setIsSavingAdminTitle(false)
     }
@@ -143,23 +145,23 @@ function AdminTitleEditor({ item, onTitleUpdated }: AdminTitleEditorProps) {
       {/* <h2>한국어 제목 수정</h2> */}
       <form className="admin-title-form" onSubmit={handleAdminTitleSubmit}>
         <label className="auth-field">
-          <span>대표 한국어 제목</span>
+          <span>{tr("대표 한국어 제목")}</span>
           <input
             type="text"
             value={adminTitle}
             onChange={(event) => setAdminTitle(event.target.value)}
-            placeholder="장송의 프리렌"
+            placeholder={tr("장송의 프리렌")}
             required
           />
         </label>
 
         <label className="auth-field">
-          <span>부제목</span>
+          <span>{tr("부제목")}</span>
           <input
             type="text"
             value={adminSubtitle}
             onChange={(event) => setAdminSubtitle(event.target.value)}
-            placeholder="비워두면 없음"
+            placeholder={tr("비워두면 없음")}
           />
         </label>
 
@@ -167,7 +169,7 @@ function AdminTitleEditor({ item, onTitleUpdated }: AdminTitleEditorProps) {
         <ErrorToast message={adminTitleError} />
 
         <button className="primary-button auth-submit" type="submit" disabled={isSavingAdminTitle}>
-          {isSavingAdminTitle ? '저장 중...' : '제목 저장 및 잠금'}
+          {isSavingAdminTitle ? tr("저장 중...") : tr("제목 저장 및 잠금")}
         </button>
       </form>
     </section>
@@ -281,7 +283,7 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
           error:
             fetchError instanceof Error
               ? fetchError.message
-              : '상세 정보를 가져오지 못했습니다.',
+              : tr("상세 정보를 가져오지 못했습니다."),
           requestKey,
         })
       }
@@ -338,7 +340,7 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
         setCastState({
           items: [],
           isLoading: false,
-          error: castError instanceof Error ? castError.message : '캐릭터/성우 정보를 불러오지 못했어요.',
+          error: castError instanceof Error ? castError.message : tr("캐릭터/성우 정보를 불러오지 못했어요."),
         })
       }
     }
@@ -370,7 +372,7 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
       try {
         const response = await searchAnimeWithRelations({
           query: relationSearchQuery,
-          titleLanguage: 'ko',
+          titleLanguage: getTitleLanguage(),
           sort: 'popularity',
           limit: 20,
           signal: controller.signal,
@@ -394,7 +396,7 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
         setRelationState({
           items: [],
           isLoading: false,
-          error: relationError instanceof Error ? relationError.message : '연관 작품을 불러오지 못했어요.',
+          error: relationError instanceof Error ? relationError.message : tr("연관 작품을 불러오지 못했어요."),
         })
       }
     }
@@ -450,8 +452,8 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
   if (!id) {
     return (
       <section className={detailPageClassName}>
-        <ErrorToast message="잘못된 경로로 접근했어요." />
-        <div className="feedback-card">요청한 작품 화면을 열 수 없어요.</div>
+        <ErrorToast message={tr("잘못된 경로로 접근했어요.")} />
+        <div className="feedback-card">{tr("요청한 작품 화면을 열 수 없어요.")}</div>
       </section>
     )
   }
@@ -460,7 +462,7 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
     return (
       <section className={detailPageClassName}>
         {isOverlay && (
-          <button className="detail-overlay-close" type="button" onClick={handleOverlayClose} aria-label="상세 닫기">
+          <button className="detail-overlay-close" type="button" onClick={handleOverlayClose} aria-label={tr("상세 닫기")}>
             ×
           </button>
         )}
@@ -479,11 +481,11 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
     return (
       <section className={detailPageClassName}>
         {isOverlay && (
-          <button className="detail-overlay-close" type="button" onClick={handleOverlayClose} aria-label="상세 닫기">
+          <button className="detail-overlay-close" type="button" onClick={handleOverlayClose} aria-label={tr("상세 닫기")}>
             ×
           </button>
         )}
-        <ConnectionErrorState message={error ?? '작품 정보를 찾을 수 없어요.'} />
+        <ConnectionErrorState message={error ?? tr("작품 정보를 찾을 수 없어요.")} />
       </section>
     )
   }
@@ -495,7 +497,7 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
       <ErrorToast message={relationState.error} />
       <ErrorToast message={castState.error} />
       {isOverlay && (
-        <button className="detail-overlay-close" type="button" onClick={handleOverlayClose} aria-label="상세 닫기">
+        <button className="detail-overlay-close" type="button" onClick={handleOverlayClose} aria-label={tr("상세 닫기")}>
           ×
         </button>
       )}
@@ -523,38 +525,38 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
 
             <div className="detail-meta-grid">
               <div>
-                <span>포맷</span>
-                <strong>{item.format ?? '미정'}</strong>
+                <span>{tr("포맷")}</span>
+                <strong>{item.format ?? tr("미정")}</strong>
               </div>
               <div>
-                <span>방영</span>
+                <span>{tr("방영")}</span>
                 <strong>{getQuarterLabel(item.season, item.seasonYear)}</strong>
               </div>
               <div>
-                <span>에피소드</span>
+                <span>{tr("에피소드")}</span>
                 <strong>
-                  {item.episodes ? `${item.episodes}화 · ${item.duration ?? '?'}분` : '정보 없음'}
+                  {item.episodes ? tr("{{v0}}화 · {{v1}}분", { v0: item.episodes, v1: item.duration ?? '?' }) : tr("정보 없음")}
                 </strong>
               </div>
               <div>
-                <span>평점</span>
-                <strong>{item.averageScore ? `${(item.averageScore / 10).toFixed(1)} / 10` : '미집계'}</strong>
+                <span>{tr("평점")}</span>
+                <strong>{item.averageScore ? `${(item.averageScore / 10).toFixed(1)} / 10` : tr("미집계")}</strong>
               </div>
             </div>
 
             <div className="detail-actions">
               {item.siteUrl && (
                 <a className="primary-button" href={item.siteUrl} target="_blank" rel="noreferrer">
-                  원본 페이지 보기
+                  {tr("원본 페이지 보기")}
                 </a>
               )}
               {isOverlay ? (
                 <button className="secondary-button" type="button" onClick={handleOverlayClose}>
-                  다른 작품 더 보기
+                  {tr("다른 작품 더 보기")}
                 </button>
               ) : (
                 <Link className="secondary-button" to={backPath}>
-                  다른 작품 더 보기
+                  {tr("다른 작품 더 보기")}
                 </Link>
               )}
             </div>
@@ -567,7 +569,7 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
           <section className="detail-section detail-overview-card">
             <div className="detail-info-block detail-description">
               <span className="detail-label">Genres</span>
-              <h2>장르</h2>
+              <h2>{tr("장르")}</h2>
               {item.genres?.length ? (
                 <div className="chip-list detail-chip-list-spacious">
                   {item.genres.map((genre) => (
@@ -577,7 +579,7 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
                   ))}
                 </div>
               ) : (
-                <p className="detail-description-text">아직 등록된 장르 정보가 없어요.</p>
+                <p className="detail-description-text">{tr("아직 등록된 장르 정보가 없어요.")}</p>
               )}
             </div>
 
@@ -585,28 +587,28 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
               <span className="detail-label">Overview</span>
               <div className="detail-facts">
                 <div>
-                  <span>상태</span>
-                  <strong>{item.status ?? '정보 없음'}</strong>
+                  <span>{tr("상태")}</span>
+                  <strong>{item.status ?? tr("정보 없음")}</strong>
                 </div>
                 <div>
-                  <span>원작</span>
-                  <strong>{item.source ?? '정보 없음'}</strong>
+                  <span>{tr("원작")}</span>
+                  <strong>{item.source ?? tr("정보 없음")}</strong>
                 </div>
                 <div>
-                  <span>국가</span>
-                  <strong>{item.countryOfOrigin ?? '정보 없음'}</strong>
+                  <span>{tr("국가")}</span>
+                  <strong>{item.countryOfOrigin ?? tr("정보 없음")}</strong>
                 </div>
                 <div>
-                  <span>인기</span>
-                  <strong>{item.popularity?.toLocaleString() ?? '정보 없음'}</strong>
+                  <span>{tr("인기")}</span>
+                  <strong>{item.popularity?.toLocaleString(getLocaleTag()) ?? tr("정보 없음")}</strong>
                 </div>
                 <div>
-                  <span>즐겨찾기</span>
-                  <strong>{item.favourites?.toLocaleString() ?? '정보 없음'}</strong>
+                  <span>{tr("즐겨찾기")}</span>
+                  <strong>{item.favourites?.toLocaleString(getLocaleTag()) ?? tr("정보 없음")}</strong>
                 </div>
                 <div>
-                  <span>성인 작품</span>
-                  <strong>{item.isAdult ? '예' : '아니오'}</strong>
+                  <span>{tr("성인 작품")}</span>
+                  <strong>{item.isAdult ? tr("예") : tr("아니오")}</strong>
                 </div>
               </div>
             </div>
@@ -621,11 +623,11 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
           {isSampleDetail ? (
             <section className="detail-section guest-detail-cta">
               <span className="detail-label">Sample detail</span>
-              <h2>내 컬렉션에 담아 분석해볼까요?</h2>
-              <p>로그인하면 감상 상태, 평점, 진행 화수를 직접 기록할 수 있어요.</p>
+              <h2>{tr("내 컬렉션에 담아 분석해볼까요?")}</h2>
+              <p>{tr("로그인하면 감상 상태, 평점, 진행 화수를 직접 기록할 수 있어요.")}</p>
               <div className="guest-preview-actions">
-                <Link className="primary-button" to="/signup">시작하기</Link>
-                <Link className="secondary-button" to="/login">로그인</Link>
+                <Link className="primary-button" to="/signup">{tr("시작하기")}</Link>
+                <Link className="secondary-button" to="/login">{tr("로그인")}</Link>
               </div>
             </section>
           ) : (
@@ -649,12 +651,12 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
           <div className="detail-cast-heading">
             <div>
               <span className="detail-label">Related anime</span>
-              <h2>이 작품과 연관된 애니</h2>
+              <h2>{tr("이 작품과 연관된 애니")}</h2>
             </div>
           </div>
 
           {relationState.isLoading ? (
-            <div className="detail-relations-grid" aria-label="연관 작품을 불러오는 중">
+            <div className="detail-relations-grid" aria-label={tr("연관 작품을 불러오는 중")}>
               {Array.from({ length: 4 }).map((_, index) => (
                 <article className="detail-relation-card skeleton-card" key={`relation-skeleton-${index}`}>
                   <div className="detail-relation-poster" />
@@ -682,7 +684,7 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
                     <div className="detail-relation-copy">
                       <span>{relationTypeLabels[relation.relationType] ?? relation.relationType}</span>
                       <strong>{relatedAnime?.title || `AniList #${relation.targetAnilistId}`}</strong>
-                      <small>{relation.resolved && relatedAnime ? '상세 보기' : '동기화 대기'}</small>
+                      <small>{relation.resolved && relatedAnime ? tr("상세 보기") : tr("동기화 대기")}</small>
                     </div>
                   </>
                 )
@@ -707,7 +709,7 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
           <div className="detail-cast-heading">
             <div>
               <span className="detail-label">Main cast</span>
-              <h2>주요 캐릭터와 성우</h2>
+              <h2>{tr("주요 캐릭터와 성우")}</h2>
             </div>
           </div>
 

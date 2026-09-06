@@ -1,3 +1,4 @@
+import { tr } from '../i18n'
 import { useState } from 'react'
 import { Share2 } from 'lucide-react'
 import { useToast } from '../contexts/ToastContext'
@@ -22,7 +23,7 @@ async function copyText(value: string) {
 
   try {
     if (!document.execCommand('copy')) {
-      throw new Error('클립보드 복사에 실패했어요.')
+      throw new Error(tr("클립보드 복사에 실패했어요."))
     }
   } finally {
     textarea.remove()
@@ -43,22 +44,22 @@ export function ShareButton({ resourceType }: { resourceType: ShareResourceType 
       const share = await saveMyShare(resourceType, null)
       url = share.url
     } catch {
-      showError('공유 링크를 만들지 못했어요. 잠시 후 다시 시도해주세요.')
+      showError(tr("공유 링크를 만들지 못했어요. 잠시 후 다시 시도해주세요."))
       setIsSharing(false)
       return
     }
 
     try {
       await copyText(url)
-      showSuccess('공유 링크가 클립보드에 복사되었어요.')
+      showSuccess(tr("공유 링크가 클립보드에 복사되었어요."))
     } catch {
-      showError('공유 링크는 생성했지만 클립보드에 복사하지 못했어요.')
+      showError(tr("공유 링크는 생성했지만 클립보드에 복사하지 못했어요."))
     } finally {
       setIsSharing(false)
     }
   }
 
-  const label = resourceType === 'COLLECTION' ? '컬렉션 공유 링크 복사' : '분석 공유 링크 복사'
+  const label = resourceType === 'COLLECTION' ? tr("컬렉션 공유 링크 복사") : tr("분석 공유 링크 복사")
 
   return (
     <button

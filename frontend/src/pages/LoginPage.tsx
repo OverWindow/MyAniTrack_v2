@@ -1,3 +1,4 @@
+import { tr } from '../i18n'
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { GoogleIcon } from '../components/GoogleIcon'
@@ -43,13 +44,13 @@ export function LoginPage() {
       if (isEmailVerificationRequiredError(submitError)) {
         navigate(`/verify-email/pending?email=${encodeURIComponent(email.trim())}`, {
           replace: true,
-          state: { message: '이메일 인증이 완료되어야 로그인할 수 있어요.' },
+          state: { message: tr("이메일 인증이 완료되어야 로그인할 수 있어요.") },
         })
         return
       }
 
       setError(
-        submitError instanceof Error ? submitError.message : '로그인에 실패했어요.',
+        submitError instanceof Error ? submitError.message : tr("로그인에 실패했어요."),
       )
     } finally {
       setIsSubmitting(false)
@@ -66,7 +67,7 @@ export function LoginPage() {
     } catch (submitError) {
       savePendingAuthReturnPath(null)
       setError(
-        submitError instanceof Error ? submitError.message : 'Google 로그인에 실패했어요.',
+        submitError instanceof Error ? submitError.message : tr("Google 로그인에 실패했어요."),
       )
       setIsGoogleSubmitting(false)
     }
@@ -75,9 +76,9 @@ export function LoginPage() {
   return (
     <section className="auth-page">
       <div className="auth-card">
-        <h1 className="auth-title">로그인</h1>
+        <h1 className="auth-title">{tr("로그인")}</h1>
         <p className="auth-description">
-          내 애니 기록과 친구 비교, 취향 분석을 이어서 확인해보세요.
+          {tr("내 애니 기록과 친구 비교, 취향 분석을 이어서 확인해보세요.")}
         </p>
 
         <button
@@ -89,19 +90,19 @@ export function LoginPage() {
           disabled={isSubmitting || isGoogleSubmitting}
         >
           <GoogleIcon />
-          {isGoogleSubmitting ? 'Google로 이동 중...' : 'Google로 계속하기'}
+          {isGoogleSubmitting ? tr("Google로 이동 중...") : tr("Google로 계속하기")}
         </button>
 
         <p className="auth-consent-notice">
-          계속하면 <Link to="/terms">이용약관</Link> 및{' '}
-          <Link to="/privacy">개인정보처리방침</Link>에 동의한 것으로 간주합니다.
+          {tr("계속하면")} <Link to="/terms">{tr("이용약관")}</Link> {tr("및")}{' '}
+          <Link to="/privacy">{tr("개인정보처리방침")}</Link>{tr("에 동의한 것으로 간주합니다.")}
         </p>
 
-        <div className="auth-divider"><span>기존 회원 이메일 로그인</span></div>
+        <div className="auth-divider"><span>{tr("기존 회원 이메일 로그인")}</span></div>
 
         <form className="auth-form" onSubmit={handleSubmit} autoComplete="on">
           <label className="auth-field">
-            <span>이메일</span>
+            <span>{tr("이메일")}</span>
             <input
               type="email"
               name="email"
@@ -114,36 +115,36 @@ export function LoginPage() {
           </label>
 
           <label className="auth-field">
-            <span>비밀번호</span>
+            <span>{tr("비밀번호")}</span>
             <input
               type="password"
               name="current-password"
               autoComplete="current-password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              placeholder="비밀번호 입력"
+              placeholder={tr("비밀번호 입력")}
               required
             />
           </label>
 
           <div className="auth-inline-links">
-            <Link to="/password-reset">비밀번호를 잊어버렸어요</Link>
+            <Link to="/password-reset">{tr("비밀번호를 잊어버렸어요")}</Link>
           </div>
 
           <ErrorToast message={error} />
 
           <button className="primary-button auth-submit" type="submit" disabled={isSubmitting}>
-            {isSubmitting ? '로그인 중...' : '로그인'}
+            {isSubmitting ? tr("로그인 중...") : tr("로그인")}
           </button>
         </form>
 
         <p className="auth-helper">
-          아직 계정이 없다면 <Link to="/signup">회원가입</Link>
+          {tr("아직 계정이 없다면")} <Link to="/signup">{tr("회원가입")}</Link>
         </p>
-        <nav className="auth-policy-links" aria-label="정책 링크">
-          <Link to="/terms">이용약관</Link>
-          <Link to="/privacy">개인정보처리방침</Link>
-          <Link to="/account-deletion">계정 및 데이터 삭제</Link>
+        <nav className="auth-policy-links" aria-label={tr("정책 링크")}>
+          <Link to="/terms">{tr("이용약관")}</Link>
+          <Link to="/privacy">{tr("개인정보처리방침")}</Link>
+          <Link to="/account-deletion">{tr("계정 및 데이터 삭제")}</Link>
         </nav>
       </div>
     </section>

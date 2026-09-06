@@ -1,3 +1,5 @@
+import { getLocaleTag } from '../i18n'
+import { getTitleLanguage, tr } from '../i18n'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Film, Layers3 } from 'lucide-react'
@@ -163,7 +165,7 @@ function HoverRating({ animeId, maxProgress, collection, onCollectionChange }: H
         progress: maxProgress && maxProgress > 0 ? maxProgress : collection?.progress ?? null,
       })
     } catch (submitError) {
-      showError(submitError instanceof Error ? submitError.message : '별점을 저장하지 못했어요.')
+      showError(submitError instanceof Error ? submitError.message : tr("별점을 저장하지 못했어요."))
     } finally {
       setIsSubmitting(false)
     }
@@ -174,7 +176,7 @@ function HoverRating({ animeId, maxProgress, collection, onCollectionChange }: H
   }
 
   return (
-    <div className={isAdded ? 'anime-hover-rating is-added' : 'anime-hover-rating'} aria-label="탐색 빠른 별점">
+    <div className={isAdded ? 'anime-hover-rating is-added' : 'anime-hover-rating'} aria-label={tr("탐색 빠른 별점")}>
       {/* {isAdded && <strong className="anime-hover-rating-label">{getUserRatingLabel(score)}</strong>} */}
       <div className="anime-hover-rating-stars">
         {Array.from({ length: 5 }).map((_, index) => {
@@ -194,7 +196,7 @@ function HoverRating({ animeId, maxProgress, collection, onCollectionChange }: H
               <button
                 className="anime-hover-star-hit is-left"
                 type="button"
-                aria-label={`${leftValue.toFixed(1)}점 주기`}
+                aria-label={tr("{{v0}}점 주기", { v0: leftValue.toFixed(1) })}
                 onClick={(event) => {
                   void handleRate(leftValue, event)
                 }}
@@ -203,7 +205,7 @@ function HoverRating({ animeId, maxProgress, collection, onCollectionChange }: H
               <button
                 className="anime-hover-star-hit is-right"
                 type="button"
-                aria-label={`${rightValue.toFixed(1)}점 주기`}
+                aria-label={tr("{{v0}}점 주기", { v0: rightValue.toFixed(1) })}
                 onClick={(event) => {
                   void handleRate(rightValue, event)
                 }}
@@ -239,7 +241,7 @@ function ExploreAnimeCard({ item, location }: ExploreAnimeCardProps) {
           className="anime-poster-link"
           to={detailPath}
           state={detailState}
-          aria-label={`${getDisplayTitle(item)} 상세 페이지로 이동`}
+          aria-label={tr("{{v0}} 상세 페이지로 이동", { v0: getDisplayTitle(item) })}
         >
           <img
             className="anime-poster"
@@ -254,8 +256,8 @@ function ExploreAnimeCard({ item, location }: ExploreAnimeCardProps) {
             maxProgress={item.episodes}
             initialIsAdded={collection?.exists}
             useCacheState={false}
-            loginLabel="추가"
-            loginAriaLabel="로그인 후 컬렉션에 추가"
+            loginLabel={tr("추가")}
+            loginAriaLabel={tr("로그인 후 컬렉션에 추가")}
             onAddedChange={(exists) => {
               setLocalCollection((current) => ({
                 exists,
@@ -313,11 +315,11 @@ function ExploreSeriesCard({
 
       <div className="explore-series-copy">
         <div className="explore-series-heading">
-          <span>{item.scope === 'mainline' ? '본편 시리즈' : '관련 작품 전체'}</span>
-          <strong>{item.memberCount.toLocaleString('ko-KR')}편</strong>
+          <span>{item.scope === 'mainline' ? tr("본편 시리즈") : tr("관련 작품 전체")}</span>
+          <strong>{item.memberCount.toLocaleString(getLocaleTag())}{tr("편")}</strong>
         </div>
         <h3>{item.title}</h3>
-        <div className="explore-series-members" aria-label={`${item.title} 작품 목록`}>
+        <div className="explore-series-members" aria-label={tr("{{v0}} 작품 목록", { v0: item.title })}>
           {item.items.map((member) => {
             const memberCover = member.coverImageExtraLarge || member.coverImageLarge
 
@@ -327,7 +329,7 @@ function ExploreSeriesCard({
                 key={member.id}
                 to={`/anime/${member.id}`}
                 state={{ fromPage: 'explore', backgroundLocation: location }}
-                aria-label={`${member.title} 상세 보기`}
+                aria-label={tr("{{v0}} 상세 보기", { v0: member.title })}
                 title={member.title}
               >
                 {memberCover ? (
@@ -353,7 +355,7 @@ export function ExplorePage() {
   const [genre, setGenre] = useState<AnimeGenre | 'all'>('all')
   const [searchTerm, setSearchTerm] = useState('')
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
-  const [searchLanguage, setSearchLanguage] = useState<'ko' | 'en'>('ko')
+  const searchLanguage = getTitleLanguage()
   const normalizedQuery = debouncedSearchTerm.trim()
   const selectedGenre = genre === 'all' ? null : genre
   const requestKey = `anime:${sort}:${normalizedQuery}:${searchLanguage}:${genre}:${isAuthenticated ? 'auth' : 'guest'}`
@@ -451,7 +453,7 @@ export function ExplorePage() {
           isLoading: false,
           isLoadingMore: false,
           error:
-            getFriendlyErrorMessage(fetchError, '알 수 없는 오류로 목록을 가져오지 못했습니다.'),
+            getFriendlyErrorMessage(fetchError, tr("알 수 없는 오류로 목록을 가져오지 못했습니다.")),
           requestKey,
         })
       }
@@ -573,7 +575,7 @@ export function ExplorePage() {
                 ...current,
                 isLoadingMore: false,
                 error:
-                  getFriendlyErrorMessage(fetchError, '추가 목록을 불러오지 못했습니다.'),
+                  getFriendlyErrorMessage(fetchError, tr("추가 목록을 불러오지 못했습니다.")),
               }
             })
           } finally {
@@ -643,7 +645,7 @@ export function ExplorePage() {
           hasNext: false,
           isLoading: false,
           isLoadingMore: false,
-          error: getFriendlyErrorMessage(fetchError, '시리즈 목록을 가져오지 못했습니다.'),
+          error: getFriendlyErrorMessage(fetchError, tr("시리즈 목록을 가져오지 못했습니다.")),
           requestKey: seriesRequestKey,
         })
       }
@@ -727,7 +729,7 @@ export function ExplorePage() {
             ? {
                 ...current,
                 isLoadingMore: false,
-                error: getFriendlyErrorMessage(fetchError, '시리즈를 더 불러오지 못했습니다.'),
+                error: getFriendlyErrorMessage(fetchError, tr("시리즈를 더 불러오지 못했습니다.")),
               }
             : current)
         } finally {
@@ -757,7 +759,7 @@ export function ExplorePage() {
       <div className="explore-toolbar-shell">
         <div className="explore-toolbar">
           <div className="search-group">
-            <div className="explore-view-switch" role="group" aria-label="탐색 단위 선택">
+            <div className="explore-view-switch" role="group" aria-label={tr("탐색 단위 선택")}>
               <button
                 className={viewMode === 'anime' ? 'is-active' : ''}
                 type="button"
@@ -769,7 +771,7 @@ export function ExplorePage() {
                 }}
               >
                 <Film size={17} aria-hidden="true" />
-                작품
+                {tr("작품")}
               </button>
               <button
                 className={viewMode === 'series' ? 'is-active' : ''}
@@ -782,43 +784,18 @@ export function ExplorePage() {
                 }}
               >
                 <Layers3 size={17} aria-hidden="true" />
-                시리즈
+                {tr("시리즈")}
               </button>
             </div>
             <label className="search-field minimalist-search" htmlFor="anime-search">
               <input
                 id="anime-search"
                 type="search"
-                placeholder={viewMode === 'series' ? '시리즈 또는 작품 제목 검색' : '제목으로 검색하기'}
+                placeholder={viewMode === 'series' ? tr("시리즈 또는 작품 제목 검색") : tr("제목으로 검색하기")}
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
               />
             </label>
-            <div className="search-language-switch" aria-label="검색 언어 선택">
-              <button
-                className={
-                  searchLanguage === 'ko'
-                    ? 'search-language-button is-active'
-                    : 'search-language-button'
-                }
-                type="button"
-                onClick={() => setSearchLanguage('ko')}
-              >
-                한
-              </button>
-              <button
-                className={
-                  searchLanguage === 'en'
-                    ? 'search-language-button is-active'
-                    : 'search-language-button'
-                }
-                type="button"
-                onClick={() => setSearchLanguage('en')}
-              >
-                EN
-              </button>
-
-            </div>
           </div>
 
           <div className={`catalog-control-group${viewMode === 'series' ? ' is-series' : ''}`}>
@@ -829,8 +806,8 @@ export function ExplorePage() {
                   value={seriesScope}
                   onChange={(event) => setSeriesScope(event.target.value as AnimeSeriesScope)}
                 >
-                  <option value="mainline">본편 시리즈</option>
-                  <option value="franchise">관련 작품 전체</option>
+                  <option value="mainline">{tr("본편 시리즈")}</option>
+                  <option value="franchise">{tr("관련 작품 전체")}</option>
                 </select>
               </label>
             )}
@@ -840,7 +817,7 @@ export function ExplorePage() {
                 value={genre}
                 onChange={(event) => setGenre(event.target.value as AnimeGenre | 'all')}
               >
-                <option value="all">전체 장르</option>
+                <option value="all">{tr("전체 장르")}</option>
                 {genreOptions.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
@@ -887,8 +864,8 @@ export function ExplorePage() {
           {animeItems.length === 0 ? (
             <div className="feedback-card">
               {normalizedQuery
-                ? '검색 결과가 없어요. 다른 제목으로 검색하거나 정렬을 바꿔서 다시 둘러보세요.'
-                : '표시할 애니가 없어요. 잠시 후 다시 시도해주세요.'}
+                ? tr("검색 결과가 없어요. 다른 제목으로 검색하거나 정렬을 바꿔서 다시 둘러보세요.")
+                : tr("표시할 애니가 없어요. 잠시 후 다시 시도해주세요.")}
             </div>
           ) : (
             <div className="anime-grid">
@@ -905,11 +882,11 @@ export function ExplorePage() {
           <div ref={sentinelRef} className="scroll-sentinel" aria-hidden="true" />
 
           {isLoadingMore && (
-            <div className="feedback-inline">작품을 더 불러오는 중이에요.</div>
+            <div className="feedback-inline">{tr("작품을 더 불러오는 중이에요.")}</div>
           )}
 
           {!hasNext && animeItems.length > 0 && (
-            <div className="feedback-inline">마지막 작품까지 모두 확인했어요.</div>
+            <div className="feedback-inline">{tr("마지막 작품까지 모두 확인했어요.")}</div>
           )}
         </>
       )}
@@ -935,8 +912,8 @@ export function ExplorePage() {
           {seriesItems.length === 0 ? (
             <div className="feedback-card">
               {normalizedQuery
-                ? '검색 결과가 없어요. 다른 시리즈 또는 작품 제목으로 검색해보세요.'
-                : '표시할 시리즈가 없어요. 다른 범위나 필터를 선택해보세요.'}
+                ? tr("검색 결과가 없어요. 다른 시리즈 또는 작품 제목으로 검색해보세요.")
+                : tr("표시할 시리즈가 없어요. 다른 범위나 필터를 선택해보세요.")}
             </div>
           ) : (
             <div className="explore-series-grid">
@@ -949,11 +926,11 @@ export function ExplorePage() {
           <div ref={seriesSentinelRef} className="scroll-sentinel" aria-hidden="true" />
 
           {isLoadingMoreSeries && (
-            <div className="feedback-inline">시리즈를 더 불러오는 중이에요.</div>
+            <div className="feedback-inline">{tr("시리즈를 더 불러오는 중이에요.")}</div>
           )}
 
           {!hasNextSeries && seriesItems.length > 0 && (
-            <div className="feedback-inline">마지막 시리즈까지 모두 확인했어요.</div>
+            <div className="feedback-inline">{tr("마지막 시리즈까지 모두 확인했어요.")}</div>
           )}
         </>
       )}

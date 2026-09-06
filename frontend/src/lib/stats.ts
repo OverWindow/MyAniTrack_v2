@@ -1,3 +1,5 @@
+import { getLocaleTag } from '../i18n'
+import { getTitleLanguage, tr } from '../i18n'
 import { authFetch } from './auth'
 import { genreOptions } from './anime'
 import type {
@@ -20,7 +22,7 @@ function getApiBaseUrl() {
   const baseUrl = import.meta.env.VITE_API_BASE_URL
 
   if (!baseUrl) {
-    throw new Error('VITE_API_BASE_URL이 설정되지 않았습니다.')
+    throw new Error(tr("VITE_API_BASE_URL이 설정되지 않았습니다."))
   }
 
   return baseUrl
@@ -41,7 +43,7 @@ function extractStatsItem(payload: unknown) {
     return payload as AnimeStatsResponse['item']
   }
 
-  throw new Error('분석 응답 형식이 올바르지 않아요.')
+  throw new Error(tr("분석 응답 형식이 올바르지 않아요."))
 }
 
 function toFiniteNumber(value: unknown) {
@@ -172,11 +174,11 @@ export async function fetchMyAnimeStats(signal?: AbortSignal) {
   })
 
   if (response.status === 401) {
-    throw new Error('로그인이 필요해요.')
+    throw new Error(tr("로그인이 필요해요."))
   }
 
   if (!response.ok) {
-    throw new Error(`분석 정보를 불러오지 못했습니다. (${response.status})`)
+    throw new Error(tr("분석 정보를 불러오지 못했습니다. ({{v0}})", { v0: response.status }))
   }
 
   const payload = await response.json()
@@ -198,11 +200,11 @@ export async function fetchViewingDnaStats(params: {
   })
 
   if (response.status === 401) {
-    throw new Error('로그인이 필요해요.')
+    throw new Error(tr("로그인이 필요해요."))
   }
 
   if (!response.ok) {
-    throw new Error(`감상 DNA를 불러오지 못했습니다. (${response.status})`)
+    throw new Error(tr("감상 DNA를 불러오지 못했습니다. ({{v0}})", { v0: response.status }))
   }
 
   const data = (await response.json()) as ViewingDnaResponse
@@ -222,11 +224,11 @@ export async function recalculateMyAnimeStats() {
   )
 
   if (response.status === 401) {
-    throw new Error('로그인이 필요해요.')
+    throw new Error(tr("로그인이 필요해요."))
   }
 
   if (!response.ok) {
-    throw new Error(`분석을 다시 계산하지 못했습니다. (${response.status})`)
+    throw new Error(tr("분석을 다시 계산하지 못했습니다. ({{v0}})", { v0: response.status }))
   }
 
   const payload = await response.json()
@@ -274,7 +276,7 @@ function createGenreBubbleUrl(params: GenreBubbleParams = {}) {
   url.searchParams.set('weighting', params.weighting ?? 'fractional')
   url.searchParams.set('status', params.status ?? 'completed')
   url.searchParams.set('communityScore', params.communityScore ?? 'average')
-  url.searchParams.set('titleLanguage', params.titleLanguage ?? 'ko')
+  url.searchParams.set('titleLanguage', params.titleLanguage ?? getTitleLanguage())
 
   url.searchParams.set('topLimit', String(params.topLimit ?? 3))
 
@@ -315,11 +317,11 @@ export async function fetchGenreBubbleStats(params: GenreBubbleParams = {}) {
   })
 
   if (response.status === 401) {
-    throw new Error('로그인이 필요해요.')
+    throw new Error(tr("로그인이 필요해요."))
   }
 
   if (!response.ok) {
-    throw new Error(`장르 취향 버블 차트를 불러오지 못했습니다. (${response.status})`)
+    throw new Error(tr("장르 취향 버블 차트를 불러오지 못했습니다. ({{v0}})", { v0: response.status }))
   }
 
   const payload = (await response.json()) as GenreBubbleResponse
@@ -333,11 +335,11 @@ export async function fetchYearlyScoreStats(params: YearlyScoreParams = {}) {
   })
 
   if (response.status === 401) {
-    throw new Error('로그인이 필요해요.')
+    throw new Error(tr("로그인이 필요해요."))
   }
 
   if (!response.ok) {
-    throw new Error(`연도별 평점 분석을 불러오지 못했습니다. (${response.status})`)
+    throw new Error(tr("연도별 평점 분석을 불러오지 못했습니다. ({{v0}})", { v0: response.status }))
   }
 
   const payload = (await response.json()) as YearlyScoreStatsResponse
@@ -351,11 +353,11 @@ export async function fetchFormatDistributionStats(params: FormatDistributionPar
   })
 
   if (response.status === 401) {
-    throw new Error('로그인이 필요해요.')
+    throw new Error(tr("로그인이 필요해요."))
   }
 
   if (!response.ok) {
-    throw new Error(`포맷별 분석을 불러오지 못했습니다. (${response.status})`)
+    throw new Error(tr("포맷별 분석을 불러오지 못했습니다. ({{v0}})", { v0: response.status }))
   }
 
   const payload = (await response.json()) as FormatDistributionResponse
@@ -434,7 +436,7 @@ function createVoiceActorAnimeUrl(params: VoiceActorAnimeParams) {
     : `/api/me/voice-actors/${params.voiceActorId}/anime`
   const url = new URL(path, getApiBaseUrl())
 
-  url.searchParams.set('titleLanguage', params.titleLanguage ?? 'ko')
+  url.searchParams.set('titleLanguage', params.titleLanguage ?? getTitleLanguage())
   url.searchParams.set('status', params.status ?? 'all')
   url.searchParams.set('limit', String(params.limit ?? 20))
 
@@ -477,7 +479,7 @@ function createStudioAnimeUrl(params: StudioAnimeParams) {
 
   url.searchParams.set('status', params.status ?? 'completed')
   url.searchParams.set('mainOnly', String(params.mainOnly ?? true))
-  url.searchParams.set('titleLanguage', params.titleLanguage ?? 'ko')
+  url.searchParams.set('titleLanguage', params.titleLanguage ?? getTitleLanguage())
   url.searchParams.set('limit', String(params.limit ?? 20))
 
   if (params.cursor) {
@@ -493,11 +495,11 @@ export async function fetchVoiceActorRanking(params: VoiceActorRankingParams) {
   })
 
   if (response.status === 401) {
-    throw new Error('로그인이 필요해요.')
+    throw new Error(tr("로그인이 필요해요."))
   }
 
   if (!response.ok) {
-    throw new Error(`성우 랭킹을 불러오지 못했습니다. (${response.status})`)
+    throw new Error(tr("성우 랭킹을 불러오지 못했습니다. ({{v0}})", { v0: response.status }))
   }
 
   const payload = (await response.json()) as VoiceActorRankingResponse
@@ -511,11 +513,11 @@ export async function fetchVoiceActorAnime(params: VoiceActorAnimeParams) {
   })
 
   if (response.status === 401) {
-    throw new Error('로그인이 필요해요.')
+    throw new Error(tr("로그인이 필요해요."))
   }
 
   if (!response.ok) {
-    throw new Error(`성우 상세 작품을 불러오지 못했습니다. (${response.status})`)
+    throw new Error(tr("성우 상세 작품을 불러오지 못했습니다. ({{v0}})", { v0: response.status }))
   }
 
   return (await response.json()) as VoiceActorAnimeResponse
@@ -527,11 +529,11 @@ export async function fetchStudioRanking(params: StudioRankingParams = {}) {
   })
 
   if (response.status === 401) {
-    throw new Error('로그인이 필요해요.')
+    throw new Error(tr("로그인이 필요해요."))
   }
 
   if (!response.ok) {
-    throw new Error(`스튜디오 랭킹을 불러오지 못했습니다. (${response.status})`)
+    throw new Error(tr("스튜디오 랭킹을 불러오지 못했습니다. ({{v0}})", { v0: response.status }))
   }
 
   return (await response.json()) as StudioRankingResponse
@@ -543,11 +545,11 @@ export async function fetchStudioAnime(params: StudioAnimeParams) {
   })
 
   if (response.status === 401) {
-    throw new Error('로그인이 필요해요.')
+    throw new Error(tr("로그인이 필요해요."))
   }
 
   if (!response.ok) {
-    throw new Error(`스튜디오 작품 목록을 불러오지 못했습니다. (${response.status})`)
+    throw new Error(tr("스튜디오 작품 목록을 불러오지 못했습니다. ({{v0}})", { v0: response.status }))
   }
 
   return (await response.json()) as StudioAnimeResponse
@@ -555,7 +557,7 @@ export async function fetchStudioAnime(params: StudioAnimeParams) {
 
 export function getGenreLabel(genre?: string | null) {
   if (!genre) {
-    return '정보 없음'
+    return tr("정보 없음")
   }
 
   return genreOptions.find((option) => option.value === genre)?.label ?? genre
@@ -563,15 +565,15 @@ export function getGenreLabel(genre?: string | null) {
 
 export function formatWatchHours(totalMinutes?: number | null) {
   if (!totalMinutes || totalMinutes <= 0) {
-    return '0시간'
+    return tr("0시간")
   }
 
-  return `${Math.round(totalMinutes / 60).toLocaleString()}시간`
+  return tr("{{v0}}시간", { v0: Math.round(totalMinutes / 60).toLocaleString(getLocaleTag()) })
 }
 
 export function formatUpdatedAt(updatedAt?: string | null) {
   if (!updatedAt) {
-    return '업데이트 정보 없음'
+    return tr("업데이트 정보 없음")
   }
 
   const normalized = updatedAt.replace(' ', 'T')
@@ -581,7 +583,7 @@ export function formatUpdatedAt(updatedAt?: string | null) {
     return updatedAt
   }
 
-  return date.toLocaleString('ko-KR', {
+  return date.toLocaleString(getLocaleTag(), {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',

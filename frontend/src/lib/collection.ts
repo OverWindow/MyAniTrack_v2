@@ -1,3 +1,4 @@
+import { getTitleLanguage, tr } from '../i18n'
 import { authFetch, getStoredSession } from './auth'
 import type { AnimeGenre } from '../types/anime'
 import type {
@@ -23,7 +24,7 @@ function getApiBaseUrl() {
   const baseUrl = import.meta.env.VITE_API_BASE_URL
 
   if (!baseUrl) {
-    throw new Error('VITE_API_BASE_URL이 설정되지 않았습니다.')
+    throw new Error(tr("VITE_API_BASE_URL이 설정되지 않았습니다."))
   }
 
   return baseUrl
@@ -53,10 +54,11 @@ function getCollectionPageStorageKey(params: {
   const genreKey = params.genre ?? 'all'
   const yearKey = params.year ?? 'all'
   const scoreKey = params.score ?? 'all'
+  const titleLanguage = getTitleLanguage()
 
   return userId
-    ? `${COLLECTION_PAGE_STORAGE_KEY_PREFIX}:${String(userId)}:${params.sort}:${genreKey}:${yearKey}:${scoreKey}`
-    : `${COLLECTION_PAGE_STORAGE_KEY_PREFIX}:guest:${params.sort}:${genreKey}:${yearKey}:${scoreKey}`
+    ? `${COLLECTION_PAGE_STORAGE_KEY_PREFIX}:${String(userId)}:${titleLanguage}:${params.sort}:${genreKey}:${yearKey}:${scoreKey}`
+    : `${COLLECTION_PAGE_STORAGE_KEY_PREFIX}:guest:${titleLanguage}:${params.sort}:${genreKey}:${yearKey}:${scoreKey}`
 }
 
 function dispatchCollectionCacheUpdated(animeId?: number) {
@@ -212,23 +214,23 @@ function normalizePayload(payload: UserAnimeListPayload) {
 
 function getErrorMessage(status: number, fallback: string) {
   if (status === 400) {
-    return '입력 형식이 올바르지 않아요.'
+    return tr("입력 형식이 올바르지 않아요.")
   }
 
   if (status === 401) {
-    return '로그인이 필요해요.'
+    return tr("로그인이 필요해요.")
   }
 
   if (status === 404) {
-    return '애니를 찾을 수 없어요.'
+    return tr("애니를 찾을 수 없어요.")
   }
 
   if (status === 409) {
-    return '이미 컬렉션에 추가된 작품이에요.'
+    return tr("이미 컬렉션에 추가된 작품이에요.")
   }
 
   if (status >= 500) {
-    return '서버 오류가 발생했어요. 잠시 후 다시 시도해주세요.'
+    return tr("서버 오류가 발생했어요. 잠시 후 다시 시도해주세요.")
   }
 
   return fallback
@@ -257,7 +259,7 @@ function extractCollectionEntry(payload: unknown) {
     return (payload as { item: UserAnimeListEntry }).item
   }
 
-  throw new Error('컬렉션 응답 형식이 올바르지 않아요.')
+  throw new Error(tr("컬렉션 응답 형식이 올바르지 않아요."))
 }
 
 export async function addToCollection(payload: UserAnimeListPayload) {
@@ -270,7 +272,7 @@ export async function addToCollection(payload: UserAnimeListPayload) {
   })
 
   if (!response.ok) {
-    throw new Error(getErrorMessage(response.status, '컬렉션 추가에 실패했어요.'))
+    throw new Error(getErrorMessage(response.status, tr("컬렉션 추가에 실패했어요.")))
   }
 
   const entry = extractCollectionEntry(await response.json())
@@ -299,7 +301,7 @@ export async function updateCollectionEntry(
   })
 
   if (!response.ok) {
-    throw new Error(getErrorMessage(response.status, '컬렉션 수정에 실패했어요.'))
+    throw new Error(getErrorMessage(response.status, tr("컬렉션 수정에 실패했어요.")))
   }
 
   const entry = extractCollectionEntry(await response.json())
@@ -314,7 +316,7 @@ export async function deleteCollectionEntry(animeId: number) {
   })
 
   if (!response.ok) {
-    throw new Error(getErrorMessage(response.status, '컬렉션 삭제에 실패했어요.'))
+    throw new Error(getErrorMessage(response.status, tr("컬렉션 삭제에 실패했어요.")))
   }
 
   removeCachedCollectionEntry(animeId)
@@ -323,7 +325,7 @@ export async function deleteCollectionEntry(animeId: number) {
 
 export async function fetchMyCollectionEntry(animeId: number, signal?: AbortSignal) {
   const url = new URL(`/api/me/anime-list/${animeId}`, getApiBaseUrl())
-  url.searchParams.set('titleLanguage', 'ko')
+  url.searchParams.set('titleLanguage', getTitleLanguage())
 
   const response = await authFetch(url.toString(), { signal })
 
@@ -332,7 +334,7 @@ export async function fetchMyCollectionEntry(animeId: number, signal?: AbortSign
   }
 
   if (!response.ok) {
-    throw new Error(getErrorMessage(response.status, '내 기록을 불러오지 못했어요.'))
+    throw new Error(getErrorMessage(response.status, tr("내 기록을 불러오지 못했어요.")))
   }
 
   const data = (await response.json()) as UserAnimeListEntryResponse
@@ -370,7 +372,7 @@ export async function fetchMyCollection(params: {
 }) {
   const url = new URL('/api/me/anime-list', getApiBaseUrl())
   url.searchParams.set('sort', params.sort)
-  url.searchParams.set('titleLanguage', 'ko')
+  url.searchParams.set('titleLanguage', getTitleLanguage())
   url.searchParams.set('limit', String(params.limit))
 
   if (params.genre) {
@@ -392,7 +394,7 @@ export async function fetchMyCollection(params: {
   const response = await authFetch(url.toString(), { signal: params.signal })
 
   if (!response.ok) {
-    throw new Error(getErrorMessage(response.status, '컬렉션 목록을 불러오지 못했어요.'))
+    throw new Error(getErrorMessage(response.status, tr("컬렉션 목록을 불러오지 못했어요.")))
   }
 
   const data = (await response.json()) as UserAnimeListResponse
@@ -443,7 +445,7 @@ function getSeriesCollectionStoragePrefix() {
 function getSeriesCollectionStorageKey(params: SeriesCollectionCacheParams) {
   const scope = params.scope ?? 'mainline'
   const status = params.status ?? 'all'
-  const titleLanguage = params.titleLanguage ?? 'ko'
+  const titleLanguage = params.titleLanguage ?? getTitleLanguage()
   const query = encodeURIComponent(params.query?.trim().toLowerCase() || 'all')
 
   return `${getSeriesCollectionStoragePrefix()}${scope}:${status}:${titleLanguage}:${query}`
@@ -516,7 +518,7 @@ export async function fetchMySeriesCollection(params: {
   const url = new URL('/api/me/anime-list/series', getApiBaseUrl())
   url.searchParams.set('scope', params.scope ?? 'mainline')
   url.searchParams.set('status', params.status ?? 'all')
-  url.searchParams.set('titleLanguage', params.titleLanguage ?? 'ko')
+  url.searchParams.set('titleLanguage', params.titleLanguage ?? getTitleLanguage())
   url.searchParams.set('limit', String(params.limit ?? 20))
 
   if (params.query?.trim()) {
@@ -530,7 +532,7 @@ export async function fetchMySeriesCollection(params: {
   const response = await authFetch(url.toString(), { signal: params.signal })
 
   if (!response.ok) {
-    throw new Error(getErrorMessage(response.status, '시리즈 컬렉션을 불러오지 못했어요.'))
+    throw new Error(getErrorMessage(response.status, tr("시리즈 컬렉션을 불러오지 못했어요.")))
   }
 
   return response.json() as Promise<UserSeriesCollectionResponse>
@@ -543,13 +545,13 @@ export async function fetchSmartRatingCandidates(params: {
 }) {
   const url = new URL('/api/me/anime-list/smart-rating/candidates', getApiBaseUrl())
   url.searchParams.set('targetAnimeId', String(params.targetAnimeId))
-  url.searchParams.set('titleLanguage', 'ko')
+  url.searchParams.set('titleLanguage', getTitleLanguage())
   url.searchParams.set('limit', String(params.limit ?? 5))
 
   const response = await authFetch(url.toString(), { signal: params.signal })
 
   if (!response.ok) {
-    throw new Error(getErrorMessage(response.status, '스마트 평점 후보를 불러오지 못했어요.'))
+    throw new Error(getErrorMessage(response.status, tr("스마트 평점 후보를 불러오지 못했어요.")))
   }
 
   return (await response.json()) as SmartRatingCandidatesResponse
@@ -571,7 +573,7 @@ export async function estimateSmartRating(params: {
   })
 
   if (!response.ok) {
-    throw new Error(getErrorMessage(response.status, '스마트 평점을 계산하지 못했어요.'))
+    throw new Error(getErrorMessage(response.status, tr("스마트 평점을 계산하지 못했어요.")))
   }
 
   return (await response.json()) as SmartRatingEstimateResponse

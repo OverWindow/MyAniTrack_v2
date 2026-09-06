@@ -1,3 +1,4 @@
+import { tr } from './i18n'
 import { useEffect, useRef, useState } from 'react'
 import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import type { Location } from 'react-router-dom'
@@ -132,7 +133,7 @@ function App() {
         </Routes>
       </main>
       {backgroundLocation && (
-        <div className="route-overlay" role="dialog" aria-modal="true" aria-label="애니 상세 정보">
+        <div className="route-overlay" role="dialog" aria-modal="true" aria-label={tr("애니 상세 정보")}>
           <div className="route-overlay-backdrop" />
           <div className="route-overlay-panel">
             <Routes>
@@ -144,27 +145,27 @@ function App() {
       {shouldShowFloatingCta && isAuthenticated && (
         <div className="floating-hub" ref={floatingPanelRef}>
           {isFriendsOpen && (
-            <section id="floating-friends-panel" className="floating-friends-panel" aria-label="친구 빠른 목록">
+            <section id="floating-friends-panel" className="floating-friends-panel" aria-label={tr("친구 빠른 목록")}>
               <div className="floating-friends-panel-header">
-                <strong>친구 목록</strong>
+                <strong>{tr("친구 목록")}</strong>
                 <button
                   className="floating-friends-close"
                   type="button"
                   onClick={() => setIsFriendsOpen(false)}
-                  aria-label="친구 목록 닫기"
+                  aria-label={tr("친구 목록 닫기")}
                 >
                   ×
                 </button>
               </div>
               {isLoadingFriends ? (
-                <p className="floating-friends-feedback">친구 목록을 불러오는 중...</p>
+                <p className="floating-friends-feedback">{tr("친구 목록을 불러오는 중...")}</p>
               ) : friendsError ? (
                 <>
                   <ErrorToast message={friendsError} />
-                  <p className="floating-friends-feedback">친구 목록을 표시할 수 없어요.</p>
+                  <p className="floating-friends-feedback">{tr("친구 목록을 표시할 수 없어요.")}</p>
                 </>
               ) : friends.length === 0 ? (
-                <p className="floating-friends-feedback">아직 추가된 친구가 없어요.</p>
+                <p className="floating-friends-feedback">{tr("아직 추가된 친구가 없어요.")}</p>
               ) : (
                 <div className="floating-friends-list">
                   {friends.map((friend) => {
@@ -180,7 +181,7 @@ function App() {
                         <img
                           className="avatar avatar-image floating-friend-avatar"
                           src={getProfileImageSrc(friend.user.profileImageUrl)}
-                          alt={`${name} 프로필 이미지`}
+                          alt={tr("{{v0}} 프로필 이미지", { v0: name })}
                           onError={handleProfileImageError}
                         />
                         <span className="floating-friend-copy">
@@ -198,7 +199,7 @@ function App() {
           <button
             className="floating-hub-trigger"
             type="button"
-            aria-label="친구 목록 열기"
+            aria-label={tr("친구 목록 열기")}
             aria-expanded={isFriendsOpen}
             aria-controls="floating-friends-panel"
             onClick={() => { void handleFriendsOverlayToggle() }}

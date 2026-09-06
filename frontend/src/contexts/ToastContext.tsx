@@ -1,3 +1,4 @@
+import { tr } from '../i18n'
 /* eslint-disable react-refresh/only-export-components */
 import {
   createContext,
@@ -93,7 +94,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <div className="toast-viewport" aria-label="알림">
+      <div className="toast-viewport" aria-label={tr("알림")}>
         {toasts.map((toast) => (
           <div className={`error-toast ${toast.variant === 'success' ? 'success-toast' : ''}`} role={toast.variant === 'error' ? 'alert' : 'status'} key={toast.id}>
             {toast.variant === 'success'
@@ -104,7 +105,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               type="button"
               className="error-toast-close"
               onClick={() => dismissToast(toast.id)}
-              aria-label="알림 닫기"
+              aria-label={tr("알림 닫기")}
             >
               <X size={17} aria-hidden="true" />
             </button>
@@ -119,7 +120,7 @@ export function useToast() {
   const value = useContext(ToastContext)
 
   if (!value) {
-    throw new Error('useToast는 ToastProvider 안에서 사용해야 합니다.')
+    throw new Error(tr("useToast는 ToastProvider 안에서 사용해야 합니다."))
   }
 
   return value

@@ -1,3 +1,4 @@
+import { tr } from '../i18n'
 /* eslint-disable react-refresh/only-export-components */
 import {
   createContext,
@@ -198,7 +199,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
       async updateMyProfile(payload) {
         if (!getStoredSession()?.user) {
-          throw new Error('로그인 후에 프로필을 수정할 수 있어요.')
+          throw new Error(tr("로그인 후에 프로필을 수정할 수 있어요."))
         }
 
         const updatedUser = await updateProfile(payload)
@@ -216,7 +217,7 @@ export function useAuth() {
   const context = useContext(AuthContext)
 
   if (!context) {
-    throw new Error('useAuth는 AuthProvider 안에서 사용해야 합니다.')
+    throw new Error(tr("useAuth는 AuthProvider 안에서 사용해야 합니다."))
   }
 
   return context

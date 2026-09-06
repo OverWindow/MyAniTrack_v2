@@ -1,3 +1,4 @@
+import { getTitleLanguage, tr } from '../i18n'
 import type {
   AnimeDetailItem,
   AnimeDetailResponse,
@@ -18,32 +19,32 @@ import type {
 import { authFetch } from './auth'
 
 export const sortOptions: Array<{ value: AnimeSort; label: string }> = [
-  { value: 'latest', label: '최신 등록순' },
-  { value: 'score', label: '평점 높은 순' },
-  { value: 'popularity', label: '인기 높은 순' },
-  { value: 'season', label: '시즌 순' },
+  { value: 'latest', label: tr("최신 등록순") },
+  { value: 'score', label: tr("평점 높은 순") },
+  { value: 'popularity', label: tr("인기 높은 순") },
+  { value: 'season', label: tr("시즌 순") },
 ]
 
 export const genreOptions: Array<{ value: AnimeGenre; label: string }> = [
-  { value: 'Action', label: '액션' },
-  { value: 'Adventure', label: '모험' },
-  { value: 'Drama', label: '드라마' },
+  { value: 'Action', label: tr("액션") },
+  { value: 'Adventure', label: tr("모험") },
+  { value: 'Drama', label: tr("드라마") },
   { value: 'Sci-Fi', label: 'SF' },
-  { value: 'Mystery', label: '미스터리' },
-  { value: 'Comedy', label: '코미디' },
-  { value: 'Supernatural', label: '초자연' },
-  { value: 'Fantasy', label: '판타지' },
-  { value: 'Sports', label: '스포츠' },
-  { value: 'Romance', label: '로맨스' },
-  { value: 'Slice of Life', label: '일상' },
-  { value: 'Horror', label: '호러' },
-  { value: 'Psychological', label: '심리' },
-  { value: 'Thriller', label: '스릴러' },
-  { value: 'Ecchi', label: '에치' },
-  { value: 'Mecha', label: '메카' },
-  { value: 'Music', label: '음악' },
-  { value: 'Mahou Shoujo', label: '마법소녀' },
-  { value: 'Hentai', label: '헨타이' },
+  { value: 'Mystery', label: tr("미스터리") },
+  { value: 'Comedy', label: tr("코미디") },
+  { value: 'Supernatural', label: tr("초자연") },
+  { value: 'Fantasy', label: tr("판타지") },
+  { value: 'Sports', label: tr("스포츠") },
+  { value: 'Romance', label: tr("로맨스") },
+  { value: 'Slice of Life', label: tr("일상") },
+  { value: 'Horror', label: tr("호러") },
+  { value: 'Psychological', label: tr("심리") },
+  { value: 'Thriller', label: tr("스릴러") },
+  { value: 'Ecchi', label: tr("에치") },
+  { value: 'Mecha', label: tr("메카") },
+  { value: 'Music', label: tr("음악") },
+  { value: 'Mahou Shoujo', label: tr("마법소녀") },
+  { value: 'Hentai', label: tr("헨타이") },
 ]
 
 type AnimeSearchItemResponse = AnimeListItem & {
@@ -62,7 +63,7 @@ function getApiBaseUrl() {
   const baseUrl = import.meta.env.VITE_API_BASE_URL
 
   if (!baseUrl) {
-    throw new Error('VITE_API_BASE_URL이 설정되지 않았습니다.')
+    throw new Error(tr("VITE_API_BASE_URL이 설정되지 않았습니다."))
   }
 
   return baseUrl
@@ -96,7 +97,7 @@ export function getPrimaryPoster(item: { coverImageExtraLarge?: string | null; c
 
 export function getGenreLabel(genre?: string | null) {
   if (!genre) {
-    return '정보 없음'
+    return tr("정보 없음")
   }
 
   return genreOptions.find((option) => option.value === genre)?.label ?? genre
@@ -153,7 +154,7 @@ export async function fetchAnimeList(params: {
 }) {
   const url = new URL('/api/anime', getApiBaseUrl())
   url.searchParams.set('sort', params.sort)
-  url.searchParams.set('titleLanguage', 'ko')
+  url.searchParams.set('titleLanguage', getTitleLanguage())
   url.searchParams.set('limit', String(params.limit))
 
   if (params.genre) {
@@ -167,7 +168,7 @@ export async function fetchAnimeList(params: {
   const response = await authFetch(url.toString(), { signal: params.signal })
 
   if (!response.ok) {
-    throw new Error(`애니 목록을 불러오지 못했습니다. (${response.status})`)
+    throw new Error(tr("애니 목록을 불러오지 못했습니다. ({{v0}})", { v0: response.status }))
   }
 
   const data = (await response.json()) as AnimeListResponse
@@ -199,7 +200,7 @@ export async function fetchAnimeSeries(params: {
   if (params.cursor) url.searchParams.set('cursor', params.cursor)
 
   const response = await authFetch(url.toString(), { signal: params.signal })
-  if (!response.ok) throw new Error(`시리즈 목록을 불러오지 못했습니다. (${response.status})`)
+  if (!response.ok) throw new Error(tr("시리즈 목록을 불러오지 못했습니다. ({{v0}})", { v0: response.status }))
 
   return response.json() as Promise<AnimeSeriesListResponse>
 }
@@ -230,7 +231,7 @@ export async function searchAnime(params: {
   const response = await authFetch(url.toString(), { signal: params.signal })
 
   if (!response.ok) {
-    throw new Error(`애니 검색에 실패했습니다. (${response.status})`)
+    throw new Error(tr("애니 검색에 실패했습니다. ({{v0}})", { v0: response.status }))
   }
 
   const data = (await response.json()) as AnimeListResponse
@@ -253,7 +254,7 @@ export async function searchAnimeWithRelations(params: {
 }) {
   const url = new URL('/api/anime/search-with-relations', getApiBaseUrl())
   url.searchParams.set('query', params.query)
-  url.searchParams.set('titleLanguage', params.titleLanguage ?? 'ko')
+  url.searchParams.set('titleLanguage', params.titleLanguage ?? getTitleLanguage())
   url.searchParams.set('sort', params.sort ?? 'popularity')
   url.searchParams.set('limit', String(params.limit ?? 20))
 
@@ -272,7 +273,7 @@ export async function searchAnimeWithRelations(params: {
   const response = await authFetch(url.toString(), { signal: params.signal })
 
   if (!response.ok) {
-    throw new Error(`연관 작품을 불러오지 못했습니다. (${response.status})`)
+    throw new Error(tr("연관 작품을 불러오지 못했습니다. ({{v0}})", { v0: response.status }))
   }
 
   return (await response.json()) as AnimeSearchWithRelationsResponse
@@ -304,7 +305,7 @@ export async function searchMyAnime(params: {
   const response = await authFetch(url.toString(), { signal: params.signal })
 
   if (!response.ok) {
-    throw new Error(`내 컬렉션 정보가 포함된 애니 검색에 실패했습니다. (${response.status})`)
+    throw new Error(tr("내 컬렉션 정보가 포함된 애니 검색에 실패했습니다. ({{v0}})", { v0: response.status }))
   }
 
   const data = (await response.json()) as AnimeListResponse & {
@@ -346,7 +347,7 @@ export async function fetchPopularAnime(params: { limit?: number; signal?: Abort
   const response = await fetch(url.toString(), { signal: params.signal })
 
   if (!response.ok) {
-    throw new Error(`인기 애니를 불러오지 못했습니다. (${response.status})`)
+    throw new Error(tr("인기 애니를 불러오지 못했습니다. ({{v0}})", { v0: response.status }))
   }
 
   const data = (await response.json()) as PopularAnimeResponse
@@ -355,20 +356,20 @@ export async function fetchPopularAnime(params: { limit?: number; signal?: Abort
 
 export async function fetchAnimeDetail(id: string, signal?: AbortSignal) {
   const url = new URL(`/api/anime/${id}`, getApiBaseUrl())
-  url.searchParams.set('titleLanguage', 'ko')
+  url.searchParams.set('titleLanguage', getTitleLanguage())
 
   const response = await authFetch(url.toString(), { signal })
 
   if (response.status === 404) {
-    throw new Error('해당 애니를 찾을 수 없어요.')
+    throw new Error(tr("해당 애니를 찾을 수 없어요."))
   }
 
   if (response.status === 400) {
-    throw new Error('잘못된 요청으로 애니 정보를 불러오지 못했어요.')
+    throw new Error(tr("잘못된 요청으로 애니 정보를 불러오지 못했어요."))
   }
 
   if (!response.ok) {
-    throw new Error(`애니 상세 정보를 불러오지 못했습니다. (${response.status})`)
+    throw new Error(tr("애니 상세 정보를 불러오지 못했습니다. ({{v0}})", { v0: response.status }))
   }
 
   const data = (await response.json()) as AnimeDetailResponse
@@ -393,11 +394,11 @@ export async function fetchAnimeCast(params: {
   const response = await authFetch(url.toString(), { signal: params.signal })
 
   if (response.status === 404) {
-    throw new Error('해당 애니를 찾을 수 없어요.')
+    throw new Error(tr("해당 애니를 찾을 수 없어요."))
   }
 
   if (!response.ok) {
-    throw new Error(`캐릭터/성우 정보를 불러오지 못했습니다. (${response.status})`)
+    throw new Error(tr("캐릭터/성우 정보를 불러오지 못했습니다. ({{v0}})", { v0: response.status }))
   }
 
   const data = (await response.json()) as AnimeCastResponse
