@@ -8,6 +8,7 @@ import {
   fetchSeasonAnimePage,
 } from './anilist.client';
 import { syncAnimeCastByAnimeId } from './anime-cast.sync.service';
+import { ensureAutomaticCatalogImageSyncJob } from './catalog-image.sync.service';
 import {
   markAnimeRelationSyncFailedByAnilistId,
   markAnimeStudioSyncFailedByAnilistId,
@@ -204,6 +205,8 @@ export async function syncAllAnimeIntegrated(params: {
       }
     }
 
+    await ensureAutomaticCatalogImageSyncJob();
+
     processedPages += 1;
     hasNextPage = result.hasNextPage;
     page += 1;
@@ -242,6 +245,8 @@ export async function syncAnimePage(page: number, perPage = 50) {
     await upsertAnimeFull(anime);
   }
 
+  await ensureAutomaticCatalogImageSyncJob();
+
   return {
     page: result.currentPage,
     lastPage: result.lastPage,
@@ -262,6 +267,8 @@ export async function syncAllAnime(startPage = 1, perPage = 50, maxPages?: numbe
     for (const anime of result.media) {
       await upsertAnimeFull(anime);
     }
+
+    await ensureAutomaticCatalogImageSyncJob();
 
     totalAnime += result.media.length;
     processedPages += 1;
@@ -385,6 +392,8 @@ export async function syncSeasonAnime(
         await sleep(options.animeDelayMs);
       }
     }
+
+    await ensureAutomaticCatalogImageSyncJob();
 
     totalAnime += result.media.length;
     processedPages += 1;

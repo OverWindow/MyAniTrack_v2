@@ -17,6 +17,11 @@ import {
   getAnimeCastSyncStateController,
   translateAnimeKoreanTitlesController,
   updateAnimeKoreanTitleController,
+  createCatalogImageSyncJobController,
+  getCatalogImageSyncJobController,
+  pauseCatalogImageSyncJobController,
+  resumeCatalogImageSyncJobController,
+  retryCatalogImageSyncJobController,
 } from '../src/controllers/admin.controller';
 import {
   listProfileReportsController,
@@ -49,5 +54,10 @@ router.post('/admin/anime/:animeId/sync/cast', requireAdmin, syncAnimeCastContro
 router.get('/admin/anime/:animeId/sync/cast', requireAdmin, getAnimeCastSyncStateController);
 router.post('/admin/anime/korean-titles/translate', requireAdmin, translateAnimeKoreanTitlesController);
 router.patch('/admin/anime/:animeId/korean-title', requireAdmin, updateAnimeKoreanTitleController);
+router.post('/admin/catalog-images/sync/jobs', createCatalogImageSyncJobController);
+router.get('/admin/catalog-images/sync/jobs/current', getCatalogImageSyncJobController);
+router.post('/admin/catalog-images/sync/jobs/:jobId/pause', pauseCatalogImageSyncJobController);
+router.post('/admin/catalog-images/sync/jobs/:jobId/resume', resumeCatalogImageSyncJobController);
+router.post('/admin/catalog-images/sync/jobs/:jobId/retry-failed', retryCatalogImageSyncJobController);
 
 export default router;

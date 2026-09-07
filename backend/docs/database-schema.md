@@ -27,8 +27,16 @@
 - 유저의 실제 기록은 `user_anime_lists`에 저장됨
 - 추천/분석용 집계 데이터는 `user_anime_stats`에 캐시됨
 - 로그인 세션 유지는 `refresh_tokens`로 관리됨
+- AniList 이미지 원본은 비공개 작업 큐에만 보관하고, 이전 완료 후 공개 이미지 컬럼에는 CloudFront URL만 저장됨
 
 ## 테이블 목록
+
+### 이미지 동기화: `catalog_image_assets`, `catalog_image_sync_jobs`, `catalog_image_legacy_objects`
+
+- 애니·캐릭터·성우·프로필·배지·프로필 신고 이미지의 원본/대상 저장소, S3 객체 키, CloudFront URL, MIME, 실제 크기, SHA-256과 항목별 처리 상태를 저장합니다.
+- 관리자 또는 자동 작업의 진행률, 일시정지 상태와 서버 재시작 복구 정보를 저장합니다.
+- S3 객체 기본 경로는 `catalog-images/{entityType}/{anilistId}/...`, `profile-images/user-{id}/...`, `badges/{filename}`입니다.
+- 이전된 Supabase 객체는 `catalog_image_legacy_objects`에 14일 삭제 대기로 기록되며, 실제 이미지 참조가 남아 있으면 삭제가 하루씩 연기됩니다.
 
 ### 1. `anime`
 애니메이션의 기본 메타데이터를 저장하는 메인 테이블입니다.

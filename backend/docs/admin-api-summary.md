@@ -8,6 +8,20 @@
 - 성공 응답 기본 형식: `{ "success": true, ... }`
 - 실패 응답 기본 형식: `{ "success": false, "message": "..." }`
 
+## Catalog Image Sync
+
+애니 커버·배너, 캐릭터·성우, 프로필과 배지 이미지를 `myanitrack-assets-prod` S3로 이전하고 `https://images.myanitrack.com` CloudFront URL로 제공합니다. 기존 Supabase Storage 이미지는 그 공개 객체를 원본으로 다시 복사하며, 작업 상태는 DB에 저장되어 브라우저 종료와 서버 재시작 후에도 이어집니다.
+
+- `POST /admin/catalog-images/sync/jobs`: `{ "scope": "all", "mode": "pending" | "refresh" }`로 작업 생성
+- `GET /admin/catalog-images/sync/jobs/current`: 현재 또는 최근 작업, 전체 큐 집계와 최근 실패 조회
+- `POST /admin/catalog-images/sync/jobs/:jobId/pause`: 진행 중인 작업 일시정지
+- `POST /admin/catalog-images/sync/jobs/:jobId/resume`: 일시정지 작업 재개
+- `POST /admin/catalog-images/sync/jobs/:jobId/retry-failed`: 해당 작업의 실패 항목으로 재시도 작업 생성
+
+작업 시작·재개 전에는 고유한 점검 객체로 S3 Put/Head, CloudFront GET, S3 Delete를 모두 확인합니다. 이전이 끝나기 전 기존 Supabase URL은 그대로 제공하고, S3 객체의 MIME·크기·SHA-256 검증이 끝난 항목만 CloudFront URL로 전환합니다. AniList URL은 사용자 API에서 제거되어 직접 노출되지 않습니다.
+
+필수 이미지 저장소 환경변수는 `IMAGE_STORAGE_PROVIDER=s3`, `AWS_REGION`, `AWS_S3_BUCKET`, `IMAGE_CDN_BASE_URL`입니다. AWS SDK 표준 자격 증명 체인을 사용하며, 기존 객체 복사·14일 후 삭제를 위해 기존 `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET` 설정도 전환 기간 동안 유지합니다.
+
 ## Users
 
 ### `GET /admin/users`
@@ -636,7 +650,7 @@ Response 예시:
 - `badges/watch-badge200.png`
 - `badges/watch-badge300.png`
 
-이미지 URL은 `{SUPABASE_URL}/storage/v1/object/public/{SUPABASE_STORAGE_BUCKET}/badges/...` 형태로 저장됩니다.
+이미지 URL은 `{IMAGE_CDN_BASE_URL}/badges/...` 형태로 저장됩니다. 기존 URL은 S3 객체 검증이 끝날 때까지 유지됩니다.
 
 Response 예시:
 

@@ -1,6 +1,7 @@
 import { ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import { pool } from '../../config/db';
-import { deleteProfileImageByUrl, normalizeProfileImageUrl } from '../lib/supabase-storage';
+import { deleteProfileImageByUrl, normalizeProfileImageUrl } from '../lib/image-storage';
+import { getObjectKeyFromPublicUrl as getLegacySupabaseObjectKeyFromPublicUrl } from '../lib/supabase-storage';
 
 export const PROFILE_REPORT_REASONS = [
   'SEXUAL_CONTENT',
@@ -31,6 +32,56 @@ interface ReportRow extends RowDataPacket {
   requestCount: number;
   createdAt: string;
   updatedAt: string;
+}
+
+async function queueLegacyProfileReportImage(reportId: number, imageUrl: string | null) {
+  if (!imageUrl) {
+    return;
+  }
+
+  const legacyObjectKey = getLegacySupabaseObjectKeyFromPublicUrl(imageUrl);
+
+  if (!legacyObjectKey) {
+    return;
+  }
+
+  await pool.execute(
+    `
+    INSERT INTO catalog_image_assets (
+      entity_type,
+      entity_id,
+      anilist_id,
+      variant,
+      source_url,
+      source_hash,
+      source_provider,
+      public_url,
+      storage_provider,
+      legacy_object_key,
+      legacy_public_url,
+      status
+    )
+    VALUES (
+      'profile_report', ?, ?, 'reported_profile_image', ?, SHA2(?, 256),
+      'supabase', ?, 'supabase', ?, ?, 'pending'
+    )
+    ON DUPLICATE KEY UPDATE
+      entity_id = VALUES(entity_id),
+      source_url = VALUES(source_url),
+      source_hash = VALUES(source_hash),
+      source_provider = 'supabase',
+      public_url = VALUES(public_url),
+      storage_provider = 'supabase',
+      legacy_object_key = VALUES(legacy_object_key),
+      legacy_public_url = VALUES(legacy_public_url),
+      status = 'pending',
+      attempt_count = 0,
+      last_error = NULL,
+      job_id = NULL,
+      updated_at = CURRENT_TIMESTAMP
+    `,
+    [reportId, reportId, imageUrl, imageUrl, imageUrl, legacyObjectKey, imageUrl],
+  );
 }
 
 export function assertOtherUser(actorId: number, targetId: number) {
@@ -93,6 +144,7 @@ export async function createProfileReport(
   const duplicateId = duplicateRows[0]?.id;
   if (duplicateId) {
     await pool.execute(`UPDATE profile_reports SET request_count = request_count + 1, reason = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [validatedReason, duplicateId]);
+    await queueLegacyProfileReportImage(Number(duplicateId), normalizedUrl);
     return { id: Number(duplicateId), merged: true };
   }
 
@@ -100,6 +152,7 @@ export async function createProfileReport(
     `INSERT INTO profile_reports (reporter_user_id, reported_user_id, profile_image_url, reason) VALUES (?, ?, ?, ?)`,
     [reporterUserId, reportedUserId, normalizedUrl, validatedReason],
   );
+  await queueLegacyProfileReportImage(result.insertId, normalizedUrl);
   return { id: result.insertId, merged: false };
 }
 
@@ -177,6 +230,15 @@ export async function resolveProfileReport(reportId: number, adminUserId: number
     await connection.beginTransaction();
     if (action === 'REMOVE_PROFILE') {
       await connection.execute(`UPDATE users SET profile_image_url = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [report.reportedUserId]);
+      await connection.execute(
+        `
+        DELETE FROM catalog_image_assets
+        WHERE entity_type = 'user_profile'
+          AND entity_id = ?
+          AND variant = 'profile_image'
+        `,
+        [report.reportedUserId],
+      );
     }
     if (action === 'SUSPEND_USER') {
       await connection.execute(`UPDATE users SET moderation_status = 'SUSPENDED', suspended_at = CURRENT_TIMESTAMP, suspension_reason = 'PROFILE_REPORT', updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [report.reportedUserId]);

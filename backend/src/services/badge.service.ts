@@ -1,6 +1,8 @@
 import { ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import { pool } from '../../config/db';
 import { getUserAnimeStats, UserAnimeStats } from './recommendation.service';
+import { getPublicObjectUrl as getLegacySupabasePublicObjectUrl } from '../lib/supabase-storage';
+import { ensureAutomaticCatalogImageSyncJob } from '../../sync/catalog-image.sync.service';
 
 type BadgeCategory = 'WATCH' | 'EPISODE' | 'TIME' | 'RATING' | 'GENRE' | 'SPECIAL';
 type BadgeConditionType =
@@ -34,23 +36,13 @@ interface BadgeUserRow extends RowDataPacket {
   userId: number;
 }
 
-function getSupabasePublicObjectUrl(objectKey: string) {
-  const supabaseUrl = process.env.SUPABASE_URL?.replace(/\/+$/, '');
-  const bucket = process.env.SUPABASE_STORAGE_BUCKET || 'myanitrack_v2';
-
-  if (!supabaseUrl) {
-    return `badges/${objectKey.split('/').pop()}`;
-  }
-
-  return `${supabaseUrl}/storage/v1/object/public/${encodeURIComponent(bucket)}/${objectKey.split('/').map(encodeURIComponent).join('/')}`;
-}
-
 const INITIAL_BADGES = [
   {
     code: 'ANIME_TOTAL_100',
     name: '100편 시청',
     description: '애니를 100개 이상 보았을 때 획득합니다.',
-    imageUrl: getSupabasePublicObjectUrl('badges/watch-badge100.png'),
+    imageUrl: null,
+    objectKey: 'badges/watch-badge100.png',
     category: 'WATCH',
     conditionType: 'COMPLETED_COUNT',
     conditionValue: '100',
@@ -60,7 +52,8 @@ const INITIAL_BADGES = [
     code: 'ANIME_TOTAL_200',
     name: '200편 시청',
     description: '애니를 200개 이상 보았을 때 획득합니다.',
-    imageUrl: getSupabasePublicObjectUrl('badges/watch-badge200.png'),
+    imageUrl: null,
+    objectKey: 'badges/watch-badge200.png',
     category: 'WATCH',
     conditionType: 'COMPLETED_COUNT',
     conditionValue: '200',
@@ -70,7 +63,8 @@ const INITIAL_BADGES = [
     code: 'ANIME_TOTAL_300',
     name: '300편 시청',
     description: '애니를 300개 이상 보았을 때 획득합니다.',
-    imageUrl: getSupabasePublicObjectUrl('badges/watch-badge300.png'),
+    imageUrl: null,
+    objectKey: 'badges/watch-badge300.png',
     category: 'WATCH',
     conditionType: 'COMPLETED_COUNT',
     conditionValue: '300',
@@ -206,8 +200,10 @@ function mapBadge(row: BadgeRow, stats: UserAnimeStats) {
 }
 
 export async function ensureInitialBadges() {
+  let queuedImage = false;
+
   for (const badge of INITIAL_BADGES) {
-    await pool.execute<ResultSetHeader>(
+    const [badgeResult] = await pool.execute<ResultSetHeader>(
       `
       INSERT INTO badges (
         code,
@@ -223,9 +219,10 @@ export async function ensureInitialBadges() {
       )
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, TRUE, FALSE)
       ON DUPLICATE KEY UPDATE
+        id = LAST_INSERT_ID(id),
         name = VALUES(name),
         description = VALUES(description),
-        image_url = VALUES(image_url),
+        image_url = COALESCE(image_url, VALUES(image_url)),
         category = VALUES(category),
         condition_type = VALUES(condition_type),
         condition_value = VALUES(condition_value),
@@ -243,6 +240,46 @@ export async function ensureInitialBadges() {
         badge.rarity,
       ]
     );
+
+    const legacyUrl = getLegacySupabasePublicObjectUrl(badge.objectKey);
+    const [assetResult] = await pool.execute<ResultSetHeader>(
+      `
+      INSERT IGNORE INTO catalog_image_assets (
+        entity_type,
+        entity_id,
+        anilist_id,
+        variant,
+        source_url,
+        source_hash,
+        source_provider,
+        public_url,
+        storage_provider,
+        legacy_object_key,
+        legacy_public_url,
+        status
+      )
+      VALUES (
+        'badge', ?, ?, 'image', ?, SHA2(?, 256), 'supabase', ?,
+        'supabase', ?, ?, 'pending'
+      )
+      `,
+      [
+        badgeResult.insertId,
+        badgeResult.insertId,
+        legacyUrl,
+        legacyUrl,
+        legacyUrl,
+        badge.objectKey,
+        legacyUrl,
+      ],
+    );
+    queuedImage = queuedImage || assetResult.affectedRows > 0;
+  }
+
+  if (queuedImage) {
+    void ensureAutomaticCatalogImageSyncJob().catch((error) => {
+      console.error('Default badge images were queued but the S3 worker could not start', error);
+    });
   }
 }
 

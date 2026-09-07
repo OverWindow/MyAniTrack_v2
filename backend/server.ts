@@ -1,5 +1,5 @@
 import express from 'express';
-import { validateSupabaseStorageEnv } from './src/config/env';
+import { validateImageStorageEnv } from './src/config/env';
 import adminRoutes from './routes/admin.routes';
 import animeRoutes from './src/routes/anime.routes';
 import authRoutes from './src/routes/auth.routes';
@@ -16,8 +16,11 @@ import userProfileRoutes from './src/routes/user-profile.routes';
 import userVoiceActorStatsRoutes from './src/routes/user-voice-actor-stats.routes';
 import maintenanceRoutes from './src/routes/maintenance.routes';
 import { getSharePreviewHtml } from './src/controllers/share-preview.controller';
+import { stripAniListImageUrls } from './src/lib/catalog-image-url';
+import { resumeCatalogImageSyncWorker } from './sync/catalog-image.sync.service';
+import { startLegacyImageCleanupScheduler } from './src/services/legacy-image-cleanup.service';
 
-validateSupabaseStorageEnv();
+validateImageStorageEnv();
 
 const app = express();
 
@@ -88,6 +91,13 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 
+app.use((_req, res, next) => {
+  const sendJson = res.json.bind(res);
+
+  res.json = ((body: unknown) => sendJson(stripAniListImageUrls(body))) as typeof res.json;
+  next();
+});
+
 app.use((req, res, next) => {
   const unsafeMethods = ['POST', 'PUT', 'PATCH', 'DELETE'];
 
@@ -139,6 +149,8 @@ async function startServer() {
   app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
   });
+  startLegacyImageCleanupScheduler();
+  await resumeCatalogImageSyncWorker();
 }
 
 void startServer().catch((error) => {

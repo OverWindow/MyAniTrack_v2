@@ -166,6 +166,65 @@ export type AdminActionResponse = {
   result: Record<string, unknown>
 }
 
+export type CatalogImageSyncMode = 'pending' | 'refresh' | 'retry'
+export type CatalogImageSyncJobStatus =
+  | 'queued'
+  | 'running'
+  | 'paused'
+  | 'completed'
+  | 'completed_with_errors'
+  | 'failed'
+  | 'cancelled'
+
+export type CatalogImageSyncJob = {
+  id: number
+  scope: 'all'
+  mode: CatalogImageSyncMode
+  triggerType: 'admin' | 'system'
+  targetProvider: 'supabase' | 's3'
+  status: CatalogImageSyncJobStatus
+  totalAssets: number
+  processedAssets: number
+  succeededAssets: number
+  failedAssets: number
+  pendingAssets: number
+  syncingAssets: number
+  skippedAssets: number
+  lastError: string | null
+  currentAsset: {
+    id: number
+    entityType: 'anime' | 'character' | 'voice_actor' | 'user_profile' | 'badge' | 'profile_report'
+    entityId: number
+    anilistId: number
+    variant: string
+  } | null
+  startedAt: string | null
+  finishedAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type CatalogImageSyncSnapshot = {
+  job: CatalogImageSyncJob | null
+  queue: {
+    total: number
+    pending: number
+    syncing: number
+    succeeded: number
+    failed: number
+  }
+  recentFailures: Array<{
+    id: number
+    entityType: 'anime' | 'character' | 'voice_actor' | 'user_profile' | 'badge' | 'profile_report'
+    entityId: number
+    anilistId: number
+    variant: string
+    attemptCount: number
+    lastError: string | null
+    updatedAt: string
+  }>
+}
+
 export type PlatformStats = {
   registeredUserCount: number
   storedAnimeCount: number

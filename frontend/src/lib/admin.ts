@@ -22,6 +22,8 @@ import type {
   AdminUserListResponse,
   AdminUserRoleFilter,
   PlatformStats,
+  CatalogImageSyncMode,
+  CatalogImageSyncSnapshot,
 } from '../types/admin'
 
 function getApiBaseUrl() {
@@ -317,4 +319,60 @@ export async function updateAnimeKoreanTitle(animeId: number, payload: AdminUpda
   }
 
   return (await response.json()) as AdminUpdateKoreanTitleResponse
+}
+
+async function requestCatalogImageSync(
+  path: string,
+  options: RequestInit = {},
+) {
+  const response = await authFetch(createAdminUrl(path), options)
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => null) as { code?: string; storageStatus?: number | null } | null
+    const fallback = getAdminErrorMessage(response.status, '카탈로그 이미지 동기화 요청에 실패했어요.')
+    const storageMessage = errorBody?.code === 'IMAGE_STORAGE_UPLOAD_FAILED'
+      ? 'S3 업로드에 실패했어요. 버킷 쓰기 권한과 AWS 자격 증명을 확인해주세요.'
+      : errorBody?.code === 'IMAGE_STORAGE_VERIFY_FAILED'
+        ? 'S3 업로드 검증에 실패했어요. HeadObject 권한과 객체 메타데이터를 확인해주세요.'
+        : errorBody?.code === 'IMAGE_STORAGE_CDN_READ_FAILED'
+          ? 'CloudFront에서 점검 객체를 읽지 못했어요. DNS, 인증서, 대체 도메인과 배포 동작을 확인해주세요.'
+          : errorBody?.code === 'IMAGE_STORAGE_DELETE_FAILED'
+            ? 'S3 점검 객체를 삭제하지 못했어요. 버킷 삭제 권한을 확인해주세요.'
+            : null
+    const message = response.status === 409
+      ? '이미 실행 중이거나 일시정지된 이미지 동기화 작업이 있어요.'
+      : response.status === 404
+        ? '이미지 동기화 작업을 찾을 수 없어요.'
+        : response.status === 502
+          ? storageMessage ?? 'S3 또는 CloudFront 연결을 확인하지 못했어요. 버킷 권한과 CDN 주소를 확인해주세요.'
+          : fallback
+    throw new Error(message)
+  }
+
+  const data = await response.json() as { success: boolean; result: CatalogImageSyncSnapshot }
+  return data.result
+}
+
+export function fetchCatalogImageSyncStatus(signal?: AbortSignal) {
+  return requestCatalogImageSync('/admin/catalog-images/sync/jobs/current', { signal })
+}
+
+export function startCatalogImageSync(mode: Exclude<CatalogImageSyncMode, 'retry'>) {
+  return requestCatalogImageSync('/admin/catalog-images/sync/jobs', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ scope: 'all', mode }),
+  })
+}
+
+export function pauseCatalogImageSync(jobId: number) {
+  return requestCatalogImageSync(`/admin/catalog-images/sync/jobs/${jobId}/pause`, { method: 'POST' })
+}
+
+export function resumeCatalogImageSync(jobId: number) {
+  return requestCatalogImageSync(`/admin/catalog-images/sync/jobs/${jobId}/resume`, { method: 'POST' })
+}
+
+export function retryFailedCatalogImageSync(jobId: number) {
+  return requestCatalogImageSync(`/admin/catalog-images/sync/jobs/${jobId}/retry-failed`, { method: 'POST' })
 }

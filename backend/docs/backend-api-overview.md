@@ -2372,7 +2372,7 @@ Response example:
 - `ANIME_TOTAL_200`: 시청 완료 애니 200편
 - `ANIME_TOTAL_300`: 시청 완료 애니 300편
 
-기본 배지 이미지는 Supabase Storage의 `myanitrack_v2/badges` 폴더 파일을 사용합니다.
+기본 배지 이미지는 S3의 `badges` 경로에 저장되고 `https://images.myanitrack.com/badges/...`로 제공됩니다.
 
 Response example:
 
@@ -2385,7 +2385,7 @@ Response example:
       "code": "ANIME_TOTAL_100",
       "name": "100편 시청",
       "description": "애니를 100개 이상 보았을 때 획득합니다.",
-      "imageUrl": "https://.../storage/v1/object/public/myanitrack_v2/badges/watch-badge100.png",
+      "imageUrl": "https://images.myanitrack.com/badges/watch-badge100.png",
       "category": "WATCH",
       "conditionType": "COMPLETED_COUNT",
       "conditionValue": "100",

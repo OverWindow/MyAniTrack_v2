@@ -4,9 +4,12 @@ import {
   deleteObjectByKey,
   deleteProfileImageByUrl,
   getObjectKeyFromPublicUrl,
+  getS3ObjectKeyFromPublicUrl,
+  isSupportedImageContentType,
   normalizeProfileImageUrl,
   uploadProfileImage,
-} from '../lib/supabase-storage';
+} from '../lib/image-storage';
+import { queueLegacySupabaseObjectWithPool } from './legacy-image-cleanup.service';
 
 export interface UserProfileRecord extends RowDataPacket {
   id: number;
@@ -31,6 +34,14 @@ interface PublicUserProfileRow extends RowDataPacket {
 interface UploadedProfileImageFile {
   buffer: Buffer;
   mimetype: string;
+}
+
+interface ProfileImageMutation {
+  removed?: boolean;
+  objectKey?: string;
+  contentType?: string;
+  contentSizeBytes?: number;
+  contentSha256?: string;
 }
 
 export type ProfileUpdateStage =
@@ -58,6 +69,7 @@ export interface UserProfileDependencies {
     userId: number,
     username: string,
     profileImageUrl: string | null,
+    imageMutation?: ProfileImageMutation,
   ): Promise<void>;
   uploadProfileImage: typeof uploadProfileImage;
   deleteObjectByKey: typeof deleteObjectByKey;
@@ -103,8 +115,8 @@ function validateProfileImage(file?: UploadedProfileImageFile) {
     return;
   }
 
-  if (!file.mimetype.startsWith('image/')) {
-    throw new Error('profileImage must be an image file');
+  if (!isSupportedImageContentType(file.mimetype)) {
+    throw new Error('profileImage must be JPEG, PNG, WebP, GIF, or AVIF');
   }
 
   if (file.buffer.length > 5 * 1024 * 1024) {
@@ -137,18 +149,100 @@ async function updateUser(
   userId: number,
   username: string,
   profileImageUrl: string | null,
+  imageMutation?: ProfileImageMutation,
 ) {
-  await pool.execute<ResultSetHeader>(
-    `
-    UPDATE users
-    SET
-      username = ?,
-      profile_image_url = ?,
-      updated_at = CURRENT_TIMESTAMP
-    WHERE id = ?
-    `,
-    [username, profileImageUrl, userId],
-  );
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+    await connection.execute<ResultSetHeader>(
+      `
+      UPDATE users
+      SET
+        username = ?,
+        profile_image_url = ?,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+      `,
+      [username, profileImageUrl, userId],
+    );
+
+    const objectKey = imageMutation?.objectKey
+      ?? (imageMutation && profileImageUrl ? getS3ObjectKeyFromPublicUrl(profileImageUrl) : null);
+
+    if (imageMutation && objectKey && profileImageUrl) {
+      await connection.execute(
+        `
+        INSERT INTO catalog_image_assets (
+          entity_type,
+          entity_id,
+          anilist_id,
+          variant,
+          source_url,
+          source_hash,
+          source_provider,
+          object_key,
+          public_url,
+          storage_provider,
+          content_type,
+          content_size_bytes,
+          content_sha256,
+          status,
+          synced_at
+        )
+        VALUES (
+          'user_profile', ?, ?, 'profile_image', ?, SHA2(?, 256),
+          'cloudfront', ?, ?, 's3', ?, ?, ?, 'success', CURRENT_TIMESTAMP
+        )
+        ON DUPLICATE KEY UPDATE
+          entity_id = VALUES(entity_id),
+          source_url = VALUES(source_url),
+          source_hash = VALUES(source_hash),
+          source_provider = VALUES(source_provider),
+          object_key = VALUES(object_key),
+          public_url = VALUES(public_url),
+          storage_provider = VALUES(storage_provider),
+          content_type = VALUES(content_type),
+          content_size_bytes = VALUES(content_size_bytes),
+          content_sha256 = VALUES(content_sha256),
+          status = 'success',
+          attempt_count = 0,
+          last_error = NULL,
+          job_id = NULL,
+          synced_at = CURRENT_TIMESTAMP,
+          updated_at = CURRENT_TIMESTAMP
+        `,
+        [
+          userId,
+          userId,
+          profileImageUrl,
+          profileImageUrl,
+          objectKey,
+          profileImageUrl,
+          imageMutation.contentType ?? null,
+          imageMutation.contentSizeBytes ?? null,
+          imageMutation.contentSha256 ?? null,
+        ],
+      );
+    } else if (imageMutation?.removed) {
+      await connection.execute(
+        `
+        DELETE FROM catalog_image_assets
+        WHERE entity_type = 'user_profile'
+          AND entity_id = ?
+          AND variant = 'profile_image'
+        `,
+        [userId],
+      );
+    }
+
+    await connection.commit();
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
 }
 
 async function findPublicUserById(userId: number) {
@@ -219,7 +313,14 @@ const defaultDependencies: UserProfileDependencies = {
   updateUser,
   uploadProfileImage,
   deleteObjectByKey,
-  deleteProfileImageByUrl,
+  deleteProfileImageByUrl: async (imageUrl) => {
+    if (imageUrl && !getS3ObjectKeyFromPublicUrl(imageUrl)) {
+      await queueLegacySupabaseObjectWithPool({ publicUrl: imageUrl });
+      return;
+    }
+
+    await deleteProfileImageByUrl(imageUrl);
+  },
 };
 
 export async function updateUserProfile(
@@ -249,6 +350,7 @@ export async function updateUserProfile(
   let newProfileImageUrl = normalizeProfileImageUrl(user.profileImageUrl);
   let uploadedObjectKey: string | null = null;
   let oldProfileImageUrlToDelete: string | null = null;
+  let imageMutation: ProfileImageMutation | undefined;
 
   if (params.profileImage) {
     params.trace?.('storage_upload_started');
@@ -273,9 +375,16 @@ export async function updateUserProfile(
     uploadedObjectKey = uploadedImage.objectKey;
     newProfileImageUrl = uploadedImage.publicUrl;
     oldProfileImageUrlToDelete = user.profileImageUrl;
+    imageMutation = {
+      objectKey: uploadedImage.objectKey,
+      contentType: params.profileImage.mimetype,
+      contentSizeBytes: uploadedImage.contentSizeBytes,
+      contentSha256: uploadedImage.contentSha256,
+    };
   } else if (removeProfileImage && user.profileImageUrl) {
     newProfileImageUrl = null;
     oldProfileImageUrlToDelete = user.profileImageUrl;
+    imageMutation = { removed: true };
   }
 
   const nextUsername = username ?? user.username;
@@ -286,6 +395,7 @@ export async function updateUserProfile(
       params.userId,
       nextUsername,
       newProfileImageUrl,
+      imageMutation,
     );
     params.trace?.('database_update_succeeded');
   } catch (error) {

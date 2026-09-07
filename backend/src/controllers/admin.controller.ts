@@ -21,10 +21,25 @@ import {
   rebuildAnimeSeries,
   validateAnimeSeriesRebuildScope,
 } from '../services/admin-anime-series.service';
+import {
+  createCatalogImageSyncJob,
+  getCatalogImageSyncStatus,
+  pauseCatalogImageSyncJob,
+  resumeCatalogImageSyncJob,
+  retryFailedCatalogImages,
+} from '../../sync/catalog-image.sync.service';
+import { ImageStorageError } from '../lib/image-storage';
 
 function sendError(res: Response, error: unknown) {
   const message = error instanceof Error ? error.message : 'Unknown error';
-  const statusCode = getErrorStatus(message);
+  const explicitStatus = typeof error === 'object' && error !== null && 'statusCode' in error
+    ? Number(error.statusCode)
+    : null;
+  const statusCode = error instanceof ImageStorageError
+    ? 502
+    : explicitStatus && Number.isInteger(explicitStatus)
+      ? explicitStatus
+      : getErrorStatus(message);
 
   if (statusCode === 500) {
     console.error(error);
@@ -33,6 +48,10 @@ function sendError(res: Response, error: unknown) {
   return res.status(statusCode).json({
     success: false,
     message,
+    ...(error instanceof ImageStorageError ? {
+      code: `IMAGE_STORAGE_${error.action.replace('-', '_').toUpperCase()}_FAILED`,
+      storageStatus: error.storageStatus ?? null,
+    } : {}),
   });
 }
 
@@ -468,6 +487,85 @@ export async function getAnimeCastSyncStateController(req: Request, res: Respons
       success: true,
       item,
     });
+  } catch (error) {
+    return sendError(res, error);
+  }
+}
+
+export async function createCatalogImageSyncJobController(req: Request, res: Response) {
+  try {
+    if (!ensureAdmin(req, res)) {
+      return;
+    }
+
+    const scope = req.body?.scope ?? 'all';
+    const mode = req.body?.mode ?? 'pending';
+
+    if (scope !== 'all') {
+      throw Object.assign(new Error('scope must be all'), { statusCode: 400 });
+    }
+
+    if (mode !== 'pending' && mode !== 'refresh') {
+      throw Object.assign(new Error('mode must be one of pending, refresh'), { statusCode: 400 });
+    }
+
+    const result = await createCatalogImageSyncJob(mode);
+    return res.status(202).json({ success: true, result });
+  } catch (error) {
+    return sendError(res, error);
+  }
+}
+
+export async function getCatalogImageSyncJobController(req: Request, res: Response) {
+  try {
+    if (!ensureAdmin(req, res)) {
+      return;
+    }
+
+    const result = await getCatalogImageSyncStatus();
+    return res.json({ success: true, result });
+  } catch (error) {
+    return sendError(res, error);
+  }
+}
+
+export async function pauseCatalogImageSyncJobController(req: Request, res: Response) {
+  try {
+    if (!ensureAdmin(req, res)) {
+      return;
+    }
+
+    const jobId = parsePositiveInteger(req.params.jobId, 'jobId');
+    const result = await pauseCatalogImageSyncJob(jobId);
+    return res.json({ success: true, result });
+  } catch (error) {
+    return sendError(res, error);
+  }
+}
+
+export async function resumeCatalogImageSyncJobController(req: Request, res: Response) {
+  try {
+    if (!ensureAdmin(req, res)) {
+      return;
+    }
+
+    const jobId = parsePositiveInteger(req.params.jobId, 'jobId');
+    const result = await resumeCatalogImageSyncJob(jobId);
+    return res.status(202).json({ success: true, result });
+  } catch (error) {
+    return sendError(res, error);
+  }
+}
+
+export async function retryCatalogImageSyncJobController(req: Request, res: Response) {
+  try {
+    if (!ensureAdmin(req, res)) {
+      return;
+    }
+
+    const jobId = parsePositiveInteger(req.params.jobId, 'jobId');
+    const result = await retryFailedCatalogImages(jobId);
+    return res.status(202).json({ success: true, result });
   } catch (error) {
     return sendError(res, error);
   }

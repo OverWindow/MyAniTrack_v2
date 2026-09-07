@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { SupabaseStorageError } from '../lib/supabase-storage';
+import { ImageStorageError } from '../lib/image-storage';
 import {
   ProfileUpdateStage,
   updateUserProfile,
@@ -57,6 +57,8 @@ function fixture(options: {
       return {
         objectKey: 'profile-images/user-7/new.jpg',
         publicUrl: 'https://cdn.example.com/new.jpg',
+        contentSizeBytes: 4,
+        contentSha256: 'a'.repeat(64),
       };
     },
     deleteObjectByKey: async (objectKey) => {
@@ -104,7 +106,7 @@ test('profile image upload stores the new URL and deletes the old object', async
 });
 
 test('storage failure does not update the database', async () => {
-  const state = fixture({ uploadError: new SupabaseStorageError('upload', 503) });
+  const state = fixture({ uploadError: new ImageStorageError('upload', 503) });
 
   await assert.rejects(
     updateUserProfile(
@@ -115,7 +117,7 @@ test('storage failure does not update the database', async () => {
       },
       state.dependencies,
     ),
-    SupabaseStorageError,
+    ImageStorageError,
   );
 
   assert.equal(state.updateCount, 0);
@@ -178,7 +180,7 @@ test('invalid MIME type and files over 5MB are rejected before upload', async ()
       },
       invalidMime.dependencies,
     ),
-    /must be an image file/,
+    /must be JPEG, PNG, WebP, GIF, or AVIF/,
   );
   assert.equal(invalidMime.uploadCount, 0);
 

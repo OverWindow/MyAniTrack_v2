@@ -1,4 +1,3 @@
-import crypto from 'crypto';
 import { getSupabaseStorageConfig } from '../config/env';
 
 const STORAGE_TIMEOUT_MS = 15_000;
@@ -7,7 +6,7 @@ export class SupabaseStorageError extends Error {
   public readonly cause?: unknown;
 
   constructor(
-    public readonly action: 'upload' | 'delete',
+    public readonly action: 'delete',
     public readonly storageStatus?: number,
     options?: { cause?: unknown },
   ) {
@@ -87,24 +86,17 @@ function getStorageHeaders(contentType?: string) {
   };
 }
 
-function getFileExtension(contentType: string) {
-  if (contentType === 'image/png') return 'png';
-  if (contentType === 'image/webp') return 'webp';
-  if (contentType === 'image/gif') return 'gif';
-  return 'jpg';
-}
-
 async function assertStorageResponse(response: Response, action: string) {
   if (response.ok) {
     return;
   }
 
   await response.body?.cancel().catch(() => undefined);
-  throw new SupabaseStorageError(action as 'upload' | 'delete', response.status);
+  throw new SupabaseStorageError(action as 'delete', response.status);
 }
 
 async function storageFetch(
-  action: 'upload' | 'delete',
+  action: 'delete',
   url: string,
   init: RequestInit,
 ) {
@@ -122,33 +114,6 @@ async function storageFetch(
 
     throw new SupabaseStorageError(action, undefined, { cause: error });
   }
-}
-
-export async function uploadProfileImage(params: {
-  userId: number;
-  buffer: Buffer;
-  contentType: string;
-}) {
-  const bucket = getBucketName();
-  const extension = getFileExtension(params.contentType);
-  const randomId = crypto.randomBytes(8).toString('hex');
-  const prefix = getSupabaseStorageConfig().profileImagesPrefix;
-  const objectKey = `${prefix}/user-${params.userId}/${Date.now()}-${randomId}.${extension}`;
-  const uploadUrl = `${getSupabaseUrl()}/storage/v1/object/${encodeURIComponent(bucket)}/${encodeObjectPath(objectKey)}`;
-
-  await storageFetch('upload', uploadUrl, {
-    method: 'POST',
-    headers: {
-      ...getStorageHeaders(params.contentType),
-      'x-upsert': 'false',
-    },
-    body: params.buffer,
-  });
-
-  return {
-    objectKey,
-    publicUrl: getProfileImagePublicUrl(objectKey),
-  };
 }
 
 export async function deleteObjectByKey(objectKey: string) {
@@ -189,6 +154,10 @@ export function getObjectKeyFromPublicUrl(imageUrl: string) {
 }
 
 export function getProfileImagePublicUrl(objectKey: string) {
+  return getPublicObjectUrl(objectKey);
+}
+
+export function getPublicObjectUrl(objectKey: string) {
   return `${getPublicBaseUrl()}/${encodeObjectPath(objectKey)}`;
 }
 

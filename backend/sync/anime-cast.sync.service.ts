@@ -6,6 +6,10 @@ import {
   AniListVoiceActor,
   fetchAnimeCastPage,
 } from './anilist.client';
+import {
+  ensureAutomaticCatalogImageSyncJob,
+  queueCatalogImageSourcesWithPool,
+} from './catalog-image.sync.service';
 
 const ANILIST_CAST_REQUEST_DELAY_MS = 2500;
 
@@ -160,6 +164,15 @@ async function upsertCharacter(character: AniListCharacter) {
   );
 
   if (existingRows[0]) {
+    await queueCatalogImageSourcesWithPool({
+      entityType: 'character',
+      entityId: existingRows[0].id,
+      anilistId: character.id,
+      sources: {
+        image_large: character.image?.large,
+        image_medium: character.image?.medium,
+      },
+    });
     return existingRows[0].id;
   }
 
@@ -185,8 +198,6 @@ async function upsertCharacter(character: AniListCharacter) {
         name_full = VALUES(name_full),
         name_native = VALUES(name_native),
         name_user_preferred = VALUES(name_user_preferred),
-        image_large = VALUES(image_large),
-        image_medium = VALUES(image_medium),
         gender = VALUES(gender),
         age = VALUES(age),
         description = VALUES(description),
@@ -198,8 +209,8 @@ async function upsertCharacter(character: AniListCharacter) {
         truncate(character.name?.full, 255),
         truncate(character.name?.native, 255),
         truncate(character.name?.userPreferred, 255),
-        truncate(character.image?.large, 500),
-        truncate(character.image?.medium, 500),
+        null,
+        null,
         truncate(character.gender, 50),
         truncate(character.age, 50),
         character.description ?? null,
@@ -207,6 +218,16 @@ async function upsertCharacter(character: AniListCharacter) {
         toMySQLDateTime(character.updatedAt),
       ]
     );
+
+    await queueCatalogImageSourcesWithPool({
+      entityType: 'character',
+      entityId: result.insertId,
+      anilistId: character.id,
+      sources: {
+        image_large: character.image?.large,
+        image_medium: character.image?.medium,
+      },
+    });
 
     return result.insertId;
   });
@@ -219,6 +240,15 @@ async function upsertVoiceActor(voiceActor: AniListVoiceActor) {
   );
 
   if (existingRows[0]) {
+    await queueCatalogImageSourcesWithPool({
+      entityType: 'voice_actor',
+      entityId: existingRows[0].id,
+      anilistId: voiceActor.id,
+      sources: {
+        image_large: voiceActor.image?.large,
+        image_medium: voiceActor.image?.medium,
+      },
+    });
     return existingRows[0].id;
   }
 
@@ -244,8 +274,6 @@ async function upsertVoiceActor(voiceActor: AniListVoiceActor) {
         name_native = VALUES(name_native),
         name_user_preferred = VALUES(name_user_preferred),
         language_v2 = VALUES(language_v2),
-        image_large = VALUES(image_large),
-        image_medium = VALUES(image_medium),
         description = VALUES(description),
         site_url = VALUES(site_url),
         source_updated_at = VALUES(source_updated_at)
@@ -256,13 +284,23 @@ async function upsertVoiceActor(voiceActor: AniListVoiceActor) {
         truncate(voiceActor.name?.native, 255),
         truncate(voiceActor.name?.userPreferred, 255),
         truncate(voiceActor.languageV2, 100),
-        truncate(voiceActor.image?.large, 500),
-        truncate(voiceActor.image?.medium, 500),
+        null,
+        null,
         voiceActor.description ?? null,
         truncate(voiceActor.siteUrl, 500),
         toMySQLDateTime(voiceActor.updatedAt),
       ]
     );
+
+    await queueCatalogImageSourcesWithPool({
+      entityType: 'voice_actor',
+      entityId: result.insertId,
+      anilistId: voiceActor.id,
+      sources: {
+        image_large: voiceActor.image?.large,
+        image_medium: voiceActor.image?.medium,
+      },
+    });
 
     return result.insertId;
   });
@@ -429,6 +467,7 @@ export async function syncAnimeCastByAnimeId(
 
     const linkResult = await replaceAnimeCastLinks(anime.id, allEdges);
     await markSyncState(anime.id, 'success', sourceUpdatedAt);
+    await ensureAutomaticCatalogImageSyncJob();
 
     return {
       animeId: anime.id,

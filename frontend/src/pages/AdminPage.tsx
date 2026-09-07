@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { AdminUserManager } from '../components/AdminUserManager'
 import { AdminProfileReportManager } from '../components/AdminProfileReportManager'
 import { AdminAnimeVisibilityManager } from '../components/AdminAnimeVisibilityManager'
+import { AdminCatalogImageSyncManager } from '../components/AdminCatalogImageSyncManager'
 import { AdminMaintenanceManager } from '../components/AdminMaintenanceManager'
 import { ErrorToast } from '../components/ErrorToast'
 import { useAuth } from '../contexts/AuthContext'
@@ -93,6 +94,7 @@ type AdminSpecialSyncActionKey =
   | 'cast-sync'
   | 'sync-relations'
   | 'series-rebuild'
+  | 'catalog-image-sync'
 
 const seasonOptions: AdminSeason[] = ['WINTER', 'SPRING', 'SUMMER', 'FALL']
 const castLanguageOptions: AdminCastLanguage[] = ['JAPANESE', 'ENGLISH', 'KOREAN']
@@ -816,6 +818,13 @@ export function AdminPage() {
       ),
     },
     {
+      key: 'catalog-image-sync' as const,
+      group: '특수 동기화',
+      label: '이미지 스토리지 동기화',
+      description: '카탈로그·프로필·배지 이미지를 AWS S3로 이전하고 CloudFront로 제공합니다.',
+      content: <AdminCatalogImageSyncManager />,
+    },
+    {
       key: 'studio-sync-missing' as const,
       group: '특수 동기화',
       label: '스튜디오 미동기화 백필',
@@ -885,6 +894,7 @@ export function AdminPage() {
     && item.key !== 'studio-sync-missing'
     && item.key !== 'cast-sync'
     && item.key !== 'sync-relations'
+    && item.key !== 'catalog-image-sync'
   ))
   const selectedSyncItem = syncToolItems.find((item) => item.key === selectedSyncAction) ?? syncToolItems[0]
   const translateActionItem = syncActionItems.find((item) => item.key === 'translate-korean')
@@ -892,7 +902,8 @@ export function AdminPage() {
   const castActionItem = syncActionItems.find((item) => item.key === 'cast-sync')
   const relationActionItem = syncActionItems.find((item) => item.key === 'sync-relations')
   const seriesRebuildActionItem = syncActionItems.find((item) => item.key === 'series-rebuild')
-  const specialSyncItems = [seriesRebuildActionItem, studioActionItem, castActionItem, relationActionItem]
+  const catalogImageActionItem = syncActionItems.find((item) => item.key === 'catalog-image-sync')
+  const specialSyncItems = [catalogImageActionItem, seriesRebuildActionItem, studioActionItem, castActionItem, relationActionItem]
     .filter((item) => item !== undefined)
   const selectedSpecialSyncItem = specialSyncItems.find((item) => item.key === selectedSpecialSyncAction)
     ?? specialSyncItems[0]

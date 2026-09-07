@@ -1,6 +1,6 @@
 import { ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import { pool } from '../../config/db';
-import { normalizeProfileImageUrl } from '../lib/supabase-storage';
+import { normalizeProfileImageUrl } from '../lib/image-storage';
 
 interface FriendUserRow extends RowDataPacket {
   id: number;

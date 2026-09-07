@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import { Request, Response } from 'express';
-import { SupabaseStorageError } from '../lib/supabase-storage';
+import { ImageStorageError } from '../lib/image-storage';
 import { getPublicUserProfile, updateUserProfile } from '../services/user-profile.service';
 import { getUserAgreementStatus } from '../services/user-agreement.service';
 
@@ -15,7 +15,7 @@ function parseUserId(value: unknown) {
 }
 
 function getErrorStatus(error: unknown) {
-  if (error instanceof SupabaseStorageError) {
+  if (error instanceof ImageStorageError) {
     return 502;
   }
 

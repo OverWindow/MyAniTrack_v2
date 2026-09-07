@@ -318,7 +318,7 @@ Authorization: Bearer <app_access_token 또는 supabase_access_token>
 2. `supabase_user_id`가 있으면 Supabase Auth user 삭제
 3. 내부 `users` row 삭제
 4. FK cascade로 refresh token, 컬렉션, 분석 데이터 등 삭제
-5. 프로필 이미지는 Supabase Storage에서 best-effort 삭제
+5. 프로필 이미지는 S3에서 best-effort 삭제하며, 이전 중인 Supabase 객체는 14일 삭제 대기 정책을 따름
 
 프론트 예시:
 

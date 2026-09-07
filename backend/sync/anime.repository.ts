@@ -1,6 +1,7 @@
 import { PoolConnection, RowDataPacket } from 'mysql2/promise';
 import { pool } from '../config/db';
 import { AniListAnime } from './anilist.client';
+import { queueCatalogImageSources } from './catalog-image.sync.service';
 
 interface StudioIdRow extends RowDataPacket {
   id: number;
@@ -451,9 +452,6 @@ export async function upsertAnimeFull(anime: AniListAnime): Promise<number> {
         mean_score = VALUES(mean_score),
         popularity = VALUES(popularity),
         favourites = VALUES(favourites),
-        cover_image_large = VALUES(cover_image_large),
-        cover_image_extra_large = VALUES(cover_image_extra_large),
-        banner_image = VALUES(banner_image),
         site_url = VALUES(site_url),
         source_updated_at = VALUES(source_updated_at)
       `,
@@ -477,9 +475,9 @@ export async function upsertAnimeFull(anime: AniListAnime): Promise<number> {
         anime.meanScore ?? null,
         anime.popularity ?? null,
         anime.favourites ?? null,
-        anime.coverImage?.large ?? null,
-        anime.coverImage?.extraLarge ?? null,
-        anime.bannerImage ?? null,
+        null,
+        null,
+        null,
         anime.siteUrl ?? null,
         fromUnixTimestampToMySQLDateTime(anime.updatedAt),
       ]
@@ -492,6 +490,17 @@ export async function upsertAnimeFull(anime: AniListAnime): Promise<number> {
     );
 
     const animeId = rows[0].id;
+
+    await queueCatalogImageSources(conn, {
+      entityType: 'anime',
+      entityId: animeId,
+      anilistId: anime.id,
+      sources: {
+        cover_large: anime.coverImage?.large,
+        cover_extra_large: anime.coverImage?.extraLarge,
+        banner: anime.bannerImage,
+      },
+    });
 
     // 이전 페이지에서 AniList ID만 저장했던 관계를 현재 내부 ID와 연결합니다.
     await conn.execute(

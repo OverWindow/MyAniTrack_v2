@@ -16,7 +16,7 @@ import {
   hasGoogleOAuthSession,
   SupabaseAuthUser,
 } from '../lib/supabase-auth';
-import { deleteProfileImageByUrl, normalizeProfileImageUrl } from '../lib/supabase-storage';
+import { deleteProfileImageByUrl, normalizeProfileImageUrl } from '../lib/image-storage';
 import {
   CURRENT_PRIVACY_VERSION,
   CURRENT_TERMS_VERSION,
@@ -1303,6 +1303,16 @@ export async function deleteMyAccount(userId: number) {
   if (result.affectedRows === 0) {
     throw new Error('User not found');
   }
+
+  await pool.execute(
+    `
+    DELETE FROM catalog_image_assets
+    WHERE entity_type = 'user_profile'
+      AND entity_id = ?
+      AND variant = 'profile_image'
+    `,
+    [user.id],
+  );
 
   deleteProfileImageByUrl(user.profileImageUrl).catch((error) => {
     console.error('Failed to delete profile image during account deletion', error);
