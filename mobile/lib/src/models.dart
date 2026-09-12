@@ -116,7 +116,6 @@ class Anime {
   const Anime({
     required this.id,
     required this.title,
-    this.anilistId,
     this.coverImageUrl,
     this.bannerImageUrl,
     this.episodes,
@@ -129,7 +128,6 @@ class Anime {
   });
 
   final int id;
-  final int? anilistId;
   final String title;
   final String? coverImageUrl;
   final String? bannerImageUrl;
@@ -175,7 +173,6 @@ class Anime {
 
     return Anime(
       id: readInt(root['id']) ?? 0,
-      anilistId: readInt(root['anilistId']),
       title: title,
       coverImageUrl:
           readString(root['coverImageExtraLarge']) ??

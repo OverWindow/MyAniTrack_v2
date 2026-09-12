@@ -3,9 +3,21 @@ USE myanitrack_v2;
 ALTER TABLE catalog_image_sync_jobs
   ADD COLUMN target_provider VARCHAR(20) NOT NULL DEFAULT 's3' AFTER trigger_type;
 
+SET @legacy_identity_column = (
+  SELECT COLUMN_NAME
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'catalog_image_assets' AND ORDINAL_POSITION = 4
+);
+SET @rename_legacy_identity_sql = CONCAT(
+  'ALTER TABLE catalog_image_assets CHANGE COLUMN `', @legacy_identity_column,
+  '` legacy_source_id BIGINT NOT NULL'
+);
+PREPARE rename_legacy_identity FROM @rename_legacy_identity_sql;
+EXECUTE rename_legacy_identity;
+DEALLOCATE PREPARE rename_legacy_identity;
+
 ALTER TABLE catalog_image_assets
-  MODIFY COLUMN anilist_id BIGINT NOT NULL,
-  ADD COLUMN source_provider VARCHAR(20) NOT NULL DEFAULT 'anilist' AFTER source_hash,
+  ADD COLUMN source_provider VARCHAR(20) NOT NULL DEFAULT 'legacy_external' AFTER source_hash,
   ADD COLUMN storage_provider VARCHAR(20) NULL AFTER public_url,
   ADD COLUMN legacy_object_key VARCHAR(1000) NULL AFTER storage_provider,
   ADD COLUMN legacy_public_url VARCHAR(1000) NULL AFTER legacy_object_key,
@@ -43,7 +55,7 @@ SET
   source_provider = IF(
     public_url LIKE '%/storage/v1/object/public/%',
     'supabase',
-    'anilist'
+    'legacy_external'
   ),
   storage_provider = IF(
     public_url LIKE '%/storage/v1/object/public/%',
@@ -68,7 +80,7 @@ SET
 INSERT INTO catalog_image_assets (
   entity_type,
   entity_id,
-  anilist_id,
+  legacy_source_id,
   variant,
   source_url,
   source_hash,
@@ -114,7 +126,7 @@ ON DUPLICATE KEY UPDATE
 INSERT INTO catalog_image_assets (
   entity_type,
   entity_id,
-  anilist_id,
+  legacy_source_id,
   variant,
   source_url,
   source_hash,
@@ -160,7 +172,7 @@ ON DUPLICATE KEY UPDATE
 INSERT INTO catalog_image_assets (
   entity_type,
   entity_id,
-  anilist_id,
+  legacy_source_id,
   variant,
   source_url,
   source_hash,

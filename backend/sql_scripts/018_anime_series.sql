@@ -363,7 +363,7 @@ ORDER BY series_row.scope, series_row.member_count DESC, series_row.id ASC;
 --   series_row.canonical_anime_id,
 --   series_row.title AS series_title,
 --   member_anime.id AS anime_id,
---   member_anime.anilist_id,
+--   member_anime.legacy_source_id,
 --   member_anime.title_romaji,
 --   member_anime.title_english,
 --   member_anime.title_native,

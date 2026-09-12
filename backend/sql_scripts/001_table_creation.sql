@@ -2,7 +2,7 @@ USE myanitrack_v2;
 
 CREATE TABLE anime (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
-  anilist_id INT NOT NULL UNIQUE,
+  legacy_source_id INT NOT NULL UNIQUE,
   title_romaji VARCHAR(255),
   title_english VARCHAR(255),
   title_native VARCHAR(255),

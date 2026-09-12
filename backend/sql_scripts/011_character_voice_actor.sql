@@ -2,7 +2,7 @@ USE myanitrack_v2;
 
 CREATE TABLE IF NOT EXISTS characters (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
-  anilist_id INT NOT NULL UNIQUE,
+  legacy_source_id INT NOT NULL UNIQUE,
   name_full VARCHAR(255) NULL,
   name_native VARCHAR(255) NULL,
   name_user_preferred VARCHAR(255) NULL,
@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS characters (
 
 CREATE TABLE IF NOT EXISTS voice_actors (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
-  anilist_id INT NOT NULL UNIQUE,
+  legacy_source_id INT NOT NULL UNIQUE,
   name_full VARCHAR(255) NULL,
   name_native VARCHAR(255) NULL,
   name_user_preferred VARCHAR(255) NULL,

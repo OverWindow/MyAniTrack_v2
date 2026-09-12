@@ -718,7 +718,7 @@ dropped
 
 - `score`: `0~10`, 소수 가능
 - 분석 평균 점수는 보통 `0~10` scale
-- AniList community score는 원본에 따라 `averageScore: 84`처럼 `0~100` 값일 수 있음
+- 레거시 community score는 원본에 따라 `averageScore: 84`처럼 `0~100` 값일 수 있음
 
 ## 19. Flutter API Client 권장 구조
 

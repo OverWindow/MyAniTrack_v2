@@ -1,18 +1,5 @@
 USE myanitrack_v2;
 
-CREATE TABLE IF NOT EXISTS catalog_source_refs (
-  id BIGINT PRIMARY KEY AUTO_INCREMENT,
-  entity_type VARCHAR(30) NOT NULL,
-  entity_id BIGINT NOT NULL,
-  provider VARCHAR(50) NOT NULL,
-  external_id VARCHAR(255) NULL,
-  source_url VARCHAR(1000) NULL,
-  metadata JSON NULL,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE KEY uq_catalog_source_ref (entity_type, provider, external_id),
-  KEY idx_catalog_source_entity (entity_type, entity_id)
-);
-
 CREATE TABLE IF NOT EXISTS catalog_change_requests (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   source VARCHAR(20) NOT NULL COMMENT 'USER, AI',
@@ -164,34 +151,6 @@ ALTER TABLE characters ADD COLUMN official_site_url VARCHAR(1000) NULL AFTER ima
 ALTER TABLE voice_actors ADD COLUMN official_site_url VARCHAR(1000) NULL AFTER image_medium;
 ALTER TABLE studios ADD COLUMN official_site_url VARCHAR(1000) NULL AFTER is_animation_studio;
 
-INSERT IGNORE INTO catalog_source_refs (entity_type, entity_id, provider, external_id, source_url)
-SELECT 'ANIME', id, 'ANILIST', CAST(anilist_id AS CHAR), site_url FROM anime;
-INSERT IGNORE INTO catalog_source_refs (entity_type, entity_id, provider, external_id, source_url)
-SELECT 'CHARACTER', id, 'ANILIST', CAST(anilist_id AS CHAR), site_url FROM characters;
-INSERT IGNORE INTO catalog_source_refs (entity_type, entity_id, provider, external_id, source_url)
-SELECT 'VOICE_ACTOR', id, 'ANILIST', CAST(anilist_id AS CHAR), site_url FROM voice_actors;
-INSERT IGNORE INTO catalog_source_refs (entity_type, entity_id, provider, external_id, source_url)
-SELECT 'STUDIO', id, 'ANILIST', CAST(anilist_id AS CHAR), site_url FROM studios;
-
-INSERT IGNORE INTO catalog_source_refs (
-  entity_type,
-  entity_id,
-  provider,
-  external_id,
-  metadata
-)
-SELECT
-  'ANIME_RELATION',
-  source_anime_id,
-  'ANILIST',
-  CONCAT(source_anime_id, ':', target_anilist_id, ':', relation_type),
-  JSON_OBJECT(
-    'targetExternalId', target_anilist_id,
-    'relationType', relation_type,
-    'resolvedTargetAnimeId', target_anime_id
-  )
-FROM anime_relations;
-
 DROP TABLE IF EXISTS anime_relations_next;
 CREATE TABLE anime_relations_next (
   source_anime_id BIGINT NOT NULL,
@@ -229,13 +188,22 @@ RENAME TABLE anime_relations_next TO anime_relations;
 DROP TABLE IF EXISTS anime_cast_sync_state;
 DROP TABLE IF EXISTS anime_studio_sync_state;
 
-UPDATE catalog_image_assets
-SET source_provider = 'legacy_external'
-WHERE source_provider = 'anilist';
+ALTER TABLE catalog_image_assets
+  DROP INDEX uq_catalog_image_asset;
+
+SET @legacy_identity_column = (
+  SELECT COLUMN_NAME
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'catalog_image_assets' AND ORDINAL_POSITION = 4
+);
+SET @drop_legacy_identity_sql = CONCAT(
+  'ALTER TABLE catalog_image_assets DROP COLUMN `', @legacy_identity_column, '`'
+);
+PREPARE drop_legacy_identity FROM @drop_legacy_identity_sql;
+EXECUTE drop_legacy_identity;
+DEALLOCATE PREPARE drop_legacy_identity;
 
 ALTER TABLE catalog_image_assets
-  DROP INDEX uq_catalog_image_asset,
-  DROP COLUMN anilist_id,
   ADD UNIQUE KEY uq_catalog_image_asset (entity_type, entity_id, variant);
 
 ALTER TABLE catalog_image_assets
@@ -245,9 +213,19 @@ ALTER TABLE catalog_image_assets
 
 DROP TABLE catalog_image_sync_jobs;
 
+SET @legacy_identity_column = (
+  SELECT COLUMN_NAME
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'anime' AND ORDINAL_POSITION = 2
+);
+SET @drop_legacy_identity_sql = CONCAT(
+  'ALTER TABLE anime DROP COLUMN `', @legacy_identity_column, '`'
+);
+PREPARE drop_legacy_identity FROM @drop_legacy_identity_sql;
+EXECUTE drop_legacy_identity;
+DEALLOCATE PREPARE drop_legacy_identity;
+
 ALTER TABLE anime
-  DROP INDEX anilist_id,
-  DROP COLUMN anilist_id,
   DROP COLUMN average_score,
   DROP COLUMN mean_score,
   DROP COLUMN popularity,
@@ -255,19 +233,49 @@ ALTER TABLE anime
   DROP COLUMN site_url,
   DROP COLUMN source_updated_at;
 
+SET @legacy_identity_column = (
+  SELECT COLUMN_NAME
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'characters' AND ORDINAL_POSITION = 2
+);
+SET @drop_legacy_identity_sql = CONCAT(
+  'ALTER TABLE characters DROP COLUMN `', @legacy_identity_column, '`'
+);
+PREPARE drop_legacy_identity FROM @drop_legacy_identity_sql;
+EXECUTE drop_legacy_identity;
+DEALLOCATE PREPARE drop_legacy_identity;
+
 ALTER TABLE characters
-  DROP INDEX anilist_id,
-  DROP COLUMN anilist_id,
   DROP COLUMN site_url,
   DROP COLUMN source_updated_at;
+
+SET @legacy_identity_column = (
+  SELECT COLUMN_NAME
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'voice_actors' AND ORDINAL_POSITION = 2
+);
+SET @drop_legacy_identity_sql = CONCAT(
+  'ALTER TABLE voice_actors DROP COLUMN `', @legacy_identity_column, '`'
+);
+PREPARE drop_legacy_identity FROM @drop_legacy_identity_sql;
+EXECUTE drop_legacy_identity;
+DEALLOCATE PREPARE drop_legacy_identity;
 
 ALTER TABLE voice_actors
-  DROP INDEX anilist_id,
-  DROP COLUMN anilist_id,
   DROP COLUMN site_url,
   DROP COLUMN source_updated_at;
 
+SET @legacy_identity_column = (
+  SELECT COLUMN_NAME
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'studios' AND ORDINAL_POSITION = 2
+);
+SET @drop_legacy_identity_sql = CONCAT(
+  'ALTER TABLE studios DROP COLUMN `', @legacy_identity_column, '`'
+);
+PREPARE drop_legacy_identity FROM @drop_legacy_identity_sql;
+EXECUTE drop_legacy_identity;
+DEALLOCATE PREPARE drop_legacy_identity;
+
 ALTER TABLE studios
-  DROP INDEX anilist_id,
-  DROP COLUMN anilist_id,
   DROP COLUMN site_url;

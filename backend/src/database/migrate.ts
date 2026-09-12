@@ -8,6 +8,72 @@ const MIGRATION_FILE_PATTERN = /^(\d{3})_([a-z0-9_]+)\.sql$/;
 const MIGRATION_LOCK_NAME = 'myanitrack:schema-migrations';
 const MIGRATION_DIRECTORY = path.resolve(__dirname, '../../sql_scripts');
 
+// These are the exact checksums produced by the deployed, provider-specific
+// forms of migrations that were later rewritten with provider-neutral names.
+// Keeping the allowlist version-scoped preserves upgrade compatibility without
+// accepting arbitrary edits to an applied migration.
+const MIGRATION_CHECKSUM_COMPATIBILITY: Readonly<Record<number, {
+  current: string;
+  deployed: readonly string[];
+}>> = {
+  1: {
+    current: 'bca49ed2af37306765a23bac291371952b84d173d40727ff27d34caa63ac2280',
+    deployed: [
+      'b141e340c94015cf2f61967abd00c29a2275d6a6dac6e61cbecb0f43e3295fe0',
+      'd3dc10bce5a75cc231566f0deae7531833ad0978d9dbb228b0d229d2c06a3e15',
+    ],
+  },
+  11: {
+    current: '0a8563c374b6a67873137018c2004cc9ca1c3eedc6e3f9040339792cf401ca06',
+    deployed: [
+      'ffcee5a0598af97cdb21966379f531aada602c3ae7d8295b1acd758431aead3a',
+      '477ff533f64980d1e9fb2ca67102790df39060dde15fa388024b1f2582411417',
+    ],
+  },
+  15: {
+    current: 'fb124017b2c6ae71f4d7a430cf60a2dc5743706c8a8d974c16363b45885b9614',
+    deployed: [
+      '7a8d76b4634ac2fb5d21477e8bddd7676c9dc12e2e1a0aec1850aa8e942458ed',
+      '53d281a533d9de46196b1b568c40b07417cc02bfdf58e4cf6ffd2c38c5d5c7c3',
+    ],
+  },
+  17: {
+    current: 'a4162cd5d468ae48f80a91a74d4fde36b490d953f7cc8626f1403e144f12818b',
+    deployed: [
+      '741cb3708fec086d7bee0de1ccd893512f658712e1c0ae9fc02a904b84cfc4df',
+      'f31c8e0bf74a1dc90dd3143f4633bf7feac1e00c9418c07072f20b673c0812f8',
+    ],
+  },
+  18: {
+    current: 'bb421c23e312a3801389f98640764ce369f09bcc73fd9e05f3a5bcddb50b1394',
+    deployed: [
+      'fff5fc5a7822b70bfb95a290c3f303297eb45470af0edb3b4e243e1003bdfb51',
+      '23edcc403e3d9e03da77e1abeee7d67fae1d553a25611abc6a3a0939c83f4057',
+    ],
+  },
+  23: {
+    current: 'f3453725c1bfd5d8fe0863f747575577dbf2b4136bad87028aeed7113b1f3790',
+    deployed: [
+      'b50607aaaf9a0dc8d80afc3fb4af257fd338db10e9a746ec4c41e1f6340b33da',
+      'ddc5a31b6005ca2ab9a3a58a8f9ba02f768c05d49d76f453a7812143dc4c4b05',
+    ],
+  },
+  24: {
+    current: '600490ab1d535793ba8ee856fc681d6a5e0911509010f8536cc72c32d964815d',
+    deployed: [
+      'd0ad28e39791824d942574261c0333dde1f3eaca2de6e8fc4af24c651f28fdcd',
+      '30602d2732167226842e08971b2f26428c171c985f0f26bf452b71a384283ea9',
+    ],
+  },
+  25: {
+    current: '71fdb4070fc5f8760e8feace5d21b59f7a5ec40cf623467dfb08709b727701fa',
+    deployed: [
+      '61e2ee48343fd0df7a5757d0bd466cbd9aa741a9e8902fe64396ff89e2c29c60',
+      '26bb589a6f78793864fef3b65ccd490e1a830bb58da056e9ac14dadae6086590',
+    ],
+  },
+};
+
 type MigrationFile = {
   version: number;
   name: string;
@@ -36,9 +102,11 @@ function sha256(source: string) {
   return createHash('sha256').update(source).digest('hex');
 }
 
-export function calculateMigrationChecksums(source: string) {
+export function calculateMigrationChecksums(source: string, version?: number) {
   const normalized = source.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n');
   const checksum = sha256(normalized);
+  const compatibility = version === undefined ? undefined : MIGRATION_CHECKSUM_COMPATIBILITY[version];
+  const deployedChecksums = compatibility?.current === checksum ? compatibility.deployed : [];
 
   // New migrations use the canonical LF checksum. The alternatives keep
   // databases created from older CRLF or raw-file checkouts compatible.
@@ -48,6 +116,7 @@ export function calculateMigrationChecksums(source: string) {
       checksum,
       sha256(normalized.replace(/\n/g, '\r\n')),
       sha256(source),
+      ...deployedChecksums,
     ]),
   };
 }
@@ -154,7 +223,7 @@ async function loadMigrationFiles() {
     seenVersions.add(version);
 
     const sql = await fs.readFile(path.join(MIGRATION_DIRECTORY, filename), 'utf8');
-    const { checksum, compatibleChecksums } = calculateMigrationChecksums(sql);
+    const { checksum, compatibleChecksums } = calculateMigrationChecksums(sql, version);
     migrations.push({
       version,
       name: match[2],

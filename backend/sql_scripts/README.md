@@ -6,11 +6,11 @@ Migration history is stored in the `schema_migrations` table.
 ## Adding a migration
 
 1. Create the next contiguous file using `NNN_snake_case.sql`.
-2. Put only forward changes in the file. Do not edit a migration that has already been deployed.
+2. Put only forward changes in the file. Do not edit a migration that has already been deployed unless its prior checksums are explicitly pinned for a provider-neutral rewrite.
 3. Run `npm test` and `npm run typecheck` from `backend`.
 4. Use `npm run migrate` only when a manual migration run is intentionally required.
 
-The next migration after the current set is `025_description.sql`.
+The next migration after the current set is `030_description.sql`.
 
 ## Deployment behavior
 

@@ -2,7 +2,7 @@ USE myanitrack_v2;
 
 CREATE TABLE IF NOT EXISTS studios (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
-  anilist_id INT NOT NULL UNIQUE,
+  legacy_source_id INT NOT NULL UNIQUE,
   name VARCHAR(255) NOT NULL,
   is_animation_studio BOOLEAN NOT NULL DEFAULT TRUE,
   site_url VARCHAR(500) NULL,
