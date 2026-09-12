@@ -68,12 +68,13 @@ export async function getUserYearlyScoreStats(params: YearlyScoreStatsParams) {
       COUNT(DISTINCT ual.anime_id) AS animeCount,
       COUNT(DISTINCT CASE WHEN ual.score IS NOT NULL THEN ual.anime_id END) AS ratedAnimeCount,
       AVG(ual.score) AS averageScore,
-      AVG(CASE WHEN ual.score IS NOT NULL THEN a.average_score END) AS communityAverageScore
+      AVG(CASE WHEN ual.score IS NOT NULL THEN acm.community_average_score END) AS communityAverageScore
     FROM user_anime_lists ual
     INNER JOIN anime a
       ON a.id = ual.anime_id
       AND a.is_adult = FALSE
       AND a.app_visible = TRUE
+    LEFT JOIN anime_community_metrics acm ON acm.anime_id = a.id
     WHERE ual.user_id = ?
       AND a.season_year IS NOT NULL
       ${getStatusWhereClause(params.status)}
@@ -86,11 +87,7 @@ export async function getUserYearlyScoreStats(params: YearlyScoreStatsParams) {
 
   const items = rows.map((row) => {
     const averageScore = roundMetric(toNumber(row.averageScore));
-    const communityAverageScore = roundMetric(
-      toNumber(row.communityAverageScore) === null
-        ? null
-        : Number(row.communityAverageScore) / 10
-    );
+    const communityAverageScore = roundMetric(toNumber(row.communityAverageScore));
 
     return {
       year: row.year,

@@ -7,10 +7,9 @@ export type StudioStatsStatus = 'all' | 'completed';
 
 interface StudioStatsRow extends RowDataPacket {
   studioId: number;
-  anilistId: number;
   name: string;
   isAnimationStudio: number | boolean;
-  siteUrl: string | null;
+  officialSiteUrl: string | null;
   animeCount: number;
   completedAnimeCount: number;
   ratedAnimeCount: number;
@@ -25,7 +24,6 @@ interface StudioStatsRow extends RowDataPacket {
 
 interface StudioAnimeRow extends RowDataPacket {
   animeId: number;
-  anilistId: number;
   titleRomaji: string | null;
   titleEnglish: string | null;
   titleNative: string | null;
@@ -39,7 +37,7 @@ interface StudioAnimeRow extends RowDataPacket {
   status: string | null;
   episodes: number | null;
   duration: number | null;
-  averageScore: number | null;
+  communityAverageScore: number | null;
   userStatus: string;
   userScore: string | number | null;
   userProgress: number;
@@ -49,10 +47,9 @@ interface StudioAnimeRow extends RowDataPacket {
 
 interface StudioRow extends RowDataPacket {
   id: number;
-  anilistId: number;
   name: string;
   isAnimationStudio: number | boolean;
-  siteUrl: string | null;
+  officialSiteUrl: string | null;
 }
 
 interface RankingCursorPayload {
@@ -257,17 +254,16 @@ function mapStudioStatsRow(row: StudioStatsRow) {
   return {
     studio: {
       id: row.studioId,
-      anilistId: row.anilistId,
       name: row.name,
       isAnimationStudio: Boolean(row.isAnimationStudio),
-      siteUrl: row.siteUrl,
+      officialSiteUrl: row.officialSiteUrl,
     },
     animeCount: row.animeCount,
     completedAnimeCount: row.completedAnimeCount,
     ratedAnimeCount: row.ratedAnimeCount,
     scoreSum: roundMetric(toNumber(row.scoreSum)),
     averageScore: roundMetric(averageScore),
-    communityAverageScore: roundMetric(communityAverageScore === null ? null : communityAverageScore / 10),
+    communityAverageScore: roundMetric(communityAverageScore),
     totalWatchedEpisodes: Math.round(toNumber(row.totalWatchedEpisodes) ?? 0),
     totalWatchMinutes,
     totalWatchHours: roundMetric(totalWatchMinutes / 60),
@@ -365,10 +361,9 @@ export async function getUserStudioRanking(params: StudioRankingParams) {
     `
     SELECT
       stats.studio_id AS studioId,
-      s.anilist_id AS anilistId,
       s.name,
       s.is_animation_studio AS isAnimationStudio,
-      s.site_url AS siteUrl,
+      s.official_site_url AS officialSiteUrl,
       stats.anime_count AS animeCount,
       stats.completed_anime_count AS completedAnimeCount,
       stats.rated_anime_count AS ratedAnimeCount,
@@ -387,7 +382,7 @@ export async function getUserStudioRanking(params: StudioRankingParams) {
         COUNT(DISTINCT CASE WHEN ual.score IS NOT NULL THEN ual.anime_id END) AS rated_anime_count,
         SUM(ual.score) AS score_sum,
         AVG(ual.score) AS average_score,
-        AVG(a.average_score) AS community_average_score,
+        AVG(acm.community_average_score) AS community_average_score,
         SUM(
           CASE
             WHEN a.episodes IS NOT NULL AND a.episodes > 0 AND ual.status = 'completed' THEN a.episodes
@@ -413,6 +408,7 @@ export async function getUserStudioRanking(params: StudioRankingParams) {
         AND a.app_visible = TRUE
       INNER JOIN anime_studios ans
         ON ans.anime_id = a.id
+      LEFT JOIN anime_community_metrics acm ON acm.anime_id = a.id
       WHERE ual.user_id = ?
         ${statusWhere}
         ${mainStudioWhere}
@@ -473,10 +469,9 @@ export async function getUserStudioAnime(params: StudioAnimeParams) {
     `
     SELECT
       id,
-      anilist_id AS anilistId,
       name,
       is_animation_studio AS isAnimationStudio,
-      site_url AS siteUrl
+      official_site_url AS officialSiteUrl
     FROM studios
     WHERE id = ?
     LIMIT 1
@@ -511,7 +506,6 @@ export async function getUserStudioAnime(params: StudioAnimeParams) {
     `
     SELECT
       a.id AS animeId,
-      a.anilist_id AS anilistId,
       a.title_romaji AS titleRomaji,
       a.title_english AS titleEnglish,
       a.title_native AS titleNative,
@@ -525,7 +519,7 @@ export async function getUserStudioAnime(params: StudioAnimeParams) {
       a.status,
       a.episodes,
       a.duration,
-      a.average_score AS averageScore,
+      acm.community_average_score AS communityAverageScore,
       ual.status AS userStatus,
       ual.score AS userScore,
       ual.progress AS userProgress,
@@ -542,6 +536,7 @@ export async function getUserStudioAnime(params: StudioAnimeParams) {
     LEFT JOIN anime_korean_titles akt
       ON akt.anime_id = a.id
       AND akt.is_primary = TRUE
+    LEFT JOIN anime_community_metrics acm ON acm.anime_id = a.id
     WHERE ual.user_id = ?
       ${getStatusWhereClause(params.status)}
       ${getMainStudioWhereClause(params.mainOnly)}
@@ -560,15 +555,13 @@ export async function getUserStudioAnime(params: StudioAnimeParams) {
   return {
     studio: {
       id: studio.id,
-      anilistId: studio.anilistId,
       name: studio.name,
       isAnimationStudio: Boolean(studio.isAnimationStudio),
-      siteUrl: studio.siteUrl,
+      officialSiteUrl: studio.officialSiteUrl,
     },
     items: pageRows.map((row) => ({
       anime: {
         id: row.animeId,
-        anilistId: row.anilistId,
         title: pickTitle(row, params.titleLanguage),
         titles: {
           korean: row.titleKorean,
@@ -585,7 +578,7 @@ export async function getUserStudioAnime(params: StudioAnimeParams) {
         status: row.status,
         episodes: row.episodes,
         duration: row.duration,
-        averageScore: row.averageScore,
+        communityAverageScore: row.communityAverageScore === null ? null : Number(row.communityAverageScore),
       },
       userList: {
         status: row.userStatus,

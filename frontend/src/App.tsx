@@ -9,7 +9,10 @@ import { ErrorToast } from './components/ErrorToast'
 import { useAuth } from './contexts/AuthContext'
 import { useFriends } from './contexts/FriendsContext'
 import { useBodyScrollLock } from './hooks/useBodyScrollLock'
-import { AdminPage } from './pages/AdminPage'
+import {
+  AdminCatalogDiscoveryPage, AdminCatalogEntitiesPage, AdminCatalogReviewsPage,
+  AdminDashboardPage, AdminMaintenancePage, AdminPage, AdminSafetyPage, AdminUsersPage,
+} from './pages/AdminPage'
 import { AccountDeletionPage } from './pages/AccountDeletionPage'
 import { AnimeDetailPage } from './pages/AnimeDetailPage'
 import { AnalysisPage } from './pages/AnalysisPage'
@@ -34,6 +37,7 @@ import { UserProfilePage } from './pages/UserProfilePage'
 import { VerifyEmailConfirmPage } from './pages/VerifyEmailConfirmPage'
 import { VerifyEmailPendingPage } from './pages/VerifyEmailPendingPage'
 import { VoiceActorDetailPage } from './pages/VoiceActorDetailPage'
+import { CatalogSubmissionsPage } from './pages/CatalogSubmissionsPage'
 import { MaintenanceLoadingPage, MaintenancePage } from './pages/MaintenancePage'
 import { useMaintenance } from './contexts/MaintenanceContext'
 import { getMaintenanceGateState } from './lib/maintenance'
@@ -153,7 +157,17 @@ function App() {
           <Route path="/account-deletion" element={<AccountDeletionPage />} />
           <Route path="/explore" element={<ExplorePage />} />
           <Route path="/analysis" element={<AnalysisPage />} />
-          <Route path="/admin" element={<AdminPage />} />
+          <Route path="/admin" element={<AdminPage />}>
+            <Route index element={<AdminDashboardPage />} />
+            <Route path="catalog" element={<Navigate to="entities" replace />} />
+            <Route path="catalog/entities" element={<AdminCatalogEntitiesPage />} />
+            <Route path="catalog/reviews" element={<AdminCatalogReviewsPage />} />
+            <Route path="catalog/discovery" element={<AdminCatalogDiscoveryPage />} />
+            <Route path="users" element={<AdminUsersPage />} />
+            <Route path="safety" element={<AdminSafetyPage />} />
+            <Route path="settings/maintenance" element={<AdminMaintenancePage />} />
+            <Route path="*" element={<Navigate to="/admin" replace />} />
+          </Route>
           <Route path="/anime/:id" element={<AnimeDetailPage />} />
           <Route path="/voice-actors/:voiceActorId" element={<VoiceActorDetailPage />} />
           <Route path="/profile" element={<ProfilePage />} />
@@ -161,6 +175,7 @@ function App() {
           <Route path="/collection" element={<CollectionPage />} />
           <Route path="/friends" element={<FriendsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/submissions" element={<CatalogSubmissionsPage />} />
           <Route path="/s/:token" element={<SharePage />} />
           <Route path="/users/:userId/profile" element={<UserProfilePage />} />
           <Route path="/users/:userId/anime-list" element={<UserCollectionPage />} />

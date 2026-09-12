@@ -130,7 +130,7 @@ export const PRIVACY_POLICY_SECTIONS: PrivacyPolicySection[] = [
     title: tr("6. 처리 위탁 및 국외 처리"),
     paragraphs: [
       tr("서비스 운영을 위해 아래 공급자를 이용합니다. Supabase는 Northeast Asia (Seoul), Railway와 Railway MySQL은 Southeast Asia 리전에서 처리되며, 그 밖의 글로벌 공급자는 대한민국 외 지역에서 정보를 처리할 수 있습니다."),
-      tr("AniList 등 애니메이션 정보 공급자는 사용자 개인정보를 전달하는 처리 위탁자가 아니라 외부 콘텐츠 출처입니다."),
+      tr("사용자 제보와 AI 보조 수집에 사용된 외부 출처는 개인정보 처리 위탁자가 아니며, 사용자 개인정보를 해당 출처로 전송하지 않습니다."),
     ],
   },
   {

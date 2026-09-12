@@ -13,12 +13,11 @@ export type VoiceActorImage = {
 
 export type VoiceActorDetail = {
   id: number
-  anilistId: number
   name: VoiceActorPersonName
   image: VoiceActorImage
   languageV2?: string | null
   description?: string | null
-  siteUrl?: string | null
+  officialSiteUrl?: string | null
 }
 
 export type VoiceActorDetailSummary = {
@@ -42,7 +41,7 @@ export type VoiceActorDetailAnime = {
   coverImageExtraLarge?: string | null
   seasonYear?: number | null
   format?: string | null
-  averageScore?: number | null
+  communityAverageScore?: number | null
 }
 
 export type VoiceActorDetailItem = {

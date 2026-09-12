@@ -148,10 +148,7 @@ export function AdminMaintenanceManager() {
 
       <div className="admin-maintenance-form">
         <section className="admin-maintenance-locale" aria-labelledby="maintenance-ko-heading">
-          <div>
-            <span className="detail-label">Korean</span>
-            <h3 id="maintenance-ko-heading">한국어 안내</h3>
-          </div>
+          <div><h3 id="maintenance-ko-heading">한국어 안내</h3></div>
           <label className="field-label">
             <span>제목</span>
             <input
@@ -174,10 +171,7 @@ export function AdminMaintenanceManager() {
         </section>
 
         <section className="admin-maintenance-locale" aria-labelledby="maintenance-en-heading">
-          <div>
-            <span className="detail-label">English</span>
-            <h3 id="maintenance-en-heading">영어 안내</h3>
-          </div>
+          <div><h3 id="maintenance-en-heading">영어 안내</h3></div>
           <label className="field-label">
             <span>제목</span>
             <input

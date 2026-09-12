@@ -41,7 +41,6 @@ export type UserAnimeListItem = {
   updatedAt: string
   anime: {
     id: number
-    anilistId: number
     title: string
     titles?: {
       korean?: string | null
@@ -56,14 +55,13 @@ export type UserAnimeListItem = {
     seasonYear?: number | null
     format?: string | null
     status?: string | null
-    averageScore?: number | null
-    meanScore?: number | null
-    popularity?: number | null
-    favourites?: number | null
+    communityAverageScore?: number | null
+    ratingCount?: number
+    collectionCount?: number
     coverImageLarge: string
     coverImageExtraLarge?: string | null
     bannerImage?: string | null
-    siteUrl?: string | null
+    officialSiteUrl?: string | null
     isAdult?: boolean
   }
 }
@@ -99,7 +97,6 @@ export type UserSeriesCollectionMember = {
   completionExclusionReason: SeriesCompletionExclusionReason | null
   anime: {
     id: number
-    anilistId: number
     title: string
     titles: {
       korean: string | null
@@ -165,7 +162,6 @@ export type SmartRatingCandidate = {
   score: number
   anime: {
     id: number
-    anilistId: number
     title: string
     coverImageLarge: string | null
     coverImageExtraLarge?: string | null

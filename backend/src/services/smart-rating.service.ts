@@ -6,7 +6,6 @@ type SmartRatingRelation = 'better' | 'similar' | 'worse';
 
 interface SmartRatingAnimeRow extends RowDataPacket {
   animeId: number;
-  anilistId: number;
   score: number | string | null;
   titleRomaji: string | null;
   titleEnglish: string | null;
@@ -73,7 +72,6 @@ function mapCandidate(row: SmartRatingAnimeRow, titleLanguage: UserAnimeListTitl
     score: parseScore(row.score),
     anime: {
       id: row.animeId,
-      anilistId: row.anilistId,
       title: pickDisplayTitle(row, titleLanguage),
       titles: {
         korean: row.titleKorean,
@@ -135,7 +133,6 @@ async function getRatedAnimeRows(userId: number, animeIds: number[]) {
     SELECT
       ual.anime_id AS animeId,
       ual.score,
-      a.anilist_id AS anilistId,
       a.title_romaji AS titleRomaji,
       a.title_english AS titleEnglish,
       a.title_native AS titleNative,
@@ -174,7 +171,6 @@ export async function getSmartRatingCandidates(params: {
     SELECT
       ual.anime_id AS animeId,
       ual.score,
-      a.anilist_id AS anilistId,
       a.title_romaji AS titleRomaji,
       a.title_english AS titleEnglish,
       a.title_native AS titleNative,

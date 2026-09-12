@@ -25,7 +25,6 @@ interface SampleAnimeItem {
   };
   anime: {
     id: number;
-    anilistId: number;
     title: string;
     titles: {
       korean: string | null;
@@ -40,14 +39,13 @@ interface SampleAnimeItem {
     seasonYear: number | null;
     format: string | null;
     status: string | null;
-    averageScore: number | null;
-    meanScore: number | null;
-    popularity: number | null;
-    favourites: number | null;
+    communityAverageScore: number | null;
+    ratingCount: number;
+    collectionCount: number;
     coverImageLarge: string | null;
     coverImageExtraLarge: string | null;
     bannerImage: string | null;
-    siteUrl: string | null;
+    officialSiteUrl: string | null;
     isAdult: boolean;
   };
 }
@@ -89,7 +87,6 @@ const sampleItems: SampleAnimeItem[] = [
     studio: { id: 1, name: 'WIT Studio' },
     anime: {
       id: 101,
-      anilistId: 16498,
       title: 'Attack on Titan',
       titles: {
         korean: '진격의 거인',
@@ -104,14 +101,13 @@ const sampleItems: SampleAnimeItem[] = [
       seasonYear: 2013,
       format: 'TV',
       status: 'FINISHED',
-      averageScore: 84,
-      meanScore: 84,
-      popularity: 860000,
-      favourites: 71000,
+      communityAverageScore: 8.4,
+      ratingCount: 71,
+      collectionCount: 860,
       coverImageLarge: null,
       coverImageExtraLarge: null,
       bannerImage: null,
-      siteUrl: 'https://anilist.co/anime/16498',
+      officialSiteUrl: null,
       isAdult: false,
     },
   },
@@ -131,7 +127,6 @@ const sampleItems: SampleAnimeItem[] = [
     studio: { id: 2, name: 'Madhouse' },
     anime: {
       id: 102,
-      anilistId: 154587,
       title: 'Frieren: Beyond Journey\'s End',
       titles: {
         korean: '장송의 프리렌',
@@ -146,14 +141,13 @@ const sampleItems: SampleAnimeItem[] = [
       seasonYear: 2023,
       format: 'TV',
       status: 'FINISHED',
-      averageScore: 89,
-      meanScore: 89,
-      popularity: 410000,
-      favourites: 39000,
+      communityAverageScore: 8.9,
+      ratingCount: 39,
+      collectionCount: 410,
       coverImageLarge: null,
       coverImageExtraLarge: null,
       bannerImage: null,
-      siteUrl: 'https://anilist.co/anime/154587',
+      officialSiteUrl: null,
       isAdult: false,
     },
   },
@@ -173,7 +167,6 @@ const sampleItems: SampleAnimeItem[] = [
     studio: { id: 3, name: 'MAPPA' },
     anime: {
       id: 103,
-      anilistId: 113415,
       title: 'Jujutsu Kaisen',
       titles: {
         korean: '주술회전',
@@ -188,14 +181,13 @@ const sampleItems: SampleAnimeItem[] = [
       seasonYear: 2020,
       format: 'TV',
       status: 'FINISHED',
-      averageScore: 84,
-      meanScore: 84,
-      popularity: 640000,
-      favourites: 46000,
+      communityAverageScore: 8.4,
+      ratingCount: 46,
+      collectionCount: 640,
       coverImageLarge: null,
       coverImageExtraLarge: null,
       bannerImage: null,
-      siteUrl: 'https://anilist.co/anime/113415',
+      officialSiteUrl: null,
       isAdult: false,
     },
   },
@@ -215,7 +207,6 @@ const sampleItems: SampleAnimeItem[] = [
     studio: { id: 4, name: 'Doga Kobo' },
     anime: {
       id: 104,
-      anilistId: 150672,
       title: 'Oshi no Ko',
       titles: {
         korean: '최애의 아이',
@@ -230,14 +221,13 @@ const sampleItems: SampleAnimeItem[] = [
       seasonYear: 2023,
       format: 'TV',
       status: 'FINISHED',
-      averageScore: 84,
-      meanScore: 84,
-      popularity: 330000,
-      favourites: 26000,
+      communityAverageScore: 8.4,
+      ratingCount: 26,
+      collectionCount: 330,
       coverImageLarge: null,
       coverImageExtraLarge: null,
       bannerImage: null,
-      siteUrl: 'https://anilist.co/anime/150672',
+      officialSiteUrl: null,
       isAdult: false,
     },
   },
@@ -257,7 +247,6 @@ const sampleItems: SampleAnimeItem[] = [
     studio: { id: 5, name: 'CoMix Wave Films' },
     anime: {
       id: 105,
-      anilistId: 21519,
       title: 'Your Name.',
       titles: {
         korean: '너의 이름은.',
@@ -272,14 +261,13 @@ const sampleItems: SampleAnimeItem[] = [
       seasonYear: 2016,
       format: 'MOVIE',
       status: 'FINISHED',
-      averageScore: 84,
-      meanScore: 84,
-      popularity: 580000,
-      favourites: 40000,
+      communityAverageScore: 8.4,
+      ratingCount: 40,
+      collectionCount: 580,
       coverImageLarge: null,
       coverImageExtraLarge: null,
       bannerImage: null,
-      siteUrl: 'https://anilist.co/anime/21519',
+      officialSiteUrl: null,
       isAdult: false,
     },
   },
@@ -299,7 +287,6 @@ const sampleItems: SampleAnimeItem[] = [
     studio: { id: 6, name: 'Kyoto Animation' },
     anime: {
       id: 106,
-      anilistId: 21827,
       title: 'Violet Evergarden',
       titles: {
         korean: '바이올렛 에버가든',
@@ -314,14 +301,13 @@ const sampleItems: SampleAnimeItem[] = [
       seasonYear: 2018,
       format: 'TV',
       status: 'FINISHED',
-      averageScore: 84,
-      meanScore: 84,
-      popularity: 360000,
-      favourites: 32000,
+      communityAverageScore: 8.4,
+      ratingCount: 32,
+      collectionCount: 360,
       coverImageLarge: null,
       coverImageExtraLarge: null,
       bannerImage: null,
-      siteUrl: 'https://anilist.co/anime/21827',
+      officialSiteUrl: null,
       isAdult: false,
     },
   },
@@ -585,7 +571,7 @@ export function getGuestSampleYearlyScoreStats(status: 'all' | 'completed' = 'co
         yearItems.reduce((sum, item) => sum + (item.score ?? 0), 0) / yearItems.length
       );
       const communityAverageScore = roundMetric(
-        yearItems.reduce((sum, item) => sum + ((item.anime.averageScore ?? 0) / 10), 0) / yearItems.length
+        yearItems.reduce((sum, item) => sum + (item.anime.communityAverageScore ?? 0), 0) / yearItems.length
       );
 
       return {
@@ -691,10 +677,9 @@ export function getGuestSampleStudioRanking(sort: StudioStatsSort = 'count', lim
       return {
         studio: {
           id: studioId,
-          anilistId: studioId,
           name: studioItems[0]?.studio.name ?? 'Unknown Studio',
           isAnimationStudio: true,
-          siteUrl: null,
+          officialSiteUrl: null,
         },
         animeCount: studioItems.length,
         completedAnimeCount: studioItems.filter((item) => item.status === 'completed').length,

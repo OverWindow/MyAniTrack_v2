@@ -50,7 +50,6 @@ async function queueLegacyProfileReportImage(reportId: number, imageUrl: string 
     INSERT INTO catalog_image_assets (
       entity_type,
       entity_id,
-      anilist_id,
       variant,
       source_url,
       source_hash,
@@ -62,7 +61,7 @@ async function queueLegacyProfileReportImage(reportId: number, imageUrl: string 
       status
     )
     VALUES (
-      'profile_report', ?, ?, 'reported_profile_image', ?, SHA2(?, 256),
+      'profile_report', ?, 'reported_profile_image', ?, SHA2(?, 256),
       'supabase', ?, 'supabase', ?, ?, 'pending'
     )
     ON DUPLICATE KEY UPDATE
@@ -77,10 +76,9 @@ async function queueLegacyProfileReportImage(reportId: number, imageUrl: string 
       status = 'pending',
       attempt_count = 0,
       last_error = NULL,
-      job_id = NULL,
       updated_at = CURRENT_TIMESTAMP
     `,
-    [reportId, reportId, imageUrl, imageUrl, imageUrl, legacyObjectKey, imageUrl],
+    [reportId, imageUrl, imageUrl, imageUrl, legacyObjectKey, imageUrl],
   );
 }
 

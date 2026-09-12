@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Film, Layers3 } from 'lucide-react'
 import { CollectionButton } from '../components/CollectionButton'
+import { CatalogSubmissionDialog } from '../components/CatalogSubmissionDialog'
 import { ConnectionErrorState } from '../components/ConnectionErrorState'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
@@ -85,7 +86,7 @@ function formatTenPointScore(score?: number | null) {
     return null
   }
 
-  return (score / 10).toFixed(1)
+  return score.toFixed(1)
 }
 
 function getOverlayScore(score?: number | null) {
@@ -268,9 +269,9 @@ function ExploreAnimeCard({ item, location }: ExploreAnimeCardProps) {
             }}
           />
         </div>
-        {formatTenPointScore(item.averageScore) && (
+        {formatTenPointScore(item.communityAverageScore) && (
           <div className="anime-card-rating">
-            {formatTenPointScore(item.averageScore)}
+            {formatTenPointScore(item.communityAverageScore)}
           </div>
         )}
         <HoverRating
@@ -308,8 +309,8 @@ function ExploreSeriesCard({
         ) : (
           <span className="explore-series-cover-placeholder">No image</span>
         )}
-        {typeof item.averageScore === 'number' && (
-          <span className="anime-card-rating">{formatTenPointScore(item.averageScore)}</span>
+        {typeof item.communityAverageScore === 'number' && (
+          <span className="anime-card-rating">{formatTenPointScore(item.communityAverageScore)}</span>
         )}
       </Link>
 
@@ -354,6 +355,7 @@ export function ExplorePage() {
   const [sort, setSort] = useState<AnimeSort>('score')
   const [genre, setGenre] = useState<AnimeGenre | 'all'>('all')
   const [searchTerm, setSearchTerm] = useState('')
+  const [submissionOpen, setSubmissionOpen] = useState(false)
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
   const searchLanguage = getTitleLanguage()
   const normalizedQuery = debouncedSearchTerm.trim()
@@ -863,9 +865,12 @@ export function ExplorePage() {
         <>
           {animeItems.length === 0 ? (
             <div className="feedback-card">
-              {normalizedQuery
+              <p>{normalizedQuery
                 ? tr("검색 결과가 없어요. 다른 제목으로 검색하거나 정렬을 바꿔서 다시 둘러보세요.")
-                : tr("표시할 애니가 없어요. 잠시 후 다시 시도해주세요.")}
+                : tr("표시할 애니가 없어요. 잠시 후 다시 시도해주세요.")}</p>
+              {normalizedQuery && (isAuthenticated
+                ? <button className="primary-button" type="button" onClick={() => setSubmissionOpen(true)}>{tr('“{{v0}}” 작품 등록 요청', { v0: normalizedQuery })}</button>
+                : <Link className="primary-button" to="/login">{tr('로그인하고 작품 등록 요청하기')}</Link>)}
             </div>
           ) : (
             <div className="anime-grid">
@@ -890,6 +895,8 @@ export function ExplorePage() {
           )}
         </>
       )}
+
+      <CatalogSubmissionDialog open={submissionOpen} onClose={() => setSubmissionOpen(false)} initialName={normalizedQuery} entityType="ANIME" />
 
       {viewMode === 'series' && seriesError && (
         <ConnectionErrorState message={seriesError} />

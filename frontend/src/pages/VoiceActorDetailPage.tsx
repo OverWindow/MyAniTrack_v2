@@ -5,6 +5,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { ConnectionErrorState } from '../components/ConnectionErrorState'
 import { ErrorToast } from '../components/ErrorToast'
 import { VoiceActorCharacterWorks } from '../components/VoiceActorCharacterWorks'
+import { CatalogSubmissionDialog } from '../components/CatalogSubmissionDialog'
 import { useAuth } from '../contexts/AuthContext'
 import { getProfileImageSrc, handleProfileImageError } from '../lib/avatar'
 import { getFriendlyErrorMessage } from '../lib/errors'
@@ -61,8 +62,8 @@ function getAnimeMeta(item: VoiceActorDetailItem) {
   return [
     item.anime.seasonYear ? String(item.anime.seasonYear) : null,
     item.anime.format,
-    item.anime.averageScore !== null && item.anime.averageScore !== undefined
-      ? tr("평균 {{v0}}점", { v0: item.anime.averageScore })
+    item.anime.communityAverageScore !== null && item.anime.communityAverageScore !== undefined
+      ? tr("평균 {{v0}}점", { v0: item.anime.communityAverageScore })
       : null,
   ].filter(Boolean).join(' · ')
 }
@@ -89,6 +90,7 @@ export function VoiceActorDetailPage() {
   const navigate = useNavigate()
   const { isAuthenticated, isBootstrapping } = useAuth()
   const [creditFilter, setCreditFilter] = useState<CreditFilter>('all')
+  const [submissionOpen, setSubmissionOpen] = useState(false)
   const [state, setState] = useState<VoiceActorDetailState>({
     item: null,
     isLoading: true,
@@ -391,15 +393,17 @@ export function VoiceActorDetailPage() {
           <div className="voice-actor-hero-meta">
             {voiceActor.name.native && <span>{voiceActor.name.native}</span>}
             {voiceActor.languageV2 && <span>{voiceActor.languageV2}</span>}
-            {voiceActor.siteUrl && (
-              <a href={voiceActor.siteUrl} target="_blank" rel="noreferrer">
-                AniList
+            {voiceActor.officialSiteUrl && (
+              <a href={voiceActor.officialSiteUrl} target="_blank" rel="noreferrer">
+                {tr('공식 홈페이지')}
               </a>
             )}
+            <button className="secondary-button" type="button" onClick={() => setSubmissionOpen(true)}>{tr('정보 수정 제보')}</button>
           </div>
           {description && <p>{description}</p>}
         </div>
       </section>
+      <CatalogSubmissionDialog open={submissionOpen} onClose={() => setSubmissionOpen(false)} entityType="VOICE_ACTOR" kind="UPDATE_ENTITY" targetEntityId={voiceActor.id} initialName={displayName} />
 
       <div className="voice-actor-summary-grid" aria-label={tr("성우 요약")}>
         <div>

@@ -191,6 +191,9 @@ export function SettingsPage() {
               <Link className="secondary-button" to="/profile">
                 {tr("프로필 보기")}
               </Link>
+              <Link className="secondary-button" to="/submissions">
+                {tr("내 카탈로그 등록 요청")}
+              </Link>
             </div>
           </>
         )

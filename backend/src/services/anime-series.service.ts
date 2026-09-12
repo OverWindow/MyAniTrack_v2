@@ -12,6 +12,7 @@ type SeriesCursorPayload = {
   seriesId: number;
   createdAt?: string;
   score?: number;
+  ratingCount?: number;
   popularity?: number;
   seasonYear?: number;
   seasonRank?: number;
@@ -40,8 +41,9 @@ interface SeriesSummaryRow extends RowDataPacket {
   titleKorean: string | null;
   coverImageLarge: string | null;
   coverImageExtraLarge: string | null;
-  averageScore: number | null;
-  popularity: number | null;
+  communityAverageScore: number | null;
+  ratingCount: number | null;
+  collectionCount: number | null;
   season: string | null;
   seasonYear: number | null;
   createdAt: string;
@@ -51,7 +53,6 @@ interface SeriesSummaryRow extends RowDataPacket {
 interface SeriesMemberRow extends RowDataPacket {
   seriesId: number;
   animeId: number;
-  anilistId: number;
   titleRomaji: string | null;
   titleEnglish: string | null;
   titleNative: string | null;
@@ -65,8 +66,9 @@ interface SeriesMemberRow extends RowDataPacket {
   status: string | null;
 }
 
-const SCORE_SQL = 'COALESCE(canonicalAnime.average_score, -1)';
-const POPULARITY_SQL = 'COALESCE(canonicalAnime.popularity, -1)';
+const SCORE_SQL = 'COALESCE(canonicalMetrics.community_average_score, -1)';
+const RATING_COUNT_SQL = 'COALESCE(canonicalMetrics.rating_count, 0)';
+const POPULARITY_SQL = 'COALESCE(canonicalMetrics.collection_count, -1)';
 const SEASON_YEAR_SQL = 'COALESCE(canonicalAnime.season_year, 0)';
 const SEASON_RANK_SQL = `CASE canonicalAnime.season
   WHEN 'WINTER' THEN 1
@@ -126,7 +128,7 @@ function validateCursor(cursor: SeriesCursorPayload | null, params: AnimeSeriesL
 }
 
 function getOrderBy(sort: AnimeSortOption) {
-  if (sort === 'score') return `${SCORE_SQL} DESC, seriesRow.id DESC`;
+  if (sort === 'score') return `${SCORE_SQL} DESC, ${RATING_COUNT_SQL} DESC, seriesRow.id DESC`;
   if (sort === 'popularity') return `${POPULARITY_SQL} DESC, seriesRow.id DESC`;
   if (sort === 'season') return `${SEASON_YEAR_SQL} DESC, ${SEASON_RANK_SQL} DESC, seriesRow.id DESC`;
   return 'canonicalAnime.created_at DESC, seriesRow.id DESC';
@@ -140,8 +142,11 @@ function getCursorClause(
   if (!cursor) return '';
 
   if (sort === 'score') {
-    queryParams.push(cursor.score ?? -1, cursor.score ?? -1, cursor.seriesId);
-    return `AND (${SCORE_SQL} < ? OR (${SCORE_SQL} = ? AND seriesRow.id < ?))`;
+    queryParams.push(cursor.score ?? -1, cursor.score ?? -1, cursor.ratingCount ?? 0,
+      cursor.score ?? -1, cursor.ratingCount ?? 0, cursor.seriesId);
+    return `AND (${SCORE_SQL} < ?
+      OR (${SCORE_SQL} = ? AND ${RATING_COUNT_SQL} < ?)
+      OR (${SCORE_SQL} = ? AND ${RATING_COUNT_SQL} = ? AND seriesRow.id < ?))`;
   }
 
   if (sort === 'popularity') {
@@ -235,8 +240,9 @@ export async function getAnimeSeriesList(params: AnimeSeriesListParams) {
       canonicalKorean.full_title AS titleKorean,
       canonicalAnime.cover_image_large AS coverImageLarge,
       canonicalAnime.cover_image_extra_large AS coverImageExtraLarge,
-      canonicalAnime.average_score AS averageScore,
-      canonicalAnime.popularity,
+      canonicalMetrics.community_average_score AS communityAverageScore,
+      canonicalMetrics.rating_count AS ratingCount,
+      canonicalMetrics.collection_count AS collectionCount,
       canonicalAnime.season,
       canonicalAnime.season_year AS seasonYear,
       canonicalAnime.created_at AS createdAt,
@@ -245,6 +251,7 @@ export async function getAnimeSeriesList(params: AnimeSeriesListParams) {
     INNER JOIN anime_series_members memberRow ON memberRow.series_id = seriesRow.id
     INNER JOIN anime memberAnime ON memberAnime.id = memberRow.anime_id AND memberAnime.is_adult = FALSE AND memberAnime.app_visible = TRUE
     INNER JOIN anime canonicalAnime ON canonicalAnime.id = seriesRow.canonical_anime_id AND canonicalAnime.is_adult = FALSE AND canonicalAnime.app_visible = TRUE
+    LEFT JOIN anime_community_metrics canonicalMetrics ON canonicalMetrics.anime_id = canonicalAnime.id
     LEFT JOIN anime_korean_titles canonicalKorean
       ON canonicalKorean.anime_id = canonicalAnime.id AND canonicalKorean.is_primary = TRUE
     WHERE seriesRow.scope = ?
@@ -263,8 +270,9 @@ export async function getAnimeSeriesList(params: AnimeSeriesListParams) {
       canonicalKorean.full_title,
       canonicalAnime.cover_image_large,
       canonicalAnime.cover_image_extra_large,
-      canonicalAnime.average_score,
-      canonicalAnime.popularity,
+      canonicalMetrics.community_average_score,
+      canonicalMetrics.rating_count,
+      canonicalMetrics.collection_count,
       canonicalAnime.season,
       canonicalAnime.season_year,
       canonicalAnime.created_at
@@ -283,7 +291,6 @@ export async function getAnimeSeriesList(params: AnimeSeriesListParams) {
       `SELECT
         memberRow.series_id AS seriesId,
         animeRow.id AS animeId,
-        animeRow.anilist_id AS anilistId,
         animeRow.title_romaji AS titleRomaji,
         animeRow.title_english AS titleEnglish,
         animeRow.title_native AS titleNative,
@@ -331,15 +338,15 @@ export async function getAnimeSeriesList(params: AnimeSeriesListParams) {
     customTitle: row.seriesTitle,
     canonicalAnimeId: row.canonicalAnimeId,
     memberCount: toNumber(row.memberCount),
-    averageScore: row.averageScore,
-    popularity: row.popularity,
+    communityAverageScore: row.communityAverageScore === null ? null : Number(row.communityAverageScore),
+    ratingCount: Number(row.ratingCount ?? 0),
+    collectionCount: Number(row.collectionCount ?? 0),
     season: row.season,
     seasonYear: row.seasonYear,
     coverImageLarge: row.coverImageLarge,
     coverImageExtraLarge: row.coverImageExtraLarge,
     items: (membersBySeriesId.get(row.seriesId) ?? []).map((member) => ({
       id: member.animeId,
-      anilistId: member.anilistId,
       title: pickTitle(member, params.titleLanguage) ?? '제목 없음',
       titles: {
         korean: member.titleKorean,
@@ -366,8 +373,9 @@ export async function getAnimeSeriesList(params: AnimeSeriesListParams) {
         genre: params.genre ?? null,
         seriesId: lastRow.seriesId,
         createdAt: lastRow.createdAt,
-        score: lastRow.averageScore ?? -1,
-        popularity: lastRow.popularity ?? -1,
+        score: lastRow.communityAverageScore ?? -1,
+        ratingCount: lastRow.ratingCount ?? 0,
+        popularity: lastRow.collectionCount ?? -1,
         seasonYear: lastRow.seasonYear ?? 0,
         seasonRank: lastRow.seasonRankValue ?? 0,
       })

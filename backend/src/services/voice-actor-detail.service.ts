@@ -4,7 +4,6 @@ import { AnimeTitleLanguage } from './anime.service';
 
 interface VoiceActorDetailRow extends RowDataPacket {
   id: number;
-  anilistId: number;
   nameFull: string | null;
   nameNative: string | null;
   nameUserPreferred: string | null;
@@ -12,12 +11,11 @@ interface VoiceActorDetailRow extends RowDataPacket {
   imageLarge: string | null;
   imageMedium: string | null;
   description: string | null;
-  siteUrl: string | null;
+  officialSiteUrl: string | null;
 }
 
 interface VoiceActorCreditRow extends RowDataPacket {
   animeId: number;
-  animeAnilistId: number;
   titleRomaji: string | null;
   titleEnglish: string | null;
   titleNative: string | null;
@@ -30,14 +28,12 @@ interface VoiceActorCreditRow extends RowDataPacket {
   seasonYear: number | null;
   format: string | null;
   animeStatus: string | null;
-  averageScore: number | null;
-  meanScore: number | null;
-  popularity: number | null;
-  favourites: number | null;
-  siteUrl: string | null;
+  communityAverageScore: number | null;
+  ratingCount: number;
+  collectionCount: number;
+  officialSiteUrl: string | null;
   isAdult: number | boolean;
   characterId: number;
-  characterAnilistId: number;
   characterNameFull: string | null;
   characterNameNative: string | null;
   characterNameUserPreferred: string | null;
@@ -46,7 +42,7 @@ interface VoiceActorCreditRow extends RowDataPacket {
   characterGender: string | null;
   characterAge: string | null;
   characterDescription: string | null;
-  characterSiteUrl: string | null;
+  characterOfficialSiteUrl: string | null;
   role: string | null;
   edgeName: string | null;
   characterSortOrder: number | null;
@@ -138,7 +134,6 @@ export async function getVoiceActorDetail(params: VoiceActorDetailParams) {
     `
     SELECT
       id,
-      anilist_id AS anilistId,
       name_full AS nameFull,
       name_native AS nameNative,
       name_user_preferred AS nameUserPreferred,
@@ -146,7 +141,7 @@ export async function getVoiceActorDetail(params: VoiceActorDetailParams) {
       image_large AS imageLarge,
       image_medium AS imageMedium,
       description,
-      site_url AS siteUrl
+      official_site_url AS officialSiteUrl
     FROM voice_actors
     WHERE id = ?
     LIMIT 1
@@ -204,7 +199,6 @@ export async function getVoiceActorDetail(params: VoiceActorDetailParams) {
     `
     SELECT
       a.id AS animeId,
-      a.anilist_id AS animeAnilistId,
       a.title_romaji AS titleRomaji,
       a.title_english AS titleEnglish,
       a.title_native AS titleNative,
@@ -217,14 +211,12 @@ export async function getVoiceActorDetail(params: VoiceActorDetailParams) {
       a.season_year AS seasonYear,
       a.format,
       a.status AS animeStatus,
-      a.average_score AS averageScore,
-      a.mean_score AS meanScore,
-      a.popularity,
-      a.favourites,
-      a.site_url AS siteUrl,
+      acm.community_average_score AS communityAverageScore,
+      COALESCE(acm.rating_count, 0) AS ratingCount,
+      COALESCE(acm.collection_count, 0) AS collectionCount,
+      a.official_site_url AS officialSiteUrl,
       a.is_adult AS isAdult,
       c.id AS characterId,
-      c.anilist_id AS characterAnilistId,
       c.name_full AS characterNameFull,
       c.name_native AS characterNameNative,
       c.name_user_preferred AS characterNameUserPreferred,
@@ -233,7 +225,7 @@ export async function getVoiceActorDetail(params: VoiceActorDetailParams) {
       c.gender AS characterGender,
       c.age AS characterAge,
       c.description AS characterDescription,
-      c.site_url AS characterSiteUrl,
+      c.official_site_url AS characterOfficialSiteUrl,
       ac.role,
       ac.edge_name AS edgeName,
       ac.sort_order AS characterSortOrder,
@@ -252,6 +244,7 @@ export async function getVoiceActorDetail(params: VoiceActorDetailParams) {
     LEFT JOIN anime_korean_titles akt
       ON akt.anime_id = a.id
       AND akt.is_primary = TRUE
+    LEFT JOIN anime_community_metrics acm ON acm.anime_id = a.id
     WHERE acva.voice_actor_id = ?
       ${cursorWhere}
     ORDER BY
@@ -282,7 +275,6 @@ export async function getVoiceActorDetail(params: VoiceActorDetailParams) {
   return {
     voiceActor: {
       id: voiceActor.id,
-      anilistId: voiceActor.anilistId,
       name: {
         full: voiceActor.nameFull,
         native: voiceActor.nameNative,
@@ -294,7 +286,7 @@ export async function getVoiceActorDetail(params: VoiceActorDetailParams) {
       },
       languageV2: voiceActor.languageV2,
       description: voiceActor.description,
-      siteUrl: voiceActor.siteUrl,
+      officialSiteUrl: voiceActor.officialSiteUrl,
     },
     summary: {
       animeCount: summary.animeCount,
@@ -304,7 +296,6 @@ export async function getVoiceActorDetail(params: VoiceActorDetailParams) {
     items: pageRows.map((row) => ({
       character: {
         id: row.characterId,
-        anilistId: row.characterAnilistId,
         role: row.role,
         edgeName: row.edgeName,
         sortOrder: row.characterSortOrder,
@@ -320,11 +311,10 @@ export async function getVoiceActorDetail(params: VoiceActorDetailParams) {
         gender: row.characterGender,
         age: row.characterAge,
         description: row.characterDescription,
-        siteUrl: row.characterSiteUrl,
+        officialSiteUrl: row.characterOfficialSiteUrl,
       },
       anime: {
         id: row.animeId,
-        anilistId: row.animeAnilistId,
         title: pickTitle(row, params.titleLanguage),
         titles: {
           korean: row.titleKorean,
@@ -340,11 +330,10 @@ export async function getVoiceActorDetail(params: VoiceActorDetailParams) {
         seasonYear: row.seasonYear,
         format: row.format,
         status: row.animeStatus,
-        averageScore: row.averageScore,
-        meanScore: row.meanScore,
-        popularity: row.popularity,
-        favourites: row.favourites,
-        siteUrl: row.siteUrl,
+        communityAverageScore: row.communityAverageScore === null ? null : Number(row.communityAverageScore),
+        ratingCount: Number(row.ratingCount),
+        collectionCount: Number(row.collectionCount),
+        officialSiteUrl: row.officialSiteUrl,
         isAdult: Boolean(row.isAdult),
       },
       voiceActing: {

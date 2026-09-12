@@ -23,7 +23,6 @@ export type AnimeGenre =
 
 export type AnimeListItem = {
   id: number
-  anilistId: number
   title: string
   titles?: {
     korean?: string | null
@@ -38,14 +37,13 @@ export type AnimeListItem = {
   seasonYear?: number | null
   format?: string | null
   status?: string | null
-  averageScore?: number | null
-  meanScore?: number | null
-  popularity?: number | null
-  favourites?: number | null
+  communityAverageScore?: number | null
+  ratingCount?: number
+  collectionCount?: number
   coverImageLarge: string
   coverImageExtraLarge?: string | null
   bannerImage?: string | null
-  siteUrl?: string | null
+  officialSiteUrl?: string | null
   isAdult?: boolean
   createdAt?: string
   myCollection?: {
@@ -58,7 +56,6 @@ export type AnimeListItem = {
 
 export type PopularAnimeItem = {
   id: number
-  anilistId: number
   title: string
   titles?: {
     korean?: string | null
@@ -69,7 +66,9 @@ export type PopularAnimeItem = {
   }
   coverImageLarge: string
   coverImageExtraLarge?: string | null
-  popularity?: number | null
+  collectionCount?: number
+  communityAverageScore?: number | null
+  ratingCount?: number
 }
 
 export type AnimeListResponse = {
@@ -88,7 +87,6 @@ export type AnimeSeriesScope = 'mainline' | 'franchise'
 
 export type AnimeSeriesListMember = {
   id: number
-  anilistId: number
   title: string
   titles: {
     korean: string | null
@@ -112,8 +110,9 @@ export type AnimeSeriesListItem = {
   customTitle: string | null
   canonicalAnimeId: number
   memberCount: number
-  averageScore: number | null
-  popularity: number | null
+  communityAverageScore: number | null
+  ratingCount: number
+  collectionCount: number | null
   season: string | null
   seasonYear: number | null
   coverImageLarge: string | null
@@ -153,21 +152,22 @@ export type AnimeRelationType =
 
 export type AnimeRelationItem = {
   relationType: AnimeRelationType
-  targetAnilistId: number
-  resolved: boolean
-  anime: (Partial<AnimeListItem> & Pick<AnimeListItem, 'id' | 'title'>) | null
+  targetAnimeId: number
+  anime: Partial<AnimeListItem> & Pick<AnimeListItem, 'id' | 'title'>
 }
 
 export type AnimeSearchWithRelationsItem = AnimeListItem & {
   relations: AnimeRelationItem[]
-  relationSync: {
-    status: 'pending' | 'syncing' | 'success' | 'failed' | string
-    lastSyncedAt: string | null
-  } | null
 }
 
 export type AnimeSearchWithRelationsResponse = Omit<AnimeListResponse, 'items'> & {
   items: AnimeSearchWithRelationsItem[]
+}
+
+export type AnimeRelationsResponse = {
+  success: boolean
+  items: AnimeRelationItem[]
+  relationType: AnimeRelationType | null
 }
 
 export type PopularAnimeResponse = {
@@ -184,7 +184,6 @@ export type KoreanTitleCandidate = {
 
 export type AnimeDetailItem = {
   id: number
-  anilistId: number
   title: string
   titles: {
     korean?: KoreanTitleCandidate[]
@@ -203,15 +202,13 @@ export type AnimeDetailItem = {
   source?: string | null
   countryOfOrigin?: string | null
   isAdult?: boolean
-  averageScore?: number | null
-  meanScore?: number | null
-  popularity?: number | null
-  favourites?: number | null
+  communityAverageScore?: number | null
+  ratingCount?: number
+  collectionCount?: number
   coverImageLarge: string
   coverImageExtraLarge?: string | null
   bannerImage?: string | null
-  siteUrl?: string | null
-  sourceUpdatedAt?: string | null
+  officialSiteUrl?: string | null
   createdAt?: string | null
   updatedAt?: string | null
   genres?: string[]
@@ -221,6 +218,12 @@ export type AnimeDetailItem = {
     isSpoiler: boolean
   }>
   synonyms?: string[]
+  studios?: Array<{
+    id: number
+    name: string
+    isMain: boolean
+    officialSiteUrl?: string | null
+  }>
 }
 
 export type AnimeDetailResponse = {
@@ -245,18 +248,16 @@ export type AnimeCastImage = {
 
 export type AnimeCastVoiceActor = {
   id: number
-  anilistId: number
   languageV2?: string | null
   sortOrder?: number | null
   name: AnimeCastPersonName
   image: AnimeCastImage
   description?: string | null
-  siteUrl?: string | null
+  officialSiteUrl?: string | null
 }
 
 export type AnimeCastCharacter = {
   id: number
-  anilistId: number
   role: string
   requestedRole?: string | null
   edgeName?: string | null
@@ -266,7 +267,7 @@ export type AnimeCastCharacter = {
   gender?: string | null
   age?: string | null
   description?: string | null
-  siteUrl?: string | null
+  officialSiteUrl?: string | null
   voiceActors: AnimeCastVoiceActor[]
 }
 

@@ -263,10 +263,9 @@ export type StudioRankingSort = 'count' | 'score' | 'watchTime'
 
 export type AnimeStudio = {
   id: number
-  anilistId: number
   name: string
   isAnimationStudio: boolean
-  siteUrl: string | null
+  officialSiteUrl: string | null
 }
 
 export type StudioRankingItem = {
@@ -309,7 +308,6 @@ export type StudioRankingResponse = {
 export type StudioAnimeItem = {
   anime: {
     id: number
-    anilistId: number
     title: string | null
     titles: {
       korean: string | null
@@ -326,8 +324,7 @@ export type StudioAnimeItem = {
     status: string | null
     episodes: number | null
     duration: number | null
-    averageScore: number | null
-    popularity?: number | null
+    communityAverageScore: number | null
   }
   userList: {
     status: string

@@ -32,7 +32,6 @@ interface SeriesSummaryRow extends RowDataPacket {
   completedMemberCount: number | string;
   completedRequiredMemberCount: number | string;
   lastActivityAt: string;
-  canonicalAnilistId: number | null;
   canonicalTitleRomaji: string | null;
   canonicalTitleEnglish: string | null;
   canonicalTitleNative: string | null;
@@ -45,7 +44,6 @@ interface SeriesSummaryRow extends RowDataPacket {
 interface SeriesMemberRow extends RowDataPacket {
   seriesId: number;
   animeId: number;
-  anilistId: number;
   titleRomaji: string | null;
   titleEnglish: string | null;
   titleNative: string | null;
@@ -334,7 +332,6 @@ export async function getUserSeriesCollection(params: GetUserSeriesCollectionPar
         AND ual.status = 'completed'
       ), 0) AS completedRequiredMemberCount,
       MAX(ual.updated_at) AS lastActivityAt,
-      canonicalAnime.anilist_id AS canonicalAnilistId,
       canonicalAnime.title_romaji AS canonicalTitleRomaji,
       canonicalAnime.title_english AS canonicalTitleEnglish,
       canonicalAnime.title_native AS canonicalTitleNative,
@@ -378,7 +375,6 @@ export async function getUserSeriesCollection(params: GetUserSeriesCollectionPar
       seriesRow.scope,
       seriesRow.title,
       seriesRow.canonical_anime_id,
-      canonicalAnime.anilist_id,
       canonicalAnime.title_romaji,
       canonicalAnime.title_english,
       canonicalAnime.title_native,
@@ -406,7 +402,6 @@ export async function getUserSeriesCollection(params: GetUserSeriesCollectionPar
       SELECT
         memberRow.series_id AS seriesId,
         animeRow.id AS animeId,
-        animeRow.anilist_id AS anilistId,
         animeRow.title_romaji AS titleRomaji,
         animeRow.title_english AS titleEnglish,
         animeRow.title_native AS titleNative,
@@ -501,7 +496,6 @@ export async function getUserSeriesCollection(params: GetUserSeriesCollectionPar
         completionExclusionReason: member.completionExclusionReason,
         anime: {
           id: member.animeId,
-          anilistId: member.anilistId,
           title: pickTitle(member, params.titleLanguage),
           titles: {
             korean: member.titleKorean,

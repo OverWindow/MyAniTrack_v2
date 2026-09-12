@@ -3,6 +3,7 @@ import { pool } from '../../config/db';
 import { AnimeGenre } from './anime.service';
 import { recalculateUserAnimeStats } from './recommendation.service';
 import { markUserVoiceActorStatsDirty } from './user-voice-actor-stats.service';
+import { recalculateAnimeCommunityMetrics } from './catalog.service';
 
 const LIST_STATUS_OPTIONS = ['planned', 'watching', 'completed', 'paused', 'dropped'] as const;
 const USER_ANIME_LIST_SORT_OPTIONS = ['latest', 'added', 'score', 'scoreAsc'] as const;
@@ -41,7 +42,6 @@ interface UserAnimeListListRow extends RowDataPacket {
   notes: string | null;
   createdAt: string;
   updatedAt: string;
-  animeAnilistId: number;
   animeTitleRomaji: string | null;
   animeTitleEnglish: string | null;
   animeTitleNative: string | null;
@@ -53,14 +53,13 @@ interface UserAnimeListListRow extends RowDataPacket {
   animeSeasonYear: number | null;
   animeFormat: string | null;
   animeStatus: string | null;
-  animeAverageScore: number | null;
-  animeMeanScore: number | null;
-  animePopularity: number | null;
-  animeFavourites: number | null;
+  animeCommunityAverageScore: number | null;
+  animeRatingCount: number;
+  animeCollectionCount: number;
   animeCoverImageLarge: string | null;
   animeCoverImageExtraLarge: string | null;
   animeBannerImage: string | null;
-  animeSiteUrl: string | null;
+  animeOfficialSiteUrl: string | null;
   animeIsAdult: number | boolean;
   sortScoreValue: number | null;
 }
@@ -649,7 +648,6 @@ export async function getUserAnimeList(params: GetUserAnimeListParams) {
       ual.notes,
       ual.created_at AS createdAt,
       ual.updated_at AS updatedAt,
-      a.anilist_id AS animeAnilistId,
       a.title_romaji AS animeTitleRomaji,
       a.title_english AS animeTitleEnglish,
       a.title_native AS animeTitleNative,
@@ -661,14 +659,13 @@ export async function getUserAnimeList(params: GetUserAnimeListParams) {
       a.season_year AS animeSeasonYear,
       a.format AS animeFormat,
       a.status AS animeStatus,
-      a.average_score AS animeAverageScore,
-      a.mean_score AS animeMeanScore,
-      a.popularity AS animePopularity,
-      a.favourites AS animeFavourites,
+      acm.community_average_score AS animeCommunityAverageScore,
+      COALESCE(acm.rating_count, 0) AS animeRatingCount,
+      COALESCE(acm.collection_count, 0) AS animeCollectionCount,
       a.cover_image_large AS animeCoverImageLarge,
       a.cover_image_extra_large AS animeCoverImageExtraLarge,
       a.banner_image AS animeBannerImage,
-      a.site_url AS animeSiteUrl,
+      a.official_site_url AS animeOfficialSiteUrl,
       a.is_adult AS animeIsAdult,
       COALESCE(ual.score, -1) AS sortScoreValue
     FROM user_anime_lists ual
@@ -679,6 +676,7 @@ export async function getUserAnimeList(params: GetUserAnimeListParams) {
     LEFT JOIN anime_korean_titles akt
       ON akt.anime_id = a.id
       AND akt.is_primary = TRUE
+    LEFT JOIN anime_community_metrics acm ON acm.anime_id = a.id
     WHERE ual.user_id = ?
       ${genreWhereClause}
       ${formatWhereClause}
@@ -740,7 +738,6 @@ export async function getUserAnimeList(params: GetUserAnimeListParams) {
       updatedAt: row.updatedAt,
       anime: {
         id: row.animeId,
-        anilistId: row.animeAnilistId,
         title: pickDisplayTitle(row, params.titleLanguage),
         titles: {
           korean: row.animeTitleKorean,
@@ -755,14 +752,13 @@ export async function getUserAnimeList(params: GetUserAnimeListParams) {
         seasonYear: row.animeSeasonYear,
         format: row.animeFormat,
         status: row.animeStatus,
-        averageScore: row.animeAverageScore,
-        meanScore: row.animeMeanScore,
-        popularity: row.animePopularity,
-        favourites: row.animeFavourites,
+        communityAverageScore: row.animeCommunityAverageScore === null ? null : Number(row.animeCommunityAverageScore),
+        ratingCount: Number(row.animeRatingCount),
+        collectionCount: Number(row.animeCollectionCount),
         coverImageLarge: row.animeCoverImageLarge,
         coverImageExtraLarge: row.animeCoverImageExtraLarge,
         bannerImage: row.animeBannerImage,
-        siteUrl: row.animeSiteUrl,
+        officialSiteUrl: row.animeOfficialSiteUrl,
         isAdult: Boolean(row.animeIsAdult),
       },
     })),
@@ -800,7 +796,6 @@ export async function getMyAnimeRelation(
       ual.notes,
       ual.created_at AS createdAt,
       ual.updated_at AS updatedAt,
-      a.anilist_id AS animeAnilistId,
       a.title_romaji AS animeTitleRomaji,
       a.title_english AS animeTitleEnglish,
       a.title_native AS animeTitleNative,
@@ -812,14 +807,13 @@ export async function getMyAnimeRelation(
       a.season_year AS animeSeasonYear,
       a.format AS animeFormat,
       a.status AS animeStatus,
-      a.average_score AS animeAverageScore,
-      a.mean_score AS animeMeanScore,
-      a.popularity AS animePopularity,
-      a.favourites AS animeFavourites,
+      acm.community_average_score AS animeCommunityAverageScore,
+      COALESCE(acm.rating_count, 0) AS animeRatingCount,
+      COALESCE(acm.collection_count, 0) AS animeCollectionCount,
       a.cover_image_large AS animeCoverImageLarge,
       a.cover_image_extra_large AS animeCoverImageExtraLarge,
       a.banner_image AS animeBannerImage,
-      a.site_url AS animeSiteUrl,
+      a.official_site_url AS animeOfficialSiteUrl,
       a.is_adult AS animeIsAdult,
       COALESCE(ual.score, -1) AS sortScoreValue
     FROM user_anime_lists ual
@@ -830,6 +824,7 @@ export async function getMyAnimeRelation(
     LEFT JOIN anime_korean_titles akt
       ON akt.anime_id = a.id
       AND akt.is_primary = TRUE
+    LEFT JOIN anime_community_metrics acm ON acm.anime_id = a.id
     WHERE ual.user_id = ?
       AND ual.anime_id = ?
     LIMIT 1
@@ -857,7 +852,6 @@ export async function getMyAnimeRelation(
     updatedAt: row.updatedAt,
     anime: {
       id: row.animeId,
-      anilistId: row.animeAnilistId,
       title: pickDisplayTitle(row, titleLanguage),
       titles: {
         korean: row.animeTitleKorean,
@@ -872,14 +866,13 @@ export async function getMyAnimeRelation(
       seasonYear: row.animeSeasonYear,
       format: row.animeFormat,
       status: row.animeStatus,
-      averageScore: row.animeAverageScore,
-      meanScore: row.animeMeanScore,
-      popularity: row.animePopularity,
-      favourites: row.animeFavourites,
+      communityAverageScore: row.animeCommunityAverageScore === null ? null : Number(row.animeCommunityAverageScore),
+      ratingCount: Number(row.animeRatingCount),
+      collectionCount: Number(row.animeCollectionCount),
       coverImageLarge: row.animeCoverImageLarge,
       coverImageExtraLarge: row.animeCoverImageExtraLarge,
       bannerImage: row.animeBannerImage,
-      siteUrl: row.animeSiteUrl,
+      officialSiteUrl: row.animeOfficialSiteUrl,
       isAdult: Boolean(row.animeIsAdult),
     },
   };
@@ -932,6 +925,7 @@ export async function addAnimeToUserList(userId: number, animeId: number, input:
 
   await recalculateUserAnimeStats(userId);
   await markUserVoiceActorStatsDirty(userId);
+  await recalculateAnimeCommunityMetrics(validatedAnimeId);
 
   return mapUserAnimeListItem(item);
 }
@@ -998,6 +992,7 @@ export async function updateUserAnimeListItem(userId: number, animeId: number, i
 
   await recalculateUserAnimeStats(userId);
   await markUserVoiceActorStatsDirty(userId);
+  await recalculateAnimeCommunityMetrics(validatedAnimeId);
 
   return mapUserAnimeListItem(item);
 }
@@ -1019,6 +1014,7 @@ export async function removeAnimeFromUserList(userId: number, animeId: number) {
 
   await recalculateUserAnimeStats(userId);
   await markUserVoiceActorStatsDirty(userId);
+  await recalculateAnimeCommunityMetrics(validatedAnimeId);
 }
 
 

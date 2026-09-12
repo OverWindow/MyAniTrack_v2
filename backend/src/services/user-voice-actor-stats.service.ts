@@ -6,7 +6,6 @@ export type VoiceActorRankingSort = 'count' | 'score' | 'watchTime';
 
 interface VoiceActorStatsRow extends RowDataPacket {
   voiceActorId: number;
-  anilistId: number;
   nameFull: string | null;
   nameNative: string | null;
   nameUserPreferred: string | null;
@@ -32,7 +31,6 @@ interface AnalysisStateRow extends RowDataPacket {
 
 interface VoiceActorRow extends RowDataPacket {
   id: number;
-  anilistId: number;
   nameFull: string | null;
   nameNative: string | null;
   nameUserPreferred: string | null;
@@ -40,12 +38,11 @@ interface VoiceActorRow extends RowDataPacket {
   imageLarge: string | null;
   imageMedium: string | null;
   description: string | null;
-  siteUrl: string | null;
+  officialSiteUrl: string | null;
 }
 
 interface VoiceActorAnimeRow extends RowDataPacket {
   animeId: number;
-  animeAnilistId: number;
   titleRomaji: string | null;
   titleEnglish: string | null;
   titleNative: string | null;
@@ -57,7 +54,7 @@ interface VoiceActorAnimeRow extends RowDataPacket {
   seasonYear: number | null;
   format: string | null;
   status: string | null;
-  averageScore: number | null;
+  communityAverageScore: number | null;
   episodes: number | null;
   duration: number | null;
   userStatus: string;
@@ -69,7 +66,6 @@ interface VoiceActorAnimeRow extends RowDataPacket {
 interface VoiceActorCharacterRow extends RowDataPacket {
   animeId: number;
   characterId: number;
-  characterAnilistId: number;
   role: string | null;
   nameFull: string | null;
   nameNative: string | null;
@@ -453,7 +449,6 @@ function mapStatsRow(row: VoiceActorStatsRow) {
   return {
     voiceActor: {
       id: row.voiceActorId,
-      anilistId: row.anilistId,
       name: {
         full: row.nameFull,
         native: row.nameNative,
@@ -572,7 +567,6 @@ export async function getUserVoiceActorRanking(params: {
     `
     SELECT
       uvas.voice_actor_id AS voiceActorId,
-      va.anilist_id AS anilistId,
       va.name_full AS nameFull,
       va.name_native AS nameNative,
       va.name_user_preferred AS nameUserPreferred,
@@ -672,7 +666,6 @@ export async function getUserVoiceActorAnime(params: {
     `
     SELECT
       id,
-      anilist_id AS anilistId,
       name_full AS nameFull,
       name_native AS nameNative,
       name_user_preferred AS nameUserPreferred,
@@ -680,7 +673,7 @@ export async function getUserVoiceActorAnime(params: {
       image_large AS imageLarge,
       image_medium AS imageMedium,
       description,
-      site_url AS siteUrl
+      official_site_url AS officialSiteUrl
     FROM voice_actors
     WHERE id = ?
     LIMIT 1
@@ -716,7 +709,6 @@ export async function getUserVoiceActorAnime(params: {
     `
     SELECT
       a.id AS animeId,
-      a.anilist_id AS animeAnilistId,
       a.title_romaji AS titleRomaji,
       a.title_english AS titleEnglish,
       a.title_native AS titleNative,
@@ -728,7 +720,7 @@ export async function getUserVoiceActorAnime(params: {
       a.season_year AS seasonYear,
       a.format,
       a.status,
-      a.average_score AS averageScore,
+      acm.community_average_score AS communityAverageScore,
       a.episodes,
       a.duration,
       ual.status AS userStatus,
@@ -743,6 +735,7 @@ export async function getUserVoiceActorAnime(params: {
     LEFT JOIN anime_korean_titles akt
       ON akt.anime_id = a.id
       AND akt.is_primary = TRUE
+    LEFT JOIN anime_community_metrics acm ON acm.anime_id = a.id
     WHERE ual.user_id = ?
       AND EXISTS (
         SELECT 1
@@ -769,7 +762,6 @@ export async function getUserVoiceActorAnime(params: {
       SELECT
         acva.anime_id AS animeId,
         c.id AS characterId,
-        c.anilist_id AS characterAnilistId,
         ac.role,
         c.name_full AS nameFull,
         c.name_native AS nameNative,
@@ -803,7 +795,6 @@ export async function getUserVoiceActorAnime(params: {
   return {
     voiceActor: {
       id: voiceActor.id,
-      anilistId: voiceActor.anilistId,
       name: {
         full: voiceActor.nameFull,
         native: voiceActor.nameNative,
@@ -815,12 +806,11 @@ export async function getUserVoiceActorAnime(params: {
       },
       languageV2: voiceActor.languageV2,
       description: voiceActor.description,
-      siteUrl: voiceActor.siteUrl,
+      officialSiteUrl: voiceActor.officialSiteUrl,
     },
     items: pageAnimeRows.map((row) => ({
       anime: {
         id: row.animeId,
-        anilistId: row.animeAnilistId,
         title: pickTitle(row, params.titleLanguage),
         titles: {
           korean: row.titleKorean,
@@ -835,7 +825,7 @@ export async function getUserVoiceActorAnime(params: {
         seasonYear: row.seasonYear,
         format: row.format,
         status: row.status,
-        averageScore: row.averageScore,
+        communityAverageScore: row.communityAverageScore === null ? null : Number(row.communityAverageScore),
         episodes: row.episodes,
         duration: row.duration,
       },
@@ -847,7 +837,6 @@ export async function getUserVoiceActorAnime(params: {
       },
       characters: (charactersByAnimeId.get(row.animeId) ?? []).map((characterRow) => ({
         id: characterRow.characterId,
-        anilistId: characterRow.characterAnilistId,
         role: characterRow.role,
         sortOrder: characterRow.sortOrder,
         name: {

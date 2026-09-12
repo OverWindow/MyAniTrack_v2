@@ -1,8 +1,6 @@
 import { ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import { pool } from '../../config/db';
 import { getUserAnimeStats, UserAnimeStats } from './recommendation.service';
-import { getPublicObjectUrl as getLegacySupabasePublicObjectUrl } from '../lib/supabase-storage';
-import { ensureAutomaticCatalogImageSyncJob } from '../../sync/catalog-image.sync.service';
 
 type BadgeCategory = 'WATCH' | 'EPISODE' | 'TIME' | 'RATING' | 'GENRE' | 'SPECIAL';
 type BadgeConditionType =
@@ -200,10 +198,8 @@ function mapBadge(row: BadgeRow, stats: UserAnimeStats) {
 }
 
 export async function ensureInitialBadges() {
-  let queuedImage = false;
-
   for (const badge of INITIAL_BADGES) {
-    const [badgeResult] = await pool.execute<ResultSetHeader>(
+    await pool.execute(
       `
       INSERT INTO badges (
         code,
@@ -241,45 +237,6 @@ export async function ensureInitialBadges() {
       ]
     );
 
-    const legacyUrl = getLegacySupabasePublicObjectUrl(badge.objectKey);
-    const [assetResult] = await pool.execute<ResultSetHeader>(
-      `
-      INSERT IGNORE INTO catalog_image_assets (
-        entity_type,
-        entity_id,
-        anilist_id,
-        variant,
-        source_url,
-        source_hash,
-        source_provider,
-        public_url,
-        storage_provider,
-        legacy_object_key,
-        legacy_public_url,
-        status
-      )
-      VALUES (
-        'badge', ?, ?, 'image', ?, SHA2(?, 256), 'supabase', ?,
-        'supabase', ?, ?, 'pending'
-      )
-      `,
-      [
-        badgeResult.insertId,
-        badgeResult.insertId,
-        legacyUrl,
-        legacyUrl,
-        legacyUrl,
-        badge.objectKey,
-        legacyUrl,
-      ],
-    );
-    queuedImage = queuedImage || assetResult.affectedRows > 0;
-  }
-
-  if (queuedImage) {
-    void ensureAutomaticCatalogImageSyncJob().catch((error) => {
-      console.error('Default badge images were queued but the S3 worker could not start', error);
-    });
   }
 }
 

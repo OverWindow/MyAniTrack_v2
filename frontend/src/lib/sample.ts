@@ -1,5 +1,5 @@
 import { getTitleLanguage, tr } from '../i18n'
-import type { AnimeGenre, AnimeListItem, AnimeListResponse } from '../types/anime'
+import type { AnimeGenre } from '../types/anime'
 import type { AnimeDetailItem } from '../types/anime'
 import type { UserAnimeListItem, UserAnimeListResponse, UserAnimeListSort } from '../types/collection'
 import type {
@@ -112,76 +112,10 @@ function getItemsResponse(payload: unknown): UserAnimeListResponse {
   throw new Error(tr("샘플 컬렉션 응답 형식이 올바르지 않아요."))
 }
 
-async function fetchAnimeCatalogPage(cursor?: string | null) {
-  const url = new URL('/api/anime', getApiBaseUrl())
-  url.searchParams.set('sort', 'popularity')
-  url.searchParams.set('titleLanguage', getTitleLanguage())
-  url.searchParams.set('limit', '50')
-
-  if (cursor) {
-    url.searchParams.set('cursor', cursor)
-  }
-
-  const response = await fetch(url.toString())
-
-  if (!response.ok) {
-    throw new Error(tr("애니 목록을 불러오지 못했습니다. ({{v0}})", { v0: response.status }))
-  }
-
-  return response.json() as Promise<AnimeListResponse>
-}
-
-async function getAnimeMatchesByAniListId(anilistIds: number[]) {
-  const remainingIds = new Set(anilistIds)
-  const matches = new Map<number, AnimeListItem>()
-  let cursor: string | null | undefined = null
-
-  for (let page = 0; page < 8 && remainingIds.size > 0; page += 1) {
-    const response = await fetchAnimeCatalogPage(cursor)
-
-    for (const item of response.items) {
-      if (remainingIds.has(item.anilistId)) {
-        matches.set(item.anilistId, item)
-        remainingIds.delete(item.anilistId)
-      }
-    }
-
-    if (!response.pageInfo.hasNext || !response.pageInfo.nextCursor) {
-      break
-    }
-
-    cursor = response.pageInfo.nextCursor
-  }
-
-  return matches
-}
-
 async function enrichSampleResponse(response: UserAnimeListResponse) {
-  const anilistIds = Array.from(new Set(response.items.map((item) => item.anime.anilistId)))
-  const matches = await getAnimeMatchesByAniListId(anilistIds)
-
   return {
     ...response,
-    items: response.items.map((item) => {
-      const match = matches.get(item.anime.anilistId)
-
-      if (!match) {
-        return withSampleCover(item)
-      }
-
-      return {
-        ...item,
-        animeId: match.id,
-        anime: {
-          ...item.anime,
-          ...match,
-          titles: {
-            ...item.anime.titles,
-            ...match.titles,
-          },
-        },
-      }
-    }),
+    items: response.items.map(withSampleCover),
   }
 }
 
@@ -284,7 +218,6 @@ export function createSampleAnimeDetail(item: UserAnimeListItem): AnimeDetailIte
 
   return {
     id: item.anime.id,
-    anilistId: item.anime.anilistId,
     title,
     titles: {
       korean: [{
@@ -307,17 +240,15 @@ export function createSampleAnimeDetail(item: UserAnimeListItem): AnimeDetailIte
     source: 'Sample',
     countryOfOrigin: 'JP',
     isAdult: item.anime.isAdult ?? false,
-    averageScore: item.anime.averageScore ?? null,
-    meanScore: item.anime.meanScore ?? null,
-    popularity: item.anime.popularity ?? null,
-    favourites: item.anime.favourites ?? null,
+    communityAverageScore: item.anime.communityAverageScore ?? null,
+    ratingCount: item.anime.ratingCount ?? 0,
+    collectionCount: item.anime.collectionCount ?? 0,
     coverImageLarge: item.anime.coverImageLarge,
     coverImageExtraLarge: item.anime.coverImageExtraLarge,
     bannerImage: item.anime.bannerImage ?? item.anime.coverImageExtraLarge ?? item.anime.coverImageLarge,
-    siteUrl: item.anime.siteUrl ?? null,
+    officialSiteUrl: item.anime.officialSiteUrl ?? null,
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,
-    sourceUpdatedAt: item.updatedAt,
     description: tr("샘플 컬렉션 미리보기에 사용되는 작품 정보입니다. 로그인하면 실제 컬렉션 기록과 함께 더 자세한 정보를 확인할 수 있어요."),
     genres: [],
     tags: [],

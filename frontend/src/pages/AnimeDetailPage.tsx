@@ -1,8 +1,9 @@
-import { getLocaleTag } from '../i18n'
-import { getTitleLanguage, tr } from '../i18n'
+import { tr } from '../i18n'
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { CollectionEditor } from '../components/CollectionEditor'
+import { CatalogSubmissionDialog } from '../components/CatalogSubmissionDialog'
+import { CatalogLinkDialog } from '../components/CatalogLinkDialog'
 import { ConnectionErrorState } from '../components/ConnectionErrorState'
 import { ErrorToast } from '../components/ErrorToast'
 import { useAuth } from '../contexts/AuthContext'
@@ -13,10 +14,11 @@ import {
   getDetailMetaTitle,
   getGenreLabel,
   getPrimaryPoster,
-  searchAnimeWithRelations,
+  fetchAnimeRelations,
 } from '../lib/anime'
 import { createSampleAnimeDetail, fetchSampleCollection } from '../lib/sample'
 import type { AnimeCastCharacter, AnimeDetailItem, AnimeRelationItem, AnimeRelationType } from '../types/anime'
+import type { CatalogEntityType } from '../types/admin'
 import '../styles/pages/AnimeDetailPage.css'
 
 type DetailState = {
@@ -207,6 +209,8 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
     isLoading: false,
     error: null,
   })
+  const [submissionType, setSubmissionType] = useState<CatalogEntityType | null>(null)
+  const [linkRequest, setLinkRequest] = useState<{ type: 'CHARACTER' | 'VOICE_ACTOR' | 'STUDIO'; characterId?: number } | null>(null)
   const { item, isLoading, error } = state
   const isSampleDetail = Boolean(sampleAnimeDetail || item?.source === 'Sample')
   const isRefreshingDetail = state.requestKey !== requestKey
@@ -214,7 +218,6 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
   const fromPage = routeState?.fromPage
   const backPath = fromPage === 'collection' ? '/collection' : '/explore'
   const detailPageClassName = isOverlay ? 'detail-page detail-page-overlay' : 'detail-page'
-  const relationSearchQuery = item ? (getDetailMetaTitle(item).trim() || item.title) : ''
 
   const handleOverlayClose = () => {
     navigate(-1)
@@ -363,27 +366,18 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
 
     const controller = new AbortController()
     const animeId = item.id
-    const anilistId = item.anilistId
     const loadingTimer = window.setTimeout(() => {
       setRelationState({ items: [], isLoading: true, error: null })
     })
 
     const loadRelations = async () => {
       try {
-        const response = await searchAnimeWithRelations({
-          query: relationSearchQuery,
-          titleLanguage: getTitleLanguage(),
-          sort: 'popularity',
-          limit: 20,
-          signal: controller.signal,
-        })
-        const matchedAnime = response.items.find((entry) => entry.id === animeId)
-          ?? response.items.find((entry) => entry.anilistId === anilistId)
+        const response = await fetchAnimeRelations(animeId, controller.signal)
         const uniqueRelations = Array.from(
           new Map(
-            (matchedAnime?.relations ?? [])
+            response.items
               .filter((relation) => relation.anime?.id !== animeId)
-              .map((relation) => [relation.targetAnilistId, relation]),
+              .map((relation) => [relation.targetAnimeId, relation]),
           ).values(),
         )
 
@@ -407,7 +401,7 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
       window.clearTimeout(loadingTimer)
       controller.abort()
     }
-  }, [isSampleDetail, item?.anilistId, item?.id, relationSearchQuery])
+  }, [isSampleDetail, item?.id])
 
   const handleAdminTitleUpdated = (updatedTitle: {
     title: string
@@ -540,14 +534,14 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
               </div>
               <div>
                 <span>{tr("평점")}</span>
-                <strong>{item.averageScore ? `${(item.averageScore / 10).toFixed(1)} / 10` : tr("미집계")}</strong>
+                <strong>{item.communityAverageScore ? `${item.communityAverageScore.toFixed(1)} / 10` : tr("미집계")}</strong>
               </div>
             </div>
 
             <div className="detail-actions">
-              {item.siteUrl && (
-                <a className="primary-button" href={item.siteUrl} target="_blank" rel="noreferrer">
-                  {tr("원본 페이지 보기")}
+              {item.officialSiteUrl && (
+                <a className="primary-button" href={item.officialSiteUrl} target="_blank" rel="noreferrer">
+                  {tr("공식 홈페이지 보기")}
                 </a>
               )}
               {isOverlay ? (
@@ -599,12 +593,12 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
                   <strong>{item.countryOfOrigin ?? tr("정보 없음")}</strong>
                 </div>
                 <div>
-                  <span>{tr("인기")}</span>
-                  <strong>{item.popularity?.toLocaleString(getLocaleTag()) ?? tr("정보 없음")}</strong>
+                  <span>{tr("컬렉션")}</span>
+                  <strong>{item.collectionCount?.toLocaleString() ?? '0'}</strong>
                 </div>
                 <div>
-                  <span>{tr("즐겨찾기")}</span>
-                  <strong>{item.favourites?.toLocaleString(getLocaleTag()) ?? tr("정보 없음")}</strong>
+                  <span>{tr("평가 수")}</span>
+                  <strong>{item.ratingCount?.toLocaleString() ?? '0'}</strong>
                 </div>
                 <div>
                   <span>{tr("성인 작품")}</span>
@@ -646,7 +640,7 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
         </aside>
       </div>
 
-      {(relationState.isLoading || (!relationState.error && relationState.items.length > 0)) && (
+      {!isSampleDetail && !relationState.error && (
         <section className="detail-section detail-relations-section">
           <div className="detail-cast-heading">
             <div>
@@ -668,7 +662,7 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
               ))}
             </div>
           ) : (
-            <div className="detail-relations-grid">
+            relationState.items.length > 0 ? <div className="detail-relations-grid">
               {relationState.items.map((relation) => {
                 const relatedAnime = relation.anime
                 const poster = relatedAnime?.coverImageExtraLarge || relatedAnime?.coverImageLarge
@@ -678,39 +672,38 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
                       <img className="detail-relation-poster" src={poster} alt="" loading="lazy" />
                     ) : (
                       <div className="detail-relation-poster detail-relation-poster-placeholder" aria-hidden="true">
-                        {relation.targetAnilistId}
+                        {relation.targetAnimeId}
                       </div>
                     )}
                     <div className="detail-relation-copy">
                       <span>{relationTypeLabels[relation.relationType] ?? relation.relationType}</span>
-                      <strong>{relatedAnime?.title || `AniList #${relation.targetAnilistId}`}</strong>
-                      <small>{relation.resolved && relatedAnime ? tr("상세 보기") : tr("동기화 대기")}</small>
+                      <strong>{relatedAnime.title}</strong>
+                      <small>{tr("상세 보기")}</small>
                     </div>
                   </>
                 )
 
-                return relation.resolved && relatedAnime ? (
-                  <Link className="detail-relation-card" to={`/anime/${relatedAnime.id}`} key={relation.targetAnilistId}>
+                return (
+                  <Link className="detail-relation-card" to={`/anime/${relatedAnime.id}`} key={relation.targetAnimeId}>
                     {content}
                   </Link>
-                ) : (
-                  <article className="detail-relation-card is-unresolved" key={relation.targetAnilistId}>
-                    {content}
-                  </article>
                 )
               })}
-            </div>
+            </div> : <div className="feedback-card"><p>{tr('아직 등록된 연관 작품이 없어요.')}</p></div>
           )}
         </section>
       )}
 
-      {(castState.isLoading || (!castState.error && castState.items.length > 0)) && (
+      {!isSampleDetail && <section className="detail-section detail-cast-section"><div className="detail-cast-heading"><div><span className="detail-label">Studio</span><h2>{tr('스튜디오')}</h2></div></div>{(item.studios?.length ?? 0) > 0 && <div className="detail-cast-grid">{item.studios?.map((studio) => <article className="detail-cast-card" key={studio.id}><div><strong>{studio.name}</strong>{studio.isMain && <small>{tr('주 제작사')}</small>}{studio.officialSiteUrl && <a href={studio.officialSiteUrl} target="_blank" rel="noreferrer">{tr('공식 홈페이지')}</a>}</div></article>)}</div>}<div className="feedback-card"><p>{tr('기존 스튜디오를 검색해 연결하거나 새 스튜디오를 요청할 수 있어요.')}</p><div className="catalog-submission-actions"><button className="secondary-button" onClick={() => setLinkRequest({ type: 'STUDIO' })}>{tr('기존 스튜디오 검색 후 연결')}</button><button className="secondary-button" onClick={() => setSubmissionType('STUDIO')}>{tr('새 스튜디오 요청')}</button></div></div></section>}
+
+      {!isSampleDetail && !castState.error && (
         <section className="detail-section detail-cast-section">
           <div className="detail-cast-heading">
             <div>
               <span className="detail-label">Main cast</span>
               <h2>{tr("주요 캐릭터와 성우")}</h2>
             </div>
+            <div className="catalog-submission-actions"><button className="secondary-button" onClick={() => setLinkRequest({ type: 'CHARACTER' })}>{tr('기존 캐릭터 검색 후 연결')}</button><button className="secondary-button" onClick={() => setSubmissionType('CHARACTER')}>{tr('새 캐릭터 요청')}</button><button className="secondary-button" onClick={() => setSubmissionType('VOICE_ACTOR')}>{tr('새 성우 요청')}</button></div>
           </div>
 
           {castState.isLoading ? (
@@ -722,7 +715,7 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
                 </article>
               ))}
             </div>
-          ) : (
+          ) : castState.items.length > 0 ? (
             <div className="detail-cast-grid">
               {castState.items.map((character) => {
                 const voiceActor = character.voiceActors[0]
@@ -730,25 +723,18 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
                 return (
                   <article className="detail-cast-card" key={character.id}>
                     <div className="detail-cast-person">
-                      <img
-                        src={character.image.large || character.image.medium || ''}
-                        alt={getCastDisplayName(character.name)}
-                        loading="lazy"
-                      />
+                      {character.image.large || character.image.medium ? <img src={character.image.large || character.image.medium || ''} alt={getCastDisplayName(character.name)} loading="lazy" /> : <span className="detail-cast-image-placeholder" aria-hidden="true">?</span>}
                       <div>
                         <span>Character</span>
                         <strong>{getCastDisplayName(character.name)}</strong>
                         {character.name.native && <small>{character.name.native}</small>}
+                        <button className="secondary-button" type="button" onClick={() => setLinkRequest({ type: 'VOICE_ACTOR', characterId: character.id })}>{tr('기존 성우 검색 후 연결')}</button>
                       </div>
                     </div>
 
                     {voiceActor && (
                       <Link className="detail-cast-person detail-cast-person-link" to={`/voice-actors/${voiceActor.id}`}>
-                        <img
-                          src={voiceActor.image.large || voiceActor.image.medium || ''}
-                          alt={getCastDisplayName(voiceActor.name)}
-                          loading="lazy"
-                        />
+                        {voiceActor.image.large || voiceActor.image.medium ? <img src={voiceActor.image.large || voiceActor.image.medium || ''} alt={getCastDisplayName(voiceActor.name)} loading="lazy" /> : <span className="detail-cast-image-placeholder" aria-hidden="true">?</span>}
                         <div>
                           <span>Voice actor</span>
                           <strong>{getCastDisplayName(voiceActor.name)}</strong>
@@ -760,9 +746,13 @@ export function AnimeDetailPage({ isOverlay = false }: AnimeDetailPageProps) {
                 )
               })}
             </div>
+          ) : (
+            <div className="feedback-card"><p>{tr('아직 등록된 캐릭터와 성우가 없어요.')}</p><div className="catalog-submission-actions"><button className="secondary-button" onClick={() => setLinkRequest({ type: 'CHARACTER' })}>{tr('기존 캐릭터 검색 후 연결')}</button><button className="secondary-button" onClick={() => setSubmissionType('CHARACTER')}>{tr('새 캐릭터 요청')}</button><button className="secondary-button" onClick={() => setSubmissionType('VOICE_ACTOR')}>{tr('새 성우 요청')}</button></div></div>
           )}
         </section>
       )}
+      <CatalogSubmissionDialog open={submissionType !== null} onClose={() => setSubmissionType(null)} entityType={submissionType ?? 'ANIME'} initialName="" />
+      <CatalogLinkDialog open={linkRequest !== null} onClose={() => setLinkRequest(null)} animeId={item.id} entityType={linkRequest?.type ?? 'CHARACTER'} characterId={linkRequest?.characterId} />
     </section>
   )
 }

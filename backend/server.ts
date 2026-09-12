@@ -15,10 +15,10 @@ import userAnimeListRoutes from './src/routes/user-anime-list.routes';
 import userProfileRoutes from './src/routes/user-profile.routes';
 import userVoiceActorStatsRoutes from './src/routes/user-voice-actor-stats.routes';
 import maintenanceRoutes from './src/routes/maintenance.routes';
+import catalogRoutes from './src/routes/catalog.routes';
 import { getSharePreviewHtml } from './src/controllers/share-preview.controller';
-import { stripAniListImageUrls } from './src/lib/catalog-image-url';
-import { resumeCatalogImageSyncWorker } from './sync/catalog-image.sync.service';
 import { startLegacyImageCleanupScheduler } from './src/services/legacy-image-cleanup.service';
+import { startCatalogDiscoveryScheduler } from './src/services/catalog-discovery.service';
 
 validateImageStorageEnv();
 
@@ -91,13 +91,6 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 
-app.use((_req, res, next) => {
-  const sendJson = res.json.bind(res);
-
-  res.json = ((body: unknown) => sendJson(stripAniListImageUrls(body))) as typeof res.json;
-  next();
-});
-
 app.use((req, res, next) => {
   const unsafeMethods = ['POST', 'PUT', 'PATCH', 'DELETE'];
 
@@ -135,6 +128,7 @@ app.use('/api', contentModerationRoutes);
 app.use('/api', guestSampleRoutes);
 app.use('/api', platformStatsRoutes);
 app.use('/api', maintenanceRoutes);
+app.use('/api', catalogRoutes);
 app.use('/api', recommendationRoutes);
 app.use('/api', shareRoutes);
 app.use('/api', userAgreementRoutes);
@@ -150,7 +144,7 @@ async function startServer() {
     console.log(`Server is running on port ${PORT}`);
   });
   startLegacyImageCleanupScheduler();
-  await resumeCatalogImageSyncWorker();
+  await startCatalogDiscoveryScheduler();
 }
 
 void startServer().catch((error) => {

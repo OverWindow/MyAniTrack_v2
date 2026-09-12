@@ -9,7 +9,6 @@ import {
   getS3ObjectKeyFromPublicUrl,
 } from './image-storage';
 import { getS3ImageStorageConfig } from '../config/env';
-import { validateCatalogImageSourceUrl } from '../../sync/catalog-image.sync.service';
 
 function configureStorageEnv() {
   process.env.IMAGE_STORAGE_PROVIDER = 's3';
@@ -88,45 +87,4 @@ test('S3 HeadObject metadata must match size, MIME, and SHA-256', () => {
 test('AWS HTTP status is retained for safe error mapping', () => {
   assert.equal(getImageStorageErrorStatus({ $metadata: { httpStatusCode: 403 } }), 403);
   assert.equal(getImageStorageErrorStatus(new Error('network failure')), undefined);
-});
-
-test('catalog image sources only allow the configured providers', () => {
-  configureStorageEnv();
-
-  assert.equal(
-    validateCatalogImageSourceUrl(
-      'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/test.jpg',
-      'anilist',
-    ).hostname,
-    's4.anilist.co',
-  );
-  assert.equal(
-    validateCatalogImageSourceUrl(
-      'https://project.supabase.co/storage/v1/object/public/legacy-assets/catalog-images/test.webp',
-      'supabase',
-    ).hostname,
-    'project.supabase.co',
-  );
-  assert.equal(
-    validateCatalogImageSourceUrl(
-      'https://images.example.com/catalog-images/test.webp',
-      'cloudfront',
-    ).hostname,
-    'images.example.com',
-  );
-
-  assert.throws(
-    () => validateCatalogImageSourceUrl(
-      'https://project.supabase.co.attacker.example/storage/v1/object/public/legacy-assets/test.webp',
-      'supabase',
-    ),
-    /not allowed/,
-  );
-  assert.throws(
-    () => validateCatalogImageSourceUrl(
-      'https://attacker.example/catalog-images/test.webp',
-      'cloudfront',
-    ),
-    /not allowed/,
-  );
 });

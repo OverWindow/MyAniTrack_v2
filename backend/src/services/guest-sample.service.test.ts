@@ -18,11 +18,10 @@ test('sample studio ranking matches the production response shape', () => {
   const firstItem = response.items[0];
   assert.ok(firstItem);
   assert.deepEqual(Object.keys(firstItem.studio).sort(), [
-    'anilistId',
     'id',
     'isAnimationStudio',
     'name',
-    'siteUrl',
+    'officialSiteUrl',
   ]);
   assert.equal(typeof firstItem.completedAnimeCount, 'number');
   assert.equal(typeof firstItem.totalWatchedEpisodes, 'number');

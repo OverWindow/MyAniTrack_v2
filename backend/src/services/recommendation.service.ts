@@ -58,7 +58,6 @@ interface UserAnimeStatsRow extends RowDataPacket {
 
 interface RecommendationCandidateRow extends RowDataPacket {
   id: number;
-  anilistId: number;
   titleRomaji: string | null;
   titleEnglish: string | null;
   titleNative: string | null;
@@ -70,28 +69,25 @@ interface RecommendationCandidateRow extends RowDataPacket {
   seasonYear: number | null;
   format: string | null;
   status: string | null;
-  averageScore: number | null;
-  meanScore: number | null;
-  popularity: number | null;
-  favourites: number | null;
+  communityAverageScore: number | null;
+  ratingCount: number;
+  collectionCount: number;
   coverImageLarge: string | null;
   coverImageExtraLarge: string | null;
   bannerImage: string | null;
-  siteUrl: string | null;
+  officialSiteUrl: string | null;
   genres: string | null;
 }
 
 interface GenreBubbleSourceRow extends RowDataPacket {
   animeId: number;
-  anilistId: number;
   userStatus: string;
   userScore: number | string | null;
   progress: number;
   episodes: number | null;
   duration: number | null;
   seasonYear: number | null;
-  averageScore: number | null;
-  meanScore: number | null;
+  communityAverageScore: number | null;
   titleRomaji: string | null;
   titleEnglish: string | null;
   titleNative: string | null;
@@ -744,9 +740,8 @@ function computeRecommendationScore(
     ? (stats.releaseYearDistribution[releaseBucket] ?? 0) * 2
     : 0;
 
-  const averageScore = candidate.averageScore ?? candidate.meanScore ?? 0;
-  const qualityScore = averageScore / 10;
-  const popularityScore = Math.min((candidate.popularity ?? 0) / 5000, 10);
+  const qualityScore = Number(candidate.communityAverageScore ?? 0);
+  const popularityScore = Math.min(Number(candidate.collectionCount ?? 0) / 100, 10);
 
   return round2(genreScore + releasePeriodScore + qualityScore + popularityScore);
 }
@@ -762,7 +757,6 @@ export async function getRecommendedAnime(
     `
     SELECT
       a.id,
-      a.anilist_id AS anilistId,
       a.title_romaji AS titleRomaji,
       a.title_english AS titleEnglish,
       a.title_native AS titleNative,
@@ -774,14 +768,13 @@ export async function getRecommendedAnime(
       a.season_year AS seasonYear,
       a.format,
       a.status,
-      a.average_score AS averageScore,
-      a.mean_score AS meanScore,
-      a.popularity,
-      a.favourites,
+      acm.community_average_score AS communityAverageScore,
+      COALESCE(acm.rating_count, 0) AS ratingCount,
+      COALESCE(acm.collection_count, 0) AS collectionCount,
       a.cover_image_large AS coverImageLarge,
       a.cover_image_extra_large AS coverImageExtraLarge,
       a.banner_image AS bannerImage,
-      a.site_url AS siteUrl,
+      a.official_site_url AS officialSiteUrl,
       GROUP_CONCAT(DISTINCT ag.genre ORDER BY ag.genre SEPARATOR ',') AS genres
     FROM anime a
     LEFT JOIN anime_genres ag
@@ -789,6 +782,7 @@ export async function getRecommendedAnime(
     LEFT JOIN anime_korean_titles akt
       ON akt.anime_id = a.id
       AND akt.is_primary = TRUE
+    LEFT JOIN anime_community_metrics acm ON acm.anime_id = a.id
     WHERE a.is_adult = FALSE
       AND a.app_visible = TRUE
       AND NOT EXISTS (
@@ -799,7 +793,6 @@ export async function getRecommendedAnime(
       )
     GROUP BY
       a.id,
-      a.anilist_id,
       a.title_romaji,
       a.title_english,
       a.title_native,
@@ -811,15 +804,14 @@ export async function getRecommendedAnime(
       a.season_year,
       a.format,
       a.status,
-      a.average_score,
-      a.mean_score,
-      a.popularity,
-      a.favourites,
+      acm.community_average_score,
+      acm.rating_count,
+      acm.collection_count,
       a.cover_image_large,
       a.cover_image_extra_large,
       a.banner_image,
-      a.site_url
-    ORDER BY a.popularity DESC, a.average_score DESC, a.id DESC
+      a.official_site_url
+    ORDER BY acm.collection_count DESC, acm.community_average_score DESC, a.id DESC
     LIMIT 300
     `,
     [userId]
@@ -828,7 +820,6 @@ export async function getRecommendedAnime(
   const scoredItems = rows
     .map((row) => ({
       id: row.id,
-      anilistId: row.anilistId,
       title: pickDisplayTitle(row, titleLanguage),
       titles: {
         korean: row.titleKorean,
@@ -843,18 +834,17 @@ export async function getRecommendedAnime(
       seasonYear: row.seasonYear,
       format: row.format,
       status: row.status,
-      averageScore: row.averageScore,
-      meanScore: row.meanScore,
-      popularity: row.popularity,
-      favourites: row.favourites,
+      communityAverageScore: row.communityAverageScore === null ? null : Number(row.communityAverageScore),
+      ratingCount: Number(row.ratingCount),
+      collectionCount: Number(row.collectionCount),
       coverImageLarge: row.coverImageLarge,
       coverImageExtraLarge: row.coverImageExtraLarge,
       bannerImage: row.bannerImage,
-      siteUrl: row.siteUrl,
+      officialSiteUrl: row.officialSiteUrl,
       genres: row.genres ? row.genres.split(',').filter(Boolean) : [],
       recommendationScore: computeRecommendationScore(row, stats),
     }))
-    .sort((a, b) => b.recommendationScore - a.recommendationScore || (b.popularity ?? 0) - (a.popularity ?? 0))
+    .sort((a, b) => b.recommendationScore - a.recommendationScore || b.collectionCount - a.collectionCount)
     .slice(0, limit);
 
   return {
@@ -891,9 +881,7 @@ function pickGenreBubbleTitle(row: GenreBubbleSourceRow, titleLanguage: 'ko' | '
 }
 
 export async function getUserGenreBubbleChart(userId: number, params: GenreBubbleParams) {
-  const scoreColumn = params.communityScore === 'mean'
-    ? 'a.mean_score'
-    : 'a.average_score';
+  const scoreColumn = 'acm.community_average_score';
   const statusWhere = params.status === 'completed'
     ? "AND ual.status = 'completed'"
     : '';
@@ -902,15 +890,13 @@ export async function getUserGenreBubbleChart(userId: number, params: GenreBubbl
     `
     SELECT
       ual.anime_id AS animeId,
-      a.anilist_id AS anilistId,
       ual.status AS userStatus,
       ual.score AS userScore,
       ual.progress,
       a.episodes,
       a.duration,
       a.season_year AS seasonYear,
-      a.average_score AS averageScore,
-      a.mean_score AS meanScore,
+      acm.community_average_score AS communityAverageScore,
       a.title_romaji AS titleRomaji,
       a.title_english AS titleEnglish,
       a.title_native AS titleNative,
@@ -937,6 +923,7 @@ export async function getUserGenreBubbleChart(userId: number, params: GenreBubbl
     LEFT JOIN anime_korean_titles akt
       ON akt.anime_id = a.id
       AND akt.is_primary = TRUE
+    LEFT JOIN anime_community_metrics acm ON acm.anime_id = a.id
     WHERE ual.user_id = ?
       ${statusWhere}
       AND ual.score IS NOT NULL
@@ -957,7 +944,6 @@ export async function getUserGenreBubbleChart(userId: number, params: GenreBubbl
     totalWatchMinutes: number;
     topRatedAnime: Array<{
       animeId: number;
-      anilistId: number;
       title: string;
       score: number;
       communityScore: number;
@@ -967,15 +953,13 @@ export async function getUserGenreBubbleChart(userId: number, params: GenreBubbl
 
   for (const row of rows) {
     const myScore = parseNullableNumber(row.userScore);
-    const rawCommunityScore = params.communityScore === 'mean'
-      ? row.meanScore
-      : row.averageScore;
+    const rawCommunityScore = row.communityAverageScore;
 
     if (myScore === null || rawCommunityScore === null) {
       continue;
     }
 
-    const communityScore = rawCommunityScore / 10;
+    const communityScore = Number(rawCommunityScore);
     const genreCount = Math.max(Number(row.genreCount) || 1, 1);
     const weight = params.weighting === 'fractional' ? 1 / genreCount : 1;
     const effectiveEpisodes = getEffectiveWatchedEpisodes({
@@ -1008,7 +992,6 @@ export async function getUserGenreBubbleChart(userId: number, params: GenreBubbl
 
     currentGenre.topRatedAnime.push({
       animeId: row.animeId,
-      anilistId: row.anilistId,
       title: pickGenreBubbleTitle(row, params.titleLanguage),
       score: myScore,
       communityScore: roundMetric(communityScore),

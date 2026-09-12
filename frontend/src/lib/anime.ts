@@ -9,6 +9,7 @@ import type {
   AnimeListItem,
   AnimeListResponse,
   AnimeRelationType,
+  AnimeRelationsResponse,
   AnimeSeriesListResponse,
   AnimeSeriesScope,
   AnimeSearchWithRelationsResponse,
@@ -277,6 +278,14 @@ export async function searchAnimeWithRelations(params: {
   }
 
   return (await response.json()) as AnimeSearchWithRelationsResponse
+}
+
+export async function fetchAnimeRelations(animeId: number, signal?: AbortSignal) {
+  const url = new URL(`/api/anime/${animeId}/relations`, getApiBaseUrl())
+  url.searchParams.set('titleLanguage', getTitleLanguage())
+  const response = await authFetch(url.toString(), { signal })
+  if (!response.ok) throw new Error(tr("연관 작품을 불러오지 못했습니다. ({{v0}})", { v0: response.status }))
+  return (await response.json()) as AnimeRelationsResponse
 }
 
 export async function searchMyAnime(params: {

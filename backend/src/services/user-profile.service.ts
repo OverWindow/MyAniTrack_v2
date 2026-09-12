@@ -176,7 +176,6 @@ async function updateUser(
         INSERT INTO catalog_image_assets (
           entity_type,
           entity_id,
-          anilist_id,
           variant,
           source_url,
           source_hash,
@@ -191,7 +190,7 @@ async function updateUser(
           synced_at
         )
         VALUES (
-          'user_profile', ?, ?, 'profile_image', ?, SHA2(?, 256),
+          'user_profile', ?, 'profile_image', ?, SHA2(?, 256),
           'cloudfront', ?, ?, 's3', ?, ?, ?, 'success', CURRENT_TIMESTAMP
         )
         ON DUPLICATE KEY UPDATE
@@ -208,12 +207,10 @@ async function updateUser(
           status = 'success',
           attempt_count = 0,
           last_error = NULL,
-          job_id = NULL,
           synced_at = CURRENT_TIMESTAMP,
           updated_at = CURRENT_TIMESTAMP
         `,
         [
-          userId,
           userId,
           profileImageUrl,
           profileImageUrl,

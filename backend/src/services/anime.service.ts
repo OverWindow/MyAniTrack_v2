@@ -39,7 +39,7 @@ export type AnimeGenre =
   | 'Mahou Shoujo'
   | 'Hentai';
 
-const SCORE_SORT_SQL = 'COALESCE(a.average_score, -1)';
+const SCORE_SORT_SQL = 'COALESCE(acm.community_average_score, -1)';
 const SEASON_YEAR_SORT_SQL = 'COALESCE(a.season_year, 0)';
 const SEASON_RANK_SQL = `CASE a.season
   WHEN 'WINTER' THEN 1
@@ -55,6 +55,7 @@ interface AnimeListCursorPayload {
   genre?: AnimeGenre | null;
   createdAt?: string;
   score?: number | null;
+  ratingCount?: number | null;
   seasonYear?: number | null;
   seasonRank?: number | null;
   popularity?: number | null;
@@ -72,7 +73,6 @@ export interface AnimeListParams {
 
 interface AnimeListRow extends RowDataPacket {
   id: number;
-  anilistId: number;
   titleRomaji: string | null;
   titleEnglish: string | null;
   titleNative: string | null;
@@ -84,14 +84,13 @@ interface AnimeListRow extends RowDataPacket {
   seasonYear: number | null;
   format: string | null;
   status: string | null;
-  averageScore: number | null;
-  meanScore: number | null;
-  popularity: number | null;
-  favourites: number | null;
+  communityAverageScore: number | null;
+  ratingCount: number;
+  collectionCount: number;
   coverImageLarge: string | null;
   coverImageExtraLarge: string | null;
   bannerImage: string | null;
-  siteUrl: string | null;
+  officialSiteUrl: string | null;
   isAdult: number | boolean;
   createdAt: string;
   scoreSortValue: number | null;
@@ -100,7 +99,6 @@ interface AnimeListRow extends RowDataPacket {
 
 interface AnimeDetailRow extends RowDataPacket {
   id: number;
-  anilistId: number;
   titleRomaji: string | null;
   titleEnglish: string | null;
   titleNative: string | null;
@@ -115,15 +113,13 @@ interface AnimeDetailRow extends RowDataPacket {
   source: string | null;
   countryOfOrigin: string | null;
   isAdult: number | boolean;
-  averageScore: number | null;
-  meanScore: number | null;
-  popularity: number | null;
-  favourites: number | null;
+  communityAverageScore: number | null;
+  ratingCount: number;
+  collectionCount: number;
   coverImageLarge: string | null;
   coverImageExtraLarge: string | null;
   bannerImage: string | null;
-  siteUrl: string | null;
-  sourceUpdatedAt: string | null;
+  officialSiteUrl: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -131,8 +127,7 @@ interface AnimeDetailRow extends RowDataPacket {
 interface AnimeRelationRow extends RowDataPacket {
   sourceAnimeId: number;
   relationType: AnimeRelationType;
-  targetAnilistId: number;
-  targetAnimeId: number | null;
+  targetAnimeId: number;
   titleRomaji: string | null;
   titleEnglish: string | null;
   titleNative: string | null;
@@ -145,13 +140,6 @@ interface AnimeRelationRow extends RowDataPacket {
   coverImageLarge: string | null;
   coverImageExtraLarge: string | null;
   isAdult: number | boolean | null;
-}
-
-interface AnimeRelationSyncStateRow extends RowDataPacket {
-  animeId: number;
-  status: string;
-  lastSyncedAt: string | null;
-  sourceUpdatedAt: string | null;
 }
 
 interface UserAnimeRelationRow extends RowDataPacket {
@@ -182,13 +170,19 @@ interface SynonymRow extends RowDataPacket {
   synonym: string;
 }
 
+interface AnimeStudioRow extends RowDataPacket {
+  id: number;
+  name: string;
+  isMain: number | boolean;
+  officialSiteUrl: string | null;
+}
+
 interface IdRow extends RowDataPacket {
   id: number;
 }
 
 interface AnimeCastRow extends RowDataPacket {
   characterId: number;
-  characterAnilistId: number;
   characterNameFull: string | null;
   characterNameNative: string | null;
   characterNameUserPreferred: string | null;
@@ -197,12 +191,11 @@ interface AnimeCastRow extends RowDataPacket {
   characterGender: string | null;
   characterAge: string | null;
   characterDescription: string | null;
-  characterSiteUrl: string | null;
+  characterOfficialSiteUrl: string | null;
   role: string | null;
   edgeName: string | null;
   characterSortOrder: number | null;
   voiceActorId: number;
-  voiceActorAnilistId: number;
   voiceActorNameFull: string | null;
   voiceActorNameNative: string | null;
   voiceActorNameUserPreferred: string | null;
@@ -210,7 +203,7 @@ interface AnimeCastRow extends RowDataPacket {
   voiceActorImageLarge: string | null;
   voiceActorImageMedium: string | null;
   voiceActorDescription: string | null;
-  voiceActorSiteUrl: string | null;
+  voiceActorOfficialSiteUrl: string | null;
   voiceActorSortOrder: number | null;
 }
 
@@ -269,11 +262,11 @@ function toStoredCharacterRole(role: AnimeCharacterRole) {
 
 function buildListOrderClause(sort: AnimeSortOption): string {
   if (sort === 'score') {
-    return `${SCORE_SORT_SQL} DESC, a.id DESC`;
+    return `${SCORE_SORT_SQL} DESC, COALESCE(acm.rating_count, 0) DESC, a.id DESC`;
   }
 
   if (sort === 'popularity') {
-    return 'COALESCE(a.popularity, -1) DESC, a.id DESC';
+    return 'COALESCE(acm.collection_count, -1) DESC, a.id DESC';
   }
 
   if (sort === 'season') {
@@ -293,11 +286,13 @@ function buildCursorWhereClause(sort: AnimeSortOption, cursor: AnimeListCursorPa
   }
 
   if (sort === 'score') {
-    params.push(cursor.score ?? -1, cursor.score ?? -1, cursor.id);
+    params.push(cursor.score ?? -1, cursor.score ?? -1, cursor.ratingCount ?? 0,
+      cursor.score ?? -1, cursor.ratingCount ?? 0, cursor.id);
     return `
       AND (
         ${SCORE_SORT_SQL} < ?
-        OR (${SCORE_SORT_SQL} = ? AND a.id < ?)
+        OR (${SCORE_SORT_SQL} = ? AND COALESCE(acm.rating_count, 0) < ?)
+        OR (${SCORE_SORT_SQL} = ? AND COALESCE(acm.rating_count, 0) = ? AND a.id < ?)
       )
     `;
   }
@@ -306,8 +301,8 @@ function buildCursorWhereClause(sort: AnimeSortOption, cursor: AnimeListCursorPa
     params.push(cursor.popularity ?? -1, cursor.popularity ?? -1, cursor.id);
     return `
       AND (
-        COALESCE(a.popularity, -1) < ?
-        OR (COALESCE(a.popularity, -1) = ? AND a.id < ?)
+        COALESCE(acm.collection_count, -1) < ?
+        OR (COALESCE(acm.collection_count, -1) = ? AND a.id < ?)
       )
     `;
   }
@@ -439,7 +434,6 @@ export async function getAnimeList(params: AnimeListParams) {
     `
     SELECT
       a.id,
-      a.anilist_id AS anilistId,
       a.title_romaji AS titleRomaji,
       a.title_english AS titleEnglish,
       a.title_native AS titleNative,
@@ -451,19 +445,19 @@ export async function getAnimeList(params: AnimeListParams) {
       a.season_year AS seasonYear,
       a.format,
       a.status,
-      a.average_score AS averageScore,
-      a.mean_score AS meanScore,
-      a.popularity,
-      a.favourites,
+      acm.community_average_score AS communityAverageScore,
+      COALESCE(acm.rating_count, 0) AS ratingCount,
+      COALESCE(acm.collection_count, 0) AS collectionCount,
       a.cover_image_large AS coverImageLarge,
       a.cover_image_extra_large AS coverImageExtraLarge,
       a.banner_image AS bannerImage,
-      a.site_url AS siteUrl,
+      a.official_site_url AS officialSiteUrl,
       a.is_adult AS isAdult,
       a.created_at AS createdAt,
       ${SCORE_SORT_SQL} AS scoreSortValue,
       ${SEASON_RANK_SQL} AS seasonRankValue
     FROM anime a
+    LEFT JOIN anime_community_metrics acm ON acm.anime_id = a.id
     LEFT JOIN anime_korean_titles akt
       ON akt.anime_id = a.id
       AND akt.is_primary = TRUE
@@ -490,9 +484,10 @@ export async function getAnimeList(params: AnimeListParams) {
         genre: params.genre ?? null,
         createdAt: lastItem.createdAt,
         score: lastItem.scoreSortValue,
+        ratingCount: lastItem.ratingCount,
         seasonYear: lastItem.seasonYear,
         seasonRank: lastItem.seasonRankValue,
-        popularity: lastItem.popularity,
+        popularity: lastItem.collectionCount,
         id: lastItem.id,
       })
     : null;
@@ -500,7 +495,6 @@ export async function getAnimeList(params: AnimeListParams) {
   return {
     items: items.map((row) => ({
       id: row.id,
-      anilistId: row.anilistId,
       title: pickDisplayTitle(row, params.titleLanguage, row.titleKorean),
       titles: {
         korean: row.titleKorean,
@@ -515,14 +509,13 @@ export async function getAnimeList(params: AnimeListParams) {
       seasonYear: row.seasonYear,
       format: row.format,
       status: row.status,
-      averageScore: row.averageScore,
-      meanScore: row.meanScore,
-      popularity: row.popularity,
-      favourites: row.favourites,
+      communityAverageScore: row.communityAverageScore === null ? null : Number(row.communityAverageScore),
+      ratingCount: Number(row.ratingCount),
+      collectionCount: Number(row.collectionCount),
       coverImageLarge: row.coverImageLarge,
       coverImageExtraLarge: row.coverImageExtraLarge,
       bannerImage: row.bannerImage,
-      siteUrl: row.siteUrl,
+      officialSiteUrl: row.officialSiteUrl,
       isAdult: normalizeBoolean(row.isAdult),
       createdAt: row.createdAt,
     })),
@@ -593,7 +586,6 @@ export async function getAnimeDetailById(id: number, titleLanguage: AnimeTitleLa
     `
     SELECT
       a.id,
-      a.anilist_id AS anilistId,
       a.title_romaji AS titleRomaji,
       a.title_english AS titleEnglish,
       a.title_native AS titleNative,
@@ -608,18 +600,17 @@ export async function getAnimeDetailById(id: number, titleLanguage: AnimeTitleLa
       a.source,
       a.country_of_origin AS countryOfOrigin,
       a.is_adult AS isAdult,
-      a.average_score AS averageScore,
-      a.mean_score AS meanScore,
-      a.popularity,
-      a.favourites,
+      acm.community_average_score AS communityAverageScore,
+      COALESCE(acm.rating_count, 0) AS ratingCount,
+      COALESCE(acm.collection_count, 0) AS collectionCount,
       a.cover_image_large AS coverImageLarge,
       a.cover_image_extra_large AS coverImageExtraLarge,
       a.banner_image AS bannerImage,
-      a.site_url AS siteUrl,
-      a.source_updated_at AS sourceUpdatedAt,
+      a.official_site_url AS officialSiteUrl,
       a.created_at AS createdAt,
       a.updated_at AS updatedAt
     FROM anime a
+    LEFT JOIN anime_community_metrics acm ON acm.anime_id = a.id
     WHERE a.id = ?
       AND a.is_adult = FALSE
       AND a.app_visible = TRUE
@@ -634,7 +625,7 @@ export async function getAnimeDetailById(id: number, titleLanguage: AnimeTitleLa
     return null;
   }
 
-  const [koreanTitleRows, genreRows, tagRows, synonymRows] = await Promise.all([
+  const [koreanTitleRows, genreRows, tagRows, synonymRows, studioRows] = await Promise.all([
     pool.query<KoreanTitleRow[]>(
       `
       SELECT
@@ -678,6 +669,16 @@ export async function getAnimeDetailById(id: number, titleLanguage: AnimeTitleLa
       `,
       [id]
     ),
+    pool.query<AnimeStudioRow[]>(
+      `
+      SELECT s.id, s.name, ans.is_main AS isMain, s.official_site_url AS officialSiteUrl
+      FROM anime_studios ans
+      JOIN studios s ON s.id = ans.studio_id
+      WHERE ans.anime_id = ?
+      ORDER BY ans.is_main DESC, s.name ASC, s.id ASC
+      `,
+      [id]
+    ),
   ]);
 
   const koreanTitles = koreanTitleRows[0];
@@ -685,7 +686,6 @@ export async function getAnimeDetailById(id: number, titleLanguage: AnimeTitleLa
 
   return {
     id: anime.id,
-    anilistId: anime.anilistId,
     title: pickDisplayTitle(anime, titleLanguage, primaryKoreanTitle),
     titles: {
       korean: koreanTitles.map((row) => ({
@@ -709,15 +709,13 @@ export async function getAnimeDetailById(id: number, titleLanguage: AnimeTitleLa
     source: anime.source,
     countryOfOrigin: anime.countryOfOrigin,
     isAdult: normalizeBoolean(anime.isAdult),
-    averageScore: anime.averageScore,
-    meanScore: anime.meanScore,
-    popularity: anime.popularity,
-    favourites: anime.favourites,
+    communityAverageScore: anime.communityAverageScore === null ? null : Number(anime.communityAverageScore),
+    ratingCount: Number(anime.ratingCount),
+    collectionCount: Number(anime.collectionCount),
     coverImageLarge: anime.coverImageLarge,
     coverImageExtraLarge: anime.coverImageExtraLarge,
     bannerImage: anime.bannerImage,
-    siteUrl: anime.siteUrl,
-    sourceUpdatedAt: anime.sourceUpdatedAt,
+    officialSiteUrl: anime.officialSiteUrl,
     createdAt: anime.createdAt,
     updatedAt: anime.updatedAt,
     genres: genreRows[0].map((row) => row.genre),
@@ -727,6 +725,12 @@ export async function getAnimeDetailById(id: number, titleLanguage: AnimeTitleLa
       isSpoiler: normalizeBoolean(row.isSpoiler),
     })),
     synonyms: synonymRows[0].map((row) => row.synonym),
+    studios: studioRows[0].map((row) => ({
+      id: row.id,
+      name: row.name,
+      isMain: normalizeBoolean(row.isMain),
+      officialSiteUrl: row.officialSiteUrl,
+    })),
   };
 }
 
@@ -757,13 +761,9 @@ function pickRelationTitle(row: AnimeRelationRow, titleLanguage: AnimeTitleLangu
 function mapAnimeRelation(row: AnimeRelationRow, titleLanguage: AnimeTitleLanguage) {
   return {
     relationType: row.relationType,
-    targetAnilistId: row.targetAnilistId,
-    resolved: row.targetAnimeId !== null,
-    anime: row.targetAnimeId === null
-      ? null
-      : {
+    targetAnimeId: row.targetAnimeId,
+    anime: {
         id: row.targetAnimeId,
-        anilistId: row.targetAnilistId,
         title: pickRelationTitle(row, titleLanguage),
         titles: {
           korean: row.titleKorean,
@@ -780,14 +780,6 @@ function mapAnimeRelation(row: AnimeRelationRow, titleLanguage: AnimeTitleLangua
         coverImageExtraLarge: row.coverImageExtraLarge,
         isAdult: Boolean(row.isAdult),
       },
-  };
-}
-
-function mapAnimeRelationSyncState(syncState?: AnimeRelationSyncStateRow) {
-  return {
-    status: syncState?.status ?? 'pending',
-    lastSyncedAt: syncState?.lastSyncedAt ?? null,
-    sourceUpdatedAt: syncState?.sourceUpdatedAt ?? null,
   };
 }
 
@@ -813,8 +805,7 @@ async function findAnimeRelations(
     SELECT
       ar.source_anime_id AS sourceAnimeId,
       ar.relation_type AS relationType,
-      ar.target_anilist_id AS targetAnilistId,
-      target.id AS targetAnimeId,
+      ar.target_anime_id AS targetAnimeId,
       target.title_romaji AS titleRomaji,
       target.title_english AS titleEnglish,
       target.title_native AS titleNative,
@@ -829,7 +820,7 @@ async function findAnimeRelations(
       target.is_adult AS isAdult
     FROM anime_relations ar
     INNER JOIN anime target
-      ON target.anilist_id = ar.target_anilist_id
+      ON target.id = ar.target_anime_id
       AND target.is_adult = FALSE
       AND target.app_visible = TRUE
     LEFT JOIN anime_korean_titles akt
@@ -850,30 +841,9 @@ async function findAnimeRelations(
         ELSE 8
       END,
       target.season_year ASC,
-      ar.target_anilist_id ASC
+      ar.target_anime_id ASC
     `,
     queryParams
-  );
-
-  return rows;
-}
-
-async function findAnimeRelationSyncStates(animeIds: number[]) {
-  if (animeIds.length === 0) {
-    return [];
-  }
-
-  const [rows] = await pool.query<AnimeRelationSyncStateRow[]>(
-    `
-    SELECT
-      anime_id AS animeId,
-      status,
-      last_synced_at AS lastSyncedAt,
-      source_updated_at AS sourceUpdatedAt
-    FROM anime_relation_sync_state
-    WHERE anime_id IN (?)
-    `,
-    [animeIds]
   );
 
   return rows;
@@ -893,17 +863,11 @@ export async function getAnimeRelations(params: {
     throw new Error('Anime not found');
   }
 
-  const [relationRows, syncStateRows] = await Promise.all([
-    findAnimeRelations([params.animeId], params.relationType),
-    findAnimeRelationSyncStates([params.animeId]),
-  ]);
-
-  const syncState = syncStateRows[0];
+  const relationRows = await findAnimeRelations([params.animeId], params.relationType);
 
   return {
     items: relationRows.map((row) => mapAnimeRelation(row, params.titleLanguage)),
     relationType: params.relationType ?? null,
-    sync: mapAnimeRelationSyncState(syncState),
   };
 }
 
@@ -912,14 +876,8 @@ export async function searchAnimeWithRelations(
 ) {
   const result = await getAnimeList(params);
   const animeIds = result.items.map((item) => item.id);
-  const [relationRows, syncStateRows] = await Promise.all([
-    findAnimeRelations(animeIds, params.relationType),
-    findAnimeRelationSyncStates(animeIds),
-  ]);
+  const relationRows = await findAnimeRelations(animeIds, params.relationType);
   const relationsByAnimeId = new Map<number, ReturnType<typeof mapAnimeRelation>[]>();
-  const syncStateByAnimeId = new Map(
-    syncStateRows.map((row) => [row.animeId, row] as const)
-  );
 
   for (const row of relationRows) {
     const relations = relationsByAnimeId.get(row.sourceAnimeId) ?? [];
@@ -931,7 +889,6 @@ export async function searchAnimeWithRelations(
     items: result.items.map((item) => ({
       ...item,
       relations: relationsByAnimeId.get(item.id) ?? [],
-      relationSync: mapAnimeRelationSyncState(syncStateByAnimeId.get(item.id)),
     })),
     pageInfo: result.pageInfo,
     relationType: params.relationType ?? null,
@@ -982,7 +939,6 @@ export async function getAnimeCastByRole(params: {
     `
     SELECT
       c.id AS characterId,
-      c.anilist_id AS characterAnilistId,
       c.name_full AS characterNameFull,
       c.name_native AS characterNameNative,
       c.name_user_preferred AS characterNameUserPreferred,
@@ -991,12 +947,11 @@ export async function getAnimeCastByRole(params: {
       c.gender AS characterGender,
       c.age AS characterAge,
       c.description AS characterDescription,
-      c.site_url AS characterSiteUrl,
+      c.official_site_url AS characterOfficialSiteUrl,
       ac.role,
       ac.edge_name AS edgeName,
       ac.sort_order AS characterSortOrder,
       va.id AS voiceActorId,
-      va.anilist_id AS voiceActorAnilistId,
       va.name_full AS voiceActorNameFull,
       va.name_native AS voiceActorNameNative,
       va.name_user_preferred AS voiceActorNameUserPreferred,
@@ -1004,7 +959,7 @@ export async function getAnimeCastByRole(params: {
       va.image_large AS voiceActorImageLarge,
       va.image_medium AS voiceActorImageMedium,
       va.description AS voiceActorDescription,
-      va.site_url AS voiceActorSiteUrl,
+      va.official_site_url AS voiceActorOfficialSiteUrl,
       acva.sort_order AS voiceActorSortOrder
     FROM anime_characters ac
     INNER JOIN characters c
@@ -1017,8 +972,6 @@ export async function getAnimeCastByRole(params: {
       ON va.id = acva.voice_actor_id
     WHERE ac.anime_id = ?
       AND ac.role = ?
-      AND COALESCE(c.image_large, c.image_medium) IS NOT NULL
-      AND COALESCE(va.image_large, va.image_medium) IS NOT NULL
     ORDER BY
       COALESCE(ac.sort_order, 999999) ASC,
       c.id ASC,
@@ -1031,7 +984,6 @@ export async function getAnimeCastByRole(params: {
 
   const characterMap = new Map<number, {
     id: number;
-    anilistId: number;
     role: string | null;
     requestedRole: AnimeCharacterRole;
     edgeName: string | null;
@@ -1048,10 +1000,9 @@ export async function getAnimeCastByRole(params: {
     gender: string | null;
     age: string | null;
     description: string | null;
-    siteUrl: string | null;
+    officialSiteUrl: string | null;
     voiceActors: Array<{
       id: number;
-      anilistId: number;
       languageV2: string | null;
       sortOrder: number | null;
       name: {
@@ -1064,7 +1015,7 @@ export async function getAnimeCastByRole(params: {
         medium: string | null;
       };
       description: string | null;
-      siteUrl: string | null;
+      officialSiteUrl: string | null;
     }>;
   }>();
 
@@ -1072,7 +1023,6 @@ export async function getAnimeCastByRole(params: {
     const existingCharacter = characterMap.get(row.characterId);
     const character = existingCharacter ?? {
       id: row.characterId,
-      anilistId: row.characterAnilistId,
       role: row.role,
       requestedRole: role,
       edgeName: row.edgeName,
@@ -1089,13 +1039,12 @@ export async function getAnimeCastByRole(params: {
       gender: row.characterGender,
       age: row.characterAge,
       description: row.characterDescription,
-      siteUrl: row.characterSiteUrl,
+      officialSiteUrl: row.characterOfficialSiteUrl,
       voiceActors: [],
     };
 
     character.voiceActors.push({
       id: row.voiceActorId,
-      anilistId: row.voiceActorAnilistId,
       languageV2: row.voiceActorLanguageV2,
       sortOrder: row.voiceActorSortOrder,
       name: {
@@ -1108,7 +1057,7 @@ export async function getAnimeCastByRole(params: {
         medium: row.voiceActorImageMedium,
       },
       description: row.voiceActorDescription,
-      siteUrl: row.voiceActorSiteUrl,
+      officialSiteUrl: row.voiceActorOfficialSiteUrl,
     });
 
     if (!existingCharacter) {
@@ -1121,7 +1070,7 @@ export async function getAnimeCastByRole(params: {
     role,
     storedRole,
     voiceLanguage: voiceLanguage ?? null,
-    requiresImages: true,
+    requiresImages: false,
     items: Array.from(characterMap.values()),
   };
 }

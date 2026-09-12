@@ -592,8 +592,8 @@ export function StudioRankingSection({
       }
 
       return [...animeState.items].sort((left, right) => {
-      const rightPopularity = right.anime.popularity ?? right.anime.averageScore ?? right.userList.score ?? 0
-      const leftPopularity = left.anime.popularity ?? left.anime.averageScore ?? left.userList.score ?? 0
+      const rightPopularity = right.anime.communityAverageScore ?? right.userList.score ?? 0
+      const leftPopularity = left.anime.communityAverageScore ?? left.userList.score ?? 0
 
       return rightPopularity - leftPopularity
       })
@@ -695,9 +695,9 @@ export function StudioRankingSection({
                 <span className="detail-label">Studio works</span>
                 <h3>{selectedStudio?.studio.name ?? tr("스튜디오")}</h3>
               </div>
-              {selectedStudio?.studio.siteUrl && (
-                <a href={selectedStudio.studio.siteUrl} target="_blank" rel="noreferrer">
-                  AniList
+              {selectedStudio?.studio.officialSiteUrl && (
+                <a href={selectedStudio.studio.officialSiteUrl} target="_blank" rel="noreferrer">
+                  {tr('공식 홈페이지')}
                 </a>
               )}
             </div>
