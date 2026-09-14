@@ -301,7 +301,9 @@ export async function fetchPublicUserAnimeStats(userId: string, signal?: AbortSi
   const path = shareToken
     ? `/api/shares/${encodeURIComponent(shareToken)}/anime-stats`
     : `/api/users/${userId}/anime-stats`
-  const response = await authFetch(new URL(path, getApiBaseUrl()).toString(), {
+  const url = new URL(path, getApiBaseUrl())
+  url.searchParams.set('titleLanguage', getTitleLanguage())
+  const response = await authFetch(url.toString(), {
     signal,
   })
 

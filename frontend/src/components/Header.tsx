@@ -3,17 +3,16 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import brandLogo from '../assets/myanitrack-logo.png'
 import { useAuth } from '../contexts/AuthContext'
-import { useAppLanguage } from '../contexts/LanguageContext'
 import { getProfileImageSrc, handleProfileImageError } from '../lib/avatar'
+
+const BRAND_NAME = String.fromCodePoint(0xb9c8, 0xc774, 0xc560, 0xb2c8, 0xd2b8, 0xb799)
 
 export function Header() {
   const { isAuthenticated, isBootstrapping, logout, logoutEverywhere, user } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const { locale, setLocale } = useAppLanguage()
   const displayName = user?.username?.trim() || user?.email?.split('@')[0] || 'MyAniTrack User'
   const isAdmin = user?.isAdmin || user?.role === 'ADMIN'
-  const isAdminRoute = location.pathname.startsWith('/admin')
   const baseNavItems = [
     { label: tr("홈"), to: '/' },
     { label: tr("컬렉션"), to: '/collection' },
@@ -70,7 +69,7 @@ export function Header() {
             <NavLink className="brand" to="/" aria-label={tr("MyAniTrack 홈")}>
               <img className="brand-mark" src={brandLogo} alt="" aria-hidden="true" />
               <span className="brand-text">
-                <span className="brand-title">MyAniTrack</span>
+                <span className="brand-title">{BRAND_NAME}</span>
                 <span className="brand-caption">Track your anime taste</span>
               </span>
             </NavLink>
@@ -112,27 +111,6 @@ export function Header() {
             </nav>
 
             <div className="header-actions">
-              {!isAdminRoute && (
-                <div className="language-switcher" role="group" aria-label={tr("앱 언어")}>
-                  <button
-                    type="button"
-                    className={locale === 'ko' ? 'is-active' : ''}
-                    aria-pressed={locale === 'ko'}
-                    onClick={() => setLocale('ko')}
-                  >
-                    KO
-                  </button>
-                  <button
-                    type="button"
-                    className={locale === 'en' ? 'is-active' : ''}
-                    aria-pressed={locale === 'en'}
-                    onClick={() => setLocale('en')}
-                  >
-                    EN
-                  </button>
-                </div>
-              )}
-
               {isAuthenticated && user ? (
                 <div className="profile-dropdown" ref={profileMenuRef}>
                 <button

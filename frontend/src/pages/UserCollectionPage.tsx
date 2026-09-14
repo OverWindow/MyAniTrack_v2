@@ -7,7 +7,7 @@ import { CollectionViewSwitch } from '../components/CollectionViewSwitch'
 import { ConnectionErrorState } from '../components/ConnectionErrorState'
 import { ErrorToast } from '../components/ErrorToast'
 import { SeriesCollectionGrid, SeriesCollectionSkeleton } from '../components/SeriesCollectionGrid'
-import { genreOptions } from '../lib/anime'
+import { genreOptions, getLocalizedAnimeTitle } from '../lib/anime'
 import { getFriendlyErrorMessage } from '../lib/errors'
 import { fetchPublicUserCollection, fetchPublicUserSeriesCollection } from '../lib/users'
 import type { AnimeGenre } from '../types/anime'
@@ -65,7 +65,7 @@ const createInitialState = (requestKey: string): PublicCollectionState => ({
 })
 
 function getCollectionDisplayTitle(item: UserAnimeListItem) {
-  return item.anime.titles?.korean || item.anime.titles?.english || item.anime.title
+  return getLocalizedAnimeTitle(item.anime)
 }
 
 function getCollectionSearchText(item: UserAnimeListItem) {

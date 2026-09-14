@@ -1,5 +1,6 @@
 import { RowDataPacket } from 'mysql2/promise';
 import { pool } from '../../config/db';
+import { pickAnimeTitle } from '../lib/anime-title';
 import { getUserSeriesStats, UserSeriesStats } from './user-series-stats.service';
 
 type JsonMap = Record<string, number>;
@@ -96,6 +97,15 @@ interface GenreBubbleSourceRow extends RowDataPacket {
   coverImageLarge: string | null;
   genre: string;
   genreCount: number;
+}
+
+interface LocalizedAnimeTitleRow extends RowDataPacket {
+  animeId: number;
+  titleRomaji: string | null;
+  titleEnglish: string | null;
+  titleNative: string | null;
+  titleUserPreferred: string | null;
+  titleKorean: string | null;
 }
 
 export type GenreBubbleWeighting = 'full' | 'fractional';
@@ -203,6 +213,59 @@ function parseTopGenreAnimeList(
   }
 }
 
+async function localizeStatsAnimeTitles(
+  stats: UserAnimeStats,
+  titleLanguage: 'ko' | 'en' | 'ja'
+): Promise<UserAnimeStats> {
+  const animeIds = Array.from(new Set([
+    ...stats.topWatchedGenreTopAnime.map((item) => item.animeId),
+    ...stats.topRatedGenreTopAnime.map((item) => item.animeId),
+  ].filter((animeId) => animeId > 0)));
+
+  if (animeIds.length === 0) {
+    return stats;
+  }
+
+  const placeholders = animeIds.map(() => '?').join(', ');
+  const [rows] = await pool.query<LocalizedAnimeTitleRow[]>(
+    `
+    SELECT
+      a.id AS animeId,
+      a.title_romaji AS titleRomaji,
+      a.title_english AS titleEnglish,
+      a.title_native AS titleNative,
+      a.title_user_preferred AS titleUserPreferred,
+      akt.full_title AS titleKorean
+    FROM anime a
+    LEFT JOIN anime_korean_titles akt
+      ON akt.anime_id = a.id
+      AND akt.is_primary = TRUE
+    WHERE a.id IN (${placeholders})
+    `,
+    animeIds
+  );
+  const titlesByAnimeId = new Map(rows.map((row) => [
+    row.animeId,
+    pickAnimeTitle({
+      korean: row.titleKorean,
+      english: row.titleEnglish,
+      romaji: row.titleRomaji,
+      userPreferred: row.titleUserPreferred,
+      native: row.titleNative,
+    }, titleLanguage),
+  ]));
+  const localizeItems = (items: TopGenreAnimeItem[]) => items.map((item) => ({
+    ...item,
+    title: titlesByAnimeId.get(item.animeId) ?? item.title,
+  }));
+
+  return {
+    ...stats,
+    topWatchedGenreTopAnime: localizeItems(stats.topWatchedGenreTopAnime),
+    topRatedGenreTopAnime: localizeItems(stats.topRatedGenreTopAnime),
+  };
+}
+
 function toReleaseYearKey(seasonYear: number | null) {
   if (!seasonYear) {
     return null;
@@ -253,27 +316,13 @@ function pickDisplayTitle(
   row: RecommendationCandidateRow,
   titleLanguage: 'ko' | 'en' | 'ja'
 ) {
-  if (titleLanguage === 'ko') {
-    return row.titleKorean
-      ?? row.titleEnglish
-      ?? row.titleRomaji
-      ?? row.titleUserPreferred
-      ?? row.titleNative;
-  }
-
-  if (titleLanguage === 'en') {
-    return row.titleEnglish
-      ?? row.titleKorean
-      ?? row.titleRomaji
-      ?? row.titleUserPreferred
-      ?? row.titleNative;
-  }
-
-  return row.titleNative
-    ?? row.titleRomaji
-    ?? row.titleUserPreferred
-    ?? row.titleEnglish
-    ?? row.titleKorean;
+  return pickAnimeTitle({
+    korean: row.titleKorean,
+    english: row.titleEnglish,
+    romaji: row.titleRomaji,
+    userPreferred: row.titleUserPreferred,
+    native: row.titleNative,
+  }, titleLanguage);
 }
 
 function pickStatsTitle(row: Pick<
@@ -649,7 +698,11 @@ export async function recalculateUserAnimeStats(userId: number) {
   return getUserAnimeStats(userId, true);
 }
 
-export async function getUserAnimeStats(userId: number, skipRecalculate = false): Promise<UserAnimeStats> {
+export async function getUserAnimeStats(
+  userId: number,
+  skipRecalculate = false,
+  titleLanguage: 'ko' | 'en' | 'ja' = 'ko'
+): Promise<UserAnimeStats> {
   const [rows] = await pool.query<UserAnimeStatsRow[]>(
     `
     SELECT
@@ -682,7 +735,8 @@ export async function getUserAnimeStats(userId: number, skipRecalculate = false)
   );
 
   if (!rows[0] && !skipRecalculate) {
-    return recalculateUserAnimeStats(userId);
+    const recalculatedStats = await recalculateUserAnimeStats(userId);
+    return localizeStatsAnimeTitles(recalculatedStats, titleLanguage);
   }
 
   if (!rows[0]) {
@@ -712,10 +766,12 @@ export async function getUserAnimeStats(userId: number, skipRecalculate = false)
     };
   }
 
-  return {
+  const stats = {
     ...mapStatsRow(rows[0]),
     seriesStats: await getUserSeriesStats(userId),
   };
+
+  return localizeStatsAnimeTitles(stats, titleLanguage);
 }
 
 function computeRecommendationScore(
@@ -854,30 +910,13 @@ export async function getRecommendedAnime(
 }
 
 function pickGenreBubbleTitle(row: GenreBubbleSourceRow, titleLanguage: 'ko' | 'en' | 'ja') {
-  if (titleLanguage === 'ko') {
-    return row.titleKorean
-      ?? row.titleEnglish
-      ?? row.titleRomaji
-      ?? row.titleUserPreferred
-      ?? row.titleNative
-      ?? 'Unknown title';
-  }
-
-  if (titleLanguage === 'en') {
-    return row.titleEnglish
-      ?? row.titleKorean
-      ?? row.titleRomaji
-      ?? row.titleUserPreferred
-      ?? row.titleNative
-      ?? 'Unknown title';
-  }
-
-  return row.titleNative
-    ?? row.titleRomaji
-    ?? row.titleUserPreferred
-    ?? row.titleEnglish
-    ?? row.titleKorean
-    ?? 'Unknown title';
+  return pickAnimeTitle({
+    korean: row.titleKorean,
+    english: row.titleEnglish,
+    romaji: row.titleRomaji,
+    userPreferred: row.titleUserPreferred,
+    native: row.titleNative,
+  }, titleLanguage) ?? 'Unknown title';
 }
 
 export async function getUserGenreBubbleChart(userId: number, params: GenreBubbleParams) {

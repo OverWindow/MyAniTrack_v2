@@ -1,5 +1,6 @@
 import { ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import { pool } from '../../config/db';
+import { pickAnimeTitle } from '../lib/anime-title';
 import { AnimeGenre } from './anime.service';
 import { recalculateUserAnimeStats } from './recommendation.service';
 import { markUserVoiceActorStatsDirty } from './user-voice-actor-stats.service';
@@ -420,27 +421,13 @@ function encodeCursor(payload: UserAnimeListCursorPayload): string {
 }
 
 function pickDisplayTitle(row: UserAnimeListListRow, titleLanguage: UserAnimeListTitleLanguage) {
-  if (titleLanguage === 'ko') {
-    return row.animeTitleKorean
-      ?? row.animeTitleEnglish
-      ?? row.animeTitleRomaji
-      ?? row.animeTitleUserPreferred
-      ?? row.animeTitleNative;
-  }
-
-  if (titleLanguage === 'en') {
-    return row.animeTitleEnglish
-      ?? row.animeTitleKorean
-      ?? row.animeTitleRomaji
-      ?? row.animeTitleUserPreferred
-      ?? row.animeTitleNative;
-  }
-
-  return row.animeTitleNative
-    ?? row.animeTitleRomaji
-    ?? row.animeTitleUserPreferred
-    ?? row.animeTitleEnglish
-    ?? row.animeTitleKorean;
+  return pickAnimeTitle({
+    korean: row.animeTitleKorean,
+    english: row.animeTitleEnglish,
+    romaji: row.animeTitleRomaji,
+    userPreferred: row.animeTitleUserPreferred,
+    native: row.animeTitleNative,
+  }, titleLanguage);
 }
 
 function buildOrderClause(sort: UserAnimeListSortOption) {

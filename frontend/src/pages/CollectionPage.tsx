@@ -16,7 +16,7 @@ import {
   saveCollectionPageCache,
   saveSeriesCollectionCache,
 } from '../lib/collection'
-import { genreOptions } from '../lib/anime'
+import { genreOptions, getLocalizedAnimeTitle } from '../lib/anime'
 import { getFriendlyErrorMessage } from '../lib/errors'
 import { fetchSampleCollection } from '../lib/sample'
 import type { AnimeGenre } from '../types/anime'
@@ -70,7 +70,7 @@ const createInitialCollectionState = (requestKey: string): CollectionState => ({
 })
 
 function getCollectionDisplayTitle(item: UserAnimeListItem) {
-  return item.anime.titles?.korean || item.anime.titles?.english || item.anime.title
+  return getLocalizedAnimeTitle(item.anime)
 }
 
 function getCollectionSearchText(item: UserAnimeListItem) {

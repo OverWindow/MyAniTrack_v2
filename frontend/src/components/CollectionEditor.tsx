@@ -16,6 +16,7 @@ import type {
   SmartRatingCandidate,
   SmartRatingEstimateResponse,
   SmartRatingRelation,
+  UserAnimeListEntry,
   UserAnimeStatus,
 } from '../types/collection'
 import '../styles/components/CollectionEditor.css'
@@ -36,6 +37,7 @@ type CollectionEditorProps = {
     coverImageLarge: string
     coverImageExtraLarge?: string | null
   }
+  onEntryChange?: (entry: UserAnimeListEntry | null) => void
 }
 
 function getInitialScore(score?: number | string | null) {
@@ -317,7 +319,7 @@ function SmartRatingModal({ animeId, targetAnime, onClose, onApplyScore }: Smart
   )
 }
 
-export function CollectionEditor({ animeId, maxProgress, targetAnime }: CollectionEditorProps) {
+export function CollectionEditor({ animeId, maxProgress, targetAnime, onEntryChange }: CollectionEditorProps) {
   const { isAuthenticated } = useAuth()
   const cached = getCachedCollectionEntry(animeId)
   const totalProgress = maxProgress && maxProgress > 0 ? maxProgress : null
@@ -360,6 +362,7 @@ export function CollectionEditor({ animeId, maxProgress, targetAnime }: Collecti
           setCompletedAt('')
           setNotes('')
           setIsAdded(false)
+          onEntryChange?.(null)
           return
         }
 
@@ -370,6 +373,15 @@ export function CollectionEditor({ animeId, maxProgress, targetAnime }: Collecti
         setCompletedAt(item.completedAt ?? '')
         setNotes(item.notes ?? '')
         setIsAdded(true)
+        onEntryChange?.({
+          animeId: item.animeId,
+          status: item.status,
+          score: item.score,
+          progress: item.progress,
+          startedAt: item.startedAt,
+          completedAt: item.completedAt,
+          notes: item.notes,
+        })
       } catch (error) {
         if (controller.signal.aborted) {
           return
@@ -386,7 +398,7 @@ export function CollectionEditor({ animeId, maxProgress, targetAnime }: Collecti
     void loadEntry()
 
     return () => controller.abort()
-  }, [animeId, defaultCompletedProgress, isAuthenticated])
+  }, [animeId, defaultCompletedProgress, isAuthenticated, onEntryChange])
 
   const payload = {
     status,
@@ -418,25 +430,27 @@ export function CollectionEditor({ animeId, maxProgress, targetAnime }: Collecti
       const nextStatus = isAdded ? status : 'completed'
       const nextProgress = totalProgress ?? progress
 
-      if (isAdded) {
-        await updateCollectionEntry(animeId, {
+      const savedEntry = isAdded
+        ? await updateCollectionEntry(animeId, {
           status: nextStatus,
           score: nextScore,
           ...(nextProgress > 0 || nextStatus === 'completed' ? { progress: nextProgress } : {}),
         })
-      } else {
-        await addToCollection({
+        : await addToCollection({
           animeId,
           status: nextStatus,
           score: nextScore,
           ...(nextProgress > 0 || nextStatus === 'completed' ? { progress: nextProgress } : {}),
         })
+
+      if (!isAdded) {
         setIsAdded(true)
       }
 
       setStatus(nextStatus)
       setScore(nextScore)
       setProgress(nextProgress)
+      onEntryChange?.(savedEntry)
       setFeedback(tr("{{v0}}점으로 저장했어요.", { v0: nextScore.toFixed(1) }))
     } catch (submitError) {
       const message = submitError instanceof Error ? submitError.message : tr("별점을 저장하지 못했어요.")
@@ -464,17 +478,20 @@ export function CollectionEditor({ animeId, maxProgress, targetAnime }: Collecti
     setActionError(null)
 
     try {
-      if (isAdded) {
-        await updateCollectionEntry(animeId, payload)
-        setFeedback(tr("컬렉션 정보를 업데이트했어요."))
-      } else {
-        await addToCollection({
+      const savedEntry = isAdded
+        ? await updateCollectionEntry(animeId, payload)
+        : await addToCollection({
           animeId,
           ...payload,
         })
+
+      if (isAdded) {
+        setFeedback(tr("컬렉션 정보를 업데이트했어요."))
+      } else {
         setIsAdded(true)
         setFeedback(tr("컬렉션에 추가했어요."))
       }
+      onEntryChange?.(savedEntry)
     } catch (submitError) {
       setActionError(
         submitError instanceof Error
@@ -500,6 +517,7 @@ export function CollectionEditor({ animeId, maxProgress, targetAnime }: Collecti
       setStartedAt('')
       setCompletedAt('')
       setNotes('')
+      onEntryChange?.(null)
       setFeedback(tr("컬렉션에서 삭제했어요."))
     } catch (submitError) {
       setActionError(
@@ -531,9 +549,6 @@ export function CollectionEditor({ animeId, maxProgress, targetAnime }: Collecti
     <section className="detail-section collection-panel">
       <span className="detail-label">My collection</span>
       <h3>{isAdded ? tr("내 컬렉션에서 관리 중") : tr("내 컬렉션에 추가")}</h3>
-      <p className="collection-helper">
-        {tr("상태, 진행도, 별점, 메모를 직접 남기고 내 기록을 한눈에 확인할 수 있어요.")}
-      </p>
 
       {isLoadingEntry && <div className="feedback-inline">{tr("내 기록을 불러오는 중이에요.")}</div>}
 

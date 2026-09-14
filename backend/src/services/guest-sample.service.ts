@@ -2,6 +2,7 @@ import {
   UserAnimeListSortOption,
   UserAnimeListTitleLanguage,
 } from './user-anime-list.service';
+import { pickAnimeTitle } from '../lib/anime-title';
 import type { StudioStatsSort } from './user-studio-stats.service';
 
 type SampleStatus = 'planned' | 'watching' | 'completed' | 'paused' | 'dropped';
@@ -314,15 +315,7 @@ const sampleItems: SampleAnimeItem[] = [
 ];
 
 function pickTitle(item: SampleAnimeItem, titleLanguage: UserAnimeListTitleLanguage) {
-  if (titleLanguage === 'ko') {
-    return item.anime.titles.korean || item.anime.title;
-  }
-
-  if (titleLanguage === 'ja') {
-    return item.anime.titles.native || item.anime.title;
-  }
-
-  return item.anime.titles.english || item.anime.title;
+  return pickAnimeTitle(item.anime.titles, titleLanguage) ?? item.anime.title;
 }
 
 function toPublicItem(item: SampleAnimeItem, titleLanguage: UserAnimeListTitleLanguage) {

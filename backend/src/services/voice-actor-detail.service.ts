@@ -1,5 +1,6 @@
 import { RowDataPacket } from 'mysql2/promise';
 import { pool } from '../../config/db';
+import { pickAnimeTitle } from '../lib/anime-title';
 import { AnimeTitleLanguage } from './anime.service';
 
 interface VoiceActorDetailRow extends RowDataPacket {
@@ -86,27 +87,13 @@ function decodeCursor(cursor?: string) {
 }
 
 function pickTitle(row: VoiceActorCreditRow, titleLanguage: AnimeTitleLanguage) {
-  if (titleLanguage === 'ko') {
-    return row.titleKorean
-      ?? row.titleEnglish
-      ?? row.titleRomaji
-      ?? row.titleUserPreferred
-      ?? row.titleNative;
-  }
-
-  if (titleLanguage === 'en') {
-    return row.titleEnglish
-      ?? row.titleKorean
-      ?? row.titleRomaji
-      ?? row.titleUserPreferred
-      ?? row.titleNative;
-  }
-
-  return row.titleNative
-    ?? row.titleRomaji
-    ?? row.titleUserPreferred
-    ?? row.titleEnglish
-    ?? row.titleKorean;
+  return pickAnimeTitle({
+    korean: row.titleKorean,
+    english: row.titleEnglish,
+    romaji: row.titleRomaji,
+    userPreferred: row.titleUserPreferred,
+    native: row.titleNative,
+  }, titleLanguage);
 }
 
 export function validateVoiceActorDetailId(value: unknown) {

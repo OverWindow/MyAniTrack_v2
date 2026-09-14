@@ -1,5 +1,6 @@
 import { RowDataPacket } from 'mysql2/promise';
 import { pool } from '../../config/db';
+import { pickAnimeTitle } from '../lib/anime-title';
 import { UserAnimeListTitleLanguage } from './user-anime-list.service';
 
 type SmartRatingRelation = 'better' | 'similar' | 'worse';
@@ -43,27 +44,13 @@ function getScoreKey(score: number) {
 }
 
 function pickDisplayTitle(row: SmartRatingAnimeRow, titleLanguage: UserAnimeListTitleLanguage) {
-  if (titleLanguage === 'ko') {
-    return row.titleKorean
-      ?? row.titleEnglish
-      ?? row.titleRomaji
-      ?? row.titleUserPreferred
-      ?? row.titleNative;
-  }
-
-  if (titleLanguage === 'en') {
-    return row.titleEnglish
-      ?? row.titleKorean
-      ?? row.titleRomaji
-      ?? row.titleUserPreferred
-      ?? row.titleNative;
-  }
-
-  return row.titleNative
-    ?? row.titleRomaji
-    ?? row.titleUserPreferred
-    ?? row.titleEnglish
-    ?? row.titleKorean;
+  return pickAnimeTitle({
+    korean: row.titleKorean,
+    english: row.titleEnglish,
+    romaji: row.titleRomaji,
+    userPreferred: row.titleUserPreferred,
+    native: row.titleNative,
+  }, titleLanguage);
 }
 
 function mapCandidate(row: SmartRatingAnimeRow, titleLanguage: UserAnimeListTitleLanguage) {

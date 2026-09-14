@@ -169,7 +169,9 @@ export function normalizeStatsItem(payload: unknown) {
 }
 
 export async function fetchMyAnimeStats(signal?: AbortSignal) {
-  const response = await authFetch(new URL('/api/me/anime-stats', getApiBaseUrl()).toString(), {
+  const url = new URL('/api/me/anime-stats', getApiBaseUrl())
+  url.searchParams.set('titleLanguage', getTitleLanguage())
+  const response = await authFetch(url.toString(), {
     signal,
   })
 
@@ -212,8 +214,10 @@ export async function fetchViewingDnaStats(params: {
 }
 
 export async function recalculateMyAnimeStats() {
+  const url = new URL('/api/me/anime-stats/recalculate', getApiBaseUrl())
+  url.searchParams.set('titleLanguage', getTitleLanguage())
   const response = await authFetch(
-    new URL('/api/me/anime-stats/recalculate', getApiBaseUrl()).toString(),
+    url.toString(),
     {
       method: 'POST',
       headers: {

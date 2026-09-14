@@ -193,7 +193,11 @@ async function sendAnalysis(req: Request, res: Response, loader: (userId: number
   } catch (error) { return sendError(res, error); }
 }
 
-export const getSharedAnimeStatsController = (req: Request, res: Response) => sendAnalysis(req, res, (userId) => getUserAnimeStats(userId));
+export const getSharedAnimeStatsController = (req: Request, res: Response) => sendAnalysis(
+  req,
+  res,
+  (userId) => getUserAnimeStats(userId, false, parseTitleLanguage(req.query.titleLanguage))
+);
 export const getSharedViewingDnaController = (req: Request, res: Response) => sendAnalysis(req, res, getUserViewingDna);
 export const getSharedGenreBubbleController = (req: Request, res: Response) => sendAnalysis(req, res, (userId) => getUserGenreBubbleChart(userId, {
   titleLanguage: parseTitleLanguage(req.query.titleLanguage),

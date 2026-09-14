@@ -142,7 +142,11 @@ export async function getMyAnimeStats(req: Request, res: Response) {
       return;
     }
 
-    const stats = await getUserAnimeStats(authUser.userId);
+    const stats = await getUserAnimeStats(
+      authUser.userId,
+      false,
+      parseTitleLanguage(req.query.titleLanguage)
+    );
 
     return res.json({
       success: true,
@@ -157,7 +161,11 @@ export async function getUserStats(req: Request, res: Response) {
   try {
     const userId = parseUserId(req.params.userId);
     const user = await getPublicUserProfile(userId);
-    const stats = await getUserAnimeStats(userId);
+    const stats = await getUserAnimeStats(
+      userId,
+      false,
+      parseTitleLanguage(req.query.titleLanguage)
+    );
 
     return res.json({
       success: true,
@@ -261,7 +269,12 @@ export async function recalculateMyAnimeStats(req: Request, res: Response) {
       return;
     }
 
-    const stats = await recalculateUserAnimeStats(authUser.userId);
+    await recalculateUserAnimeStats(authUser.userId);
+    const stats = await getUserAnimeStats(
+      authUser.userId,
+      true,
+      parseTitleLanguage(req.query.titleLanguage)
+    );
 
     return res.json({
       success: true,

@@ -1,5 +1,6 @@
 import { RowDataPacket } from 'mysql2/promise';
 import { pool } from '../../config/db';
+import { pickAnimeTitle } from '../lib/anime-title';
 import { AnimeGenre, AnimeSortOption, AnimeTitleLanguage } from './anime.service';
 
 export type AnimeSeriesScope = 'mainline' | 'franchise';
@@ -94,15 +95,13 @@ function pickTitle(row: {
   titleUserPreferred: string | null;
   titleKorean: string | null;
 }, language: AnimeTitleLanguage) {
-  if (language === 'ko') {
-    return row.titleKorean ?? row.titleEnglish ?? row.titleRomaji ?? row.titleUserPreferred ?? row.titleNative;
-  }
-
-  if (language === 'en') {
-    return row.titleEnglish ?? row.titleRomaji ?? row.titleUserPreferred ?? row.titleKorean ?? row.titleNative;
-  }
-
-  return row.titleNative ?? row.titleRomaji ?? row.titleUserPreferred ?? row.titleEnglish ?? row.titleKorean;
+  return pickAnimeTitle({
+    korean: row.titleKorean,
+    english: row.titleEnglish,
+    romaji: row.titleRomaji,
+    userPreferred: row.titleUserPreferred,
+    native: row.titleNative,
+  }, language);
 }
 
 function encodeCursor(payload: SeriesCursorPayload) {

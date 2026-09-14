@@ -1,5 +1,6 @@
 import { pool } from '../../config/db';
 import { RowDataPacket } from 'mysql2/promise';
+import { pickAnimeTitle } from '../lib/anime-title';
 
 export type AnimeSortOption = 'latest' | 'score' | 'season' | 'popularity';
 export type AnimeTitleLanguage = 'ko' | 'en' | 'ja';
@@ -229,27 +230,13 @@ function normalizeBoolean(value: number | boolean): boolean {
 }
 
 function pickDisplayTitle(row: AnimeListRow | AnimeDetailRow, titleLanguage: AnimeTitleLanguage, koreanTitle?: string | null) {
-  if (titleLanguage === 'ko') {
-    return koreanTitle
-      ?? row.titleEnglish
-      ?? row.titleRomaji
-      ?? row.titleUserPreferred
-      ?? row.titleNative;
-  }
-
-  if (titleLanguage === 'en') {
-    return row.titleEnglish
-      ?? koreanTitle
-      ?? row.titleRomaji
-      ?? row.titleUserPreferred
-      ?? row.titleNative;
-  }
-
-  return row.titleNative
-    ?? row.titleRomaji
-    ?? row.titleUserPreferred
-    ?? row.titleEnglish
-    ?? koreanTitle;
+  return pickAnimeTitle({
+    korean: koreanTitle,
+    english: row.titleEnglish,
+    romaji: row.titleRomaji,
+    userPreferred: row.titleUserPreferred,
+    native: row.titleNative,
+  }, titleLanguage);
 }
 
 function toStoredCharacterRole(role: AnimeCharacterRole) {
@@ -735,27 +722,13 @@ export async function getAnimeDetailById(id: number, titleLanguage: AnimeTitleLa
 }
 
 function pickRelationTitle(row: AnimeRelationRow, titleLanguage: AnimeTitleLanguage) {
-  if (titleLanguage === 'ko') {
-    return row.titleKorean
-      ?? row.titleEnglish
-      ?? row.titleRomaji
-      ?? row.titleUserPreferred
-      ?? row.titleNative;
-  }
-
-  if (titleLanguage === 'en') {
-    return row.titleEnglish
-      ?? row.titleKorean
-      ?? row.titleRomaji
-      ?? row.titleUserPreferred
-      ?? row.titleNative;
-  }
-
-  return row.titleNative
-    ?? row.titleRomaji
-    ?? row.titleUserPreferred
-    ?? row.titleEnglish
-    ?? row.titleKorean;
+  return pickAnimeTitle({
+    korean: row.titleKorean,
+    english: row.titleEnglish,
+    romaji: row.titleRomaji,
+    userPreferred: row.titleUserPreferred,
+    native: row.titleNative,
+  }, titleLanguage);
 }
 
 function mapAnimeRelation(row: AnimeRelationRow, titleLanguage: AnimeTitleLanguage) {

@@ -70,8 +70,50 @@ function getApiBaseUrl() {
   return baseUrl
 }
 
+type LocalizedAnimeTitleSource = {
+  title?: string | null
+  titles?: {
+    korean?: string | null
+    english?: string | null
+    native?: string | null
+    romaji?: string | null
+    userPreferred?: string | null
+  }
+}
+
+function firstNonEmptyTitle(values: Array<string | null | undefined>) {
+  return values.find((value) => value?.trim())?.trim() ?? tr("제목 없음")
+}
+
+export function getLocalizedAnimeTitle(
+  item: LocalizedAnimeTitleSource,
+  language = getTitleLanguage(),
+) {
+  const titles = item.titles
+
+  if (language === 'en') {
+    return firstNonEmptyTitle([
+      titles?.english,
+      titles?.romaji,
+      titles?.userPreferred,
+      titles?.native,
+      titles?.korean,
+      item.title,
+    ])
+  }
+
+  return firstNonEmptyTitle([
+    titles?.korean,
+    item.title,
+    titles?.english,
+    titles?.romaji,
+    titles?.userPreferred,
+    titles?.native,
+  ])
+}
+
 export function getDisplayTitle(item: AnimeListItem | PopularAnimeItem) {
-  return item.titles?.korean || item.titles?.english || item.title
+  return getLocalizedAnimeTitle(item)
 }
 
 export function getSearchableTitle(item: AnimeListItem) {
@@ -89,7 +131,13 @@ export function getSearchableTitle(item: AnimeListItem) {
 }
 
 export function getDetailMetaTitle(item: AnimeDetailItem) {
-  return item.titles.korean?.find((title) => title.isPrimary)?.fullTitle || item.title
+  return item.title
+    || item.titles.english
+    || item.titles.romaji
+    || item.titles.userPreferred
+    || item.titles.native
+    || item.titles.korean?.find((title) => title.isPrimary)?.fullTitle
+    || tr("제목 없음")
 }
 
 export function getPrimaryPoster(item: { coverImageExtraLarge?: string | null; coverImageLarge: string }) {

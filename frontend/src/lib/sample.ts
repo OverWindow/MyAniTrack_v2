@@ -10,6 +10,7 @@ import type {
   StudioRankingResponse,
   YearlyScoreStats,
 } from '../types/stats'
+import { getLocalizedAnimeTitle } from './anime'
 import { normalizeStatsItem } from './stats'
 
 function getApiBaseUrl() {
@@ -85,7 +86,7 @@ function createSampleCoverDataUri(title: string) {
 }
 
 function withSampleCover(item: UserAnimeListItem): UserAnimeListItem {
-  const title = item.anime.titles?.korean || item.anime.titles?.english || item.anime.title
+  const title = getLocalizedAnimeTitle(item.anime)
   const coverImage = item.anime.coverImageExtraLarge || item.anime.coverImageLarge || createSampleCoverDataUri(title)
 
   return {
@@ -214,7 +215,7 @@ export async function fetchSampleStudioRanking(params: {
 }
 
 export function createSampleAnimeDetail(item: UserAnimeListItem): AnimeDetailItem {
-  const title = item.anime.titles?.korean || item.anime.titles?.english || item.anime.title
+  const title = getLocalizedAnimeTitle(item.anime)
 
   return {
     id: item.anime.id,

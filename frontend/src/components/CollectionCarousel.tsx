@@ -7,6 +7,7 @@ import { Link } from 'react-router-dom'
 import type { Location } from 'react-router-dom'
 import { ConnectionErrorState } from './ConnectionErrorState'
 import { SERVER_CONNECTION_ERROR_MESSAGE } from '../lib/errors'
+import { getLocalizedAnimeTitle } from '../lib/anime'
 import type { UserAnimeListItem } from '../types/collection'
 
 type CollectionCarouselState = {
@@ -24,7 +25,7 @@ type CollectionCarouselProps = {
 }
 
 function getDisplayTitle(item: UserAnimeListItem) {
-  return item.anime.titles?.korean || item.anime.titles?.english || item.anime.title
+  return getLocalizedAnimeTitle(item.anime)
 }
 
 function getCoverImageSrc(item: UserAnimeListItem) {

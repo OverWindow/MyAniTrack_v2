@@ -22,6 +22,7 @@ import {
   setAnalysisCache,
 } from '../lib/analysisCache'
 import { getProfileImageSrc, handleProfileImageError } from '../lib/avatar'
+import { getLocalizedAnimeTitle } from '../lib/anime'
 import { fetchMyCollection } from '../lib/collection'
 import { getFriendlyErrorMessage } from '../lib/errors'
 import {
@@ -218,7 +219,7 @@ function getStarFillPercent(score: number, starIndex: number) {
 }
 
 function getStudioAnimeTitle(item: StudioAnimeItem) {
-  return item.anime.titles.korean || item.anime.titles.english || item.anime.title || item.anime.titles.romaji || tr("제목 없음")
+  return getLocalizedAnimeTitle(item.anime)
 }
 
 function formatStudioWatchTime(hours?: number | null, minutes?: number | null) {
