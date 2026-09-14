@@ -1,12 +1,29 @@
+import { getLocaleTag } from '../i18n'
+import { tr } from '../i18n'
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { AnalysisAnimeToast } from '../components/AnalysisAnimeToast'
+import { ConnectionErrorState } from '../components/ConnectionErrorState'
+import { ErrorToast } from '../components/ErrorToast'
+import { ReleaseDecadeProgress } from '../components/ReleaseDecadeProgress'
 import { VoiceActorRankingSection } from '../components/VoiceActorRankingSection'
+import { ViewingDnaCard } from '../components/ViewingDnaCard'
+import { StudioRankingSection, WatchTimeComparisonTicker } from './AnalysisPage'
 import { getProfileImageSrc, handleProfileImageError } from '../lib/avatar'
-import { formatUpdatedAt, formatWatchHours, getGenreLabel } from '../lib/stats'
+import { getFriendlyErrorMessage } from '../lib/errors'
+import {
+  fetchFormatDistributionStats,
+  fetchGenreBubbleStats,
+  fetchViewingDnaStats,
+  fetchYearlyScoreStats,
+  formatUpdatedAt,
+  formatWatchHours,
+  getGenreLabel,
+} from '../lib/stats'
 import { fetchPublicUserAnimeStats, fetchPublicUserCollection } from '../lib/users'
 import type { AnimeGenre } from '../types/anime'
 import type { UserAnimeListItem } from '../types/collection'
-import type { AnimeStatsItem } from '../types/stats'
+import type { AnimeStatsItem, FormatDistributionStats, GenreBubbleResponse, ViewingDnaItem, YearlyScoreStats } from '../types/stats'
 import type { PublicUserProfile } from '../types/users'
 import '../styles/pages/AnalysisPage.css'
 import '../styles/pages/UserAnalysisPage.css'
@@ -40,14 +57,15 @@ type PieDatum = {
   key: string
   label: string
   value: number
+  count?: number
 }
 
 type AnalysisTab = 'genre' | 'year' | 'score'
 
 const analysisTabs: Array<{ value: AnalysisTab; label: string }> = [
-  { value: 'genre', label: '장르별 분석' },
-  { value: 'year', label: '연도별 분석' },
-  { value: 'score', label: '평점별 분석' },
+  { value: 'genre', label: tr("장르별 분석") },
+  { value: 'year', label: tr("연도별 분석") },
+  { value: 'score', label: tr("평점별 분석") },
 ]
 
 const GenreDistributionPieChart = lazy(async () => {
@@ -65,6 +83,18 @@ const ReleaseYearBarChart = lazy(async () => {
 const ScoreDistributionBarChart = lazy(async () => {
   const module = await import('../components/AnalysisCharts')
   return { default: module.ScoreDistributionBarChart }
+})
+const YearlyScoreLineChart = lazy(async () => {
+  const module = await import('../components/AnalysisCharts')
+  return { default: module.YearlyScoreLineChart }
+})
+const GenrePreferenceBubbleChart = lazy(async () => {
+  const module = await import('../components/AnalysisCharts')
+  return { default: module.GenrePreferenceBubbleChart }
+})
+const FormatDistributionPieChart = lazy(async () => {
+  const module = await import('../components/AnalysisCharts')
+  return { default: module.FormatDistributionPieChart }
 })
 
 function getTopEntries(record: Record<string, number>, limit = 8) {
@@ -90,7 +120,16 @@ function toFiniteNumber(value: unknown) {
   return null
 }
 
-function renderEmptyMessage(message: string) {
+function renderEmptyMessage(message: string, isError = false) {
+  if (isError) {
+    return (
+      <>
+        <ErrorToast message={message} />
+        <div className="analysis-empty-state">{tr("지금은 이 분석을 표시할 수 없어요.")}</div>
+      </>
+    )
+  }
+
   return <div className="analysis-empty-state">{message}</div>
 }
 
@@ -104,60 +143,13 @@ function getStarFillPercent(score: number, starIndex: number) {
   return `${fill * 100}%`
 }
 
-function FilteredAnimeList({
-  selectedValue,
-  items,
-  isLoading,
-  error,
-  emptyTitle,
-  emptyDescription,
-  selectedTitle,
-  selectedDescription,
-}: FilteredAnimeState & {
-  emptyTitle: string
-  emptyDescription: string
-  selectedTitle: string
-  selectedDescription: string
-}) {
-  return (
-    <section className="analysis-panel analysis-genre-anime-panel">
-      <div className="analysis-panel-heading">
-        <span className="detail-label">Selection detail</span>
-        <h2>{selectedValue ? selectedTitle : emptyTitle}</h2>
-        <p>{selectedValue ? selectedDescription : emptyDescription}</p>
-      </div>
-
-      {isLoading && <div className="analysis-empty-state">작품을 불러오는 중이에요.</div>}
-      {error && !isLoading && <div className="analysis-empty-state">{error}</div>}
-      {!isLoading && !error && selectedValue && items.length === 0 && (
-        <div className="analysis-empty-state">표시할 작품이 없어요.</div>
-      )}
-      {!isLoading && !error && items.length > 0 && (
-        <div className="analysis-year-anime-list">
-          {items.map((entry) => (
-            <Link className="analysis-year-anime-card" key={entry.id} to={`/anime/${entry.anime.id}`}>
-              <img
-                src={entry.anime.coverImageExtraLarge || entry.anime.coverImageLarge}
-                alt={entry.anime.title}
-                loading="lazy"
-              />
-              <div className="analysis-year-anime-copy">
-                <strong>{entry.anime.title}</strong>
-                <span>
-                  {entry.anime.seasonYear ?? '연도 정보 없음'}
-                  {entry.score !== null && entry.score !== undefined ? ` · ${Number(entry.score).toFixed(1)}점` : ''}
-                </span>
-              </div>
-            </Link>
-          ))}
-        </div>
-      )}
-    </section>
-  )
+function formatAnalysisScore(value?: number | null) {
+  return typeof value === 'number' && Number.isFinite(value) ? value.toFixed(2) : '-'
 }
 
-export function UserAnalysisPage() {
-  const { userId } = useParams<{ userId: string }>()
+export function UserAnalysisPage({ shareToken }: { shareToken?: string } = {}) {
+  const { userId: routeUserId } = useParams<{ userId: string }>()
+  const userId = shareToken ? 'shared' : routeUserId
   const [state, setState] = useState<UserAnalysisState>({
     user: null,
     item: null,
@@ -183,6 +175,42 @@ export function UserAnalysisPage() {
     isLoading: false,
     error: null,
   })
+  const [genreBubbleState, setGenreBubbleState] = useState<{
+    item: GenreBubbleResponse['item'] | null
+    isLoading: boolean
+    error: string | null
+  }>({
+    item: null,
+    isLoading: true,
+    error: null,
+  })
+  const [yearlyScoreState, setYearlyScoreState] = useState<{
+    item: YearlyScoreStats | null
+    isLoading: boolean
+    error: string | null
+  }>({
+    item: null,
+    isLoading: true,
+    error: null,
+  })
+  const [formatDistributionState, setFormatDistributionState] = useState<{
+    item: FormatDistributionStats | null
+    isLoading: boolean
+    error: string | null
+  }>({
+    item: null,
+    isLoading: true,
+    error: null,
+  })
+  const [viewingDnaState, setViewingDnaState] = useState<{
+    item: ViewingDnaItem | null
+    isLoading: boolean
+    error: string | null
+  }>({
+    item: null,
+    isLoading: true,
+    error: null,
+  })
 
   useEffect(() => {
     if (!userId) {
@@ -193,7 +221,7 @@ export function UserAnalysisPage() {
 
     const loadStats = async () => {
       try {
-        const data = await fetchPublicUserAnimeStats(userId, controller.signal)
+        const data = await fetchPublicUserAnimeStats(userId, controller.signal, shareToken)
         setState({ user: data.user, item: data.item, isLoading: false, error: null })
       } catch (loadError) {
         if (loadError instanceof DOMException && loadError.name === 'AbortError') {
@@ -204,7 +232,7 @@ export function UserAnalysisPage() {
           user: null,
           item: null,
           isLoading: false,
-          error: loadError instanceof Error ? loadError.message : '분석 정보를 불러오지 못했어요.',
+          error: getFriendlyErrorMessage(loadError, tr("분석 정보를 불러오지 못했어요.")),
         })
       }
     }
@@ -212,7 +240,131 @@ export function UserAnalysisPage() {
     void loadStats()
 
     return () => controller.abort()
-  }, [userId])
+  }, [shareToken, userId])
+
+  useEffect(() => {
+    if (!userId) {
+      return
+    }
+
+    const controller = new AbortController()
+
+    const loadViewingDna = async () => {
+      setViewingDnaState((current) => ({ ...current, isLoading: true, error: null }))
+
+      try {
+        const item = await fetchViewingDnaStats({ userId, shareToken, signal: controller.signal })
+        setViewingDnaState({ item, isLoading: false, error: null })
+      } catch (loadError) {
+        if (loadError instanceof DOMException && loadError.name === 'AbortError') {
+          return
+        }
+
+        setViewingDnaState({
+          item: null,
+          isLoading: false,
+          error: getFriendlyErrorMessage(loadError, tr("감상 DNA 분석을 불러오지 못했어요.")),
+        })
+      }
+    }
+
+    void loadViewingDna()
+
+    return () => controller.abort()
+  }, [shareToken, userId])
+
+  useEffect(() => {
+    if (!userId) {
+      return
+    }
+
+    const controller = new AbortController()
+
+    const loadFormatDistribution = async () => {
+      setFormatDistributionState((current) => ({ ...current, isLoading: true, error: null }))
+
+      try {
+        const item = await fetchFormatDistributionStats({ userId, shareToken, signal: controller.signal })
+        setFormatDistributionState({ item, isLoading: false, error: null })
+      } catch (loadError) {
+        if (loadError instanceof DOMException && loadError.name === 'AbortError') {
+          return
+        }
+
+        setFormatDistributionState({
+          item: null,
+          isLoading: false,
+          error: getFriendlyErrorMessage(loadError, tr("포맷별 분석을 불러오지 못했어요.")),
+        })
+      }
+    }
+
+    void loadFormatDistribution()
+
+    return () => controller.abort()
+  }, [shareToken, userId])
+
+  useEffect(() => {
+    if (!userId) {
+      return
+    }
+
+    const controller = new AbortController()
+
+    const loadYearlyScores = async () => {
+      setYearlyScoreState((current) => ({ ...current, isLoading: true, error: null }))
+
+      try {
+        const item = await fetchYearlyScoreStats({ userId, shareToken, signal: controller.signal })
+        setYearlyScoreState({ item, isLoading: false, error: null })
+      } catch (loadError) {
+        if (loadError instanceof DOMException && loadError.name === 'AbortError') {
+          return
+        }
+
+        setYearlyScoreState({
+          item: null,
+          isLoading: false,
+          error: getFriendlyErrorMessage(loadError, tr("연도별 평점 분석을 불러오지 못했어요.")),
+        })
+      }
+    }
+
+    void loadYearlyScores()
+
+    return () => controller.abort()
+  }, [shareToken, userId])
+
+  useEffect(() => {
+    if (!userId) {
+      return
+    }
+
+    const controller = new AbortController()
+
+    const loadGenreBubble = async () => {
+      setGenreBubbleState((current) => ({ ...current, isLoading: true, error: null }))
+
+      try {
+        const item = await fetchGenreBubbleStats({ userId, shareToken, signal: controller.signal })
+        setGenreBubbleState({ item, isLoading: false, error: null })
+      } catch (loadError) {
+        if (loadError instanceof DOMException && loadError.name === 'AbortError') {
+          return
+        }
+
+        setGenreBubbleState({
+          item: null,
+          isLoading: false,
+          error: getFriendlyErrorMessage(loadError, tr("장르 취향 버블 차트를 불러오지 못했어요.")),
+        })
+      }
+    }
+
+    void loadGenreBubble()
+
+    return () => controller.abort()
+  }, [shareToken, userId])
 
   const genreDistribution = useMemo(
     () => getTopEntries(state.item?.genreDistribution ?? {}),
@@ -235,19 +387,27 @@ export function UserAnalysisPage() {
     [state.item?.scoreDistribution],
   )
   const genreDistributionChartData = useMemo<PieDatum[]>(
-    () => getPieData(genreDistribution).map((entry) => ({ ...entry, label: getGenreLabel(entry.key) })),
+    () => getPieData(genreDistribution).map((entry) => ({
+      ...entry,
+      count: entry.value,
+      label: getGenreLabel(entry.key),
+    })),
     [genreDistribution],
   )
   const genreWatchMinutesChartData = useMemo<PieDatum[]>(
-    () => getPieData(genreWatchMinutes).map((entry) => ({ ...entry, label: getGenreLabel(entry.key) })),
-    [genreWatchMinutes],
+    () => getPieData(genreWatchMinutes).map((entry) => ({
+      ...entry,
+      count: state.item?.genreDistribution[entry.key] ?? 0,
+      label: getGenreLabel(entry.key),
+    })),
+    [genreWatchMinutes, state.item?.genreDistribution],
   )
   const releaseYearChartData = useMemo<ReleaseYearChartDatum[]>(
     () => releaseDistribution.map(([year, count]) => ({ year, count })),
     [releaseDistribution],
   )
   const scoreDistributionChartData = useMemo<ScoreDistributionChartDatum[]>(
-    () => scoreDistribution.map(([score, count]) => ({ score, label: `${score}점대`, count })),
+    () => scoreDistribution.map(([score, count]) => ({ score, label: tr("{{v0}}점대", { v0: score }), count })),
     [scoreDistribution],
   )
 
@@ -261,6 +421,8 @@ export function UserAnalysisPage() {
     try {
       const response = await fetchPublicUserCollection({
         userId,
+        shareToken,
+        shareAnalysis: Boolean(shareToken),
         sort: 'score',
         limit: 50,
         genre: genre as AnimeGenre,
@@ -271,7 +433,7 @@ export function UserAnalysisPage() {
         selectedValue: genre,
         items: [],
         isLoading: false,
-        error: error instanceof Error ? error.message : '해당 장르 작품을 불러오지 못했어요.',
+        error: getFriendlyErrorMessage(error, tr("해당 장르 작품을 불러오지 못했어요.")),
       })
     }
   }
@@ -288,7 +450,7 @@ export function UserAnalysisPage() {
         selectedValue: year,
         items: [],
         isLoading: false,
-        error: '이 항목은 단일 연도가 아니라 기간이라서 작품 목록을 불러올 수 없어요.',
+        error: tr("이 항목은 단일 연도가 아니라 기간이라서 작품 목록을 불러올 수 없어요."),
       })
       return
     }
@@ -298,6 +460,8 @@ export function UserAnalysisPage() {
     try {
       const response = await fetchPublicUserCollection({
         userId,
+        shareToken,
+        shareAnalysis: Boolean(shareToken),
         sort: 'score',
         limit: 50,
         year: normalizedYear,
@@ -308,7 +472,7 @@ export function UserAnalysisPage() {
         selectedValue: year,
         items: [],
         isLoading: false,
-        error: error instanceof Error ? error.message : '해당 연도 작품을 불러오지 못했어요.',
+        error: getFriendlyErrorMessage(error, tr("해당 연도 작품을 불러오지 못했어요.")),
       })
     }
   }
@@ -325,7 +489,7 @@ export function UserAnalysisPage() {
         selectedValue: score,
         items: [],
         isLoading: false,
-        error: '선택한 평점 형식이 올바르지 않아요.',
+        error: tr("선택한 평점 형식이 올바르지 않아요."),
       })
       return
     }
@@ -335,6 +499,8 @@ export function UserAnalysisPage() {
     try {
       const response = await fetchPublicUserCollection({
         userId,
+        shareToken,
+        shareAnalysis: Boolean(shareToken),
         sort: 'score',
         limit: 50,
         score: normalizedScore,
@@ -345,7 +511,7 @@ export function UserAnalysisPage() {
         selectedValue: score,
         items: [],
         isLoading: false,
-        error: error instanceof Error ? error.message : '해당 평점 작품을 불러오지 못했어요.',
+        error: getFriendlyErrorMessage(error, tr("해당 평점 작품을 불러오지 못했어요.")),
       })
     }
   }
@@ -353,7 +519,8 @@ export function UserAnalysisPage() {
   if (!userId) {
     return (
       <section className="analysis-page">
-        <div className="feedback-card is-error">잘못된 사용자 경로예요.</div>
+        <ErrorToast message={tr("잘못된 사용자 경로예요.")} />
+        <div className="feedback-card">{tr("요청한 분석 화면을 열 수 없어요.")}</div>
       </section>
     )
   }
@@ -376,7 +543,7 @@ export function UserAnalysisPage() {
   if (state.error || !state.item || !state.user) {
     return (
       <section className="analysis-page">
-        <div className="feedback-card is-error">{state.error ?? '분석 정보를 찾을 수 없어요.'}</div>
+        <ConnectionErrorState message={state.error ?? tr("분석 정보를 찾을 수 없어요.")} />
       </section>
     )
   }
@@ -388,9 +555,13 @@ export function UserAnalysisPage() {
 
   return (
     <section className="analysis-page user-analysis-page">
-      <Link className="detail-back-link" to={`/users/${userId}/profile`}>
-        프로필로 돌아가기
-      </Link>
+      {shareToken ? (
+        <span className="detail-label">{tr("공유 리포트")}</span>
+      ) : (
+        <Link className="detail-back-link" to={`/users/${userId}/profile`}>
+          {tr("프로필로 돌아가기")}
+        </Link>
+      )}
 
       <div className="analysis-hero-card">
         <div className="analysis-hero-copy">
@@ -408,62 +579,123 @@ export function UserAnalysisPage() {
               </div>
             )}
             <div>
-              <span className="section-kicker">Friend analysis</span>
               <h1>{user.username}</h1>
-              <p>사용자 ID {user.id}</p>
+              <p>{shareToken ? tr("읽기 전용 공유 분석") : tr("사용자 ID {{v0}}", { v0: user.id })}</p>
             </div>
           </div>
           <p className="analysis-profile-note">
-            이 유저의 공개 컬렉션, 평점, 시청 기록을 바탕으로 취향 흐름을 정리했어요.
+            {tr("이 유저의 공개 컬렉션, 평점, 시청 기록을 바탕으로 취향 흐름을 정리했어요.")}
           </p>
-          <span className="analysis-updated-at">마지막 계산 {formatUpdatedAt(item.updatedAt)}</span>
+          <span className="analysis-updated-at">{tr("마지막 계산")} {formatUpdatedAt(item.updatedAt)}</span>
         </div>
 
-        <div className="analysis-hero-actions user-analysis-actions">
-          <Link className="secondary-button" to={`/users/${userId}/anime-list`}>
-            컬렉션 보기
-          </Link>
-        </div>
+        {!shareToken && (
+          <div className="analysis-hero-actions user-analysis-actions">
+            <Link className="secondary-button" to={`/users/${userId}/anime-list`}>
+              {tr("컬렉션 보기")}
+            </Link>
+          </div>
+        )}
       </div>
 
-      <div className="analysis-summary-grid">
-        <article className="analysis-summary-card">
-          <span>선호 장르</span>
-          <strong>{getGenreLabel(item.favoriteGenre)}</strong>
-        </article>
-        <article className="analysis-summary-card">
-          <span>총 작품 수</span>
-          <strong>{item.totalCount.toLocaleString()}편</strong>
-        </article>
-        <article className="analysis-summary-card">
-          <span>평균 점수</span>
-          <strong>{averageScore !== null ? `${averageScore.toFixed(1)} / 10` : '미집계'}</strong>
-        </article>
-        <article className="analysis-summary-card">
-          <span>총 시청 시간</span>
-          <strong>{formatWatchHours(item.totalWatchMinutes)}</strong>
-        </article>
-      </div>
+      <section className="analysis-summary-card">
+        <div className="analysis-summary-grid">
+          <article className="analysis-summary-item">
+            <span>{tr("선호 장르")}</span>
+            <strong>{getGenreLabel(item.favoriteGenre)}</strong>
+          </article>
+          <article className="analysis-summary-item">
+            <span>{tr("총 작품 수")}</span>
+            <strong>{item.totalCount.toLocaleString(getLocaleTag())}{tr("편")}</strong>
+          </article>
+          <article className="analysis-summary-item">
+            <span>{tr("평균 점수")}</span>
+            <strong>{averageScore !== null ? `${averageScore.toFixed(1)} / 10` : tr("미집계")}</strong>
+          </article>
+          <article className="analysis-summary-item">
+            <span>{tr("총 시청 시간")}</span>
+            <strong>{formatWatchHours(item.totalWatchMinutes)}</strong>
+          </article>
+        </div>
+        <WatchTimeComparisonTicker totalWatchMinutes={item.totalWatchMinutes} />
+      </section>
 
       <div className="analysis-panel-grid">
         <section className="analysis-panel analysis-overview-panel">
           <div className="analysis-panel-heading">
             <span className="detail-label">Overview</span>
-            <h2>기본 통계</h2>
+            <h2>{tr("기본 통계")}</h2>
           </div>
           <div className="analysis-facts-grid">
-            <article><span>총 작품 수</span><strong>{item.totalCount.toLocaleString()}</strong></article>
-            <article><span>완주 작품</span><strong>{item.completedCount.toLocaleString()}</strong></article>
-            <article><span>보는 중</span><strong>{item.watchingCount.toLocaleString()}</strong></article>
-            <article><span>중단 작품</span><strong>{item.droppedCount.toLocaleString()}</strong></article>
-            <article><span>총 시청 화수</span><strong>{item.totalWatchedEpisodes.toLocaleString()}화</strong></article>
-            <article><span>선호 시기</span><strong>{item.favoriteReleasePeriod || '정보 없음'}</strong></article>
-            <article><span>평균 방영 연도</span><strong>{averageReleaseYear !== null ? averageReleaseYear.toFixed(1) : '정보 없음'}</strong></article>
+            <article><span>{tr("총 작품 수")}</span><strong>{item.totalCount.toLocaleString(getLocaleTag())}</strong></article>
+            <article><span>{tr("완주 작품")}</span><strong>{item.completedCount.toLocaleString(getLocaleTag())}</strong></article>
+            <article><span>{tr("보는 중")}</span><strong>{item.watchingCount.toLocaleString(getLocaleTag())}</strong></article>
+            <article><span>{tr("중단 작품")}</span><strong>{item.droppedCount.toLocaleString(getLocaleTag())}</strong></article>
+            <article><span>{tr("총 시청 화수")}</span><strong>{item.totalWatchedEpisodes.toLocaleString(getLocaleTag())}{tr("화")}</strong></article>
+            <article><span>{tr("선호 시기")}</span><strong>{item.favoriteReleasePeriod || tr("정보 없음")}</strong></article>
+            <article><span>{tr("평균 방영 연도")}</span><strong>{averageReleaseYear !== null ? averageReleaseYear.toFixed(1) : tr("정보 없음")}</strong></article>
+            <article><span>{tr("본 시리즈")}</span><strong>{(item.seriesStats?.watchedSeriesCount ?? 0).toLocaleString(getLocaleTag())}{tr("개")}</strong></article>
+            <article><span>{tr("완주 시리즈")}</span><strong>{(item.seriesStats?.completedSeriesCount ?? 0).toLocaleString(getLocaleTag())}{tr("개")}</strong></article>
+            <article><span>{tr("시리즈 완주율")}</span><strong>{(item.seriesStats?.seriesCompletionRate ?? 0).toFixed(1)}%</strong></article>
           </div>
         </section>
 
         <div className="analysis-tab-area">
-          <div className="analysis-segmented-control" role="tablist" aria-label="분석 종류 선택">
+          <section className="analysis-panel analysis-format-panel">
+            <div className="analysis-panel-heading">
+              <span className="detail-label">Format distribution</span>
+              <h2>{tr("포맷별 감상 분포")}</h2>
+              <p>{tr("TV, 영화, OVA 같은 포맷별로 감상 비중과 시청 시간을 비교해요.")}</p>
+            </div>
+            {formatDistributionState.isLoading && (
+              <div className="analysis-chart-skeleton" />
+            )}
+            {formatDistributionState.error && !formatDistributionState.isLoading && (
+              renderEmptyMessage(formatDistributionState.error, true)
+            )}
+            {!formatDistributionState.isLoading
+              && !formatDistributionState.error
+              && formatDistributionState.item
+              && formatDistributionState.item.items.length > 0 && (
+                <div className="analysis-format-layout">
+                  <Suspense fallback={<div className="analysis-chart-skeleton" />}>
+                    <FormatDistributionPieChart data={formatDistributionState.item.items} />
+                  </Suspense>
+                  <div className="analysis-format-summary">
+                    <article>
+                      <span>{tr("대표 포맷")}</span>
+                      <strong>{formatDistributionState.item.summary.topFormatLabel ?? tr("정보 없음")}</strong>
+                    </article>
+                    <article>
+                      <span>{tr("포맷 수")}</span>
+                      <strong>{formatDistributionState.item.summary.formatCount.toLocaleString(getLocaleTag())}{tr("개")}</strong>
+                    </article>
+                    <article>
+                      <span>{tr("총 작품 수")}</span>
+                      <strong>{formatDistributionState.item.totalAnimeCount.toLocaleString(getLocaleTag())}{tr("편")}</strong>
+                    </article>
+                    <article>
+                      <span>{tr("총 시청 시간")}</span>
+                      <strong>{formatDistributionState.item.totalWatchHours !== null
+                        ? tr("{{v0}}시간", { v0: formatDistributionState.item.totalWatchHours.toLocaleString(getLocaleTag(), { maximumFractionDigits: 1 }) })
+                        : tr("{{v0}}시간", { v0: Math.round(formatDistributionState.item.totalWatchMinutes / 60).toLocaleString(getLocaleTag()) })}</strong>
+                    </article>
+                  </div>
+                </div>
+              )}
+            {!formatDistributionState.isLoading
+              && !formatDistributionState.error
+              && (!formatDistributionState.item || formatDistributionState.item.items.length === 0)
+              && renderEmptyMessage(tr("아직 포맷별 분석 데이터가 없어요."))}
+          </section>
+
+          <ViewingDnaCard
+            item={viewingDnaState.item}
+            isLoading={viewingDnaState.isLoading}
+            error={viewingDnaState.error}
+          />
+
+          <div className="analysis-segmented-control" role="tablist" aria-label={tr("분석 종류 선택")}>
             {analysisTabs.map((tab) => (
               <button
                 className={activeTab === tab.value ? 'analysis-segment is-active' : 'analysis-segment'}
@@ -479,22 +711,61 @@ export function UserAnalysisPage() {
           </div>
 
           {activeTab === 'genre' && (
-            <div className="analysis-tab-grid" role="tabpanel">
-              <section className="analysis-panel">
+            <div className="analysis-genre-layout" role="tabpanel">
+              <section className="analysis-panel analysis-genre-chart-panel">
+                <div className="analysis-panel-heading">
+                  <span className="detail-label">Genre</span>
+                  <h2>{tr("장르 분포")}</h2>
+                </div>
+                {genreDistributionChartData.length > 0 ? (
+                  <Suspense fallback={<div className="analysis-chart-skeleton" />}>
+                    <GenreDistributionPieChart
+                      data={genreDistributionChartData}
+                      selectedKey={genreAnimeState.selectedValue}
+                      onSelectGenre={(genre) => {
+                        void handleSelectGenre(genre)
+                      }}
+                    />
+                  </Suspense>
+                ) : renderEmptyMessage(tr("아직 장르 분포 데이터가 없어요."))}
+              </section>
+
+              <section className="analysis-panel analysis-genre-chart-panel">
+                <div className="analysis-panel-heading">
+                  <span className="detail-label">Watch time</span>
+                  <h2>{tr("장르별 시청 시간")}</h2>
+                </div>
+                {genreWatchMinutesChartData.length > 0 ? (
+                  <Suspense fallback={<div className="analysis-chart-skeleton" />}>
+                    <GenreWatchMinutesPieChart
+                      data={genreWatchMinutesChartData}
+                      selectedKey={genreAnimeState.selectedValue}
+                      onSelectGenre={(genre) => {
+                        void handleSelectGenre(genre)
+                      }}
+                    />
+                  </Suspense>
+                ) : renderEmptyMessage(tr("아직 장르별 시청 시간 데이터가 없어요."))}
+              </section>
+
+              <section className="analysis-panel analysis-genre-score-panel">
                 <div className="analysis-panel-heading">
                   <span className="detail-label">Genre score</span>
-                  <h2>장르별 평균 점수</h2>
+                  <h2>{tr("장르별 평균 점수")}</h2>
                 </div>
                 <div className="analysis-list">
-                  {genreAvgScore.length > 0 ? genreAvgScore.map(([genre, rawScore]) => {
+                  {genreAvgScore.length > 0 ? genreAvgScore.map(([genre, rawScore], index) => {
                     const normalizedScore = toFiniteNumber(rawScore) ?? 0
+                    const rank = index + 1
+                    const rankClassName = rank <= 3 ? ` is-top-rank is-rank-${rank}` : ''
+                    const genreAnimeCount = item.genreDistribution[genre] ?? 0
 
                     return (
                       <button
                         className={
                           genreAnimeState.selectedValue === genre
-                            ? 'analysis-genre-score-row analysis-genre-score-button is-active'
-                            : 'analysis-genre-score-row analysis-genre-score-button'
+                            ? `analysis-genre-score-row analysis-genre-score-button is-active${rankClassName}`
+                            : `analysis-genre-score-row analysis-genre-score-button${rankClassName}`
                         }
                         key={`score-${genre}`}
                         type="button"
@@ -502,8 +773,10 @@ export function UserAnalysisPage() {
                           void handleSelectGenre(genre)
                         }}
                       >
+                        <span className="analysis-genre-score-rank">{rank}{tr("위")}</span>
                         <div className="analysis-genre-score-copy">
                           <span>{getGenreLabel(genre)}</span>
+                          <small>{genreAnimeCount.toLocaleString(getLocaleTag())}{tr("편")}</small>
                           <div className="analysis-score-stars" aria-hidden="true">
                             {Array.from({ length: 5 }).map((_, index) => (
                               <div className="analysis-score-star-shell" key={`${genre}-${index}`}>
@@ -521,53 +794,10 @@ export function UserAnalysisPage() {
                         <strong>{normalizedScore.toFixed(1)} / 10</strong>
                       </button>
                     )
-                  }) : renderEmptyMessage('아직 장르별 평균 점수 데이터가 없어요.')}
+                  }) : renderEmptyMessage(tr("아직 장르별 평균 점수 데이터가 없어요."))}
                 </div>
               </section>
 
-              <section className="analysis-panel">
-                <div className="analysis-panel-heading">
-                  <span className="detail-label">Genre</span>
-                  <h2>장르 분포</h2>
-                </div>
-                {genreDistributionChartData.length > 0 ? (
-                  <Suspense fallback={<div className="analysis-chart-skeleton" />}>
-                    <GenreDistributionPieChart
-                      data={genreDistributionChartData}
-                      selectedKey={genreAnimeState.selectedValue}
-                      onSelectGenre={(genre) => {
-                        void handleSelectGenre(genre)
-                      }}
-                    />
-                  </Suspense>
-                ) : renderEmptyMessage('아직 장르 분포 데이터가 없어요.')}
-              </section>
-
-              <section className="analysis-panel">
-                <div className="analysis-panel-heading">
-                  <span className="detail-label">Watch time</span>
-                  <h2>장르별 시청 시간</h2>
-                </div>
-                {genreWatchMinutesChartData.length > 0 ? (
-                  <Suspense fallback={<div className="analysis-chart-skeleton" />}>
-                    <GenreWatchMinutesPieChart
-                      data={genreWatchMinutesChartData}
-                      selectedKey={genreAnimeState.selectedValue}
-                      onSelectGenre={(genre) => {
-                        void handleSelectGenre(genre)
-                      }}
-                    />
-                  </Suspense>
-                ) : renderEmptyMessage('아직 장르별 시청 시간 데이터가 없어요.')}
-              </section>
-
-              <FilteredAnimeList
-                {...genreAnimeState}
-                emptyTitle="장르별 감상 작품"
-                emptyDescription="장르 항목을 누르면 해당 장르에 속한 감상 작품이 여기에 표시돼요."
-                selectedTitle={`${getGenreLabel(genreAnimeState.selectedValue)} 감상 작품`}
-                selectedDescription="선택한 장르에 속한 공개 컬렉션 작품들이에요."
-              />
             </div>
           )}
 
@@ -576,28 +806,68 @@ export function UserAnalysisPage() {
               <section className="analysis-panel analysis-panel-wide">
                 <div className="analysis-panel-heading">
                   <span className="detail-label">Release year</span>
-                  <h2>연도별 감상 작품 수</h2>
+                  <h2>{tr("연도별 감상 작품 수")}</h2>
                 </div>
                 {releaseYearChartData.length > 0 ? (
-                  <Suspense fallback={<div className="analysis-chart-skeleton analysis-chart-skeleton-wide" />}>
-                    <ReleaseYearBarChart
-                      data={releaseYearChartData}
-                      selectedYear={yearAnimeState.selectedValue}
-                      onSelectYear={(year) => {
-                        void handleSelectReleaseYear(year)
-                      }}
-                    />
-                  </Suspense>
-                ) : renderEmptyMessage('아직 연도별 감상 데이터가 없어요.')}
+                  <>
+                    <Suspense fallback={<div className="analysis-chart-skeleton analysis-chart-skeleton-wide" />}>
+                      <ReleaseYearBarChart
+                        data={releaseYearChartData}
+                        selectedYear={yearAnimeState.selectedValue}
+                        onSelectYear={(year) => {
+                          void handleSelectReleaseYear(year)
+                        }}
+                      />
+                    </Suspense>
+                    <ReleaseDecadeProgress entries={releaseDistribution} />
+                  </>
+                ) : renderEmptyMessage(tr("아직 연도별 감상 데이터가 없어요."))}
               </section>
 
-              <FilteredAnimeList
-                {...yearAnimeState}
-                emptyTitle="연도별 감상 작품"
-                emptyDescription="그래프의 연도 막대를 누르면 해당 연도에 방영된 감상 작품을 볼 수 있어요."
-                selectedTitle={`${yearAnimeState.selectedValue}년 감상 작품`}
-                selectedDescription="선택한 연도에 방영된 공개 컬렉션 작품들이에요."
-              />
+              <section className="analysis-panel analysis-panel-wide">
+                <div className="analysis-panel-heading">
+                  <span className="detail-label">Year score</span>
+                  <h2>{tr("연도별 평균 평점")}</h2>
+                  <p>{tr("평점이 있는 작품이 3편 이상인 연도만 모아 이 유저의 평균과 커뮤니티 평균을 비교해요.")}</p>
+                </div>
+                {yearlyScoreState.isLoading && <div className="analysis-empty-state">{tr("연도별 평점 분석을 불러오는 중이에요.")}</div>}
+                {yearlyScoreState.error && !yearlyScoreState.isLoading && renderEmptyMessage(yearlyScoreState.error, true)}
+                {!yearlyScoreState.isLoading && !yearlyScoreState.error && yearlyScoreState.item && yearlyScoreState.item.items.length > 0 && (
+                  <>
+                    <div className="analysis-year-score-summary">
+                      <article>
+                        <span>{tr("최고 연도")}</span>
+                        <strong>{yearlyScoreState.item.summary.bestYear ?? '-'}</strong>
+                      </article>
+                      <article>
+                        <span>{tr("최저 연도")}</span>
+                        <strong>{yearlyScoreState.item.summary.worstYear ?? '-'}</strong>
+                      </article>
+                      <article>
+                        <span>{tr("전체 평균")}</span>
+                        <strong>{formatAnalysisScore(yearlyScoreState.item.summary.averageScore)}{tr("점")}</strong>
+                      </article>
+                      <article>
+                        <span>{tr("분석 연도")}</span>
+                        <strong>{yearlyScoreState.item.summary.yearCount.toLocaleString(getLocaleTag())}{tr("개")}</strong>
+                      </article>
+                    </div>
+                    <Suspense fallback={<div className="analysis-chart-skeleton analysis-chart-skeleton-wide" />}>
+                      <YearlyScoreLineChart
+                        data={yearlyScoreState.item.items}
+                        selectedYear={yearAnimeState.selectedValue}
+                        onSelectYear={(year) => {
+                          void handleSelectReleaseYear(year)
+                        }}
+                      />
+                    </Suspense>
+                  </>
+                )}
+                {!yearlyScoreState.isLoading && !yearlyScoreState.error && (!yearlyScoreState.item || yearlyScoreState.item.items.length === 0) && (
+                  <div className="analysis-empty-state">{tr("연도별 평점 분석에 표시할 데이터가 아직 없어요.")}</div>
+                )}
+              </section>
+
             </div>
           )}
 
@@ -606,7 +876,7 @@ export function UserAnalysisPage() {
               <section className="analysis-panel analysis-panel-wide">
                 <div className="analysis-panel-heading">
                   <span className="detail-label">Score distribution</span>
-                  <h2>평점 분포</h2>
+                  <h2>{tr("평점 분포")}</h2>
                 </div>
                 {scoreDistributionChartData.length > 0 ? (
                   <Suspense fallback={<div className="analysis-chart-skeleton analysis-chart-skeleton-wide" />}>
@@ -618,22 +888,99 @@ export function UserAnalysisPage() {
                       }}
                     />
                   </Suspense>
-                ) : renderEmptyMessage('아직 평점 분포 데이터가 없어요.')}
+                ) : renderEmptyMessage(tr("아직 평점 분포 데이터가 없어요."))}
               </section>
 
-              <FilteredAnimeList
-                {...scoreAnimeState}
-                emptyTitle="평점별 감상 작품"
-                emptyDescription="평점 막대를 누르면 해당 평점에 속한 감상 작품이 여기에 표시돼요."
-                selectedTitle={`${scoreAnimeState.selectedValue}점대 감상 작품`}
-                selectedDescription="선택한 평점에 해당하는 공개 컬렉션 작품들이에요."
-              />
             </div>
           )}
         </div>
       </div>
 
-      <VoiceActorRankingSection userId={userId} ownerLabel={user.username} />
+      <AnalysisAnimeToast
+        title={
+          activeTab === 'genre'
+            ? tr("{{v0}} 감상 작품", { v0: getGenreLabel(genreAnimeState.selectedValue) })
+            : activeTab === 'year'
+              ? tr("{{v0}}년 감상 작품", { v0: yearAnimeState.selectedValue })
+              : tr("{{v0}}점대 감상 작품", { v0: scoreAnimeState.selectedValue })
+        }
+        description={tr("선택한 분석 항목에 해당하는 애니예요.")}
+        items={
+          activeTab === 'genre'
+            ? genreAnimeState.items
+            : activeTab === 'year'
+              ? yearAnimeState.items
+              : scoreAnimeState.items
+        }
+        isLoading={
+          activeTab === 'genre'
+            ? genreAnimeState.isLoading
+            : activeTab === 'year'
+              ? yearAnimeState.isLoading
+              : scoreAnimeState.isLoading
+        }
+        error={
+          activeTab === 'genre'
+            ? genreAnimeState.error
+            : activeTab === 'year'
+              ? yearAnimeState.error
+              : scoreAnimeState.error
+        }
+        isOpen={
+          activeTab === 'genre'
+            ? Boolean(genreAnimeState.selectedValue)
+            : activeTab === 'year'
+              ? Boolean(yearAnimeState.selectedValue)
+              : Boolean(scoreAnimeState.selectedValue)
+        }
+        onClose={() => {
+          if (activeTab === 'genre') {
+            setGenreAnimeState({ selectedValue: null, items: [], isLoading: false, error: null })
+          } else if (activeTab === 'year') {
+            setYearAnimeState({ selectedValue: null, items: [], isLoading: false, error: null })
+          } else {
+            setScoreAnimeState({ selectedValue: null, items: [], isLoading: false, error: null })
+          }
+        }}
+      />
+
+      <section className="analysis-panel analysis-bubble-panel">
+        <div className="analysis-panel-heading">
+          <span className="detail-label">Genre preference</span>
+          <h2>{tr("장르 취향 버블 차트")}</h2>
+          <p>{tr("이 유저의 평균과 커뮤니티 평균을 각각의 전체 평균 대비로 정규화해, 취향이 어느 쪽으로 기우는지 볼 수 있어요.")}</p>
+        </div>
+        {genreBubbleState.isLoading && <div className="analysis-empty-state">{tr("장르 취향 차트를 불러오는 중이에요.")}</div>}
+        {genreBubbleState.error && !genreBubbleState.isLoading && renderEmptyMessage(genreBubbleState.error, true)}
+        {!genreBubbleState.isLoading && !genreBubbleState.error && genreBubbleState.item && genreBubbleState.item.items.length > 0 && (
+          <Suspense fallback={<div className="analysis-chart-skeleton analysis-chart-skeleton-wide" />}>
+            <GenrePreferenceBubbleChart
+              data={genreBubbleState.item.items}
+              selectedGenre={genreAnimeState.selectedValue}
+              onSelectGenre={(genre) => {
+                setActiveTab('genre')
+                void handleSelectGenre(genre)
+              }}
+            />
+          </Suspense>
+        )}
+        {!genreBubbleState.isLoading && !genreBubbleState.error && (!genreBubbleState.item || genreBubbleState.item.items.length === 0) && (
+          <div className="analysis-empty-state">{tr("표시할 장르 취향 데이터가 아직 없어요.")}</div>
+        )}
+      </section>
+
+      <StudioRankingSection
+        apiUserId={shareToken ? undefined : userId}
+        shareToken={shareToken}
+        cacheOwnerId={shareToken ? `share:${shareToken}` : `public:${userId}`}
+      />
+
+      <VoiceActorRankingSection
+        userId={shareToken ? undefined : userId}
+        shareToken={shareToken}
+        cacheOwnerId={shareToken ? `share:${shareToken}` : undefined}
+        ownerLabel={user.username}
+      />
     </section>
   )
 }

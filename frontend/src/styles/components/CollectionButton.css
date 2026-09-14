@@ -5,8 +5,8 @@
 }
 
 .collection-mini-button {
-  min-width: 40px;
-  min-height: 40px;
+  min-width: 44px;
+  min-height: 44px;
   padding: 0 12px;
   border-radius: var(--radius-pill);
   border: 1px solid rgba(255, 255, 255, 0.55);

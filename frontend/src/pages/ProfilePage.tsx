@@ -1,9 +1,12 @@
+import { tr } from '../i18n'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { BadgeSection } from '../components/BadgeSection'
+import { ConnectionErrorState } from '../components/ConnectionErrorState'
 import { useAuth } from '../contexts/AuthContext'
 import { getProfileImageSrc, handleProfileImageError } from '../lib/avatar'
 import { fetchMyBadges } from '../lib/badges'
+import { SERVER_CONNECTION_ERROR_MESSAGE, getFriendlyErrorMessage } from '../lib/errors'
 import type { UserBadge } from '../types/badges'
 import '../styles/pages/ProfilePage.css'
 
@@ -57,7 +60,7 @@ export function ProfilePage() {
           earnedCount: 0,
           totalCount: 0,
           isLoading: false,
-          error: error instanceof Error ? error.message : '내 배지를 불러오지 못했어요.',
+          error: getFriendlyErrorMessage(error, tr("내 배지를 불러오지 못했어요.")),
         })
       }
     }
@@ -71,8 +74,7 @@ export function ProfilePage() {
     return (
       <section className="profile-page">
         <div className="feedback-card">
-          프로필은 로그인한 사용자만 볼 수 있어요. <Link to="/login">로그인</Link> 후
-          다시 확인해주세요.
+          {tr("프로필은 로그인한 사용자만 볼 수 있어요.")} <Link to="/login">{tr("로그인")}</Link> {tr("후\n          다시 확인해주세요.")}
         </div>
       </section>
     )
@@ -92,10 +94,9 @@ export function ProfilePage() {
           />
 
           <div className="profile-hero-copy">
-            <span className="section-kicker">My profile</span>
             <h1 className="profile-hero-title">{displayName}</h1>
             <p className="profile-hero-bio">
-              {user.bio || '좋아하는 장르와 감상 스타일을 천천히 채워가는 중이에요.'}
+              {user.bio || tr("좋아하는 장르와 감상 스타일을 천천히 채워가는 중이에요.")}
             </p>
           </div>
         </div>
@@ -106,26 +107,30 @@ export function ProfilePage() {
             type="button"
             onClick={() => navigate('/profile/edit')}
           >
-            프로필 수정
+            {tr("프로필 수정")}
           </button>
           <button
             className="primary-button profile-analysis-button"
             type="button"
             onClick={() => navigate('/analysis')}
           >
-            분석 보기
+            {tr("분석 보기")}
           </button>
         </div>
       </div>
 
-      <BadgeSection
-        badges={badgesState.items.filter((badge) => badge.earned)}
-        isLoading={badgesState.isLoading}
-        error={badgesState.error}
-        newlyEarned={badgesState.newlyEarned}
-        emptyMessage="아직 획득한 배지가 없어요."
-        showProgress
-      />
+      {badgesState.error === SERVER_CONNECTION_ERROR_MESSAGE ? (
+        <ConnectionErrorState message={badgesState.error} />
+      ) : (
+        <BadgeSection
+          badges={badgesState.items.filter((badge) => badge.earned)}
+          isLoading={badgesState.isLoading}
+          error={badgesState.error}
+          newlyEarned={badgesState.newlyEarned}
+          emptyMessage={tr("아직 획득한 배지가 없어요.")}
+          showProgress
+        />
+      )}
     </section>
   )
 }

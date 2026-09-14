@@ -1,3 +1,4 @@
+import { tr } from '../i18n'
 /* eslint-disable react-refresh/only-export-components */
 import {
   createContext,
@@ -9,27 +10,28 @@ import {
 } from 'react'
 import {
   clearStoredSession,
-  consumePendingAgreements,
   createStoredSession,
+  createSupabaseStoredSession,
+  completeSupabaseLogin,
+  deleteMyAccount,
   fetchMe,
   getSessionRefreshDelay,
   getStoredSession,
+  hasSupabaseSession,
   isSessionExpiredError,
   login,
+  logoutSupabaseSession,
   logoutAllDevices,
   logoutCurrentDevice,
   refreshStoredSession,
   saveStoredSession,
-  signup,
-  updateMyAgreements,
+  signInWithGoogle,
   updateProfile,
 } from '../lib/auth'
 import type {
   AuthResponse,
   AuthUser,
   LoginPayload,
-  SignupPayload,
-  SignupResponse,
   UpdateProfilePayload,
 } from '../types/auth'
 
@@ -38,9 +40,11 @@ type AuthContextValue = {
   isAuthenticated: boolean
   isBootstrapping: boolean
   loginWithEmail: (payload: LoginPayload) => Promise<void>
-  signupWithEmail: (payload: SignupPayload) => Promise<SignupResponse>
+  loginWithGoogle: () => Promise<void>
+  completeGoogleLogin: () => Promise<void>
   logout: () => Promise<void>
   logoutEverywhere: () => Promise<void>
+  deleteAccount: () => Promise<void>
   refreshMe: () => Promise<void>
   updateMyProfile: (payload: UpdateProfilePayload) => Promise<void>
 }
@@ -66,14 +70,26 @@ function replaceStoredSessionUser(nextUser: AuthUser | null) {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const initialSession = getStoredSession()
-  const [user, setUser] = useState<AuthUser | null>(() => initialSession?.user ?? null)
-  const [isBootstrapping, setIsBootstrapping] = useState(true)
+  const isAuthCallbackRoute = window.location.pathname === '/auth/callback'
+  const [user, setUser] = useState<AuthUser | null>(() => isAuthCallbackRoute ? null : initialSession?.user ?? null)
+  const [isBootstrapping, setIsBootstrapping] = useState(() => !isAuthCallbackRoute)
 
   useEffect(() => {
+    if (isAuthCallbackRoute) {
+      return
+    }
+
     const session = getStoredSession()
 
     const loadMe = async () => {
       try {
+        if (await hasSupabaseSession()) {
+          const me = await fetchMe()
+          setUser(me)
+          saveStoredSession(createSupabaseStoredSession(me))
+          return
+        }
+
         await refreshStoredSession()
         const me = await fetchMe()
         setUser(me)
@@ -91,7 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     void loadMe()
-  }, [])
+  }, [isAuthCallbackRoute])
 
   useEffect(() => {
     if (!user) {
@@ -99,6 +115,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const session = getStoredSession()
+
+    if (session?.authMode === 'supabase') {
+      return
+    }
+
+    if (!session || session.authMode !== 'legacy') {
+      return
+    }
 
     const timeoutId = window.setTimeout(() => {
       const refreshInBackground = async () => {
@@ -131,23 +155,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         persistSession(response)
         setUser(response.user)
 
-        const pendingAgreements = consumePendingAgreements(response.user.email)
-
-        if (pendingAgreements) {
-          try {
-            await updateMyAgreements(pendingAgreements)
-          } catch {
-            // Ignore agreement sync failures during login; the user can retry later.
-          }
-        }
       },
-      async signupWithEmail(payload) {
-        return signup(payload)
+      async loginWithGoogle() {
+        await signInWithGoogle()
+      },
+      async completeGoogleLogin() {
+        const nextUser = await completeSupabaseLogin()
+        setUser(nextUser)
       },
       async logout() {
         try {
           await logoutCurrentDevice()
         } finally {
+          await logoutSupabaseSession().catch(() => {})
           clearStoredSession()
           setUser(null)
         }
@@ -155,6 +175,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       async logoutEverywhere() {
         try {
           await logoutAllDevices()
+        } finally {
+          await logoutSupabaseSession().catch(() => {})
+          clearStoredSession()
+          setUser(null)
+        }
+      },
+      async deleteAccount() {
+        await deleteMyAccount()
+
+        try {
+          await logoutSupabaseSession().catch(() => {})
         } finally {
           clearStoredSession()
           setUser(null)
@@ -167,8 +198,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         replaceStoredSessionUser(me)
       },
       async updateMyProfile(payload) {
-        if (!user) {
-          throw new Error('로그인 후에 프로필을 수정할 수 있어요.')
+        if (!getStoredSession()?.user) {
+          throw new Error(tr("로그인 후에 프로필을 수정할 수 있어요."))
         }
 
         const updatedUser = await updateProfile(payload)
@@ -186,7 +217,7 @@ export function useAuth() {
   const context = useContext(AuthContext)
 
   if (!context) {
-    throw new Error('useAuth는 AuthProvider 안에서 사용해야 합니다.')
+    throw new Error(tr("useAuth는 AuthProvider 안에서 사용해야 합니다."))
   }
 
   return context

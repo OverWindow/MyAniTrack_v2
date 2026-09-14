@@ -1,254 +1,58 @@
-import { Request, Response } from 'express';
-import { syncAnimePage, syncAllAnime, syncAnimeInChunks, syncSeasonAnime } from '../../sync/anime.sync.service';
-import {
-  getAnimeCastSyncState,
-  syncAnimeCastBatch,
-  syncAnimeCastByAnimeId,
-  syncAnimeCastInChunks,
-} from '../../sync/anime-cast.sync.service';
-import { translateAnimeKoreanTitlesInBatches } from '../../translations/anime.korean-title.service';
+import type { Request, Response } from 'express';
+import { rebuildAnimeSeries, validateAnimeSeriesRebuildScope } from '../services/admin-anime-series.service';
 import { updateAnimeKoreanTitleByAdmin } from '../services/admin-korean-title.service';
+import { getAdminUserById, getAdminUsers } from '../services/admin-user.service';
 
 function sendError(res: Response, error: unknown) {
   const message = error instanceof Error ? error.message : 'Unknown error';
-  const statusCode = getErrorStatus(message);
-
-  if (statusCode === 500) {
-    console.error(error);
-  }
-
-  return res.status(statusCode).json({
-    success: false,
-    message,
-  });
+  const status = message.includes('must be') || message.includes('required') ? 400
+    : message.includes('not found') ? 404
+      : message === 'Admin access required' ? 403
+        : message.includes('already running') ? 409 : 500;
+  if (status === 500) console.error(error);
+  return res.status(status).json({ success: false, message });
 }
 
-function getErrorStatus(message: string) {
-  if (message.includes('must be') || message.includes('required')) {
-    return 400;
-  }
-
-  if (message === 'Anime not found' || message === 'Korean title not found') {
-    return 404;
-  }
-
-  return 500;
+function admin(req: Request) {
+  if (!req.authUser || req.authUser.role !== 'ADMIN') throw new Error('Admin access required');
+  return req.authUser;
 }
 
-function parsePositiveInteger(value: unknown, fieldName: string) {
-  const parsedValue = Number(value);
-
-  if (!Number.isInteger(parsedValue) || parsedValue <= 0) {
-    throw new Error(`${fieldName} must be a positive integer`);
-  }
-
-  return parsedValue;
+function positiveInteger(value: unknown, field: string) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) throw new Error(`${field} must be a positive integer`);
+  return parsed;
 }
 
-export async function syncAnimePageController(req: Request, res: Response) {
+export async function rebuildAnimeSeriesController(req: Request, res: Response) {
   try {
-    const page = Number(req.body.page || 1);
-    const perPage = Number(req.body.perPage || 50);
-
-    const result = await syncAnimePage(page, perPage);
-
-    return res.json({
-      success: true,
-      message: 'Anime page synced successfully',
-      result,
-    });
-  } catch (error) {
-    return sendError(res, error);
-  }
+    admin(req);
+    const result = await rebuildAnimeSeries(validateAnimeSeriesRebuildScope(req.body?.scope));
+    return res.json({ success: true, message: 'Anime series rebuild completed', result });
+  } catch (error) { return sendError(res, error); }
 }
 
-export async function syncAllAnimeController(req: Request, res: Response) {
+export async function getAdminUsersController(req: Request, res: Response) {
   try {
-    const startPage = Number(req.body.startPage || 1);
-    const perPage = Number(req.body.perPage || 50);
-    const maxPages = req.body.maxPages ? Number(req.body.maxPages) : undefined;
-
-    const result = await syncAllAnime(startPage, perPage, maxPages);
-
-    return res.json({
-      success: true,
-      message: 'Anime sync completed',
-      result,
-    });
-  } catch (error) {
-    return sendError(res, error);
-  }
+    admin(req);
+    const result = await getAdminUsers({ page: req.query.page, limit: req.query.limit, search: req.query.search, role: req.query.role });
+    return res.json({ success: true, ...result });
+  } catch (error) { return sendError(res, error); }
 }
 
-export async function syncAnimeInChunksController(req: Request, res: Response) {
+export async function getAdminUserController(req: Request, res: Response) {
   try {
-    const startPage = Number(req.body.startPage || 1);
-    const perPage = Number(req.body.perPage || 50);
-    const pagesPerChunk = Number(req.body.pagesPerChunk || 10);
-    const chunkDelayMs = Number(req.body.chunkDelayMs || 10000);
-    const maxChunks = req.body.maxChunks ? Number(req.body.maxChunks) : undefined;
-
-    const result = await syncAnimeInChunks(
-      startPage,
-      perPage,
-      pagesPerChunk,
-      chunkDelayMs,
-      maxChunks
-    );
-
-    return res.json({
-      success: true,
-      message: 'Anime chunked sync completed',
-      result,
-    });
-  } catch (error) {
-    return sendError(res, error);
-  }
-}
-
-export async function syncSeasonAnimeController(req: Request, res: Response) {
-  try {
-    const season = req.body.season as 'WINTER' | 'SPRING' | 'SUMMER' | 'FALL' | undefined;
-    const seasonYear = req.body.seasonYear ? Number(req.body.seasonYear) : undefined;
-    const startPage = Number(req.body.startPage || 1);
-    const perPage = Number(req.body.perPage || 50);
-    const maxPages = req.body.maxPages ? Number(req.body.maxPages) : undefined;
-
-    const result = await syncSeasonAnime(
-      season,
-      seasonYear,
-      startPage,
-      perPage,
-      maxPages
-    );
-
-    return res.json({
-      success: true,
-      message: 'Season anime sync completed',
-      result,
-    });
-  } catch (error) {
-    return sendError(res, error);
-  }
-}
-
-export async function translateAnimeKoreanTitlesController(req: Request, res: Response) {
-  try {
-    const batchSize = Number(req.body.batchSize || 100);
-    const maxBatches = Number(req.body.maxBatches || 1);
-
-    const result = await translateAnimeKoreanTitlesInBatches(batchSize, maxBatches);
-
-    return res.json({
-      success: true,
-      message: 'Anime Korean title translation completed',
-      result,
-    });
-  } catch (error) {
-    return sendError(res, error);
-  }
+    admin(req);
+    return res.json({ success: true, item: await getAdminUserById(positiveInteger(req.params.userId, 'userId')) });
+  } catch (error) { return sendError(res, error); }
 }
 
 export async function updateAnimeKoreanTitleController(req: Request, res: Response) {
   try {
-    const authUser = req.authUser;
-
-    if (!authUser) {
-      return res.status(401).json({
-        success: false,
-        message: 'Unauthorized',
-      });
-    }
-
-    const animeId = parsePositiveInteger(req.params.animeId, 'animeId');
-    const item = await updateAnimeKoreanTitleByAdmin(authUser.userId, animeId, {
-      title: req.body.title,
-      subtitle: req.body.subtitle,
+    const actor = admin(req);
+    const item = await updateAnimeKoreanTitleByAdmin(actor.userId, positiveInteger(req.params.animeId, 'animeId'), {
+      title: req.body.title, subtitle: req.body.subtitle,
     });
-
-    return res.json({
-      success: true,
-      message: 'Anime Korean title updated and locked',
-      item,
-    });
-  } catch (error) {
-    return sendError(res, error);
-  }
-}
-
-export async function syncAnimeCastController(req: Request, res: Response) {
-  try {
-    const animeId = parsePositiveInteger(req.params.animeId, 'animeId');
-    const result = await syncAnimeCastByAnimeId(animeId, {
-      perPage: req.body.perPage,
-      language: req.body.language,
-    });
-
-    return res.json({
-      success: true,
-      message: 'Anime cast synced successfully',
-      result,
-    });
-  } catch (error) {
-    return sendError(res, error);
-  }
-}
-
-export async function syncAnimeCastBatchController(req: Request, res: Response) {
-  try {
-    const result = await syncAnimeCastBatch({
-      limit: req.body.limit,
-      perPage: req.body.perPage,
-      language: req.body.language,
-      onlyMissing: req.body.onlyMissing,
-      retryFailed: req.body.retryFailed,
-      delayMs: req.body.delayMs,
-    });
-
-    return res.json({
-      success: true,
-      message: 'Anime cast batch sync completed',
-      result,
-    });
-  } catch (error) {
-    return sendError(res, error);
-  }
-}
-
-export async function syncAnimeCastInChunksController(req: Request, res: Response) {
-  try {
-    const result = await syncAnimeCastInChunks({
-      totalLimit: req.body.totalLimit,
-      chunkSize: req.body.chunkSize,
-      maxChunks: req.body.maxChunks,
-      chunkDelayMs: req.body.chunkDelayMs,
-      perPage: req.body.perPage,
-      language: req.body.language,
-      onlyMissing: req.body.onlyMissing,
-      retryFailed: req.body.retryFailed,
-      delayMs: req.body.delayMs,
-    });
-
-    return res.json({
-      success: true,
-      message: 'Anime cast chunked sync completed',
-      result,
-    });
-  } catch (error) {
-    return sendError(res, error);
-  }
-}
-
-export async function getAnimeCastSyncStateController(req: Request, res: Response) {
-  try {
-    const animeId = parsePositiveInteger(req.params.animeId, 'animeId');
-    const item = await getAnimeCastSyncState(animeId);
-
-    return res.json({
-      success: true,
-      item,
-    });
-  } catch (error) {
-    return sendError(res, error);
-  }
+    return res.json({ success: true, message: 'Anime Korean title updated and locked', item });
+  } catch (error) { return sendError(res, error); }
 }

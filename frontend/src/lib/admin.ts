@@ -1,150 +1,84 @@
 import { authFetch } from './auth'
 import type {
-  AdminActionResponse,
-  AdminCastSyncAnimePayload,
-  AdminCastSyncBatchPayload,
-  AdminCastSyncChunkedPayload,
-  AdminCastSyncStatusPayload,
-  AdminSyncAllPayload,
-  AdminSyncChunkedPayload,
-  AdminSyncPagePayload,
-  AdminSyncSeasonPayload,
-  AdminTranslateKoreanTitlesPayload,
-  AdminUpdateKoreanTitlePayload,
-  AdminUpdateKoreanTitleResponse,
-  PlatformStats,
+  AdminSeriesRebuildPayload, AdminSeriesRebuildResponse, AdminUpdateKoreanTitlePayload,
+  AdminOverview, AdminUpdateKoreanTitleResponse, AdminUserDetailResponse, AdminUserListResponse, AdminUserRoleFilter,
+  CatalogChangeSource, CatalogChangeStatus, CatalogDiscoveryRun, CatalogEntityDetail, CatalogEntityType, CatalogSearchItem,
+  CatalogTaxonomy,
+  CatalogSubmission, PlatformStats,
 } from '../types/admin'
 
-function getApiBaseUrl() {
-  const baseUrl = import.meta.env.VITE_API_BASE_URL
-
-  if (!baseUrl) {
-    throw new Error('VITE_API_BASE_URL이 설정되지 않았습니다.')
-  }
-
-  return baseUrl
+function apiBase() {
+  const value = import.meta.env.VITE_API_BASE_URL
+  if (!value) throw new Error('VITE_API_BASE_URL이 설정되지 않았습니다.')
+  return value
 }
-
-function createAdminUrl(path: string) {
-  return new URL(path, getApiBaseUrl()).toString()
+function url(path: string) { return new URL(path, apiBase()).toString() }
+async function parse<T>(response: Response, fallback: string): Promise<T> {
+  const data = await response.json().catch(() => null) as { message?: string; candidates?: CatalogSearchItem[] } | null
+  if (!response.ok) throw Object.assign(new Error(data?.message || fallback), { candidates: data?.candidates ?? [] })
+  return data as T
 }
-
-function getAdminErrorMessage(status: number, fallback: string) {
-  if (status === 400) {
-    return '요청 값이 올바르지 않아요.'
-  }
-
-  if (status === 401) {
-    return '관리자 인증이 필요해요. 다시 로그인해주세요.'
-  }
-
-  if (status === 403) {
-    return '관리자 권한이 있는 계정만 사용할 수 있어요.'
-  }
-
-  if (status === 404) {
-    return '해당 애니를 찾을 수 없어요.'
-  }
-
-  if (status >= 500) {
-    return '서버 오류가 발생했어요. 잠시 후 다시 시도해주세요.'
-  }
-
-  return fallback
-}
-
-async function postAdminAction<TPayload>(path: string, payload: TPayload, fallback: string) {
-  const response = await authFetch(createAdminUrl(path), {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
-  })
-
-  if (!response.ok) {
-    throw new Error(getAdminErrorMessage(response.status, fallback))
-  }
-
-  return (await response.json()) as AdminActionResponse
+async function jsonRequest<T>(path: string, method: string, body?: unknown) {
+  return parse<T>(await authFetch(url(path), {
+    method, headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  }), '요청을 처리하지 못했어요.')
 }
 
 export async function fetchPlatformStats() {
-  const response = await fetch(createAdminUrl('/api/stats/platform'))
-
-  if (!response.ok) {
-    throw new Error(getAdminErrorMessage(response.status, '플랫폼 통계를 불러오지 못했어요.'))
-  }
-
-  const data = (await response.json()) as {
-    success: boolean
-    item: PlatformStats
-  }
-
-  return data.item
+  return (await parse<{ item: PlatformStats }>(await fetch(url('/api/stats/platform')), '플랫폼 통계를 불러오지 못했어요.')).item
+}
+export async function fetchAdminOverview(signal?: AbortSignal) {
+  return (await parse<{ item: AdminOverview }>(
+    await authFetch(url('/admin/overview'), { signal }),
+    '관리자 현황을 불러오지 못했어요.',
+  )).item
+}
+export async function fetchAdminUsers(params: { page?: number; limit?: number; search?: string; role?: AdminUserRoleFilter; signal?: AbortSignal } = {}) {
+  const target = new URL('/admin/users', apiBase())
+  target.searchParams.set('page', String(params.page ?? 1)); target.searchParams.set('limit', String(params.limit ?? 20)); target.searchParams.set('role', params.role ?? 'ALL')
+  if (params.search?.trim()) target.searchParams.set('search', params.search.trim())
+  return parse<AdminUserListResponse>(await authFetch(target.toString(), { signal: params.signal }), '사용자 목록을 불러오지 못했어요.')
+}
+export async function fetchAdminUserDetail(userId: number, signal?: AbortSignal) {
+  return (await parse<AdminUserDetailResponse>(await authFetch(url(`/admin/users/${userId}`), { signal }), '사용자 상세 정보를 불러오지 못했어요.')).item
 }
 
-export function syncAnimePage(payload: AdminSyncPagePayload) {
-  return postAdminAction('/admin/anime/sync/page', payload, '애니 페이지 동기화에 실패했어요.')
+export interface AdminProfileReport { id: number; reporterUserId: number; reportedUserId: number; reporterUsername: string; reportedUsername: string; profileImageUrl: string | null; reason: string; status: string; requestCount: number; createdAt: string }
+export async function fetchProfileReports() { return (await parse<{ reports: AdminProfileReport[] }>(await authFetch(url('/admin/profile-reports')), '프로필 신고를 불러오지 못했어요.')).reports }
+export async function resolveProfileReport(id: number, action: 'DISMISS' | 'REMOVE_PROFILE' | 'SUSPEND_USER') { await jsonRequest(`/admin/profile-reports/${id}`, 'PATCH', { action }) }
+export async function setAnimeVisibility(animeId: number, visible: boolean, reason: string) { await jsonRequest(`/admin/anime/${animeId}/visibility`, 'PATCH', { visible, reason }) }
+export async function rebuildAnimeSeries(payload: AdminSeriesRebuildPayload) { return jsonRequest<AdminSeriesRebuildResponse>('/admin/anime/series/rebuild', 'POST', payload) }
+export async function updateAnimeKoreanTitle(animeId: number, payload: AdminUpdateKoreanTitlePayload) { return jsonRequest<AdminUpdateKoreanTitleResponse>(`/admin/anime/${animeId}/korean-title`, 'PATCH', payload) }
+
+export async function searchCatalog(type: CatalogEntityType, query: string, limit = 20, signal?: AbortSignal) {
+  const target = new URL('/admin/catalog/entities/search', apiBase()); target.searchParams.set('type', type); target.searchParams.set('q', query); target.searchParams.set('limit', String(limit))
+  return (await parse<{ items: CatalogSearchItem[] }>(await authFetch(target.toString(), { signal }), '카탈로그 검색에 실패했어요.')).items
 }
-
-export function syncAllAnimePages(payload: AdminSyncAllPayload) {
-  return postAdminAction('/admin/anime/sync/all', payload, '연속 페이지 동기화에 실패했어요.')
+export async function fetchCatalogTaxonomy(signal?: AbortSignal) {
+  return (await parse<{ item: CatalogTaxonomy }>(await authFetch(url('/admin/catalog/taxonomy'), { signal }), '분류 목록을 불러오지 못했어요.')).item
 }
-
-export function syncAnimeChunked(payload: AdminSyncChunkedPayload) {
-  return postAdminAction('/admin/anime/sync/chunked', payload, '청크 동기화에 실패했어요.')
+export async function fetchCatalogEntity(type: CatalogEntityType, id: number, signal?: AbortSignal) {
+  return (await parse<{ item: CatalogEntityDetail }>(await authFetch(url(`/admin/catalog/entities/${type}/${id}`), { signal }), '엔티티 상세 정보를 불러오지 못했어요.')).item
 }
-
-export function syncAnimeSeason(payload: AdminSyncSeasonPayload) {
-  return postAdminAction('/admin/anime/sync/season', payload, '시즌 동기화에 실패했어요.')
+export async function writeCatalogEntity(type: CatalogEntityType, payload: Record<string, unknown>, id?: number) {
+  return jsonRequest<{ result: { entityId: number } }>(`/admin/catalog/entities/${type}${id ? `/${id}` : ''}`, id ? 'PATCH' : 'POST', payload)
 }
-
-export function translateKoreanTitles(payload: AdminTranslateKoreanTitlesPayload) {
-  return postAdminAction('/admin/anime/korean-titles/translate', payload, '한국어 제목 번역 배치 실행에 실패했어요.')
+export async function uploadCatalogEntityImage(type: CatalogEntityType, id: number, variant: string, file: File) {
+  const form = new FormData(); form.append('variant', variant); form.append('image', file)
+  return parse<{ result: { publicUrl: string } }>(await authFetch(url(`/admin/catalog/entities/${type}/${id}/images`), { method: 'POST', body: form }), '이미지 업로드에 실패했어요.')
 }
-
-export function syncAnimeCast(payload: AdminCastSyncAnimePayload) {
-  const { animeId, ...body } = payload
-  return postAdminAction(`/admin/anime/${animeId}/sync/cast`, body, '캐릭터/성우 단건 동기화에 실패했어요.')
+export async function fetchCatalogSubmissions(filters: { status?: CatalogChangeStatus; source?: CatalogChangeSource; type?: CatalogEntityType; confidence?: 'high' | 'medium' | 'low' } = {}) {
+  const target = new URL('/admin/catalog/submissions', apiBase())
+  Object.entries(filters).forEach(([key, value]) => { if (value) target.searchParams.set(key, value) })
+  return (await parse<{ submissions: CatalogSubmission[] }>(await authFetch(target.toString()), '검토함을 불러오지 못했어요.')).submissions
 }
-
-export function syncAnimeCastBatch(payload: AdminCastSyncBatchPayload) {
-  return postAdminAction('/admin/anime/sync/cast/batch', payload, '캐릭터/성우 배치 동기화에 실패했어요.')
-}
-
-export function syncAnimeCastChunked(payload: AdminCastSyncChunkedPayload) {
-  return postAdminAction('/admin/anime/sync/cast/chunked', payload, '캐릭터/성우 청크 동기화에 실패했어요.')
-}
-
-export async function fetchAnimeCastSyncStatus(payload: AdminCastSyncStatusPayload) {
-  const response = await authFetch(createAdminUrl(`/admin/anime/${payload.animeId}/sync/cast`))
-
-  if (!response.ok) {
-    throw new Error(getAdminErrorMessage(response.status, '캐릭터/성우 동기화 상태 조회에 실패했어요.'))
-  }
-
-  const data = await response.json()
-
-  return {
-    success: Boolean(data?.success ?? true),
-    message: typeof data?.message === 'string' ? data.message : '캐릭터/성우 동기화 상태를 조회했어요.',
-    result: data,
-  } as AdminActionResponse
-}
-
-export async function updateAnimeKoreanTitle(animeId: number, payload: AdminUpdateKoreanTitlePayload) {
-  const response = await authFetch(createAdminUrl(`/admin/anime/${animeId}/korean-title`), {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
-  })
-
-  if (!response.ok) {
-    throw new Error(getAdminErrorMessage(response.status, '한국어 제목 수정에 실패했어요.'))
-  }
-
-  return (await response.json()) as AdminUpdateKoreanTitleResponse
-}
+export async function fetchCatalogSubmission(id: number) { return (await parse<{ submission: CatalogSubmission }>(await authFetch(url(`/admin/catalog/submissions/${id}`)), '검토 요청을 불러오지 못했어요.')).submission }
+export async function updateCatalogSubmission(id: number, payload: Partial<Pick<CatalogSubmission, 'displayName' | 'sourceUrl' | 'description' | 'payload' | 'kind' | 'targetEntityId' | 'duplicateResolution'>>) { return (await jsonRequest<{ submission: CatalogSubmission }>(`/admin/catalog/submissions/${id}`, 'PATCH', payload)).submission }
+export async function approveCatalogSubmission(id: number) { return jsonRequest<{ result: { entityId: number } }>(`/admin/catalog/submissions/${id}/approve`, 'POST') }
+export async function rejectCatalogSubmission(id: number, reason: string) { return jsonRequest(`/admin/catalog/submissions/${id}/reject`, 'POST', { reason }) }
+export async function fetchDiscoveryRuns() { return (await parse<{ runs: CatalogDiscoveryRun[] }>(await authFetch(url('/admin/catalog/discovery-runs')), 'AI 실행 이력을 불러오지 못했어요.')).runs }
+export async function fetchDiscoveryRun(id: number) { return (await parse<{ run: CatalogDiscoveryRun }>(await authFetch(url(`/admin/catalog/discovery-runs/${id}`)), 'AI 실행 상세를 불러오지 못했어요.')).run }
+export async function createDiscoveryRun(payload: { seasonYear: number; season: CatalogDiscoveryRun['season'] }) { return (await jsonRequest<{ run: CatalogDiscoveryRun }>('/admin/catalog/discovery-runs', 'POST', payload)).run }
+export async function cancelDiscoveryRun(id: number) { await jsonRequest(`/admin/catalog/discovery-runs/${id}/cancel`, 'POST') }
+export async function retryDiscoveryRun(id: number) { return (await jsonRequest<{ run: CatalogDiscoveryRun }>(`/admin/catalog/discovery-runs/${id}/retry`, 'POST')).run }

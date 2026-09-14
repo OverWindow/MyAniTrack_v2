@@ -1,7 +1,13 @@
+import { getLocaleTag } from '../i18n'
+import { getTitleLanguage, tr } from '../i18n'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import { Film, Layers3 } from 'lucide-react'
 import { CollectionButton } from '../components/CollectionButton'
+import { CatalogSubmissionDialog } from '../components/CatalogSubmissionDialog'
+import { ConnectionErrorState } from '../components/ConnectionErrorState'
 import { useAuth } from '../contexts/AuthContext'
+import { useToast } from '../contexts/ToastContext'
 import {
   addToCollection,
   syncCollectionCacheFromSearchItems,
@@ -9,6 +15,7 @@ import {
 } from '../lib/collection'
 import {
   fetchAnimeList,
+  fetchAnimeSeries,
   genreOptions,
   getDisplayTitle,
   getPrimaryPoster,
@@ -16,12 +23,29 @@ import {
   searchMyAnime,
   sortOptions,
 } from '../lib/anime'
-import type { AnimeGenre, AnimeListItem, AnimeSort } from '../types/anime'
+import { getFriendlyErrorMessage } from '../lib/errors'
+import type {
+  AnimeGenre,
+  AnimeListItem,
+  AnimeSeriesListItem,
+  AnimeSeriesScope,
+  AnimeSort,
+} from '../types/anime'
 import '../styles/pages/CatalogPage.css'
 import '../styles/pages/ExplorePage.css'
 
 type ExploreState = {
   animeItems: AnimeListItem[]
+  nextCursor: string | null
+  hasNext: boolean
+  isLoading: boolean
+  isLoadingMore: boolean
+  error: string | null
+  requestKey: string
+}
+
+type SeriesExploreState = {
+  items: AnimeSeriesListItem[]
   nextCursor: string | null
   hasNext: boolean
   isLoading: boolean
@@ -47,12 +71,22 @@ const createInitialExploreState = (requestKey: string): ExploreState => ({
   requestKey,
 })
 
+const createInitialSeriesState = (requestKey: string): SeriesExploreState => ({
+  items: [],
+  nextCursor: null,
+  hasNext: false,
+  isLoading: true,
+  isLoadingMore: false,
+  error: null,
+  requestKey,
+})
+
 function formatTenPointScore(score?: number | null) {
   if (typeof score !== 'number') {
     return null
   }
 
-  return (score / 10).toFixed(1)
+  return score.toFixed(1)
 }
 
 function getOverlayScore(score?: number | null) {
@@ -94,6 +128,7 @@ function logExploreCollectionOnHover(item: AnimeListItem, collection: AnimeListI
 
 function HoverRating({ animeId, maxProgress, collection, onCollectionChange }: HoverRatingProps) {
   const { isAuthenticated } = useAuth()
+  const { showError } = useToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const score = getOverlayScore(collection?.score)
   const isAdded = Boolean(collection?.exists)
@@ -130,6 +165,8 @@ function HoverRating({ animeId, maxProgress, collection, onCollectionChange }: H
         score: nextScore,
         progress: maxProgress && maxProgress > 0 ? maxProgress : collection?.progress ?? null,
       })
+    } catch (submitError) {
+      showError(submitError instanceof Error ? submitError.message : tr("별점을 저장하지 못했어요."))
     } finally {
       setIsSubmitting(false)
     }
@@ -140,7 +177,7 @@ function HoverRating({ animeId, maxProgress, collection, onCollectionChange }: H
   }
 
   return (
-    <div className={isAdded ? 'anime-hover-rating is-added' : 'anime-hover-rating'} aria-label="탐색 빠른 별점">
+    <div className={isAdded ? 'anime-hover-rating is-added' : 'anime-hover-rating'} aria-label={tr("탐색 빠른 별점")}>
       {/* {isAdded && <strong className="anime-hover-rating-label">{getUserRatingLabel(score)}</strong>} */}
       <div className="anime-hover-rating-stars">
         {Array.from({ length: 5 }).map((_, index) => {
@@ -160,7 +197,7 @@ function HoverRating({ animeId, maxProgress, collection, onCollectionChange }: H
               <button
                 className="anime-hover-star-hit is-left"
                 type="button"
-                aria-label={`${leftValue.toFixed(1)}점 주기`}
+                aria-label={tr("{{v0}}점 주기", { v0: leftValue.toFixed(1) })}
                 onClick={(event) => {
                   void handleRate(leftValue, event)
                 }}
@@ -169,7 +206,7 @@ function HoverRating({ animeId, maxProgress, collection, onCollectionChange }: H
               <button
                 className="anime-hover-star-hit is-right"
                 type="button"
-                aria-label={`${rightValue.toFixed(1)}점 주기`}
+                aria-label={tr("{{v0}}점 주기", { v0: rightValue.toFixed(1) })}
                 onClick={(event) => {
                   void handleRate(rightValue, event)
                 }}
@@ -191,28 +228,37 @@ type ExploreAnimeCardProps = {
 function ExploreAnimeCard({ item, location }: ExploreAnimeCardProps) {
   const [localCollection, setLocalCollection] = useState<AnimeListItem['myCollection']>(undefined)
   const collection = localCollection ?? item.myCollection
+  const detailPath = `/anime/${item.id}`
+  const detailState = { fromPage: 'explore', backgroundLocation: location }
 
   return (
-    <Link
-      className="anime-card anime-card-link"
-      key={item.id}
-      to={`/anime/${item.id}`}
-      state={{ fromPage: 'explore', backgroundLocation: location }}
-    >
+    <article className="anime-card" key={item.id}>
       <div
         className="anime-poster-wrap"
         onMouseEnter={() => logExploreCollectionOnHover(item, collection)}
         onFocus={() => logExploreCollectionOnHover(item, collection)}
       >
-        <div
-          className="anime-card-quick-action"
-          onClick={(event) => event.preventDefault()}
+        <Link
+          className="anime-poster-link"
+          to={detailPath}
+          state={detailState}
+          aria-label={tr("{{v0}} 상세 페이지로 이동", { v0: getDisplayTitle(item) })}
         >
+          <img
+            className="anime-poster"
+            src={getPrimaryPoster(item)}
+            alt={getDisplayTitle(item)}
+            loading="lazy"
+          />
+        </Link>
+        <div className="anime-card-quick-action">
           <CollectionButton
             animeId={item.id}
             maxProgress={item.episodes}
             initialIsAdded={collection?.exists}
             useCacheState={false}
+            loginLabel={tr("추가")}
+            loginAriaLabel={tr("로그인 후 컬렉션에 추가")}
             onAddedChange={(exists) => {
               setLocalCollection((current) => ({
                 exists,
@@ -223,17 +269,11 @@ function ExploreAnimeCard({ item, location }: ExploreAnimeCardProps) {
             }}
           />
         </div>
-        {formatTenPointScore(item.averageScore) && (
+        {formatTenPointScore(item.communityAverageScore) && (
           <div className="anime-card-rating">
-            {formatTenPointScore(item.averageScore)}
+            {formatTenPointScore(item.communityAverageScore)}
           </div>
         )}
-        <img
-          className="anime-poster"
-          src={getPrimaryPoster(item)}
-          alt={getDisplayTitle(item)}
-          loading="lazy"
-        />
         <HoverRating
           animeId={item.id}
           maxProgress={item.episodes}
@@ -241,29 +281,107 @@ function ExploreAnimeCard({ item, location }: ExploreAnimeCardProps) {
           onCollectionChange={setLocalCollection}
         />
       </div>
-      <div className="anime-copy">
+      <Link className="anime-copy anime-card-link" to={detailPath} state={detailState}>
         <h3>{getDisplayTitle(item)}</h3>
+      </Link>
+    </article>
+  )
+}
+
+function ExploreSeriesCard({
+  item,
+  location,
+}: {
+  item: AnimeSeriesListItem
+  location: ReturnType<typeof useLocation>
+}) {
+  const coverImage = item.coverImageExtraLarge || item.coverImageLarge
+
+  return (
+    <article className="explore-series-card">
+      <Link
+        className="explore-series-cover-link"
+        to={`/anime/${item.canonicalAnimeId}`}
+        state={{ fromPage: 'explore', backgroundLocation: location }}
+      >
+        {coverImage ? (
+          <img className="explore-series-cover" src={coverImage} alt={item.title} loading="lazy" />
+        ) : (
+          <span className="explore-series-cover-placeholder">No image</span>
+        )}
+        {typeof item.communityAverageScore === 'number' && (
+          <span className="anime-card-rating">{formatTenPointScore(item.communityAverageScore)}</span>
+        )}
+      </Link>
+
+      <div className="explore-series-copy">
+        <div className="explore-series-heading">
+          <span>{item.scope === 'mainline' ? tr("본편 시리즈") : tr("관련 작품 전체")}</span>
+          <strong>{item.memberCount.toLocaleString(getLocaleTag())}{tr("편")}</strong>
+        </div>
+        <h3>{item.title}</h3>
+        <div className="explore-series-members" aria-label={tr("{{v0}} 작품 목록", { v0: item.title })}>
+          {item.items.map((member) => {
+            const memberCover = member.coverImageExtraLarge || member.coverImageLarge
+
+            return (
+              <Link
+                className="explore-series-member"
+                key={member.id}
+                to={`/anime/${member.id}`}
+                state={{ fromPage: 'explore', backgroundLocation: location }}
+                aria-label={tr("{{v0}} 상세 보기", { v0: member.title })}
+                title={member.title}
+              >
+                {memberCover ? (
+                  <img src={memberCover} alt="" loading="lazy" />
+                ) : (
+                  <span>No image</span>
+                )}
+              </Link>
+            )
+          })}
+        </div>
       </div>
-    </Link>
+    </article>
   )
 }
 
 export function ExplorePage() {
   const location = useLocation()
   const { isAuthenticated } = useAuth()
+  const [viewMode, setViewMode] = useState<'anime' | 'series'>('anime')
+  const [seriesScope, setSeriesScope] = useState<AnimeSeriesScope>('mainline')
   const [sort, setSort] = useState<AnimeSort>('score')
   const [genre, setGenre] = useState<AnimeGenre | 'all'>('all')
   const [searchTerm, setSearchTerm] = useState('')
+  const [submissionOpen, setSubmissionOpen] = useState(false)
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
-  const [searchLanguage, setSearchLanguage] = useState<'ko' | 'en'>('ko')
+  const searchLanguage = getTitleLanguage()
   const normalizedQuery = debouncedSearchTerm.trim()
   const selectedGenre = genre === 'all' ? null : genre
-  const requestKey = `${sort}:${normalizedQuery}:${searchLanguage}:${genre}:${isAuthenticated ? 'auth' : 'guest'}`
+  const requestKey = `anime:${sort}:${normalizedQuery}:${searchLanguage}:${genre}:${isAuthenticated ? 'auth' : 'guest'}`
+  const seriesRequestKey = `series:${seriesScope}:${sort}:${normalizedQuery}:${searchLanguage}:${genre}`
   const [state, setState] = useState<ExploreState>(() => createInitialExploreState(requestKey))
+  const [seriesState, setSeriesState] = useState<SeriesExploreState>(
+    () => createInitialSeriesState(seriesRequestKey),
+  )
   const sentinelRef = useRef<HTMLDivElement | null>(null)
+  const seriesSentinelRef = useRef<HTMLDivElement | null>(null)
   const isLoadingMoreRef = useRef(false)
+  const isLoadingMoreSeriesRef = useRef(false)
+  const loadedCursorRef = useRef<Set<string>>(new Set())
+  const loadedSeriesCursorRef = useRef<Set<string>>(new Set())
   const { animeItems, nextCursor, hasNext, isLoading, isLoadingMore, error } = state
+  const {
+    items: seriesItems,
+    hasNext: hasNextSeries,
+    isLoading: isLoadingSeries,
+    isLoadingMore: isLoadingMoreSeries,
+    error: seriesError,
+  } = seriesState
   const isRefreshingQuery = state.requestKey !== requestKey
+  const isRefreshingSeriesQuery = seriesState.requestKey !== seriesRequestKey
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -276,11 +394,16 @@ export function ExplorePage() {
   }, [searchTerm])
 
   useEffect(() => {
+    if (viewMode !== 'anime') {
+      return
+    }
+
     const controller = new AbortController()
 
     const loadFirstPage = async () => {
       try {
         isLoadingMoreRef.current = false
+        loadedCursorRef.current = new Set()
 
         const data = isAuthenticated
           ? await searchMyAnime({
@@ -332,9 +455,7 @@ export function ExplorePage() {
           isLoading: false,
           isLoadingMore: false,
           error:
-            fetchError instanceof Error
-              ? fetchError.message
-              : '알 수 없는 오류로 목록을 가져오지 못했습니다.',
+            getFriendlyErrorMessage(fetchError, tr("알 수 없는 오류로 목록을 가져오지 못했습니다.")),
           requestKey,
         })
       }
@@ -343,9 +464,13 @@ export function ExplorePage() {
     void loadFirstPage()
 
     return () => controller.abort()
-  }, [isAuthenticated, normalizedQuery, requestKey, searchLanguage, selectedGenre, sort])
+  }, [isAuthenticated, normalizedQuery, requestKey, searchLanguage, selectedGenre, sort, viewMode])
 
   useEffect(() => {
+    if (viewMode !== 'anime') {
+      return
+    }
+
     const node = sentinelRef.current
 
     if (
@@ -367,6 +492,18 @@ export function ExplorePage() {
           return
         }
 
+        const cursorForRequest = nextCursor
+
+        if (loadedCursorRef.current.has(cursorForRequest)) {
+          setState((current) => (
+            current.requestKey === requestKey
+              ? { ...current, hasNext: false, nextCursor: null, isLoadingMore: false }
+              : current
+          ))
+          return
+        }
+
+        loadedCursorRef.current.add(cursorForRequest)
         isLoadingMoreRef.current = true
         setState((current) => ({ ...current, isLoadingMore: true }))
 
@@ -379,7 +516,7 @@ export function ExplorePage() {
                   genre: selectedGenre,
                   titleLanguage: searchLanguage,
                   limit: 24,
-                  cursor: nextCursor,
+                  cursor: cursorForRequest,
                 })
               : normalizedQuery
                 ? await searchAnime({
@@ -388,13 +525,13 @@ export function ExplorePage() {
                     genre: selectedGenre,
                     titleLanguage: searchLanguage,
                     limit: 24,
-                    cursor: nextCursor,
+                    cursor: cursorForRequest,
                   })
               : await fetchAnimeList({
                   sort,
                   genre: selectedGenre,
                   limit: 24,
-                  cursor: nextCursor,
+                  cursor: cursorForRequest,
                 })
 
             if (isAuthenticated) {
@@ -416,12 +553,17 @@ export function ExplorePage() {
                 seen.add(item.id)
                 return true
               })
+              const responseNextCursor = data.pageInfo.nextCursor
+              const canLoadAnotherPage =
+                data.pageInfo.hasNext &&
+                Boolean(responseNextCursor) &&
+                responseNextCursor !== cursorForRequest
 
               return {
                 ...current,
                 animeItems: deduped,
-                nextCursor: data.pageInfo.nextCursor,
-                hasNext: data.pageInfo.hasNext,
+                nextCursor: canLoadAnotherPage ? responseNextCursor : null,
+                hasNext: canLoadAnotherPage,
                 isLoadingMore: false,
               }
             })
@@ -435,9 +577,7 @@ export function ExplorePage() {
                 ...current,
                 isLoadingMore: false,
                 error:
-                  fetchError instanceof Error
-                    ? fetchError.message
-                    : '추가 목록을 불러오지 못했습니다.',
+                  getFriendlyErrorMessage(fetchError, tr("추가 목록을 불러오지 못했습니다.")),
               }
             })
           } finally {
@@ -465,6 +605,155 @@ export function ExplorePage() {
     searchLanguage,
     selectedGenre,
     sort,
+    viewMode,
+  ])
+
+  useEffect(() => {
+    if (viewMode !== 'series') {
+      return
+    }
+
+    const controller = new AbortController()
+
+    const loadFirstSeriesPage = async () => {
+      try {
+        isLoadingMoreSeriesRef.current = false
+        loadedSeriesCursorRef.current = new Set()
+        const data = await fetchAnimeSeries({
+          scope: seriesScope,
+          sort,
+          titleLanguage: searchLanguage,
+          query: normalizedQuery || undefined,
+          genre: selectedGenre,
+          limit: 12,
+          signal: controller.signal,
+        })
+
+        setSeriesState({
+          items: data.items,
+          nextCursor: data.pageInfo.nextCursor,
+          hasNext: data.pageInfo.hasNext,
+          isLoading: false,
+          isLoadingMore: false,
+          error: null,
+          requestKey: seriesRequestKey,
+        })
+      } catch (fetchError) {
+        if (fetchError instanceof DOMException && fetchError.name === 'AbortError') return
+
+        setSeriesState({
+          items: [],
+          nextCursor: null,
+          hasNext: false,
+          isLoading: false,
+          isLoadingMore: false,
+          error: getFriendlyErrorMessage(fetchError, tr("시리즈 목록을 가져오지 못했습니다.")),
+          requestKey: seriesRequestKey,
+        })
+      }
+    }
+
+    void loadFirstSeriesPage()
+    return () => controller.abort()
+  }, [normalizedQuery, searchLanguage, selectedGenre, seriesRequestKey, seriesScope, sort, viewMode])
+
+  useEffect(() => {
+    if (viewMode !== 'series') {
+      return
+    }
+
+    const node = seriesSentinelRef.current
+    const {
+      hasNext: hasNextSeries,
+      isLoading: isLoadingSeries,
+      isLoadingMore: isLoadingMoreSeries,
+      nextCursor: seriesNextCursor,
+    } = seriesState
+
+    if (
+      !node || !hasNextSeries || isLoadingSeries || isLoadingMoreSeries ||
+      !seriesNextCursor || isRefreshingSeriesQuery
+    ) {
+      return
+    }
+
+    const observer = new IntersectionObserver((entries) => {
+      const [entry] = entries
+      if (!entry?.isIntersecting || isLoadingMoreSeriesRef.current) return
+
+      const cursorForRequest = seriesNextCursor
+      if (loadedSeriesCursorRef.current.has(cursorForRequest)) {
+        setSeriesState((current) => current.requestKey === seriesRequestKey
+          ? { ...current, hasNext: false, nextCursor: null, isLoadingMore: false }
+          : current)
+        return
+      }
+
+      loadedSeriesCursorRef.current.add(cursorForRequest)
+      isLoadingMoreSeriesRef.current = true
+      setSeriesState((current) => ({ ...current, isLoadingMore: true }))
+
+      const loadMoreSeries = async () => {
+        try {
+          const data = await fetchAnimeSeries({
+            scope: seriesScope,
+            sort,
+            titleLanguage: searchLanguage,
+            query: normalizedQuery || undefined,
+            genre: selectedGenre,
+            limit: 12,
+            cursor: cursorForRequest,
+          })
+
+          setSeriesState((current) => {
+            if (current.requestKey !== seriesRequestKey) return current
+
+            const seen = new Set<number>()
+            const items = [...current.items, ...data.items].filter((item) => {
+              if (seen.has(item.seriesId)) return false
+              seen.add(item.seriesId)
+              return true
+            })
+            const responseNextCursor = data.pageInfo.nextCursor
+            const canLoadAnotherPage = data.pageInfo.hasNext &&
+              Boolean(responseNextCursor) && responseNextCursor !== cursorForRequest
+
+            return {
+              ...current,
+              items,
+              nextCursor: canLoadAnotherPage ? responseNextCursor : null,
+              hasNext: canLoadAnotherPage,
+              isLoadingMore: false,
+            }
+          })
+        } catch (fetchError) {
+          setSeriesState((current) => current.requestKey === seriesRequestKey
+            ? {
+                ...current,
+                isLoadingMore: false,
+                error: getFriendlyErrorMessage(fetchError, tr("시리즈를 더 불러오지 못했습니다.")),
+              }
+            : current)
+        } finally {
+          isLoadingMoreSeriesRef.current = false
+        }
+      }
+
+      void loadMoreSeries()
+    }, { rootMargin: '280px 0px' })
+
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [
+    isRefreshingSeriesQuery,
+    normalizedQuery,
+    searchLanguage,
+    selectedGenre,
+    seriesRequestKey,
+    seriesScope,
+    seriesState,
+    sort,
+    viewMode,
   ])
 
   return (
@@ -472,50 +761,65 @@ export function ExplorePage() {
       <div className="explore-toolbar-shell">
         <div className="explore-toolbar">
           <div className="search-group">
+            <div className="explore-view-switch" role="group" aria-label={tr("탐색 단위 선택")}>
+              <button
+                className={viewMode === 'anime' ? 'is-active' : ''}
+                type="button"
+                aria-pressed={viewMode === 'anime'}
+                onClick={() => {
+                  if (viewMode === 'anime') return
+                  setState((current) => ({ ...current, isLoading: true, error: null }))
+                  setViewMode('anime')
+                }}
+              >
+                <Film size={17} aria-hidden="true" />
+                {tr("작품")}
+              </button>
+              <button
+                className={viewMode === 'series' ? 'is-active' : ''}
+                type="button"
+                aria-pressed={viewMode === 'series'}
+                onClick={() => {
+                  if (viewMode === 'series') return
+                  setSeriesState((current) => ({ ...current, isLoading: true, error: null }))
+                  setViewMode('series')
+                }}
+              >
+                <Layers3 size={17} aria-hidden="true" />
+                {tr("시리즈")}
+              </button>
+            </div>
             <label className="search-field minimalist-search" htmlFor="anime-search">
               <input
                 id="anime-search"
                 type="search"
-                placeholder="제목으로 검색하기"
+                placeholder={viewMode === 'series' ? tr("시리즈 또는 작품 제목 검색") : tr("제목으로 검색하기")}
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
               />
             </label>
-            <div className="search-language-switch" aria-label="검색 언어 선택">
-              <button
-                className={
-                  searchLanguage === 'ko'
-                    ? 'search-language-button is-active'
-                    : 'search-language-button'
-                }
-                type="button"
-                onClick={() => setSearchLanguage('ko')}
-              >
-                한
-              </button>
-              <button
-                className={
-                  searchLanguage === 'en'
-                    ? 'search-language-button is-active'
-                    : 'search-language-button'
-                }
-                type="button"
-                onClick={() => setSearchLanguage('en')}
-              >
-                EN
-              </button>
-
-            </div>
           </div>
 
-          <div className="catalog-control-group">
+          <div className={`catalog-control-group${viewMode === 'series' ? ' is-series' : ''}`}>
+            {viewMode === 'series' && (
+              <label className="sort-field" htmlFor="anime-series-scope">
+                <select
+                  id="anime-series-scope"
+                  value={seriesScope}
+                  onChange={(event) => setSeriesScope(event.target.value as AnimeSeriesScope)}
+                >
+                  <option value="mainline">{tr("본편 시리즈")}</option>
+                  <option value="franchise">{tr("관련 작품 전체")}</option>
+                </select>
+              </label>
+            )}
             <label className="sort-field" htmlFor="anime-genre">
               <select
                 id="anime-genre"
                 value={genre}
                 onChange={(event) => setGenre(event.target.value as AnimeGenre | 'all')}
               >
-                <option value="all">전체 장르</option>
+                <option value="all">{tr("전체 장르")}</option>
                 {genreOptions.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
@@ -541,9 +845,11 @@ export function ExplorePage() {
         </div>
       </div>
 
-      {error && <div className="feedback-card is-error">{error}</div>}
+      {viewMode === 'anime' && error && (
+        <ConnectionErrorState message={error} />
+      )}
 
-      {!error && (isLoading || isRefreshingQuery) && (
+      {viewMode === 'anime' && !error && (isLoading || isRefreshingQuery) && (
         <div className="anime-grid">
           {Array.from({ length: 10 }).map((_, index) => (
             <article className="anime-card skeleton-card" key={`skeleton-${index}`}>
@@ -555,13 +861,16 @@ export function ExplorePage() {
         </div>
       )}
 
-      {!isLoading && !isRefreshingQuery && !error && (
+      {viewMode === 'anime' && !isLoading && !isRefreshingQuery && !error && (
         <>
           {animeItems.length === 0 ? (
             <div className="feedback-card">
-              {normalizedQuery
-                ? '검색 결과가 없어요. 다른 제목으로 검색하거나 정렬을 바꿔서 다시 둘러보세요.'
-                : '표시할 애니가 없어요. 잠시 후 다시 시도해주세요.'}
+              <p>{normalizedQuery
+                ? tr("검색 결과가 없어요. 다른 제목으로 검색하거나 정렬을 바꿔서 다시 둘러보세요.")
+                : tr("표시할 애니가 없어요. 잠시 후 다시 시도해주세요.")}</p>
+              {normalizedQuery && (isAuthenticated
+                ? <button className="primary-button" type="button" onClick={() => setSubmissionOpen(true)}>{tr('“{{v0}}” 작품 등록 요청', { v0: normalizedQuery })}</button>
+                : <Link className="primary-button" to="/login">{tr('로그인하고 작품 등록 요청하기')}</Link>)}
             </div>
           ) : (
             <div className="anime-grid">
@@ -578,11 +887,57 @@ export function ExplorePage() {
           <div ref={sentinelRef} className="scroll-sentinel" aria-hidden="true" />
 
           {isLoadingMore && (
-            <div className="feedback-inline">작품을 더 불러오는 중이에요.</div>
+            <div className="feedback-inline">{tr("작품을 더 불러오는 중이에요.")}</div>
           )}
 
           {!hasNext && animeItems.length > 0 && (
-            <div className="feedback-inline">마지막 작품까지 모두 확인했어요.</div>
+            <div className="feedback-inline">{tr("마지막 작품까지 모두 확인했어요.")}</div>
+          )}
+        </>
+      )}
+
+      <CatalogSubmissionDialog open={submissionOpen} onClose={() => setSubmissionOpen(false)} initialName={normalizedQuery} entityType="ANIME" />
+
+      {viewMode === 'series' && seriesError && (
+        <ConnectionErrorState message={seriesError} />
+      )}
+
+      {viewMode === 'series' && !seriesError && (isLoadingSeries || isRefreshingSeriesQuery) && (
+        <div className="explore-series-grid">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <article className="explore-series-card skeleton-card" key={`series-skeleton-${index}`}>
+              <div className="skeleton-poster" />
+              <div className="skeleton-line short" />
+              <div className="skeleton-line long" />
+            </article>
+          ))}
+        </div>
+      )}
+
+      {viewMode === 'series' && !isLoadingSeries && !isRefreshingSeriesQuery && !seriesError && (
+        <>
+          {seriesItems.length === 0 ? (
+            <div className="feedback-card">
+              {normalizedQuery
+                ? tr("검색 결과가 없어요. 다른 시리즈 또는 작품 제목으로 검색해보세요.")
+                : tr("표시할 시리즈가 없어요. 다른 범위나 필터를 선택해보세요.")}
+            </div>
+          ) : (
+            <div className="explore-series-grid">
+              {seriesItems.map((item) => (
+                <ExploreSeriesCard key={item.seriesId} item={item} location={location} />
+              ))}
+            </div>
+          )}
+
+          <div ref={seriesSentinelRef} className="scroll-sentinel" aria-hidden="true" />
+
+          {isLoadingMoreSeries && (
+            <div className="feedback-inline">{tr("시리즈를 더 불러오는 중이에요.")}</div>
+          )}
+
+          {!hasNextSeries && seriesItems.length > 0 && (
+            <div className="feedback-inline">{tr("마지막 시리즈까지 모두 확인했어요.")}</div>
           )}
         </>
       )}

@@ -23,7 +23,6 @@ export type AnimeGenre =
 
 export type AnimeListItem = {
   id: number
-  anilistId: number
   title: string
   titles?: {
     korean?: string | null
@@ -38,14 +37,13 @@ export type AnimeListItem = {
   seasonYear?: number | null
   format?: string | null
   status?: string | null
-  averageScore?: number | null
-  meanScore?: number | null
-  popularity?: number | null
-  favourites?: number | null
+  communityAverageScore?: number | null
+  ratingCount?: number
+  collectionCount?: number
   coverImageLarge: string
   coverImageExtraLarge?: string | null
   bannerImage?: string | null
-  siteUrl?: string | null
+  officialSiteUrl?: string | null
   isAdult?: boolean
   createdAt?: string
   myCollection?: {
@@ -58,7 +56,6 @@ export type AnimeListItem = {
 
 export type PopularAnimeItem = {
   id: number
-  anilistId: number
   title: string
   titles?: {
     korean?: string | null
@@ -69,7 +66,9 @@ export type PopularAnimeItem = {
   }
   coverImageLarge: string
   coverImageExtraLarge?: string | null
-  popularity?: number | null
+  collectionCount?: number
+  communityAverageScore?: number | null
+  ratingCount?: number
 }
 
 export type AnimeListResponse = {
@@ -82,6 +81,93 @@ export type AnimeListResponse = {
     sort: AnimeSort
     titleLanguage: 'ko' | 'en' | 'ja'
   }
+}
+
+export type AnimeSeriesScope = 'mainline' | 'franchise'
+
+export type AnimeSeriesListMember = {
+  id: number
+  title: string
+  titles: {
+    korean: string | null
+    english: string | null
+    native: string | null
+    romaji: string | null
+    userPreferred: string | null
+  }
+  coverImageLarge: string | null
+  coverImageExtraLarge: string | null
+  season: string | null
+  seasonYear: number | null
+  format: string | null
+  status: string | null
+}
+
+export type AnimeSeriesListItem = {
+  seriesId: number
+  scope: AnimeSeriesScope
+  title: string
+  customTitle: string | null
+  canonicalAnimeId: number
+  memberCount: number
+  communityAverageScore: number | null
+  ratingCount: number
+  collectionCount: number | null
+  season: string | null
+  seasonYear: number | null
+  coverImageLarge: string | null
+  coverImageExtraLarge: string | null
+  items: AnimeSeriesListMember[]
+}
+
+export type AnimeSeriesListResponse = {
+  success: boolean
+  items: AnimeSeriesListItem[]
+  pageInfo: {
+    hasNext: boolean
+    nextCursor: string | null
+    limit: number
+    scope: AnimeSeriesScope
+    sort: AnimeSort
+    titleLanguage: 'ko' | 'en' | 'ja'
+    query: string | null
+    genre: AnimeGenre | null
+  }
+}
+
+export type AnimeRelationType =
+  | 'PREQUEL'
+  | 'SEQUEL'
+  | 'PARENT'
+  | 'SIDE_STORY'
+  | 'SPIN_OFF'
+  | 'ADAPTATION'
+  | 'SOURCE'
+  | 'SUMMARY'
+  | 'ALTERNATIVE'
+  | 'CHARACTER'
+  | 'COMPILATION'
+  | 'CONTAINS'
+  | 'OTHER'
+
+export type AnimeRelationItem = {
+  relationType: AnimeRelationType
+  targetAnimeId: number
+  anime: Partial<AnimeListItem> & Pick<AnimeListItem, 'id' | 'title'>
+}
+
+export type AnimeSearchWithRelationsItem = AnimeListItem & {
+  relations: AnimeRelationItem[]
+}
+
+export type AnimeSearchWithRelationsResponse = Omit<AnimeListResponse, 'items'> & {
+  items: AnimeSearchWithRelationsItem[]
+}
+
+export type AnimeRelationsResponse = {
+  success: boolean
+  items: AnimeRelationItem[]
+  relationType: AnimeRelationType | null
 }
 
 export type PopularAnimeResponse = {
@@ -98,7 +184,6 @@ export type KoreanTitleCandidate = {
 
 export type AnimeDetailItem = {
   id: number
-  anilistId: number
   title: string
   titles: {
     korean?: KoreanTitleCandidate[]
@@ -117,15 +202,13 @@ export type AnimeDetailItem = {
   source?: string | null
   countryOfOrigin?: string | null
   isAdult?: boolean
-  averageScore?: number | null
-  meanScore?: number | null
-  popularity?: number | null
-  favourites?: number | null
+  communityAverageScore?: number | null
+  ratingCount?: number
+  collectionCount?: number
   coverImageLarge: string
   coverImageExtraLarge?: string | null
   bannerImage?: string | null
-  siteUrl?: string | null
-  sourceUpdatedAt?: string | null
+  officialSiteUrl?: string | null
   createdAt?: string | null
   updatedAt?: string | null
   genres?: string[]
@@ -135,6 +218,12 @@ export type AnimeDetailItem = {
     isSpoiler: boolean
   }>
   synonyms?: string[]
+  studios?: Array<{
+    id: number
+    name: string
+    isMain: boolean
+    officialSiteUrl?: string | null
+  }>
 }
 
 export type AnimeDetailResponse = {
@@ -159,18 +248,16 @@ export type AnimeCastImage = {
 
 export type AnimeCastVoiceActor = {
   id: number
-  anilistId: number
   languageV2?: string | null
   sortOrder?: number | null
   name: AnimeCastPersonName
   image: AnimeCastImage
   description?: string | null
-  siteUrl?: string | null
+  officialSiteUrl?: string | null
 }
 
 export type AnimeCastCharacter = {
   id: number
-  anilistId: number
   role: string
   requestedRole?: string | null
   edgeName?: string | null
@@ -180,7 +267,7 @@ export type AnimeCastCharacter = {
   gender?: string | null
   age?: string | null
   description?: string | null
-  siteUrl?: string | null
+  officialSiteUrl?: string | null
   voiceActors: AnimeCastVoiceActor[]
 }
 

@@ -1,12 +1,12 @@
 import { ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import { pool } from '../../config/db';
+import { pickAnimeTitle } from '../lib/anime-title';
 import { AnimeTitleLanguage } from './anime.service';
 
-export type VoiceActorRankingSort = 'count' | 'score';
+export type VoiceActorRankingSort = 'count' | 'score' | 'watchTime';
 
 interface VoiceActorStatsRow extends RowDataPacket {
   voiceActorId: number;
-  anilistId: number;
   nameFull: string | null;
   nameNative: string | null;
   nameUserPreferred: string | null;
@@ -18,6 +18,7 @@ interface VoiceActorStatsRow extends RowDataPacket {
   ratedAnimeCount: number;
   scoreSum: string | number | null;
   averageScore: string | number | null;
+  totalWatchMinutes: string | number | null;
   statsVersion: number;
   lastCalculatedAt: string | null;
 }
@@ -31,7 +32,6 @@ interface AnalysisStateRow extends RowDataPacket {
 
 interface VoiceActorRow extends RowDataPacket {
   id: number;
-  anilistId: number;
   nameFull: string | null;
   nameNative: string | null;
   nameUserPreferred: string | null;
@@ -39,12 +39,11 @@ interface VoiceActorRow extends RowDataPacket {
   imageLarge: string | null;
   imageMedium: string | null;
   description: string | null;
-  siteUrl: string | null;
+  officialSiteUrl: string | null;
 }
 
 interface VoiceActorAnimeRow extends RowDataPacket {
   animeId: number;
-  animeAnilistId: number;
   titleRomaji: string | null;
   titleEnglish: string | null;
   titleNative: string | null;
@@ -56,7 +55,9 @@ interface VoiceActorAnimeRow extends RowDataPacket {
   seasonYear: number | null;
   format: string | null;
   status: string | null;
-  averageScore: number | null;
+  communityAverageScore: number | null;
+  episodes: number | null;
+  duration: number | null;
   userStatus: string;
   userScore: number | null;
   userProgress: number;
@@ -66,7 +67,6 @@ interface VoiceActorAnimeRow extends RowDataPacket {
 interface VoiceActorCharacterRow extends RowDataPacket {
   animeId: number;
   characterId: number;
-  characterAnilistId: number;
   role: string | null;
   nameFull: string | null;
   nameNative: string | null;
@@ -100,12 +100,14 @@ interface RankingCursorPayload {
   animeCount?: number;
   ratedAnimeCount?: number;
   averageScore?: number | null;
+  totalWatchMinutes?: number;
   voiceActorId: number;
 }
 
 interface AnimeCursorPayload {
   voiceActorId: number;
   animeId: number;
+  status?: 'all' | 'completed';
 }
 
 function encodeCursor(payload: RankingCursorPayload | AnimeCursorPayload) {
@@ -174,8 +176,8 @@ function normalizeLimit(value: unknown) {
 export function validateVoiceActorRankingSort(value: unknown): VoiceActorRankingSort {
   const sort = typeof value === 'string' ? value : 'count';
 
-  if (sort !== 'count' && sort !== 'score') {
-    throw new Error('sort must be one of count, score');
+  if (sort !== 'count' && sort !== 'score' && sort !== 'watchTime') {
+    throw new Error('sort must be one of count, score, watchTime');
   }
 
   return sort;
@@ -206,27 +208,13 @@ export function validateVoiceActorId(value: unknown) {
 }
 
 function pickTitle(row: VoiceActorAnimeRow, titleLanguage: AnimeTitleLanguage) {
-  if (titleLanguage === 'ko') {
-    return row.titleKorean
-      ?? row.titleEnglish
-      ?? row.titleRomaji
-      ?? row.titleUserPreferred
-      ?? row.titleNative;
-  }
-
-  if (titleLanguage === 'en') {
-    return row.titleEnglish
-      ?? row.titleKorean
-      ?? row.titleRomaji
-      ?? row.titleUserPreferred
-      ?? row.titleNative;
-  }
-
-  return row.titleNative
-    ?? row.titleRomaji
-    ?? row.titleUserPreferred
-    ?? row.titleEnglish
-    ?? row.titleKorean;
+  return pickAnimeTitle({
+    korean: row.titleKorean,
+    english: row.titleEnglish,
+    romaji: row.titleRomaji,
+    userPreferred: row.titleUserPreferred,
+    native: row.titleNative,
+  }, titleLanguage);
 }
 
 async function ensureAnalysisState(userId: number) {
@@ -327,6 +315,10 @@ export async function recalculateUserVoiceActorStats(userId: number) {
           ual.anime_id,
           ual.score
         FROM user_anime_lists ual
+        INNER JOIN anime a
+          ON a.id = ual.anime_id
+          AND a.is_adult = FALSE
+          AND a.app_visible = TRUE
         INNER JOIN anime_character_voice_actors acva
           ON acva.anime_id = ual.anime_id
         WHERE ual.user_id = ?
@@ -338,6 +330,10 @@ export async function recalculateUserVoiceActorStats(userId: number) {
           acva.voice_actor_id,
           COUNT(DISTINCT acva.character_id) AS characterCount
         FROM user_anime_lists ual
+        INNER JOIN anime a
+          ON a.id = ual.anime_id
+          AND a.is_adult = FALSE
+          AND a.app_visible = TRUE
         INNER JOIN anime_character_voice_actors acva
           ON acva.anime_id = ual.anime_id
         WHERE ual.user_id = ?
@@ -379,8 +375,7 @@ export async function recalculateUserVoiceActorStats(userId: number) {
               character_count,
               rated_anime_count,
               score_sum,
-              average_score,
-              last_calculated_at
+              average_score
             )
             VALUES ?
             `,
@@ -441,7 +436,6 @@ function mapStatsRow(row: VoiceActorStatsRow) {
   return {
     voiceActor: {
       id: row.voiceActorId,
-      anilistId: row.anilistId,
       name: {
         full: row.nameFull,
         native: row.nameNative,
@@ -458,6 +452,7 @@ function mapStatsRow(row: VoiceActorStatsRow) {
     ratedAnimeCount: row.ratedAnimeCount,
     scoreSum: toNumber(row.scoreSum),
     averageScore: toNumber(row.averageScore),
+    totalWatchMinutes: Number(row.totalWatchMinutes ?? 0),
     statsVersion: row.statsVersion,
     lastCalculatedAt: row.lastCalculatedAt,
   };
@@ -509,6 +504,27 @@ export async function getUserVoiceActorRanking(params: {
         cursor.voiceActorId
       );
     }
+  } else if (params.sort === 'watchTime') {
+    if (cursor) {
+      if (cursor.sort !== params.sort || cursor.minAnimeCount !== params.minAnimeCount || cursor.minRatedAnimeCount !== params.minRatedAnimeCount) {
+        throw new Error('Cursor does not match ranking query');
+      }
+      cursorWhere = `
+        AND (
+          COALESCE(wt.totalWatchMinutes, 0) < ?
+          OR (COALESCE(wt.totalWatchMinutes, 0) = ? AND uvas.anime_count < ?)
+          OR (COALESCE(wt.totalWatchMinutes, 0) = ? AND uvas.anime_count = ? AND uvas.voice_actor_id < ?)
+        )
+      `;
+      queryParams.push(
+        cursor.totalWatchMinutes ?? 0,
+        cursor.totalWatchMinutes ?? 0,
+        cursor.animeCount ?? 0,
+        cursor.totalWatchMinutes ?? 0,
+        cursor.animeCount ?? 0,
+        cursor.voiceActorId
+      );
+    }
   } else if (cursor) {
     if (cursor.sort !== params.sort || cursor.minAnimeCount !== params.minAnimeCount || cursor.minRatedAnimeCount !== params.minRatedAnimeCount) {
       throw new Error('Cursor does not match ranking query');
@@ -530,13 +546,14 @@ export async function getUserVoiceActorRanking(params: {
     : '';
   const orderClause = params.sort === 'score'
     ? 'uvas.average_score DESC, uvas.rated_anime_count DESC, uvas.anime_count DESC, uvas.voice_actor_id DESC'
-    : 'uvas.anime_count DESC, uvas.voice_actor_id DESC';
+    : params.sort === 'watchTime'
+      ? 'COALESCE(wt.totalWatchMinutes, 0) DESC, uvas.anime_count DESC, uvas.voice_actor_id DESC'
+      : 'uvas.anime_count DESC, uvas.voice_actor_id DESC';
 
   const [rows] = await pool.query<VoiceActorStatsRow[]>(
     `
     SELECT
       uvas.voice_actor_id AS voiceActorId,
-      va.anilist_id AS anilistId,
       va.name_full AS nameFull,
       va.name_native AS nameNative,
       va.name_user_preferred AS nameUserPreferred,
@@ -548,6 +565,7 @@ export async function getUserVoiceActorRanking(params: {
       uvas.rated_anime_count AS ratedAnimeCount,
       uvas.score_sum AS scoreSum,
       uvas.average_score AS averageScore,
+      COALESCE(wt.totalWatchMinutes, 0) AS totalWatchMinutes,
       uas.voice_actor_stats_version AS statsVersion,
       uvas.last_calculated_at AS lastCalculatedAt
     FROM user_voice_actor_stats uvas
@@ -555,6 +573,31 @@ export async function getUserVoiceActorRanking(params: {
       ON va.id = uvas.voice_actor_id
     INNER JOIN user_analysis_state uas
       ON uas.user_id = uvas.user_id
+    LEFT JOIN (
+      SELECT
+        ual.user_id AS userId,
+        relation.voice_actor_id AS voiceActorId,
+        SUM(
+          CASE
+            WHEN a.duration IS NULL THEN 0
+            WHEN ual.status = 'completed' AND a.episodes IS NOT NULL
+              THEN a.episodes * a.duration
+            ELSE LEAST(ual.progress, COALESCE(a.episodes, ual.progress)) * a.duration
+          END
+        ) AS totalWatchMinutes
+      FROM user_anime_lists ual
+      INNER JOIN anime a
+        ON a.id = ual.anime_id
+        AND a.is_adult = FALSE
+        AND a.app_visible = TRUE
+      INNER JOIN (
+        SELECT DISTINCT anime_id, voice_actor_id
+        FROM anime_character_voice_actors
+      ) relation ON relation.anime_id = ual.anime_id
+      GROUP BY ual.user_id, relation.voice_actor_id
+    ) wt
+      ON wt.userId = uvas.user_id
+      AND wt.voiceActorId = uvas.voice_actor_id
     WHERE uvas.user_id = ?
       AND uvas.anime_count >= ?
       ${scoreFilter}
@@ -585,6 +628,7 @@ export async function getUserVoiceActorRanking(params: {
           animeCount: lastRow.animeCount,
           ratedAnimeCount: lastRow.ratedAnimeCount,
           averageScore: toNumber(lastRow.averageScore),
+          totalWatchMinutes: Number(lastRow.totalWatchMinutes ?? 0),
           voiceActorId: lastRow.voiceActorId,
         })
         : null,
@@ -601,6 +645,7 @@ export async function getUserVoiceActorAnime(params: {
   userId: number;
   voiceActorId: number;
   titleLanguage: AnimeTitleLanguage;
+  status: 'all' | 'completed';
   limit: number;
   cursor?: string;
 }) {
@@ -608,7 +653,6 @@ export async function getUserVoiceActorAnime(params: {
     `
     SELECT
       id,
-      anilist_id AS anilistId,
       name_full AS nameFull,
       name_native AS nameNative,
       name_user_preferred AS nameUserPreferred,
@@ -616,7 +660,7 @@ export async function getUserVoiceActorAnime(params: {
       image_large AS imageLarge,
       image_medium AS imageMedium,
       description,
-      site_url AS siteUrl
+      official_site_url AS officialSiteUrl
     FROM voice_actors
     WHERE id = ?
     LIMIT 1
@@ -633,8 +677,10 @@ export async function getUserVoiceActorAnime(params: {
   let cursorWhere = '';
 
   if (cursor) {
-    if (cursor.voiceActorId !== params.voiceActorId) {
-      throw new Error('Cursor does not match voice actor');
+    const cursorStatus = cursor.status ?? 'all';
+
+    if (cursor.voiceActorId !== params.voiceActorId || cursorStatus !== params.status) {
+      throw new Error('Cursor does not match request filters');
     }
 
     cursorWhere = 'AND a.id < ?';
@@ -642,12 +688,14 @@ export async function getUserVoiceActorAnime(params: {
   }
 
   queryParams.push(params.limit + 1);
+  const statusWhere = params.status === 'completed'
+    ? "AND ual.status = 'completed'"
+    : '';
 
   const [animeRows] = await pool.query<VoiceActorAnimeRow[]>(
     `
     SELECT
       a.id AS animeId,
-      a.anilist_id AS animeAnilistId,
       a.title_romaji AS titleRomaji,
       a.title_english AS titleEnglish,
       a.title_native AS titleNative,
@@ -659,7 +707,9 @@ export async function getUserVoiceActorAnime(params: {
       a.season_year AS seasonYear,
       a.format,
       a.status,
-      a.average_score AS averageScore,
+      acm.community_average_score AS communityAverageScore,
+      a.episodes,
+      a.duration,
       ual.status AS userStatus,
       ual.score AS userScore,
       ual.progress AS userProgress,
@@ -667,9 +717,12 @@ export async function getUserVoiceActorAnime(params: {
     FROM user_anime_lists ual
     INNER JOIN anime a
       ON a.id = ual.anime_id
+      AND a.is_adult = FALSE
+      AND a.app_visible = TRUE
     LEFT JOIN anime_korean_titles akt
       ON akt.anime_id = a.id
       AND akt.is_primary = TRUE
+    LEFT JOIN anime_community_metrics acm ON acm.anime_id = a.id
     WHERE ual.user_id = ?
       AND EXISTS (
         SELECT 1
@@ -677,6 +730,7 @@ export async function getUserVoiceActorAnime(params: {
         WHERE acva.anime_id = a.id
           AND acva.voice_actor_id = ?
       )
+      ${statusWhere}
       ${cursorWhere}
     ORDER BY a.id DESC
     LIMIT ?
@@ -695,7 +749,6 @@ export async function getUserVoiceActorAnime(params: {
       SELECT
         acva.anime_id AS animeId,
         c.id AS characterId,
-        c.anilist_id AS characterAnilistId,
         ac.role,
         c.name_full AS nameFull,
         c.name_native AS nameNative,
@@ -729,7 +782,6 @@ export async function getUserVoiceActorAnime(params: {
   return {
     voiceActor: {
       id: voiceActor.id,
-      anilistId: voiceActor.anilistId,
       name: {
         full: voiceActor.nameFull,
         native: voiceActor.nameNative,
@@ -741,12 +793,11 @@ export async function getUserVoiceActorAnime(params: {
       },
       languageV2: voiceActor.languageV2,
       description: voiceActor.description,
-      siteUrl: voiceActor.siteUrl,
+      officialSiteUrl: voiceActor.officialSiteUrl,
     },
     items: pageAnimeRows.map((row) => ({
       anime: {
         id: row.animeId,
-        anilistId: row.animeAnilistId,
         title: pickTitle(row, params.titleLanguage),
         titles: {
           korean: row.titleKorean,
@@ -761,7 +812,9 @@ export async function getUserVoiceActorAnime(params: {
         seasonYear: row.seasonYear,
         format: row.format,
         status: row.status,
-        averageScore: row.averageScore,
+        communityAverageScore: row.communityAverageScore === null ? null : Number(row.communityAverageScore),
+        episodes: row.episodes,
+        duration: row.duration,
       },
       userList: {
         status: row.userStatus,
@@ -771,7 +824,6 @@ export async function getUserVoiceActorAnime(params: {
       },
       characters: (charactersByAnimeId.get(row.animeId) ?? []).map((characterRow) => ({
         id: characterRow.characterId,
-        anilistId: characterRow.characterAnilistId,
         role: characterRow.role,
         sortOrder: characterRow.sortOrder,
         name: {
@@ -788,11 +840,13 @@ export async function getUserVoiceActorAnime(params: {
     pageInfo: {
       limit: params.limit,
       titleLanguage: params.titleLanguage,
+      status: params.status,
       hasNext,
       nextCursor: hasNext && lastRow
         ? encodeCursor({
           voiceActorId: params.voiceActorId,
           animeId: lastRow.animeId,
+          status: params.status,
         })
         : null,
     },

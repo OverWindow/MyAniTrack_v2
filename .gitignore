@@ -73,6 +73,10 @@ docker-compose.override.yml
 # =========================
 *.local
 
+# android key 
+android/key.properties
+*.jks
+*.keystore
 
 # 데이터 베이스 가리기 용
 myanitrack_v2_dump.sql

@@ -2,9 +2,14 @@ import { Request, Response } from 'express';
 import { getPublicUserProfile } from '../services/user-profile.service';
 import {
   getRecommendedAnime,
+  getUserGenreBubbleChart,
   getUserAnimeStats,
+  GenreBubbleCommunityScore,
+  GenreBubbleStatus,
+  GenreBubbleWeighting,
   recalculateUserAnimeStats,
 } from '../services/recommendation.service';
+import { getUserViewingDna } from '../services/user-viewing-dna.service';
 
 function parseTitleLanguage(value: unknown): 'ko' | 'en' | 'ja' {
   if (value === 'ko' || value === 'en' || value === 'ja') {
@@ -22,6 +27,56 @@ function parseLimit(value: unknown) {
   }
 
   return limit;
+}
+
+function parseTopLimit(value: unknown) {
+  const limit = Number(value ?? 3);
+
+  if (!Number.isInteger(limit) || limit <= 0 || limit > 10) {
+    throw new Error('topLimit must be an integer between 1 and 10');
+  }
+
+  return limit;
+}
+
+function parseMinCount(value: unknown) {
+  const minCount = Number(value ?? 5);
+
+  if (!Number.isInteger(minCount) || minCount <= 0 || minCount > 100) {
+    throw new Error('minCount must be an integer between 1 and 100');
+  }
+
+  return minCount;
+}
+
+function parseWeighting(value: unknown): GenreBubbleWeighting {
+  const weighting = typeof value === 'string' ? value : 'fractional';
+
+  if (weighting !== 'full' && weighting !== 'fractional') {
+    throw new Error('weighting must be one of full, fractional');
+  }
+
+  return weighting;
+}
+
+function parseBubbleStatus(value: unknown): GenreBubbleStatus {
+  const status = typeof value === 'string' ? value : 'completed';
+
+  if (status !== 'all' && status !== 'completed') {
+    throw new Error('status must be one of all, completed');
+  }
+
+  return status;
+}
+
+function parseCommunityScore(value: unknown): GenreBubbleCommunityScore {
+  const communityScore = typeof value === 'string' ? value : 'average';
+
+  if (communityScore !== 'average' && communityScore !== 'mean') {
+    throw new Error('communityScore must be one of average, mean');
+  }
+
+  return communityScore;
 }
 
 function parseUserId(value: unknown) {
@@ -87,7 +142,11 @@ export async function getMyAnimeStats(req: Request, res: Response) {
       return;
     }
 
-    const stats = await getUserAnimeStats(authUser.userId);
+    const stats = await getUserAnimeStats(
+      authUser.userId,
+      false,
+      parseTitleLanguage(req.query.titleLanguage)
+    );
 
     return res.json({
       success: true,
@@ -102,12 +161,100 @@ export async function getUserStats(req: Request, res: Response) {
   try {
     const userId = parseUserId(req.params.userId);
     const user = await getPublicUserProfile(userId);
-    const stats = await getUserAnimeStats(userId);
+    const stats = await getUserAnimeStats(
+      userId,
+      false,
+      parseTitleLanguage(req.query.titleLanguage)
+    );
 
     return res.json({
       success: true,
       user,
       item: stats,
+    });
+  } catch (error) {
+    return sendError(res, error);
+  }
+}
+
+export async function getMyViewingDna(req: Request, res: Response) {
+  try {
+    const authUser = ensureAuth(req, res);
+
+    if (!authUser) {
+      return;
+    }
+
+    const item = await getUserViewingDna(authUser.userId);
+
+    return res.json({
+      success: true,
+      item,
+    });
+  } catch (error) {
+    return sendError(res, error);
+  }
+}
+
+export async function getUserViewingDnaController(req: Request, res: Response) {
+  try {
+    const userId = parseUserId(req.params.userId);
+    const user = await getPublicUserProfile(userId);
+    const item = await getUserViewingDna(userId);
+
+    return res.json({
+      success: true,
+      user,
+      item,
+    });
+  } catch (error) {
+    return sendError(res, error);
+  }
+}
+
+export async function getMyGenreBubbleChart(req: Request, res: Response) {
+  try {
+    const authUser = ensureAuth(req, res);
+
+    if (!authUser) {
+      return;
+    }
+
+    const item = await getUserGenreBubbleChart(authUser.userId, {
+      titleLanguage: parseTitleLanguage(req.query.titleLanguage),
+      minCount: parseMinCount(req.query.minCount),
+      weighting: parseWeighting(req.query.weighting),
+      status: parseBubbleStatus(req.query.status),
+      communityScore: parseCommunityScore(req.query.communityScore),
+      topLimit: parseTopLimit(req.query.topLimit),
+    });
+
+    return res.json({
+      success: true,
+      item,
+    });
+  } catch (error) {
+    return sendError(res, error);
+  }
+}
+
+export async function getUserGenreBubbleChartController(req: Request, res: Response) {
+  try {
+    const userId = parseUserId(req.params.userId);
+    const user = await getPublicUserProfile(userId);
+    const item = await getUserGenreBubbleChart(userId, {
+      titleLanguage: parseTitleLanguage(req.query.titleLanguage),
+      minCount: parseMinCount(req.query.minCount),
+      weighting: parseWeighting(req.query.weighting),
+      status: parseBubbleStatus(req.query.status),
+      communityScore: parseCommunityScore(req.query.communityScore),
+      topLimit: parseTopLimit(req.query.topLimit),
+    });
+
+    return res.json({
+      success: true,
+      user,
+      item,
     });
   } catch (error) {
     return sendError(res, error);
@@ -122,7 +269,12 @@ export async function recalculateMyAnimeStats(req: Request, res: Response) {
       return;
     }
 
-    const stats = await recalculateUserAnimeStats(authUser.userId);
+    await recalculateUserAnimeStats(authUser.userId);
+    const stats = await getUserAnimeStats(
+      authUser.userId,
+      true,
+      parseTitleLanguage(req.query.titleLanguage)
+    );
 
     return res.json({
       success: true,

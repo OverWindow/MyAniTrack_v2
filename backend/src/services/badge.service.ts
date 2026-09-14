@@ -34,23 +34,13 @@ interface BadgeUserRow extends RowDataPacket {
   userId: number;
 }
 
-function getSupabasePublicObjectUrl(objectKey: string) {
-  const supabaseUrl = process.env.SUPABASE_URL?.replace(/\/+$/, '');
-  const bucket = process.env.SUPABASE_STORAGE_BUCKET || 'myanitrack_v2';
-
-  if (!supabaseUrl) {
-    return `badges/${objectKey.split('/').pop()}`;
-  }
-
-  return `${supabaseUrl}/storage/v1/object/public/${encodeURIComponent(bucket)}/${objectKey.split('/').map(encodeURIComponent).join('/')}`;
-}
-
 const INITIAL_BADGES = [
   {
     code: 'ANIME_TOTAL_100',
     name: '100편 시청',
     description: '애니를 100개 이상 보았을 때 획득합니다.',
-    imageUrl: getSupabasePublicObjectUrl('badges/watch-badge100.png'),
+    imageUrl: null,
+    objectKey: 'badges/watch-badge100.png',
     category: 'WATCH',
     conditionType: 'COMPLETED_COUNT',
     conditionValue: '100',
@@ -60,7 +50,8 @@ const INITIAL_BADGES = [
     code: 'ANIME_TOTAL_200',
     name: '200편 시청',
     description: '애니를 200개 이상 보았을 때 획득합니다.',
-    imageUrl: getSupabasePublicObjectUrl('badges/watch-badge200.png'),
+    imageUrl: null,
+    objectKey: 'badges/watch-badge200.png',
     category: 'WATCH',
     conditionType: 'COMPLETED_COUNT',
     conditionValue: '200',
@@ -70,7 +61,8 @@ const INITIAL_BADGES = [
     code: 'ANIME_TOTAL_300',
     name: '300편 시청',
     description: '애니를 300개 이상 보았을 때 획득합니다.',
-    imageUrl: getSupabasePublicObjectUrl('badges/watch-badge300.png'),
+    imageUrl: null,
+    objectKey: 'badges/watch-badge300.png',
     category: 'WATCH',
     conditionType: 'COMPLETED_COUNT',
     conditionValue: '300',
@@ -207,7 +199,7 @@ function mapBadge(row: BadgeRow, stats: UserAnimeStats) {
 
 export async function ensureInitialBadges() {
   for (const badge of INITIAL_BADGES) {
-    await pool.execute<ResultSetHeader>(
+    await pool.execute(
       `
       INSERT INTO badges (
         code,
@@ -223,9 +215,10 @@ export async function ensureInitialBadges() {
       )
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, TRUE, FALSE)
       ON DUPLICATE KEY UPDATE
+        id = LAST_INSERT_ID(id),
         name = VALUES(name),
         description = VALUES(description),
-        image_url = VALUES(image_url),
+        image_url = COALESCE(image_url, VALUES(image_url)),
         category = VALUES(category),
         condition_type = VALUES(condition_type),
         condition_value = VALUES(condition_value),
@@ -243,6 +236,7 @@ export async function ensureInitialBadges() {
         badge.rarity,
       ]
     );
+
   }
 }
 

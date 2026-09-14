@@ -1,18 +1,28 @@
+import { getLocaleTag } from '../i18n'
+import { getTitleLanguage, tr } from '../i18n'
 import { authFetch } from './auth'
 import { genreOptions } from './anime'
 import type {
   AnimeStatsResponse,
+  FormatDistributionResponse,
+  GenreBubbleResponse,
+  StudioAnimeResponse,
+  StudioRankingResponse,
+  StudioRankingSort,
   TopGenreAnimeItem,
   VoiceActorAnimeResponse,
   VoiceActorRankingResponse,
   VoiceActorRankingSort,
+  ViewingDnaItem,
+  ViewingDnaResponse,
+  YearlyScoreStatsResponse,
 } from '../types/stats'
 
 function getApiBaseUrl() {
   const baseUrl = import.meta.env.VITE_API_BASE_URL
 
   if (!baseUrl) {
-    throw new Error('VITE_API_BASE_URL이 설정되지 않았습니다.')
+    throw new Error(tr("VITE_API_BASE_URL이 설정되지 않았습니다."))
   }
 
   return baseUrl
@@ -29,7 +39,11 @@ function extractStatsItem(payload: unknown) {
     return (payload as AnimeStatsResponse).item
   }
 
-  throw new Error('분석 응답 형식이 올바르지 않아요.')
+  if (payload && typeof payload === 'object' && 'totalCount' in payload) {
+    return payload as AnimeStatsResponse['item']
+  }
+
+  throw new Error(tr("분석 응답 형식이 올바르지 않아요."))
 }
 
 function toFiniteNumber(value: unknown) {
@@ -117,8 +131,15 @@ function normalizeTopGenreAnimeItems(value: unknown) {
   })
 }
 
-function normalizeStatsItem(payload: unknown) {
+export function normalizeStatsItem(payload: unknown) {
   const item = extractStatsItem(payload)
+  const seriesStats = item.seriesStats ?? {
+    scope: 'mainline' as const,
+    startedSeriesCount: 0,
+    watchedSeriesCount: 0,
+    completedSeriesCount: 0,
+    seriesCompletionRate: 0,
+  }
 
   return {
     ...item,
@@ -137,29 +158,66 @@ function normalizeStatsItem(payload: unknown) {
     scoreDistribution: normalizeNumericMap(item.scoreDistribution),
     topWatchedGenreTopAnime: normalizeTopGenreAnimeItems(item.topWatchedGenreTopAnime),
     topRatedGenreTopAnime: normalizeTopGenreAnimeItems(item.topRatedGenreTopAnime),
+    seriesStats: {
+      scope: 'mainline' as const,
+      startedSeriesCount: toFiniteNumber(seriesStats.startedSeriesCount) ?? 0,
+      watchedSeriesCount: toFiniteNumber(seriesStats.watchedSeriesCount) ?? 0,
+      completedSeriesCount: toFiniteNumber(seriesStats.completedSeriesCount) ?? 0,
+      seriesCompletionRate: toFiniteNumber(seriesStats.seriesCompletionRate) ?? 0,
+    },
   }
 }
 
 export async function fetchMyAnimeStats(signal?: AbortSignal) {
-  const response = await authFetch(new URL('/api/me/anime-stats', getApiBaseUrl()).toString(), {
+  const url = new URL('/api/me/anime-stats', getApiBaseUrl())
+  url.searchParams.set('titleLanguage', getTitleLanguage())
+  const response = await authFetch(url.toString(), {
     signal,
   })
 
   if (response.status === 401) {
-    throw new Error('로그인이 필요해요.')
+    throw new Error(tr("로그인이 필요해요."))
   }
 
   if (!response.ok) {
-    throw new Error(`분석 정보를 불러오지 못했습니다. (${response.status})`)
+    throw new Error(tr("분석 정보를 불러오지 못했습니다. ({{v0}})", { v0: response.status }))
   }
 
   const payload = await response.json()
   return normalizeStatsItem(payload)
 }
 
+export async function fetchViewingDnaStats(params: {
+  userId?: string
+  shareToken?: string
+  signal?: AbortSignal
+} = {}): Promise<ViewingDnaItem> {
+  const path = params.shareToken
+    ? `/api/shares/${encodeURIComponent(params.shareToken)}/viewing-dna`
+    : params.userId
+    ? `/api/users/${params.userId}/anime-stats/viewing-dna`
+    : '/api/me/anime-stats/viewing-dna'
+  const response = await authFetch(new URL(path, getApiBaseUrl()).toString(), {
+    signal: params.signal,
+  })
+
+  if (response.status === 401) {
+    throw new Error(tr("로그인이 필요해요."))
+  }
+
+  if (!response.ok) {
+    throw new Error(tr("감상 DNA를 불러오지 못했습니다. ({{v0}})", { v0: response.status }))
+  }
+
+  const data = (await response.json()) as ViewingDnaResponse
+  return data.item
+}
+
 export async function recalculateMyAnimeStats() {
+  const url = new URL('/api/me/anime-stats/recalculate', getApiBaseUrl())
+  url.searchParams.set('titleLanguage', getTitleLanguage())
   const response = await authFetch(
-    new URL('/api/me/anime-stats/recalculate', getApiBaseUrl()).toString(),
+    url.toString(),
     {
       method: 'POST',
       headers: {
@@ -170,11 +228,11 @@ export async function recalculateMyAnimeStats() {
   )
 
   if (response.status === 401) {
-    throw new Error('로그인이 필요해요.')
+    throw new Error(tr("로그인이 필요해요."))
   }
 
   if (!response.ok) {
-    throw new Error(`분석을 다시 계산하지 못했습니다. (${response.status})`)
+    throw new Error(tr("분석을 다시 계산하지 못했습니다. ({{v0}})", { v0: response.status }))
   }
 
   const payload = await response.json()
@@ -182,8 +240,138 @@ export async function recalculateMyAnimeStats() {
   return normalizeStatsItem(payload)
 }
 
+type GenreBubbleParams = {
+  userId?: string
+  shareToken?: string
+  minCount?: number
+  weighting?: 'fractional' | 'full'
+  status?: 'completed' | 'all'
+  communityScore?: 'average' | 'mean'
+  titleLanguage?: 'ko' | 'en' | 'ja'
+  topLimit?: number
+  signal?: AbortSignal
+}
+
+type YearlyScoreParams = {
+  userId?: string
+  shareToken?: string
+  status?: 'completed' | 'all'
+  minRatedAnimeCount?: number
+  signal?: AbortSignal
+}
+
+type FormatDistributionParams = {
+  userId?: string
+  shareToken?: string
+  status?: 'completed' | 'all'
+  minCount?: number
+  signal?: AbortSignal
+}
+
+function createGenreBubbleUrl(params: GenreBubbleParams = {}) {
+  const path = params.shareToken
+    ? `/api/shares/${encodeURIComponent(params.shareToken)}/genre-bubble`
+    : params.userId
+    ? `/api/users/${params.userId}/anime-stats/genre-bubble`
+    : '/api/me/anime-stats/genre-bubble'
+  const url = new URL(path, getApiBaseUrl())
+
+  url.searchParams.set('minCount', String(params.minCount ?? 5))
+  url.searchParams.set('weighting', params.weighting ?? 'fractional')
+  url.searchParams.set('status', params.status ?? 'completed')
+  url.searchParams.set('communityScore', params.communityScore ?? 'average')
+  url.searchParams.set('titleLanguage', params.titleLanguage ?? getTitleLanguage())
+
+  url.searchParams.set('topLimit', String(params.topLimit ?? 3))
+
+  return url
+}
+
+function createYearlyScoreUrl(params: YearlyScoreParams = {}) {
+  const path = params.shareToken
+    ? `/api/shares/${encodeURIComponent(params.shareToken)}/yearly-scores`
+    : params.userId
+    ? `/api/users/${params.userId}/anime-stats/yearly-scores`
+    : '/api/me/anime-stats/yearly-scores'
+  const url = new URL(path, getApiBaseUrl())
+
+  url.searchParams.set('status', params.status ?? 'completed')
+  url.searchParams.set('minRatedAnimeCount', String(params.minRatedAnimeCount ?? 3))
+
+  return url
+}
+
+function createFormatDistributionUrl(params: FormatDistributionParams = {}) {
+  const path = params.shareToken
+    ? `/api/shares/${encodeURIComponent(params.shareToken)}/format-distribution`
+    : params.userId
+    ? `/api/users/${params.userId}/anime-stats/format-distribution`
+    : '/api/me/anime-stats/format-distribution'
+  const url = new URL(path, getApiBaseUrl())
+
+  url.searchParams.set('status', params.status ?? 'completed')
+  url.searchParams.set('minCount', String(params.minCount ?? 1))
+
+  return url
+}
+
+export async function fetchGenreBubbleStats(params: GenreBubbleParams = {}) {
+  const response = await authFetch(createGenreBubbleUrl(params).toString(), {
+    signal: params.signal,
+  })
+
+  if (response.status === 401) {
+    throw new Error(tr("로그인이 필요해요."))
+  }
+
+  if (!response.ok) {
+    throw new Error(tr("장르 취향 버블 차트를 불러오지 못했습니다. ({{v0}})", { v0: response.status }))
+  }
+
+  const payload = (await response.json()) as GenreBubbleResponse
+
+  return payload.item
+}
+
+export async function fetchYearlyScoreStats(params: YearlyScoreParams = {}) {
+  const response = await authFetch(createYearlyScoreUrl(params).toString(), {
+    signal: params.signal,
+  })
+
+  if (response.status === 401) {
+    throw new Error(tr("로그인이 필요해요."))
+  }
+
+  if (!response.ok) {
+    throw new Error(tr("연도별 평점 분석을 불러오지 못했습니다. ({{v0}})", { v0: response.status }))
+  }
+
+  const payload = (await response.json()) as YearlyScoreStatsResponse
+
+  return payload.item
+}
+
+export async function fetchFormatDistributionStats(params: FormatDistributionParams = {}) {
+  const response = await authFetch(createFormatDistributionUrl(params).toString(), {
+    signal: params.signal,
+  })
+
+  if (response.status === 401) {
+    throw new Error(tr("로그인이 필요해요."))
+  }
+
+  if (!response.ok) {
+    throw new Error(tr("포맷별 분석을 불러오지 못했습니다. ({{v0}})", { v0: response.status }))
+  }
+
+  const payload = (await response.json()) as FormatDistributionResponse
+
+  return payload.item
+}
+
 type VoiceActorRankingParams = {
   userId?: string
+  shareToken?: string
   sort: VoiceActorRankingSort
   limit?: number
   minRatedAnimeCount?: number
@@ -192,15 +380,44 @@ type VoiceActorRankingParams = {
 
 type VoiceActorAnimeParams = {
   userId?: string
+  shareToken?: string
   voiceActorId: number
-  titleLanguage?: 'ko' | 'en' | 'romaji'
+  titleLanguage?: 'ko' | 'en' | 'ja'
+  status?: 'all' | 'completed'
+  limit?: number
+  cursor?: string | null
+  signal?: AbortSignal
+}
+
+type StudioRankingParams = {
+  userId?: string
+  shareToken?: string
+  status?: 'completed' | 'all'
+  sort?: StudioRankingSort
+  mainOnly?: boolean
+  minAnimeCount?: number
+  minRatedAnimeCount?: number
+  limit?: number
+  cursor?: string | null
+  signal?: AbortSignal
+}
+
+type StudioAnimeParams = {
+  userId?: string
+  shareToken?: string
+  studioId: number
+  status?: 'completed' | 'all'
+  mainOnly?: boolean
+  titleLanguage?: 'ko' | 'en' | 'ja'
   limit?: number
   cursor?: string | null
   signal?: AbortSignal
 }
 
 function createVoiceActorRankingUrl(params: VoiceActorRankingParams) {
-  const path = params.userId
+  const path = params.shareToken
+    ? `/api/shares/${encodeURIComponent(params.shareToken)}/voice-actors/ranking`
+    : params.userId
     ? `/api/users/${params.userId}/voice-actors/ranking`
     : '/api/me/voice-actors/ranking'
   const url = new URL(path, getApiBaseUrl())
@@ -216,12 +433,57 @@ function createVoiceActorRankingUrl(params: VoiceActorRankingParams) {
 }
 
 function createVoiceActorAnimeUrl(params: VoiceActorAnimeParams) {
-  const path = params.userId
+  const path = params.shareToken
+    ? `/api/shares/${encodeURIComponent(params.shareToken)}/voice-actors/${params.voiceActorId}/anime`
+    : params.userId
     ? `/api/users/${params.userId}/voice-actors/${params.voiceActorId}/anime`
     : `/api/me/voice-actors/${params.voiceActorId}/anime`
   const url = new URL(path, getApiBaseUrl())
 
-  url.searchParams.set('titleLanguage', params.titleLanguage ?? 'ko')
+  url.searchParams.set('titleLanguage', params.titleLanguage ?? getTitleLanguage())
+  url.searchParams.set('status', params.status ?? 'all')
+  url.searchParams.set('limit', String(params.limit ?? 20))
+
+  if (params.cursor) {
+    url.searchParams.set('cursor', params.cursor)
+  }
+
+  return url
+}
+
+function createStudioRankingUrl(params: StudioRankingParams = {}) {
+  const path = params.shareToken
+    ? `/api/shares/${encodeURIComponent(params.shareToken)}/studios`
+    : params.userId
+    ? `/api/users/${params.userId}/anime-stats/studios`
+    : '/api/me/anime-stats/studios'
+  const url = new URL(path, getApiBaseUrl())
+
+  url.searchParams.set('status', params.status ?? 'completed')
+  url.searchParams.set('sort', params.sort ?? 'count')
+  url.searchParams.set('mainOnly', String(params.mainOnly ?? true))
+  url.searchParams.set('minAnimeCount', String(params.minAnimeCount ?? 1))
+  url.searchParams.set('minRatedAnimeCount', String(params.minRatedAnimeCount ?? 1))
+  url.searchParams.set('limit', String(params.limit ?? 20))
+
+  if (params.cursor) {
+    url.searchParams.set('cursor', params.cursor)
+  }
+
+  return url
+}
+
+function createStudioAnimeUrl(params: StudioAnimeParams) {
+  const path = params.shareToken
+    ? `/api/shares/${encodeURIComponent(params.shareToken)}/studios/${params.studioId}/anime`
+    : params.userId
+    ? `/api/users/${params.userId}/anime-stats/studios/${params.studioId}/anime`
+    : `/api/me/anime-stats/studios/${params.studioId}/anime`
+  const url = new URL(path, getApiBaseUrl())
+
+  url.searchParams.set('status', params.status ?? 'completed')
+  url.searchParams.set('mainOnly', String(params.mainOnly ?? true))
+  url.searchParams.set('titleLanguage', params.titleLanguage ?? getTitleLanguage())
   url.searchParams.set('limit', String(params.limit ?? 20))
 
   if (params.cursor) {
@@ -237,11 +499,11 @@ export async function fetchVoiceActorRanking(params: VoiceActorRankingParams) {
   })
 
   if (response.status === 401) {
-    throw new Error('로그인이 필요해요.')
+    throw new Error(tr("로그인이 필요해요."))
   }
 
   if (!response.ok) {
-    throw new Error(`성우 랭킹을 불러오지 못했습니다. (${response.status})`)
+    throw new Error(tr("성우 랭킹을 불러오지 못했습니다. ({{v0}})", { v0: response.status }))
   }
 
   const payload = (await response.json()) as VoiceActorRankingResponse
@@ -255,19 +517,51 @@ export async function fetchVoiceActorAnime(params: VoiceActorAnimeParams) {
   })
 
   if (response.status === 401) {
-    throw new Error('로그인이 필요해요.')
+    throw new Error(tr("로그인이 필요해요."))
   }
 
   if (!response.ok) {
-    throw new Error(`성우 상세 작품을 불러오지 못했습니다. (${response.status})`)
+    throw new Error(tr("성우 상세 작품을 불러오지 못했습니다. ({{v0}})", { v0: response.status }))
   }
 
   return (await response.json()) as VoiceActorAnimeResponse
 }
 
+export async function fetchStudioRanking(params: StudioRankingParams = {}) {
+  const response = await authFetch(createStudioRankingUrl(params).toString(), {
+    signal: params.signal,
+  })
+
+  if (response.status === 401) {
+    throw new Error(tr("로그인이 필요해요."))
+  }
+
+  if (!response.ok) {
+    throw new Error(tr("스튜디오 랭킹을 불러오지 못했습니다. ({{v0}})", { v0: response.status }))
+  }
+
+  return (await response.json()) as StudioRankingResponse
+}
+
+export async function fetchStudioAnime(params: StudioAnimeParams) {
+  const response = await authFetch(createStudioAnimeUrl(params).toString(), {
+    signal: params.signal,
+  })
+
+  if (response.status === 401) {
+    throw new Error(tr("로그인이 필요해요."))
+  }
+
+  if (!response.ok) {
+    throw new Error(tr("스튜디오 작품 목록을 불러오지 못했습니다. ({{v0}})", { v0: response.status }))
+  }
+
+  return (await response.json()) as StudioAnimeResponse
+}
+
 export function getGenreLabel(genre?: string | null) {
   if (!genre) {
-    return '정보 없음'
+    return tr("정보 없음")
   }
 
   return genreOptions.find((option) => option.value === genre)?.label ?? genre
@@ -275,15 +569,15 @@ export function getGenreLabel(genre?: string | null) {
 
 export function formatWatchHours(totalMinutes?: number | null) {
   if (!totalMinutes || totalMinutes <= 0) {
-    return '0시간'
+    return tr("0시간")
   }
 
-  return `${Math.round(totalMinutes / 60).toLocaleString()}시간`
+  return tr("{{v0}}시간", { v0: Math.round(totalMinutes / 60).toLocaleString(getLocaleTag()) })
 }
 
 export function formatUpdatedAt(updatedAt?: string | null) {
   if (!updatedAt) {
-    return '업데이트 정보 없음'
+    return tr("업데이트 정보 없음")
   }
 
   const normalized = updatedAt.replace(' ', 'T')
@@ -293,7 +587,7 @@ export function formatUpdatedAt(updatedAt?: string | null) {
     return updatedAt
   }
 
-  return date.toLocaleString('ko-KR', {
+  return date.toLocaleString(getLocaleTag(), {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',

@@ -1,3 +1,4 @@
+import { tr } from '../i18n'
 import { authFetch } from './auth'
 import type { MyBadgesResponse, PublicUserBadgesResponse, UserBadge } from '../types/badges'
 
@@ -5,7 +6,7 @@ function getApiBaseUrl() {
   const baseUrl = import.meta.env.VITE_API_BASE_URL
 
   if (!baseUrl) {
-    throw new Error('VITE_API_BASE_URL이 설정되지 않았습니다.')
+    throw new Error(tr("VITE_API_BASE_URL이 설정되지 않았습니다."))
   }
 
   return baseUrl
@@ -13,15 +14,15 @@ function getApiBaseUrl() {
 
 function getErrorMessage(status: number, fallback: string) {
   if (status === 401) {
-    return '로그인이 필요하거나 세션이 만료되었어요.'
+    return tr("로그인이 필요하거나 세션이 만료되었어요.")
   }
 
   if (status === 404) {
-    return '배지 정보를 찾을 수 없어요.'
+    return tr("배지 정보를 찾을 수 없어요.")
   }
 
   if (status >= 500) {
-    return '서버 오류가 발생했어요. 잠시 후 다시 시도해주세요.'
+    return tr("서버 오류가 발생했어요. 잠시 후 다시 시도해주세요.")
   }
 
   return fallback
@@ -95,7 +96,7 @@ export async function fetchMyBadges(signal?: AbortSignal) {
   const response = await authFetch(new URL('/api/me/badges', getApiBaseUrl()).toString(), { signal })
 
   if (!response.ok) {
-    throw new Error(getErrorMessage(response.status, '내 배지를 불러오지 못했어요.'))
+    throw new Error(getErrorMessage(response.status, tr("내 배지를 불러오지 못했어요.")))
   }
 
   const data = (await response.json()) as MyBadgesResponse
@@ -114,7 +115,7 @@ export async function fetchPublicUserBadges(userId: string, signal?: AbortSignal
   const response = await authFetch(new URL(`/api/users/${userId}/badges`, getApiBaseUrl()).toString(), { signal })
 
   if (!response.ok) {
-    throw new Error(getErrorMessage(response.status, '사용자 배지를 불러오지 못했어요.'))
+    throw new Error(getErrorMessage(response.status, tr("사용자 배지를 불러오지 못했어요.")))
   }
 
   const data = (await response.json()) as PublicUserBadgesResponse

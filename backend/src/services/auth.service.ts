@@ -10,7 +10,17 @@ import {
   verifyPassword,
 } from '../lib/auth';
 import { sendPasswordResetEmail, sendVerifyEmail } from '../lib/mail';
-import { normalizeProfileImageUrl } from '../lib/supabase-storage';
+import {
+  deleteSupabaseAuthUser,
+  getSupabaseAuthUser,
+  hasGoogleOAuthSession,
+  SupabaseAuthUser,
+} from '../lib/supabase-auth';
+import { deleteProfileImageByUrl, normalizeProfileImageUrl } from '../lib/image-storage';
+import {
+  CURRENT_PRIVACY_VERSION,
+  CURRENT_TERMS_VERSION,
+} from './user-agreement.service';
 
 type UserRole = 'USER' | 'ADMIN';
 type EmailTokenPurpose = 'SIGNUP_VERIFY' | 'PASSWORD_RESET';
@@ -39,16 +49,17 @@ interface EmailVerificationTokenRow extends RowDataPacket {
   usedAt: string | null;
 }
 
-export interface SignUpParams {
+interface PasswordResetRateRow extends RowDataPacket {
+  lastMinute: number | string;
+  lastHour: number | string;
+  lastDay: number | string;
+}
+
+interface UserDeletionRow extends RowDataPacket {
+  id: number;
   email: string;
-  username: string;
-  password: string;
-  profileImageUrl?: string | null;
-  bio?: string | null;
-  deviceType?: string | null;
-  deviceName?: string | null;
-  userAgent?: string | null;
-  ipAddress?: string | null;
+  profileImageUrl: string | null;
+  supabaseUserId: string | null;
 }
 
 export interface LoginParams {
@@ -233,6 +244,31 @@ async function findUserByUsername(username: string) {
   return rows[0] ?? null;
 }
 
+async function findUserBySupabaseUserId(supabaseUserId: string) {
+  const [rows] = await pool.query<UserRow[]>(
+    `
+    SELECT
+      id,
+      email,
+      username,
+      role,
+      password_hash AS passwordHash,
+      profile_image_url AS profileImageUrl,
+      bio,
+      email_verified AS emailVerified,
+      email_verified_at AS emailVerifiedAt,
+      created_at AS createdAt,
+      updated_at AS updatedAt
+    FROM users
+    WHERE supabase_user_id = ?
+    LIMIT 1
+    `,
+    [supabaseUserId]
+  );
+
+  return rows[0] ?? null;
+}
+
 async function findUserById(id: number) {
   const [rows] = await pool.query<UserRow[]>(
     `
@@ -248,6 +284,24 @@ async function findUserById(id: number) {
       email_verified_at AS emailVerifiedAt,
       created_at AS createdAt,
       updated_at AS updatedAt
+    FROM users
+    WHERE id = ?
+    LIMIT 1
+    `,
+    [id]
+  );
+
+  return rows[0] ?? null;
+}
+
+async function findUserDeletionTargetById(id: number) {
+  const [rows] = await pool.query<UserDeletionRow[]>(
+    `
+    SELECT
+      id,
+      email,
+      profile_image_url AS profileImageUrl,
+      supabase_user_id AS supabaseUserId
     FROM users
     WHERE id = ?
     LIMIT 1
@@ -293,6 +347,336 @@ function mapUserProfile(user: UserRow) {
     bio: user.bio,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
+  };
+}
+
+function getSupabaseProvider(user: SupabaseAuthUser) {
+  const provider = user.appMetadata.provider;
+
+  return typeof provider === 'string' && provider.trim()
+    ? provider.trim().slice(0, 30)
+    : user.providers[0]
+      ? user.providers[0].slice(0, 30)
+    : 'supabase';
+}
+
+function getSupabaseMetadataText(user: SupabaseAuthUser, keys: string[]) {
+  for (const key of keys) {
+    const value = user.userMetadata[key];
+
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim();
+    }
+  }
+
+  return null;
+}
+
+function buildUsernameBase(user: SupabaseAuthUser) {
+  const metadataName = getSupabaseMetadataText(user, ['user_name', 'preferred_username', 'name', 'full_name']);
+  const rawBase = metadataName || user.email.split('@')[0] || 'user';
+  const normalizedBase = rawBase
+    .replace(/[^a-zA-Z0-9_]/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 16);
+
+  return normalizedBase.length >= 3 ? normalizedBase : `user_${normalizedBase}`.slice(0, 16);
+}
+
+async function createUniqueUsername(user: SupabaseAuthUser) {
+  const base = buildUsernameBase(user);
+  const baseCandidate = base.slice(0, 20);
+
+  if (!await findUserByUsername(baseCandidate)) {
+    return baseCandidate;
+  }
+
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const suffix = crypto.randomBytes(3).toString('hex');
+    const candidate = `${base.slice(0, Math.max(3, 20 - suffix.length - 1))}_${suffix}`;
+
+    if (!await findUserByUsername(candidate)) {
+      return candidate;
+    }
+  }
+
+  throw new Error('Failed to create unique username');
+}
+
+function isSupabaseEmailVerified(user: SupabaseAuthUser) {
+  return Boolean(user.emailConfirmedAt) || user.providers.includes('google');
+}
+
+function requireGoogleProvider(user: SupabaseAuthUser) {
+  if (!hasGoogleOAuthSession(user)) {
+    throw new Error('Google OAuth session required');
+  }
+}
+
+interface AgreementHistoryRow extends RowDataPacket {
+  agreementType: 'TERMS' | 'PRIVACY';
+  version: string;
+  agreed: number | boolean;
+}
+
+interface AgreementFlagsRow extends RowDataPacket {
+  termsAgreed: number | boolean;
+  privacyAgreed: number | boolean;
+}
+
+async function ensureCurrentRequiredAgreements(conn: PoolConnection, userId: number) {
+  const [flagRows] = await conn.query<AgreementFlagsRow[]>(
+    `
+    SELECT
+      terms_agreed AS termsAgreed,
+      privacy_agreed AS privacyAgreed
+    FROM users
+    WHERE id = ?
+    LIMIT 1
+    FOR UPDATE
+    `,
+    [userId]
+  );
+  const [historyRows] = await conn.query<AgreementHistoryRow[]>(
+    `
+    SELECT
+      agreement_type AS agreementType,
+      version,
+      agreed
+    FROM user_agreements
+    WHERE user_id = ?
+      AND agreement_type IN ('TERMS', 'PRIVACY')
+    ORDER BY id DESC
+    `,
+    [userId]
+  );
+
+  const latestByType = new Map<'TERMS' | 'PRIVACY', AgreementHistoryRow>();
+  for (const row of historyRows) {
+    if (!latestByType.has(row.agreementType)) {
+      latestByType.set(row.agreementType, row);
+    }
+  }
+
+  const latestTerms = latestByType.get('TERMS');
+  const latestPrivacy = latestByType.get('PRIVACY');
+  const needsTermsRecord = !latestTerms
+    || !Boolean(latestTerms.agreed)
+    || latestTerms.version !== CURRENT_TERMS_VERSION;
+  const needsPrivacyRecord = !latestPrivacy
+    || !Boolean(latestPrivacy.agreed)
+    || latestPrivacy.version !== CURRENT_PRIVACY_VERSION;
+  const flags = flagRows[0];
+  const needsFlagUpdate = !flags
+    || !Boolean(flags.termsAgreed)
+    || !Boolean(flags.privacyAgreed);
+
+  if (!needsTermsRecord && !needsPrivacyRecord && !needsFlagUpdate) {
+    return;
+  }
+
+  await conn.execute(
+    `
+    UPDATE users
+    SET
+      terms_agreed = TRUE,
+      privacy_agreed = TRUE,
+      agreed_at = CURRENT_TIMESTAMP,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+    `,
+    [userId]
+  );
+
+  if (needsTermsRecord) {
+    await conn.execute(
+      `
+      INSERT INTO user_agreements (user_id, agreement_type, version, agreed, agreed_at)
+      VALUES (?, 'TERMS', ?, TRUE, CURRENT_TIMESTAMP)
+      `,
+      [userId, CURRENT_TERMS_VERSION]
+    );
+  }
+
+  if (needsPrivacyRecord) {
+    await conn.execute(
+      `
+      INSERT INTO user_agreements (user_id, agreement_type, version, agreed, agreed_at)
+      VALUES (?, 'PRIVACY', ?, TRUE, CURRENT_TIMESTAMP)
+      `,
+      [userId, CURRENT_PRIVACY_VERSION]
+    );
+  }
+}
+
+async function linkExistingUserToSupabase(user: UserRow, supabaseUser: SupabaseAuthUser) {
+  const conn = await pool.getConnection();
+
+  try {
+    await conn.beginTransaction();
+    await conn.execute(
+      `
+      UPDATE users
+      SET
+        supabase_user_id = ?,
+        auth_provider = ?,
+        email_verified = TRUE,
+        email_verified_at = COALESCE(email_verified_at, CURRENT_TIMESTAMP),
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+      `,
+      [supabaseUser.id, getSupabaseProvider(supabaseUser), user.id]
+    );
+    await ensureCurrentRequiredAgreements(conn, user.id);
+    await conn.commit();
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
+  }
+
+  const linkedUser = await findUserById(user.id);
+
+  if (!linkedUser) {
+    throw new Error('User not found');
+  }
+
+  return linkedUser;
+}
+
+async function ensureAgreementsForExistingUser(user: UserRow) {
+  const conn = await pool.getConnection();
+
+  try {
+    await conn.beginTransaction();
+    await ensureCurrentRequiredAgreements(conn, user.id);
+    await conn.commit();
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
+  }
+
+  return user;
+}
+
+async function createUserFromSupabase(supabaseUser: SupabaseAuthUser) {
+  const username = await createUniqueUsername(supabaseUser);
+  const provider = getSupabaseProvider(supabaseUser);
+  const conn = await pool.getConnection();
+  let createdUserId = 0;
+
+  try {
+    await conn.beginTransaction();
+
+    const [result] = await conn.execute<ResultSetHeader>(
+      `
+      INSERT INTO users (
+        email,
+        username,
+        password_hash,
+        role,
+        email_verified,
+        email_verified_at,
+        supabase_user_id,
+        auth_provider
+      )
+      VALUES (?, ?, ?, 'USER', TRUE, CURRENT_TIMESTAMP, ?, ?)
+      `,
+      [
+        supabaseUser.email,
+        username,
+        `SUPABASE_AUTH:${supabaseUser.id}`,
+        supabaseUser.id,
+        provider,
+      ]
+    );
+
+    createdUserId = result.insertId;
+    await ensureCurrentRequiredAgreements(conn, createdUserId);
+    await conn.commit();
+  } catch (error) {
+    await conn.rollback();
+
+    if ((error as { code?: string }).code === 'ER_DUP_ENTRY') {
+      const existingUser = await findUserByEmail(supabaseUser.email);
+
+      if (existingUser) {
+        return linkExistingUserToSupabase(existingUser, supabaseUser);
+      }
+    }
+
+    throw error;
+  } finally {
+    conn.release();
+  }
+
+  const createdUser = await findUserById(createdUserId);
+
+  if (!createdUser) {
+    throw new Error('Failed to create user');
+  }
+
+  return createdUser;
+}
+
+async function getVerifiedGoogleSupabaseUser(accessToken: string) {
+  const supabaseUser = await getSupabaseAuthUser(accessToken);
+
+  requireGoogleProvider(supabaseUser);
+
+  if (!isSupabaseEmailVerified(supabaseUser)) {
+    throw new Error('Supabase email verification required');
+  }
+
+  return supabaseUser;
+}
+
+export async function findLinkedUserFromSupabaseToken(accessToken: string) {
+  const supabaseUser = await getVerifiedGoogleSupabaseUser(accessToken);
+  const user = await findUserBySupabaseUserId(supabaseUser.id);
+
+  if (!user) {
+    throw new Error('Supabase account is not linked');
+  }
+
+  return user;
+}
+
+async function findOrCreateGoogleUserFromSupabaseToken(accessToken: string) {
+  const supabaseUser = await getVerifiedGoogleSupabaseUser(accessToken);
+
+  const existingLinkedUser = await findUserBySupabaseUserId(supabaseUser.id);
+
+  if (existingLinkedUser) {
+    return ensureAgreementsForExistingUser(existingLinkedUser);
+  }
+
+  const existingEmailUser = await findUserByEmail(supabaseUser.email);
+
+  if (existingEmailUser) {
+    return linkExistingUserToSupabase(existingEmailUser, supabaseUser);
+  }
+
+  return createUserFromSupabase(supabaseUser);
+}
+
+export async function loginWithSupabaseAccessToken(accessToken: string) {
+  const normalizedToken = normalizeOptionalText(accessToken, 5000);
+
+  if (!normalizedToken) {
+    throw new Error('accessToken is required');
+  }
+
+  const user = await findOrCreateGoogleUserFromSupabaseToken(normalizedToken);
+
+  return {
+    tokenType: 'Bearer',
+    authProvider: 'supabase',
+    user: mapUserProfile(user),
   };
 }
 
@@ -423,102 +807,6 @@ async function findRefreshTokenByTokenHash(tokenHash: string) {
   );
 
   return rows[0] ?? null;
-}
-
-export async function signUp(params: SignUpParams) {
-  const email = validateEmail(params.email);
-  const username = validateUsername(params.username);
-  const password = validatePassword(params.password);
-  const profileImageUrl = normalizeProfileImageUrl(normalizeOptionalText(params.profileImageUrl, 500));
-  const bio = normalizeOptionalText(params.bio, 500);
-
-  const passwordHash = await hashPassword(password);
-  const conn = await pool.getConnection();
-  let user: UserRow | null = null;
-  let verifyToken = '';
-
-  try {
-    await conn.beginTransaction();
-
-    const [result] = await conn.execute<ResultSetHeader>(
-      `
-      INSERT INTO users (
-        email,
-        username,
-        password_hash,
-        profile_image_url,
-        bio,
-        role,
-        email_verified,
-        email_verified_at
-      )
-      VALUES (?, ?, ?, ?, ?, 'USER', FALSE, NULL)
-      `,
-      [email, username, passwordHash, profileImageUrl, bio]
-    );
-
-    const [userRows] = await conn.query<UserRow[]>(
-      `
-      SELECT
-        id,
-        email,
-        username,
-        role,
-        password_hash AS passwordHash,
-        profile_image_url AS profileImageUrl,
-        bio,
-        email_verified AS emailVerified,
-        email_verified_at AS emailVerifiedAt,
-        created_at AS createdAt,
-        updated_at AS updatedAt
-      FROM users
-      WHERE id = ?
-      LIMIT 1
-      `,
-      [result.insertId]
-    );
-
-    user = userRows[0] ?? null;
-
-    if (!user) {
-      throw new Error('Failed to create user');
-    }
-
-    verifyToken = await createEmailTokenRecord(conn, {
-      userId: user.id,
-      email: user.email,
-      purpose: 'SIGNUP_VERIFY',
-      expiresAt: getSignupVerifyExpiresAt(),
-      ipAddress: params.ipAddress,
-      userAgent: params.userAgent,
-    });
-
-    await conn.commit();
-  } catch (error) {
-    await conn.rollback();
-
-    if ((error as { code?: string }).code === 'ER_DUP_ENTRY') {
-      throw new Error('Email or username already exists');
-    }
-
-    throw error;
-  } finally {
-    conn.release();
-  }
-
-  if (!user) {
-    throw new Error('Failed to create user');
-  }
-
-  await sendVerifyEmail({
-    to: user.email,
-    token: verifyToken,
-  });
-
-  return {
-    requiresEmailVerification: true,
-    user: mapUserProfile(user),
-  };
 }
 
 export async function login(params: LoginParams) {
@@ -699,28 +987,78 @@ export async function verifySignupEmail(token: string) {
 
 export async function requestPasswordReset(params: RequestPasswordResetParams) {
   const email = validateEmail(params.email);
+
+  // Do not await account lookup, token creation, or mail delivery. The public
+  // response must be the same for existing and non-existing accounts, including
+  // when the mail provider is unavailable.
+  void processPasswordResetRequest(email, params).catch((error) => {
+    console.error('Password reset email processing failed', error);
+  });
+}
+
+async function processPasswordResetRequest(
+  email: string,
+  params: RequestPasswordResetParams
+) {
   const user = await findUserByEmail(email);
 
   if (!user || !user.emailVerified) {
-    return {
-      email,
-      sent: true,
-    };
+    return;
   }
 
   const conn = await pool.getConnection();
   let token = '';
+  let shouldSend = false;
 
   try {
     await conn.beginTransaction();
-    token = await createEmailTokenRecord(conn, {
-      userId: user.id,
-      email: user.email,
-      purpose: 'PASSWORD_RESET',
-      expiresAt: getPasswordResetExpiresAt(),
-      ipAddress: params.ipAddress,
-      userAgent: params.userAgent,
-    });
+
+    // Serialize requests for the same account so concurrent calls cannot all
+    // pass the quota check before any of them inserts a token.
+    await conn.query('SELECT id FROM users WHERE id = ? FOR UPDATE', [user.id]);
+
+    const [rateRows] = await conn.query<PasswordResetRateRow[]>(
+      `
+      SELECT
+        SUM(created_at >= DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 1 MINUTE)) AS lastMinute,
+        SUM(created_at >= DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 1 HOUR)) AS lastHour,
+        SUM(created_at >= DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 1 DAY)) AS lastDay
+      FROM email_verification_tokens
+      WHERE user_id = ?
+        AND purpose = 'PASSWORD_RESET'
+      `,
+      [user.id]
+    );
+
+    const rate = rateRows[0];
+    const lastMinute = Number(rate?.lastMinute || 0);
+    const lastHour = Number(rate?.lastHour || 0);
+    const lastDay = Number(rate?.lastDay || 0);
+
+    if (lastMinute < 1 && lastHour < 3 && lastDay < 5) {
+      // Only the most recently issued password reset link remains valid.
+      await conn.execute(
+        `
+        UPDATE email_verification_tokens
+        SET used_at = CURRENT_TIMESTAMP
+        WHERE user_id = ?
+          AND purpose = 'PASSWORD_RESET'
+          AND used_at IS NULL
+        `,
+        [user.id]
+      );
+
+      token = await createEmailTokenRecord(conn, {
+        userId: user.id,
+        email: user.email,
+        purpose: 'PASSWORD_RESET',
+        expiresAt: getPasswordResetExpiresAt(),
+        ipAddress: params.ipAddress,
+        userAgent: params.userAgent,
+      });
+      shouldSend = true;
+    }
+
     await conn.commit();
   } catch (error) {
     await conn.rollback();
@@ -729,16 +1067,13 @@ export async function requestPasswordReset(params: RequestPasswordResetParams) {
     conn.release();
   }
 
-  await sendPasswordResetEmail({
-    to: user.email,
-    token,
-    email: user.email,
-  });
-
-  return {
-    email,
-    sent: true,
-  };
+  if (shouldSend) {
+    await sendPasswordResetEmail({
+      to: user.email,
+      token,
+      email: user.email,
+    });
+  }
 }
 
 export async function resetPasswordWithEmailToken(token: string, newPassword: string) {
@@ -780,6 +1115,24 @@ export async function resetPasswordWithEmailToken(token: string, newPassword: st
   try {
     await conn.beginTransaction();
 
+    // Serialize reset confirmation with new reset-email issuance for this user.
+    await conn.query('SELECT id FROM users WHERE id = ? FOR UPDATE', [user.id]);
+
+    const [claimResult] = await conn.execute<ResultSetHeader>(
+      `
+      UPDATE email_verification_tokens
+      SET used_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+        AND used_at IS NULL
+        AND expires_at > CURRENT_TIMESTAMP
+      `,
+      [resetToken.id]
+    );
+
+    if (claimResult.affectedRows !== 1) {
+      throw new Error('Invalid password reset token');
+    }
+
     await conn.execute(
       `
       UPDATE users
@@ -789,15 +1142,6 @@ export async function resetPasswordWithEmailToken(token: string, newPassword: st
       WHERE id = ?
       `,
       [passwordHash, user.id]
-    );
-
-    await conn.execute(
-      `
-      UPDATE email_verification_tokens
-      SET used_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-      `,
-      [resetToken.id]
     );
 
     await conn.execute(
@@ -935,5 +1279,49 @@ export async function logoutAll(userId: number) {
     `,
     [userId]
   );
+}
+
+export async function deleteMyAccount(userId: number) {
+  const user = await findUserDeletionTargetById(userId);
+
+  if (!user) {
+    throw new Error('User not found');
+  }
+
+  if (user.supabaseUserId) {
+    await deleteSupabaseAuthUser(user.supabaseUserId);
+  }
+
+  const [result] = await pool.execute<ResultSetHeader>(
+    `
+    DELETE FROM users
+    WHERE id = ?
+    `,
+    [user.id]
+  );
+
+  if (result.affectedRows === 0) {
+    throw new Error('User not found');
+  }
+
+  await pool.execute(
+    `
+    DELETE FROM catalog_image_assets
+    WHERE entity_type = 'user_profile'
+      AND entity_id = ?
+      AND variant = 'profile_image'
+    `,
+    [user.id],
+  );
+
+  deleteProfileImageByUrl(user.profileImageUrl).catch((error) => {
+    console.error('Failed to delete profile image during account deletion', error);
+  });
+
+  return {
+    deleted: true,
+    userId: user.id,
+    email: user.email,
+  };
 }
 

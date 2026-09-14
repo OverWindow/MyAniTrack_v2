@@ -1,5 +1,9 @@
+import { tr } from '../i18n'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { Pencil } from 'lucide-react'
+import { ErrorToast } from '../components/ErrorToast'
+import { ProfileImageCropper } from '../components/ProfileImageCropper'
 import { useAuth } from '../contexts/AuthContext'
 import { getProfileImageSrc, handleProfileImageError } from '../lib/avatar'
 import { checkUsernameAvailability } from '../lib/auth'
@@ -18,6 +22,7 @@ export function ProfileEditPage() {
   const [username, setUsername] = useState(user?.username ?? '')
   const [bio, setBio] = useState(user?.bio ?? '')
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [isCropModalOpen, setIsCropModalOpen] = useState(false)
   const [removeProfileImage, setRemoveProfileImage] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isCheckingUsername, setIsCheckingUsername] = useState(false)
@@ -53,7 +58,7 @@ export function ProfileEditPage() {
     [isUsernameChanged, normalizedUsername, usernameCheck.checkedUsername, usernameCheck.isAvailable],
   )
   const displayName = normalizedUsername || user?.username || 'MyAniTrack User'
-  const displayBio = normalizedBio || '좋아하는 장르와 감상 스타일을 소개해보세요.'
+  const displayBio = normalizedBio || tr("좋아하는 장르와 감상 스타일을 소개해보세요.")
   const hasChanges =
     isUsernameChanged || isBioChanged || Boolean(selectedFile) || removeProfileImage
 
@@ -89,7 +94,7 @@ export function ProfileEditPage() {
       setUsernameCheck({
         checkedUsername: null,
         isAvailable: null,
-        message: '닉네임을 먼저 입력해주세요.',
+        message: tr("닉네임을 먼저 입력해주세요."),
       })
       return
     }
@@ -98,7 +103,7 @@ export function ProfileEditPage() {
       setUsernameCheck({
         checkedUsername: normalizedUsername,
         isAvailable: true,
-        message: '현재 사용 중인 닉네임이에요.',
+        message: tr("현재 사용 중인 닉네임이에요."),
       })
       return
     }
@@ -115,7 +120,7 @@ export function ProfileEditPage() {
       setUsernameCheck({
         checkedUsername: result.username,
         isAvailable: result.available,
-        message: result.available ? '사용 가능한 닉네임이에요.' : '이미 사용 중인 닉네임이에요.',
+        message: result.available ? tr("사용 가능한 닉네임이에요.") : tr("이미 사용 중인 닉네임이에요."),
       })
     } catch (checkError) {
       setUsernameCheck({
@@ -124,7 +129,7 @@ export function ProfileEditPage() {
         message:
           checkError instanceof Error
             ? checkError.message
-            : '닉네임 중복 확인에 실패했어요.',
+            : tr("닉네임 중복 확인에 실패했어요."),
       })
     } finally {
       setIsCheckingUsername(false)
@@ -135,7 +140,7 @@ export function ProfileEditPage() {
     event.preventDefault()
 
     if (!isUsernameVerified) {
-      setError('닉네임 중복 확인을 완료해주세요.')
+      setError(tr("닉네임 중복 확인을 완료해주세요."))
       return
     }
 
@@ -153,7 +158,7 @@ export function ProfileEditPage() {
       navigate('/profile', { replace: true })
     } catch (submitError) {
       setError(
-        submitError instanceof Error ? submitError.message : '프로필 저장에 실패했어요.',
+        submitError instanceof Error ? submitError.message : tr("프로필 저장에 실패했어요."),
       )
     } finally {
       setIsSubmitting(false)
@@ -163,20 +168,29 @@ export function ProfileEditPage() {
   return (
     <section className="auth-page profile-edit-page">
       <div className="auth-card auth-card-wide profile-edit-card">
-        <span className="section-kicker">Edit profile</span>
-        <h1 className="auth-title">프로필 수정</h1>
+        <h1 className="auth-title">{tr("프로필 수정")}</h1>
         <p className="auth-description">
-          사용자명, bio, 프로필 이미지를 바꾸면 즉시 헤더와 프로필 페이지에 반영돼요.
+          {tr("사용자명, bio, 프로필 이미지를 바꾸면 즉시 헤더와 프로필 페이지에 반영돼요.")}
         </p>
 
         <form className="auth-form" onSubmit={handleSubmit}>
           <div className="profile-edit-preview">
-            <img
-              className="profile-hero-avatar profile-hero-avatar-image"
-              src={getProfileImageSrc(previewUrl)}
-              alt={displayName}
-              onError={handleProfileImageError}
-            />
+            <button
+              className="profile-edit-avatar-button"
+              type="button"
+              aria-label={tr("프로필 이미지 수정")}
+              onClick={() => setIsCropModalOpen(true)}
+            >
+              <img
+                className="profile-hero-avatar profile-hero-avatar-image"
+                src={getProfileImageSrc(previewUrl)}
+                alt={displayName}
+                onError={handleProfileImageError}
+              />
+              <span className="profile-edit-avatar-overlay" aria-hidden="true">
+                <Pencil size={22} />
+              </span>
+            </button>
 
             <div className="profile-edit-preview-copy">
               <strong>{displayName}</strong>
@@ -185,13 +199,13 @@ export function ProfileEditPage() {
           </div>
 
           <div className="auth-field">
-            <span>사용자명</span>
+            <span>{tr("사용자명")}</span>
             <div className="auth-inline-field">
               <input
                 type="text"
                 value={username}
                 onChange={(event) => handleUsernameChange(event.target.value)}
-                placeholder="새 사용자명을 입력하세요"
+                placeholder={tr("새 사용자명을 입력하세요")}
               />
               <button
                 className="secondary-button auth-inline-button"
@@ -201,7 +215,7 @@ export function ProfileEditPage() {
                 }}
                 disabled={isCheckingUsername}
               >
-                {isCheckingUsername ? '확인 중...' : '중복 확인'}
+                {isCheckingUsername ? tr("확인 중...") : tr("중복 확인")}
               </button>
             </div>
             {usernameCheck.message && (
@@ -216,7 +230,7 @@ export function ProfileEditPage() {
               </p>
             )}
             {isUsernameChanged && !isUsernameVerified && !usernameCheck.message && (
-              <p className="auth-field-hint">저장 전에 닉네임 중복 확인을 완료해주세요.</p>
+              <p className="auth-field-hint">{tr("저장 전에 닉네임 중복 확인을 완료해주세요.")}</p>
             )}
           </div>
 
@@ -226,25 +240,25 @@ export function ProfileEditPage() {
               id="profile-bio"
               value={bio}
               onChange={(event) => setBio(event.target.value)}
-              placeholder="좋아하는 장르나 감상 스타일을 적어보세요."
+              placeholder={tr("좋아하는 장르나 감상 스타일을 적어보세요.")}
               maxLength={160}
             />
           </label>
 
-          <label className="auth-field">
-            <span>프로필 이미지</span>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(event) => {
-                const file = event.target.files?.[0] ?? null
-                setSelectedFile(file)
-                if (file) {
-                  setRemoveProfileImage(false)
-                }
+          {isCropModalOpen && (
+            <ProfileImageCropper
+              onApply={(croppedFile) => {
+                setSelectedFile(croppedFile)
+                setIsCropModalOpen(false)
+                setRemoveProfileImage(false)
               }}
+              onClose={() => setIsCropModalOpen(false)}
             />
-          </label>
+          )}
+
+          {selectedFile && (
+            <p className="auth-field-hint is-success">{tr("프레임 조절이 적용됐어요. 저장하면 새 이미지로 변경됩니다.")}</p>
+          )}
 
           <label className="consent-field">
             <input
@@ -256,13 +270,14 @@ export function ProfileEditPage() {
 
                 if (checked) {
                   setSelectedFile(null)
+                  setIsCropModalOpen(false)
                 }
               }}
             />
-            <span>현재 프로필 이미지를 삭제할게요.</span>
+            <span>{tr("현재 프로필 이미지를 삭제할게요.")}</span>
           </label>
 
-          {error && <div className="feedback-card is-error">{error}</div>}
+          <ErrorToast message={error} />
 
           <div className="profile-edit-actions">
             <button
@@ -270,10 +285,10 @@ export function ProfileEditPage() {
               type="submit"
               disabled={isSubmitting || isCheckingUsername || !hasChanges || !isUsernameVerified}
             >
-              {isSubmitting ? '저장 중...' : '저장하기'}
+              {isSubmitting ? tr("저장 중...") : tr("저장하기")}
             </button>
             <Link className="secondary-button profile-edit-cancel" to="/profile">
-              취소
+              {tr("취소")}
             </Link>
           </div>
         </form>

@@ -1,6 +1,6 @@
 import { ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import { pool } from '../../config/db';
-import { normalizeProfileImageUrl } from '../lib/supabase-storage';
+import { normalizeProfileImageUrl } from '../lib/image-storage';
 
 interface FriendUserRow extends RowDataPacket {
   id: number;
@@ -43,11 +43,133 @@ interface FriendListRow extends RowDataPacket {
   animeListCount: number;
 }
 
+interface UserSearchRow extends FriendUserRow {
+  relationship: 'none' | 'incoming' | 'outgoing' | 'friend';
+  requestId: number | null;
+}
+
 export type FriendRequestAction = 'accept' | 'reject' | 'cancel';
 
 export interface SendFriendRequestInput {
   receiverId?: number;
   username?: string;
+}
+
+function escapeLike(value: string) {
+  return value.replace(/[\\%_]/g, '\\$&');
+}
+
+function decodeUserSearchCursor(cursor?: string) {
+  if (!cursor) return null;
+  try {
+    const value = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')) as {
+      query?: unknown;
+      username?: unknown;
+      userId?: unknown;
+    };
+    if (
+      typeof value.query !== 'string' ||
+      typeof value.username !== 'string' ||
+      !Number.isInteger(value.userId) ||
+      Number(value.userId) <= 0
+    ) {
+      throw new Error('Invalid cursor');
+    }
+    return { query: value.query, username: value.username, userId: Number(value.userId) };
+  } catch {
+    throw new Error('Invalid cursor');
+  }
+}
+
+export async function searchUsers(
+  currentUserId: number,
+  rawQuery: string,
+  limit: number,
+  encodedCursor?: string
+) {
+  const query = rawQuery.trim().replace(/\s+/g, ' ').toLocaleLowerCase();
+  if (query.length < 2 || query.length > 50) {
+    throw new Error('query must be between 2 and 50 characters');
+  }
+  if (!Number.isInteger(limit) || limit < 1 || limit > 30) {
+    throw new Error('limit must be an integer between 1 and 30');
+  }
+
+  const cursor = decodeUserSearchCursor(encodedCursor);
+  if (cursor && cursor.query !== query) {
+    throw new Error('Cursor query does not match requested query');
+  }
+
+  const params: Array<string | number> = [
+    currentUserId,
+    currentUserId,
+    currentUserId,
+    currentUserId,
+    currentUserId,
+    currentUserId,
+  ];
+  const cursorWhere = cursor
+    ? 'AND (LOWER(u.username) > ? OR (LOWER(u.username) = ? AND u.id > ?))'
+    : '';
+  params.push(`%${escapeLike(query)}%`);
+  if (cursor) params.push(cursor.username, cursor.username, cursor.userId);
+  params.push(limit + 1);
+
+  const [rows] = await pool.query<UserSearchRow[]>(
+    `
+    SELECT
+      u.id,
+      u.username,
+      u.profile_image_url AS profileImageUrl,
+      u.bio,
+      (SELECT COUNT(*) FROM user_anime_lists ual WHERE ual.user_id = u.id) AS animeListCount,
+      CASE
+        WHEN f.id IS NOT NULL THEN 'friend'
+        WHEN incoming.id IS NOT NULL THEN 'incoming'
+        WHEN outgoing.id IS NOT NULL THEN 'outgoing'
+        ELSE 'none'
+      END AS relationship,
+      COALESCE(incoming.id, outgoing.id) AS requestId
+    FROM users u
+    LEFT JOIN friendships f
+      ON f.user_id = ? AND f.friend_user_id = u.id
+    LEFT JOIN friend_requests incoming
+      ON incoming.requester_id = u.id AND incoming.receiver_id = ? AND incoming.status = 'pending'
+    LEFT JOIN friend_requests outgoing
+      ON outgoing.requester_id = ? AND outgoing.receiver_id = u.id AND outgoing.status = 'pending'
+    WHERE u.id <> ?
+      AND u.moderation_status = 'ACTIVE'
+      AND NOT EXISTS (
+        SELECT 1 FROM user_blocks ub
+        WHERE (ub.blocker_user_id = ? AND ub.blocked_user_id = u.id)
+           OR (ub.blocker_user_id = u.id AND ub.blocked_user_id = ?)
+      )
+      AND LOWER(u.username) LIKE ? ESCAPE '\\\\'
+      ${cursorWhere}
+    ORDER BY LOWER(u.username) ASC, u.id ASC
+    LIMIT ?
+    `,
+    params
+  );
+
+  const hasNext = rows.length > limit;
+  const pageRows = hasNext ? rows.slice(0, limit) : rows;
+  const last = pageRows[pageRows.length - 1];
+  return {
+    items: pageRows.map((row) => ({
+      user: mapUser(row),
+      relationship: row.relationship,
+      requestId: row.requestId,
+    })),
+    pageInfo: {
+      limit,
+      hasNext,
+      nextCursor: hasNext && last
+        ? Buffer.from(JSON.stringify({ query, username: last.username.toLocaleLowerCase(), userId: last.id }))
+            .toString('base64url')
+        : null,
+    },
+  };
 }
 
 function mapUser(row: Pick<FriendUserRow, 'id' | 'username' | 'profileImageUrl' | 'bio' | 'animeListCount'>) {
@@ -231,6 +353,10 @@ export async function sendFriendRequest(userId: number, input: SendFriendRequest
     throw new Error('receiverId must be a positive integer');
   }
 
+  if (hasUsername && !/^[a-zA-Z0-9_]{3,20}$/.test(normalizedUsername)) {
+    throw new Error('username must be 3-20 characters using only letters, numbers, and underscore');
+  }
+
   let receiver: FriendUserRow | null = null;
 
   if (hasReceiverId) {
@@ -248,6 +374,12 @@ export async function sendFriendRequest(userId: number, input: SendFriendRequest
   if (userId === receiverId) {
     throw new Error('You cannot send a friend request to yourself');
   }
+
+  const [blockRows] = await pool.query<RowDataPacket[]>(
+    `SELECT 1 FROM user_blocks WHERE (blocker_user_id = ? AND blocked_user_id = ?) OR (blocker_user_id = ? AND blocked_user_id = ?) LIMIT 1`,
+    [userId, receiverId, receiverId, userId],
+  );
+  if (blockRows.length > 0) throw new Error('User not found');
 
   if (await areFriends(userId, receiverId)) {
     throw new Error('Users are already friends');
@@ -483,9 +615,15 @@ export async function getFriends(userId: number) {
     INNER JOIN users u
       ON u.id = f.friend_user_id
     WHERE f.user_id = ?
+      AND u.moderation_status = 'ACTIVE'
+      AND NOT EXISTS (
+        SELECT 1 FROM user_blocks ub
+        WHERE (ub.blocker_user_id = ? AND ub.blocked_user_id = u.id)
+           OR (ub.blocker_user_id = u.id AND ub.blocked_user_id = ?)
+      )
     ORDER BY f.created_at DESC, f.id DESC
     `,
-    [userId]
+    [userId, userId, userId]
   );
 
   return rows.map((row) => ({

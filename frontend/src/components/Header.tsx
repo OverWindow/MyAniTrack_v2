@@ -1,15 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { tr } from '../i18n'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
+import brandLogo from '../assets/myanitrack-logo.png'
 import { useAuth } from '../contexts/AuthContext'
 import { getProfileImageSrc, handleProfileImageError } from '../lib/avatar'
 
-const baseNavItems = [
-  { label: '홈', to: '/' },
-  { label: '컬렉션', to: '/collection' },
-  { label: '분석', to: '/analysis' },
-  { label: '탐색', to: '/explore' },
-  { label: '친구', to: '/friends' },
-]
+const BRAND_NAME = String.fromCodePoint(0xb9c8, 0xc774, 0xc560, 0xb2c8, 0xd2b8, 0xb799)
 
 export function Header() {
   const { isAuthenticated, isBootstrapping, logout, logoutEverywhere, user } = useAuth()
@@ -17,17 +13,25 @@ export function Header() {
   const location = useLocation()
   const displayName = user?.username?.trim() || user?.email?.split('@')[0] || 'MyAniTrack User'
   const isAdmin = user?.isAdmin || user?.role === 'ADMIN'
+  const baseNavItems = [
+    { label: tr("홈"), to: '/' },
+    { label: tr("컬렉션"), to: '/collection' },
+    { label: tr("분석"), to: '/analysis' },
+    { label: tr("탐색"), to: '/explore' },
+    { label: tr("친구"), to: '/friends' },
+  ]
   const navItems = isAdmin
-    ? [...baseNavItems, { label: '관리자', to: '/admin' }]
+    ? [...baseNavItems, { label: tr("관리자"), to: '/admin' }]
     : baseNavItems
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false)
+  const [mobileMenuState, setMobileMenuState] = useState({ path: location.pathname, isOpen: false })
+  const [profileMenuState, setProfileMenuState] = useState({ path: location.pathname, isOpen: false })
   const profileMenuRef = useRef<HTMLDivElement | null>(null)
+  const isMobileMenuOpen = mobileMenuState.path === location.pathname && mobileMenuState.isOpen
+  const isProfileMenuOpen = profileMenuState.path === location.pathname && profileMenuState.isOpen
 
-  useEffect(() => {
-    setIsMobileMenuOpen(false)
-    setIsProfileMenuOpen(false)
-  }, [location.pathname])
+  const closeProfileMenu = useCallback(() => {
+    setProfileMenuState({ path: location.pathname, isOpen: false })
+  }, [location.pathname, setProfileMenuState])
 
   useEffect(() => {
     if (!isProfileMenuOpen) {
@@ -39,12 +43,12 @@ export function Header() {
         return
       }
 
-      setIsProfileMenuOpen(false)
+      closeProfileMenu()
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        setIsProfileMenuOpen(false)
+        closeProfileMenu()
       }
     }
 
@@ -55,19 +59,17 @@ export function Header() {
       document.removeEventListener('mousedown', handlePointerDown)
       window.removeEventListener('keydown', handleKeyDown)
     }
-  }, [isProfileMenuOpen])
+  }, [closeProfileMenu, isProfileMenuOpen])
 
   return (
     <header className="site-header">
       <div className="topbar-shell">
         <div className="topbar">
           <div className="brand-block">
-            <NavLink className="brand" to="/" aria-label="MyAniTrack 홈">
-              <span className="brand-mark" aria-hidden="true">
-                <span className="brand-mark-core" />
-              </span>
+            <NavLink className="brand" to="/" aria-label={tr("MyAniTrack 홈")}>
+              <img className="brand-mark" src={brandLogo} alt="" aria-hidden="true" />
               <span className="brand-text">
-                <span className="brand-title">MyAniTrack</span>
+                <span className="brand-title">{BRAND_NAME}</span>
                 <span className="brand-caption">Track your anime taste</span>
               </span>
             </NavLink>
@@ -76,10 +78,13 @@ export function Header() {
           <button
             className={isMobileMenuOpen ? 'mobile-menu-button is-open' : 'mobile-menu-button'}
             type="button"
-            aria-label="메뉴 열기"
+            aria-label={tr("메뉴 열기")}
             aria-expanded={isMobileMenuOpen}
             aria-controls="site-mobile-menu"
-            onClick={() => setIsMobileMenuOpen((current) => !current)}
+            onClick={() => setMobileMenuState((current) => ({
+              path: location.pathname,
+              isOpen: current.path === location.pathname ? !current.isOpen : true,
+            }))}
           >
             <span />
             <span />
@@ -90,7 +95,7 @@ export function Header() {
             className={isMobileMenuOpen ? 'header-menu-panel is-open' : 'header-menu-panel'}
             id="site-mobile-menu"
           >
-            <nav className="main-nav" aria-label="주 메뉴">
+            <nav className="main-nav" aria-label={tr("주 메뉴")}>
               {navItems.map((item) => (
                 <NavLink
                   key={item.to}
@@ -105,14 +110,18 @@ export function Header() {
               ))}
             </nav>
 
-            {isAuthenticated && user ? (
-              <div className="profile-dropdown" ref={profileMenuRef}>
+            <div className="header-actions">
+              {isAuthenticated && user ? (
+                <div className="profile-dropdown" ref={profileMenuRef}>
                 <button
                   className={isProfileMenuOpen ? 'profile-chip profile-chip-button is-open' : 'profile-chip profile-chip-button'}
                   type="button"
                   aria-expanded={isProfileMenuOpen}
                   aria-controls="profile-menu-card"
-                  onClick={() => setIsProfileMenuOpen((current) => !current)}
+                  onClick={() => setProfileMenuState((current) => ({
+                    path: location.pathname,
+                    isOpen: current.path === location.pathname ? !current.isOpen : true,
+                  }))}
                 >
                   <img
                     className="avatar avatar-image"
@@ -123,9 +132,9 @@ export function Header() {
                   <div className="profile-meta">
                     <div className="profile-name-row">
                       <strong className="profile-name">{displayName}</strong>
-                      {isAdmin && <span className="admin-badge">관리자</span>}
+                      {isAdmin && <span className="admin-badge">{tr("관리자")}</span>}
                     </div>
-                    <span className="profile-status">{user.bio || user.email}</span>
+                    {user.bio && <span className="profile-status">{user.bio}</span>}
                   </div>
                   <span className="profile-menu-caret" aria-hidden="true">▾</span>
                 </button>
@@ -134,44 +143,45 @@ export function Header() {
                   className={isProfileMenuOpen ? 'profile-dropdown-card is-open' : 'profile-dropdown-card'}
                   id="profile-menu-card"
                 >
-                  <NavLink className="profile-dropdown-link" to="/profile" onClick={() => setIsProfileMenuOpen(false)}>
-                    프로필
+                  <NavLink className="profile-dropdown-link" to="/profile" onClick={closeProfileMenu}>
+                    {tr("프로필")}
                   </NavLink>
-                  <NavLink className="profile-dropdown-link" to="/settings" onClick={() => setIsProfileMenuOpen(false)}>
-                    설정
+                  <NavLink className="profile-dropdown-link" to="/settings" onClick={closeProfileMenu}>
+                    {tr("설정")}
                   </NavLink>
                   <button
                     className="profile-dropdown-link profile-dropdown-button"
                     type="button"
                     onClick={() => {
-                      setIsProfileMenuOpen(false)
+                      closeProfileMenu()
                       void logout()
                       navigate('/')
                     }}
                   >
-                    로그아웃
+                    {tr("로그아웃")}
                   </button>
                   <button
                     className="profile-dropdown-link profile-dropdown-button"
                     type="button"
                     onClick={() => {
-                      setIsProfileMenuOpen(false)
+                      closeProfileMenu()
                       void logoutEverywhere()
                       navigate('/')
                     }}
                   >
-                    전체 로그아웃
+                    {tr("전체 로그아웃")}
                   </button>
                 </div>
-              </div>
-            ) : (
-              <div className="auth-chip">
-                <NavLink className="auth-link" to="/login">
-                  로그인
-                </NavLink>
-                {isBootstrapping && <span className="auth-booting">불러오는 중...</span>}
-              </div>
-            )}
+                </div>
+              ) : (
+                <div className="auth-chip">
+                  <NavLink className="auth-link" to="/login">
+                    {tr("로그인")}
+                  </NavLink>
+                  {isBootstrapping && <span className="auth-booting">{tr("불러오는 중...")}</span>}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

@@ -25,13 +25,6 @@ export type AuthResponse = AuthTokens & {
   user: AuthUser
 }
 
-export type SignupResponse = {
-  success: boolean
-  message: string
-  requiresEmailVerification: boolean
-  user: AuthUser
-}
-
 export type VerifyEmailResendResponse = {
   success: boolean
   message: string
@@ -66,14 +59,6 @@ export type LoginPayload = {
   deviceName: string
 }
 
-export type SignupPayload = {
-  email: string
-  username: string
-  password: string
-  deviceType: DeviceType
-  deviceName: string
-}
-
 export type UpdateProfilePayload = {
   username?: string
   bio?: string | null
@@ -98,5 +83,6 @@ export type UserAgreements = {
 
 export type StoredSession = {
   user: AuthUser | null
+  authMode?: 'legacy' | 'supabase'
   accessTokenExpiresAt?: number
 }

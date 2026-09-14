@@ -1,3 +1,4 @@
+import { tr } from '../i18n'
 /* eslint-disable react-refresh/only-export-components */
 import {
   createContext,
@@ -19,6 +20,7 @@ import {
   sortFriendsByNewest,
   updateFriendRequest,
 } from '../lib/friends'
+import { getFriendlyErrorMessage } from '../lib/errors'
 import type { FriendItem, FriendRequestAction, FriendRequestItem } from '../types/friends'
 
 const FRIENDS_PENDING_REFRESH_INTERVAL_MS = 15_000
@@ -124,7 +126,7 @@ export function FriendsProvider({ children }: { children: ReactNode }) {
         setState((current) => ({
           ...current,
           isLoading: false,
-          error: error instanceof Error ? error.message : '친구 정보를 불러오지 못했어요.',
+          error: getFriendlyErrorMessage(error, tr("친구 정보를 불러오지 못했어요.")),
         }))
       }
     },
@@ -188,21 +190,21 @@ export function FriendsProvider({ children }: { children: ReactNode }) {
       async sendRequest(username) {
         const result = await sendFriendRequest({ username })
         await refreshFriends({ silent: true })
-        return result.message || '친구 요청을 보냈어요.'
+        return result.message || tr("친구 요청을 보냈어요.")
       },
       async respondToRequest(requestId, action) {
         await updateFriendRequest(requestId, action)
         await refreshFriends({ silent: true })
 
         if (action === 'accept') {
-          return '친구 요청을 수락했어요.'
+          return tr("친구 요청을 수락했어요.")
         }
 
         if (action === 'reject') {
-          return '친구 요청을 거절했어요.'
+          return tr("친구 요청을 거절했어요.")
         }
 
-        return '보낸 친구 요청을 취소했어요.'
+        return tr("보낸 친구 요청을 취소했어요.")
       },
       async deleteFriend(friendUserId) {
         const previousState = state
@@ -238,7 +240,7 @@ export function useFriends() {
   const context = useContext(FriendsContext)
 
   if (!context) {
-    throw new Error('useFriends는 FriendsProvider 안에서 사용해야 합니다.')
+    throw new Error(tr("useFriends는 FriendsProvider 안에서 사용해야 합니다."))
   }
 
   return context

@@ -1,8 +1,17 @@
 import crypto from 'crypto';
 
-const ACCESS_TOKEN_SECRET = process.env.AUTH_TOKEN_SECRET || 'dev-only-secret-change-me';
+const DEFAULT_ACCESS_TOKEN_SECRET = 'dev-only-secret-change-me';
+const ACCESS_TOKEN_SECRET = process.env.AUTH_TOKEN_SECRET || DEFAULT_ACCESS_TOKEN_SECRET;
 const ACCESS_TOKEN_EXPIRES_IN_SECONDS = Number(process.env.AUTH_TOKEN_EXPIRES_IN_SECONDS || 60 * 15);
 const REFRESH_TOKEN_EXPIRES_IN_SECONDS = Number(process.env.AUTH_REFRESH_TOKEN_EXPIRES_IN_SECONDS || 60 * 60 * 24 * 30);
+
+if (process.env.NODE_ENV === 'production' && ACCESS_TOKEN_SECRET === DEFAULT_ACCESS_TOKEN_SECRET) {
+  throw new Error('AUTH_TOKEN_SECRET is required in production');
+}
+
+if (process.env.NODE_ENV === 'production' && ACCESS_TOKEN_SECRET.length < 32) {
+  throw new Error('AUTH_TOKEN_SECRET must be at least 32 characters in production');
+}
 
 interface AccessTokenPayload {
   userId: number;

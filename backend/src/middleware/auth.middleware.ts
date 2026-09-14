@@ -2,6 +2,7 @@ import { NextFunction, Request, Response } from 'express';
 import { RowDataPacket } from 'mysql2/promise';
 import { pool } from '../../config/db';
 import { verifyAccessToken } from '../lib/auth';
+import { findLinkedUserFromSupabaseToken } from '../services/auth.service';
 
 type UserRole = 'USER' | 'ADMIN';
 
@@ -10,6 +11,7 @@ interface AuthUserRow extends RowDataPacket {
   email: string;
   username: string;
   role: UserRole;
+  moderationStatus: 'ACTIVE' | 'SUSPENDED';
 }
 
 declare global {
@@ -33,6 +35,7 @@ async function findAuthUserById(userId: number) {
       email,
       username,
       role
+      , moderation_status AS moderationStatus
     FROM users
     WHERE id = ?
     LIMIT 1
@@ -41,6 +44,32 @@ async function findAuthUserById(userId: number) {
   );
 
   return rows[0] ?? null;
+}
+
+function rejectSuspended(user: AuthUserRow, res: Response) {
+  if (user.moderationStatus !== 'SUSPENDED') return false;
+  res.status(403).json({ success: false, message: 'Account suspended' });
+  return true;
+}
+
+function getSupabaseAuthFailureStatus(message: string) {
+  if (message === 'Supabase email verification required') {
+    return 403;
+  }
+
+  if (message === 'Google OAuth session required') {
+    return 403;
+  }
+
+  if (
+    message === 'Invalid Supabase token'
+    || message === 'Invalid Supabase user'
+    || message === 'Supabase account is not linked'
+  ) {
+    return 401;
+  }
+
+  return 500;
 }
 
 export async function requireAuth(req: Request, res: Response, next: NextFunction) {
@@ -66,6 +95,8 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       });
     }
 
+    if (rejectSuspended(user, res)) return;
+
     req.authUser = {
       userId: user.id,
       email: user.email,
@@ -75,12 +106,37 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 
     return next();
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unauthorized';
+    try {
+      const user = await findLinkedUserFromSupabaseToken(token);
+      const persistedUser = await findAuthUserById(user.id);
+      if (!persistedUser) throw new Error('User not found');
+      if (rejectSuspended(persistedUser, res)) return;
 
-    return res.status(401).json({
-      success: false,
-      message,
-    });
+      req.authUser = {
+        userId: persistedUser.id,
+        email: persistedUser.email,
+        username: persistedUser.username,
+        role: persistedUser.role,
+      };
+
+      return next();
+    } catch (supabaseError) {
+      const appTokenMessage = error instanceof Error ? error.message : 'Unauthorized';
+      const supabaseTokenMessage = supabaseError instanceof Error ? supabaseError.message : 'Unauthorized';
+      const message = appTokenMessage === 'Invalid token' ? supabaseTokenMessage : appTokenMessage;
+      const statusCode = appTokenMessage === 'Invalid token'
+        ? getSupabaseAuthFailureStatus(supabaseTokenMessage)
+        : 401;
+
+      if (statusCode === 500) {
+        console.error(supabaseError);
+      }
+
+      return res.status(statusCode).json({
+        success: false,
+        message,
+      });
+    }
   }
 }
 

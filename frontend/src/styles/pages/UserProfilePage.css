@@ -1,6 +1,7 @@
 .user-profile-page {
   display: grid;
   gap: 22px;
+  min-width: 0;
 }
 
 .user-profile-hero-card {

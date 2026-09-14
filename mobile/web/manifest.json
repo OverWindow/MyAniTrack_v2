@@ -1,0 +1,24 @@
+{
+  "name": "MyAniTrack",
+  "short_name": "MyAniTrack",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#FFF7ED",
+  "theme_color": "#F59E0B",
+  "description": "Anime watch history and collection analytics",
+  "orientation": "portrait-primary",
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "icons.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "favicon.ico",
+      "sizes": "16x16 32x32 48x48",
+      "type": "image/x-icon"
+    }
+  ]
+}

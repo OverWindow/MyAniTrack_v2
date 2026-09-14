@@ -1,21 +1,30 @@
+import { getTitleLanguage, tr } from '../i18n'
 import { authFetch } from './auth'
 import type { AnimeGenre } from '../types/anime'
 import type { AnimeStatsItem } from '../types/stats'
-import type { UserAnimeListItem, UserAnimeListSort } from '../types/collection'
+import type {
+  AnimeSeriesScope,
+  UserAnimeListItem,
+  UserAnimeListSort,
+  UserSeriesCollectionStatus,
+} from '../types/collection'
 import type {
   PublicUserAnimeListPage,
   PublicUserAnimeListResponse,
+  PublicUserSeriesCollectionPage,
+  PublicUserSeriesCollectionResponse,
   PublicUserAnimeStatsPage,
   PublicUserAnimeStatsResponse,
   PublicUserProfile,
   PublicUserProfileResponse,
 } from '../types/users'
+import type { ShareOwner } from '../types/share'
 
 function getApiBaseUrl() {
   const baseUrl = import.meta.env.VITE_API_BASE_URL
 
   if (!baseUrl) {
-    throw new Error('VITE_API_BASE_URL이 설정되지 않았습니다.')
+    throw new Error(tr("VITE_API_BASE_URL이 설정되지 않았습니다."))
   }
 
   return baseUrl
@@ -23,19 +32,19 @@ function getApiBaseUrl() {
 
 function getErrorMessage(status: number, fallback: string) {
   if (status === 400) {
-    return '요청 형식이 올바르지 않아요.'
+    return tr("요청 형식이 올바르지 않아요.")
   }
 
   if (status === 401) {
-    return '로그인이 필요해요.'
+    return tr("로그인이 필요해요.")
   }
 
   if (status === 404) {
-    return '해당 사용자를 찾을 수 없어요.'
+    return tr("해당 사용자를 찾을 수 없어요.")
   }
 
   if (status >= 500) {
-    return '서버 오류가 발생했어요. 잠시 후 다시 시도해주세요.'
+    return tr("서버 오류가 발생했어요. 잠시 후 다시 시도해주세요.")
   }
 
   return fallback
@@ -128,20 +137,46 @@ function normalizePublicUserProfile(value: unknown) {
   } as PublicUserProfile
 }
 
+function normalizeShareOwner(value: unknown): PublicUserProfile | null {
+  if (!value || typeof value !== 'object') return null
+  const source = value as ShareOwner
+  if (typeof source.username !== 'string' || !source.username.trim()) return null
+  return {
+    id: 0,
+    username: source.username,
+    profileImageUrl: source.profileImageUrl ?? null,
+    bio: source.bio ?? null,
+    animeListCount: toFiniteNumber(source.animeListCount) ?? 0,
+    createdAt: '',
+    updatedAt: '',
+  }
+}
+
+function normalizeSharedListItem(item: UserAnimeListItem): UserAnimeListItem {
+  return {
+    ...item,
+    id: item.animeId,
+    userId: 0,
+    notes: null,
+    createdAt: '',
+    updatedAt: '',
+  }
+}
+
 export async function fetchPublicUserProfile(userId: string, signal?: AbortSignal) {
   const response = await authFetch(new URL(`/api/users/${userId}/profile`, getApiBaseUrl()).toString(), {
     signal,
   })
 
   if (!response.ok) {
-    throw new Error(getErrorMessage(response.status, '사용자 프로필을 불러오지 못했어요.'))
+    throw new Error(getErrorMessage(response.status, tr("사용자 프로필을 불러오지 못했어요.")))
   }
 
   const data = (await response.json()) as PublicUserProfileResponse
   const user = normalizePublicUserProfile(data.user)
 
   if (!user) {
-    throw new Error('사용자 정보를 찾을 수 없어요.')
+    throw new Error(tr("사용자 정보를 찾을 수 없어요."))
   }
 
   return user
@@ -149,17 +184,23 @@ export async function fetchPublicUserProfile(userId: string, signal?: AbortSigna
 
 export async function fetchPublicUserCollection(params: {
   userId: string
+  shareToken?: string
+  shareAnalysis?: boolean
   sort: UserAnimeListSort
   limit: number
   genre?: AnimeGenre | null
   year?: number | string | null
   score?: number | string | null
+  titleLanguage?: 'ko' | 'en' | 'ja'
   cursor?: string | null
   signal?: AbortSignal
 }) {
-  const url = new URL(`/api/users/${params.userId}/anime-list`, getApiBaseUrl())
+  const path = params.shareToken
+    ? `/api/shares/${encodeURIComponent(params.shareToken)}/${params.shareAnalysis ? 'analysis/anime-list' : 'anime-list'}`
+    : `/api/users/${params.userId}/anime-list`
+  const url = new URL(path, getApiBaseUrl())
   url.searchParams.set('sort', params.sort)
-  url.searchParams.set('titleLanguage', 'ko')
+  url.searchParams.set('titleLanguage', params.titleLanguage ?? getTitleLanguage())
   url.searchParams.set('limit', String(params.limit))
 
   if (params.genre) {
@@ -181,34 +222,101 @@ export async function fetchPublicUserCollection(params: {
   const response = await authFetch(url.toString(), { signal: params.signal })
 
   if (!response.ok) {
-    throw new Error(getErrorMessage(response.status, '사용자 컬렉션을 불러오지 못했어요.'))
+    throw new Error(getErrorMessage(response.status, tr("사용자 컬렉션을 불러오지 못했어요.")))
   }
 
-  const data = (await response.json()) as PublicUserAnimeListResponse
-  const filteredItems = data.items.filter(
+  const data = (await response.json()) as PublicUserAnimeListResponse & { owner?: ShareOwner }
+  const user = data.user ?? normalizeShareOwner(data.owner)
+  if (!user) throw new Error(tr("공유 사용자 정보를 불러오지 못했어요."))
+  const normalizedItems = params.shareToken ? data.items.map(normalizeSharedListItem) : data.items
+  const filteredItems = normalizedItems.filter(
     (item: UserAnimeListItem) => item.anime.coverImageExtraLarge || item.anime.coverImageLarge,
   )
 
   return {
-    user: data.user,
+    user,
     items: filteredItems,
     pageInfo: data.pageInfo,
   } as PublicUserAnimeListPage
 }
 
-export async function fetchPublicUserAnimeStats(userId: string, signal?: AbortSignal) {
-  const response = await authFetch(new URL(`/api/users/${userId}/anime-stats`, getApiBaseUrl()).toString(), {
+export async function fetchPublicUserSeriesCollection(params: {
+  userId: string
+  shareToken?: string
+  scope?: AnimeSeriesScope
+  status?: UserSeriesCollectionStatus
+  titleLanguage?: 'ko' | 'en' | 'ja'
+  query?: string
+  limit?: number
+  cursor?: string | null
+  signal?: AbortSignal
+}) {
+  const path = params.shareToken
+    ? `/api/shares/${encodeURIComponent(params.shareToken)}/anime-list/series`
+    : `/api/users/${params.userId}/anime-list/series`
+  const url = new URL(path, getApiBaseUrl())
+  url.searchParams.set('scope', params.scope ?? 'mainline')
+  url.searchParams.set('status', params.status ?? 'all')
+  url.searchParams.set('titleLanguage', params.titleLanguage ?? getTitleLanguage())
+  url.searchParams.set('limit', String(params.limit ?? 20))
+
+  if (params.query?.trim()) {
+    url.searchParams.set('query', params.query.trim())
+  }
+
+  if (params.cursor) {
+    url.searchParams.set('cursor', params.cursor)
+  }
+
+  const response = await authFetch(url.toString(), { signal: params.signal })
+
+  if (!response.ok) {
+    throw new Error(getErrorMessage(response.status, tr("사용자 시리즈 컬렉션을 불러오지 못했어요.")))
+  }
+
+  const data = (await response.json()) as PublicUserSeriesCollectionResponse & { owner?: ShareOwner }
+  const user = data.user ?? normalizeShareOwner(data.owner)
+  if (!user) throw new Error(tr("공유 사용자 정보를 불러오지 못했어요."))
+  const items = params.shareToken ? data.items.map((series) => ({
+    ...series,
+    lastActivityAt: '',
+    items: series.items.map((member) => ({
+      ...member,
+      userList: member.userList ? {
+        ...member.userList,
+        id: member.anime.id,
+        updatedAt: null,
+      } : null,
+    })),
+  })) : data.items
+
+  return {
+    user,
+    items,
+    pageInfo: data.pageInfo,
+  } as PublicUserSeriesCollectionPage
+}
+
+export async function fetchPublicUserAnimeStats(userId: string, signal?: AbortSignal, shareToken?: string) {
+  const path = shareToken
+    ? `/api/shares/${encodeURIComponent(shareToken)}/anime-stats`
+    : `/api/users/${userId}/anime-stats`
+  const url = new URL(path, getApiBaseUrl())
+  url.searchParams.set('titleLanguage', getTitleLanguage())
+  const response = await authFetch(url.toString(), {
     signal,
   })
 
   if (!response.ok) {
-    throw new Error(getErrorMessage(response.status, '사용자 분석 정보를 불러오지 못했어요.'))
+    throw new Error(getErrorMessage(response.status, tr("사용자 분석 정보를 불러오지 못했어요.")))
   }
 
-  const data = (await response.json()) as PublicUserAnimeStatsResponse
+  const data = (await response.json()) as PublicUserAnimeStatsResponse & { owner?: ShareOwner }
+  const user = data.user ?? normalizeShareOwner(data.owner)
+  if (!user) throw new Error(tr("공유 사용자 정보를 불러오지 못했어요."))
 
   return {
-    user: data.user,
+    user,
     item: normalizeStatsItem(data.item),
   } as PublicUserAnimeStatsPage
 }

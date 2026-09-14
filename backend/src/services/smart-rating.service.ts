@@ -1,12 +1,12 @@
 import { RowDataPacket } from 'mysql2/promise';
 import { pool } from '../../config/db';
+import { pickAnimeTitle } from '../lib/anime-title';
 import { UserAnimeListTitleLanguage } from './user-anime-list.service';
 
 type SmartRatingRelation = 'better' | 'similar' | 'worse';
 
 interface SmartRatingAnimeRow extends RowDataPacket {
   animeId: number;
-  anilistId: number;
   score: number | string | null;
   titleRomaji: string | null;
   titleEnglish: string | null;
@@ -44,27 +44,13 @@ function getScoreKey(score: number) {
 }
 
 function pickDisplayTitle(row: SmartRatingAnimeRow, titleLanguage: UserAnimeListTitleLanguage) {
-  if (titleLanguage === 'ko') {
-    return row.titleKorean
-      ?? row.titleEnglish
-      ?? row.titleRomaji
-      ?? row.titleUserPreferred
-      ?? row.titleNative;
-  }
-
-  if (titleLanguage === 'en') {
-    return row.titleEnglish
-      ?? row.titleKorean
-      ?? row.titleRomaji
-      ?? row.titleUserPreferred
-      ?? row.titleNative;
-  }
-
-  return row.titleNative
-    ?? row.titleRomaji
-    ?? row.titleUserPreferred
-    ?? row.titleEnglish
-    ?? row.titleKorean;
+  return pickAnimeTitle({
+    korean: row.titleKorean,
+    english: row.titleEnglish,
+    romaji: row.titleRomaji,
+    userPreferred: row.titleUserPreferred,
+    native: row.titleNative,
+  }, titleLanguage);
 }
 
 function mapCandidate(row: SmartRatingAnimeRow, titleLanguage: UserAnimeListTitleLanguage) {
@@ -73,7 +59,6 @@ function mapCandidate(row: SmartRatingAnimeRow, titleLanguage: UserAnimeListTitl
     score: parseScore(row.score),
     anime: {
       id: row.animeId,
-      anilistId: row.anilistId,
       title: pickDisplayTitle(row, titleLanguage),
       titles: {
         korean: row.titleKorean,
@@ -112,6 +97,8 @@ async function ensureAnimeExists(animeId: number) {
     SELECT id
     FROM anime
     WHERE id = ?
+      AND is_adult = FALSE
+      AND app_visible = TRUE
     LIMIT 1
     `,
     [animeId]
@@ -133,7 +120,6 @@ async function getRatedAnimeRows(userId: number, animeIds: number[]) {
     SELECT
       ual.anime_id AS animeId,
       ual.score,
-      a.anilist_id AS anilistId,
       a.title_romaji AS titleRomaji,
       a.title_english AS titleEnglish,
       a.title_native AS titleNative,
@@ -144,6 +130,8 @@ async function getRatedAnimeRows(userId: number, animeIds: number[]) {
     FROM user_anime_lists ual
     INNER JOIN anime a
       ON a.id = ual.anime_id
+      AND a.is_adult = FALSE
+      AND a.app_visible = TRUE
     LEFT JOIN anime_korean_titles akt
       ON akt.anime_id = a.id
       AND akt.is_primary = TRUE
@@ -170,7 +158,6 @@ export async function getSmartRatingCandidates(params: {
     SELECT
       ual.anime_id AS animeId,
       ual.score,
-      a.anilist_id AS anilistId,
       a.title_romaji AS titleRomaji,
       a.title_english AS titleEnglish,
       a.title_native AS titleNative,
@@ -181,6 +168,8 @@ export async function getSmartRatingCandidates(params: {
     FROM user_anime_lists ual
     INNER JOIN anime a
       ON a.id = ual.anime_id
+      AND a.is_adult = FALSE
+      AND a.app_visible = TRUE
     LEFT JOIN anime_korean_titles akt
       ON akt.anime_id = a.id
       AND akt.is_primary = TRUE

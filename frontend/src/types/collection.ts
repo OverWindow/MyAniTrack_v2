@@ -41,7 +41,6 @@ export type UserAnimeListItem = {
   updatedAt: string
   anime: {
     id: number
-    anilistId: number
     title: string
     titles?: {
       korean?: string | null
@@ -56,14 +55,13 @@ export type UserAnimeListItem = {
     seasonYear?: number | null
     format?: string | null
     status?: string | null
-    averageScore?: number | null
-    meanScore?: number | null
-    popularity?: number | null
-    favourites?: number | null
+    communityAverageScore?: number | null
+    ratingCount?: number
+    collectionCount?: number
     coverImageLarge: string
     coverImageExtraLarge?: string | null
     bannerImage?: string | null
-    siteUrl?: string | null
+    officialSiteUrl?: string | null
     isAdult?: boolean
   }
 }
@@ -85,6 +83,78 @@ export type UserAnimeListEntryResponse = {
   item: UserAnimeListItem | null
 }
 
+export type AnimeSeriesScope = 'mainline' | 'franchise'
+export type UserSeriesCollectionStatus = 'all' | 'started' | 'watched' | 'completed'
+export type SeriesCompletionExclusionReason =
+  | 'MUSIC'
+  | 'RECAP'
+  | 'COMPILATION'
+  | 'NOT_YET_RELEASED'
+  | 'CANCELLED'
+
+export type UserSeriesCollectionMember = {
+  completionRequired: boolean
+  completionExclusionReason: SeriesCompletionExclusionReason | null
+  anime: {
+    id: number
+    title: string
+    titles: {
+      korean: string | null
+      english: string | null
+      native: string | null
+      romaji: string | null
+      userPreferred: string | null
+    }
+    season: string | null
+    seasonYear: number | null
+    format: string | null
+    status: string | null
+    coverImageLarge: string | null
+    coverImageExtraLarge: string | null
+  }
+  userList: {
+    id: number
+    status: UserAnimeStatus
+    score: number | null
+    progress: number | null
+    updatedAt: string | null
+  } | null
+}
+
+export type UserSeriesCollectionItem = {
+  seriesId: number
+  scope: AnimeSeriesScope
+  title: string | null
+  customTitle: string | null
+  canonicalAnimeId: number | null
+  memberCount: number
+  requiredMemberCount: number
+  collectedMemberCount: number
+  startedMemberCount: number
+  completedMemberCount: number
+  completedRequiredMemberCount: number
+  completionRate: number
+  completed: boolean
+  lastActivityAt: string
+  coverImageLarge: string | null
+  coverImageExtraLarge: string | null
+  items: UserSeriesCollectionMember[]
+}
+
+export type UserSeriesCollectionResponse = {
+  success: boolean
+  items: UserSeriesCollectionItem[]
+  pageInfo: {
+    hasNext: boolean
+    nextCursor: string | null
+    limit: number
+    scope: AnimeSeriesScope
+    status: UserSeriesCollectionStatus
+    titleLanguage: 'ko' | 'en' | 'ja'
+    query: string | null
+  }
+}
+
 export type SmartRatingRelation = 'better' | 'similar' | 'worse'
 
 export type SmartRatingCandidate = {
@@ -92,7 +162,6 @@ export type SmartRatingCandidate = {
   score: number
   anime: {
     id: number
-    anilistId: number
     title: string
     coverImageLarge: string | null
     coverImageExtraLarge?: string | null

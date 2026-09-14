@@ -1,10 +1,32 @@
+import { getTitleLanguage, tr } from '../i18n'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import collectionEmptyMoaImage from '../assets/collection-empty-moa.png'
+import { CollectionCarousel } from '../components/CollectionCarousel'
+import { CollectionViewSwitch } from '../components/CollectionViewSwitch'
+import { ConnectionErrorState } from '../components/ConnectionErrorState'
+import { SeriesCollectionGrid, SeriesCollectionSkeleton } from '../components/SeriesCollectionGrid'
+import { ShareButton } from '../components/ShareButton'
 import { useAuth } from '../contexts/AuthContext'
-import { fetchMyCollection, getCachedCollectionPage, saveCollectionPageCache } from '../lib/collection'
-import { genreOptions } from '../lib/anime'
+import {
+  fetchMyCollection,
+  fetchMySeriesCollection,
+  getCachedCollectionPage,
+  getCachedSeriesCollection,
+  saveCollectionPageCache,
+  saveSeriesCollectionCache,
+} from '../lib/collection'
+import { genreOptions, getLocalizedAnimeTitle } from '../lib/anime'
+import { getFriendlyErrorMessage } from '../lib/errors'
+import { fetchSampleCollection } from '../lib/sample'
 import type { AnimeGenre } from '../types/anime'
-import type { UserAnimeListItem, UserAnimeListSort } from '../types/collection'
+import type {
+  AnimeSeriesScope,
+  UserAnimeListItem,
+  UserAnimeListSort,
+  UserSeriesCollectionItem,
+  UserSeriesCollectionStatus,
+} from '../types/collection'
 import '../styles/pages/CatalogPage.css'
 import '../styles/pages/CollectionPage.css'
 
@@ -18,11 +40,23 @@ type CollectionState = {
   requestKey: string
 }
 
+type PerfectScoreState = {
+  items: UserAnimeListItem[]
+  isLoading: boolean
+  error: string | null
+}
+
+type SeriesCollectionState = {
+  items: UserSeriesCollectionItem[]
+  isLoading: boolean
+  error: string | null
+}
+
 const sortOptions: Array<{ value: UserAnimeListSort; label: string }> = [
-  { value: 'latest', label: '최근 수정순' },
-  { value: 'added', label: '추가 최신순' },
-  { value: 'score', label: '내 점수 높은 순' },
-  { value: 'scoreAsc', label: '내 점수 낮은 순' },
+  { value: 'latest', label: tr("최근 수정순") },
+  { value: 'added', label: tr("추가 최신순") },
+  { value: 'score', label: tr("내 점수 높은 순") },
+  { value: 'scoreAsc', label: tr("내 점수 낮은 순") },
 ]
 
 const createInitialCollectionState = (requestKey: string): CollectionState => ({
@@ -36,7 +70,7 @@ const createInitialCollectionState = (requestKey: string): CollectionState => ({
 })
 
 function getCollectionDisplayTitle(item: UserAnimeListItem) {
-  return item.anime.titles?.korean || item.anime.titles?.english || item.anime.title
+  return getLocalizedAnimeTitle(item.anime)
 }
 
 function getCollectionSearchText(item: UserAnimeListItem) {
@@ -62,7 +96,7 @@ function renderStars(score?: number | null) {
         : NaN
 
   if (!Number.isFinite(numericScore) || numericScore <= 0) {
-    return '평점 없음'
+    return tr("평점 없음")
   }
 
   const filled = Math.round(numericScore / 2)
@@ -84,20 +118,78 @@ function formatScore(score?: number | null) {
   return numericScore.toFixed(1)
 }
 
+function sortCollectionItems(items: UserAnimeListItem[], sort: UserAnimeListSort) {
+  const sortedItems = [...items]
+  const getNumericScore = (item: UserAnimeListItem) => {
+    if (item.score === null || item.score === undefined) {
+      return null
+    }
+
+    const score = Number(item.score)
+    return Number.isFinite(score) ? score : null
+  }
+
+  sortedItems.sort((left, right) => {
+    if (sort === 'score' || sort === 'scoreAsc') {
+      const leftScore = getNumericScore(left)
+      const rightScore = getNumericScore(right)
+
+      if (leftScore === null && rightScore !== null) {
+        return 1
+      }
+
+      if (leftScore !== null && rightScore === null) {
+        return -1
+      }
+
+      if (leftScore !== null && rightScore !== null && leftScore !== rightScore) {
+        return sort === 'score' ? rightScore - leftScore : leftScore - rightScore
+      }
+    } else {
+      const leftDate = sort === 'added' ? left.createdAt : left.updatedAt
+      const rightDate = sort === 'added' ? right.createdAt : right.updatedAt
+      const dateComparison = String(rightDate ?? '').localeCompare(String(leftDate ?? ''))
+
+      if (dateComparison !== 0) {
+        return dateComparison
+      }
+    }
+
+    return right.animeId - left.animeId
+  })
+
+  return sortedItems
+}
+
 export function CollectionPage() {
   const location = useLocation()
   const { isAuthenticated, isBootstrapping } = useAuth()
+  const isGuestPreview = !isBootstrapping && !isAuthenticated
   const [sort, setSort] = useState<UserAnimeListSort>('latest')
   const [genre, setGenre] = useState<AnimeGenre | 'all'>('all')
   const [searchTerm, setSearchTerm] = useState('')
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
+  const [viewMode, setViewMode] = useState<'anime' | 'series'>('anime')
+  const [seriesScope, setSeriesScope] = useState<AnimeSeriesScope>('mainline')
+  const [seriesStatus, setSeriesStatus] = useState<UserSeriesCollectionStatus>('all')
+  const [seriesState, setSeriesState] = useState<SeriesCollectionState>({
+    items: [],
+    isLoading: false,
+    error: null,
+  })
   const [reloadKey, setReloadKey] = useState(0)
+  const [perfectScoreState, setPerfectScoreState] = useState<PerfectScoreState>({
+    items: [],
+    isLoading: true,
+    error: null,
+  })
   const selectedGenre = genre === 'all' ? null : genre
   const requestKey = `${sort}:${genre}`
   const [state, setState] = useState<CollectionState>(() => createInitialCollectionState(requestKey))
   const sentinelRef = useRef<HTMLDivElement | null>(null)
   const isLoadingMoreRef = useRef(false)
   const consumedReloadKeyRef = useRef(0)
+  const consumedSeriesReloadKeyRef = useRef(0)
   const { items, nextCursor, hasNext, isLoading, isLoadingMore, error } = state
   const isRefreshingQuery = state.requestKey !== requestKey
 
@@ -114,23 +206,170 @@ export function CollectionPage() {
   const filteredItems = items.filter((item) =>
     getCollectionSearchText(item).includes(debouncedSearchTerm.trim().toLowerCase()),
   )
+  const isCollectionEmpty = !isGuestPreview
+    && items.length === 0
+    && genre === 'all'
+    && searchTerm.trim().length === 0
+
+  useEffect(() => {
+    if (viewMode !== 'series' || !isAuthenticated || isBootstrapping) {
+      return
+    }
+
+    const controller = new AbortController()
+
+    const loadSeries = async () => {
+      const cacheParams = {
+        scope: seriesScope,
+        status: seriesStatus,
+        titleLanguage: getTitleLanguage(),
+        query: debouncedSearchTerm,
+      }
+      const shouldFetchFromApi = reloadKey !== consumedSeriesReloadKeyRef.current
+
+      if (!shouldFetchFromApi) {
+        const cachedSeries = getCachedSeriesCollection(cacheParams)
+
+        if (cachedSeries) {
+          setSeriesState({ items: cachedSeries.items, isLoading: false, error: null })
+          return
+        }
+      }
+
+      setSeriesState((current) => ({ ...current, isLoading: true, error: null }))
+      consumedSeriesReloadKeyRef.current = reloadKey
+
+      try {
+        const firstPage = await fetchMySeriesCollection({
+          scope: seriesScope,
+          status: seriesStatus,
+          query: debouncedSearchTerm,
+          limit: 50,
+          signal: controller.signal,
+        })
+        const allItems = [...firstPage.items]
+        let cursor = firstPage.pageInfo.nextCursor
+        let hasMore = firstPage.pageInfo.hasNext
+        const seenCursors = new Set<string>()
+
+        while (hasMore && cursor && !seenCursors.has(cursor)) {
+          seenCursors.add(cursor)
+          const nextPage = await fetchMySeriesCollection({
+            scope: seriesScope,
+            status: seriesStatus,
+            query: debouncedSearchTerm,
+            limit: 50,
+            cursor,
+            signal: controller.signal,
+          })
+          const seenSeriesIds = new Set(allItems.map((item) => item.seriesId))
+
+          for (const item of nextPage.items) {
+            if (!seenSeriesIds.has(item.seriesId)) {
+              allItems.push(item)
+              seenSeriesIds.add(item.seriesId)
+            }
+          }
+
+          cursor = nextPage.pageInfo.nextCursor
+          hasMore = nextPage.pageInfo.hasNext
+        }
+
+        saveSeriesCollectionCache(cacheParams, {
+          ...firstPage,
+          items: allItems,
+          pageInfo: {
+            ...firstPage.pageInfo,
+            hasNext: false,
+            nextCursor: null,
+            limit: allItems.length,
+          },
+        })
+        setSeriesState({ items: allItems, isLoading: false, error: null })
+      } catch (fetchError) {
+        if (fetchError instanceof DOMException && fetchError.name === 'AbortError') {
+          return
+        }
+
+        setSeriesState({
+          items: [],
+          isLoading: false,
+          error: getFriendlyErrorMessage(fetchError, tr("시리즈 컬렉션을 불러오지 못했어요.")),
+        })
+      }
+    }
+
+    void loadSeries()
+
+    return () => controller.abort()
+  }, [debouncedSearchTerm, isAuthenticated, isBootstrapping, reloadKey, seriesScope, seriesStatus, viewMode])
+
+  useEffect(() => {
+    if (isBootstrapping || (!isAuthenticated && !isGuestPreview)) {
+      return
+    }
+
+    const controller = new AbortController()
+
+    const loadPerfectScoreAnime = async () => {
+      try {
+        const data = isGuestPreview
+          ? await fetchSampleCollection({
+            sort: 'score',
+            limit: 12,
+            signal: controller.signal,
+          })
+          : await fetchMyCollection({
+            sort: 'score',
+            score: 10,
+            limit: 12,
+            signal: controller.signal,
+          })
+
+        setPerfectScoreState({
+          items: data.items.filter((item) => item.anime.coverImageExtraLarge || item.anime.coverImageLarge),
+          isLoading: false,
+          error: null,
+        })
+      } catch (fetchError) {
+        if (fetchError instanceof DOMException && fetchError.name === 'AbortError') {
+          return
+        }
+
+        setPerfectScoreState({
+          items: [],
+          isLoading: false,
+          error:
+            getFriendlyErrorMessage(fetchError, tr("만점 작품을 불러오지 못했어요.")),
+        })
+      }
+    }
+
+    void loadPerfectScoreAnime()
+
+    return () => controller.abort()
+  }, [isAuthenticated, isBootstrapping, isGuestPreview, reloadKey])
 
   const fetchFullCollection = useCallback(async (signal?: AbortSignal) => {
+    // The score cursor is based only on numeric score + anime ID, so it remains
+    // stable across page boundaries. Date cursors and scoreAsc currently do not.
+    const paginationSort: UserAnimeListSort = 'score'
     const firstPage = await fetchMyCollection({
-      sort,
+      sort: paginationSort,
       genre: selectedGenre,
       limit: 50,
       signal,
     })
     const allItems = [...firstPage.items]
     let cursor = firstPage.pageInfo.nextCursor
+    let hasMore = firstPage.pageInfo.hasNext
     const seenCursors = new Set<string>()
 
-    while (firstPage.pageInfo.hasNext && cursor && !seenCursors.has(cursor)) {
+    while (hasMore && cursor && !seenCursors.has(cursor)) {
       seenCursors.add(cursor)
 
       const nextPage = await fetchMyCollection({
-        sort,
+        sort: paginationSort,
         genre: selectedGenre,
         limit: 50,
         cursor,
@@ -146,20 +385,18 @@ export function CollectionPage() {
       }
 
       cursor = nextPage.pageInfo.nextCursor
-
-      if (!nextPage.pageInfo.hasNext) {
-        break
-      }
+      hasMore = nextPage.pageInfo.hasNext
     }
 
     const fullData = {
       ...firstPage,
-      items: allItems,
+      items: sortCollectionItems(allItems, sort),
       pageInfo: {
         ...firstPage.pageInfo,
         hasNext: false,
         nextCursor: null,
         limit: allItems.length,
+        sort,
       },
     }
 
@@ -175,7 +412,7 @@ export function CollectionPage() {
   }, [selectedGenre, sort])
 
   useEffect(() => {
-    if (isBootstrapping || !isAuthenticated) {
+    if (isBootstrapping || (!isAuthenticated && !isGuestPreview)) {
       return
     }
 
@@ -186,13 +423,17 @@ export function CollectionPage() {
         isLoadingMoreRef.current = false
         const shouldFetchFromApi = reloadKey !== consumedReloadKeyRef.current
 
-        if (!shouldFetchFromApi) {
+        if (!isGuestPreview && !shouldFetchFromApi) {
           const cachedPage = getCachedCollectionPage({
             sort,
             genre: selectedGenre,
           })
 
-          if (cachedPage) {
+          const isCompleteCachedPage = cachedPage
+            && !cachedPage.pageInfo.hasNext
+            && !cachedPage.pageInfo.nextCursor
+
+          if (isCompleteCachedPage) {
             setState({
               items: cachedPage.items,
               nextCursor: null,
@@ -215,7 +456,14 @@ export function CollectionPage() {
         }))
         consumedReloadKeyRef.current = reloadKey
 
-        const data = await fetchFullCollection(controller.signal)
+        const data = isGuestPreview
+          ? await fetchSampleCollection({
+            sort,
+            genre: selectedGenre,
+            limit: 50,
+            signal: controller.signal,
+          })
+          : await fetchFullCollection(controller.signal)
 
         setState({
           items: data.items,
@@ -238,9 +486,7 @@ export function CollectionPage() {
           isLoading: false,
           isLoadingMore: false,
           error:
-            fetchError instanceof Error
-              ? fetchError.message
-              : '컬렉션을 불러오지 못했어요.',
+            getFriendlyErrorMessage(fetchError, tr("컬렉션을 불러오지 못했어요.")),
           requestKey,
         })
       }
@@ -249,7 +495,7 @@ export function CollectionPage() {
     void loadFirstPage()
 
     return () => controller.abort()
-  }, [fetchFullCollection, isAuthenticated, isBootstrapping, reloadKey, requestKey, selectedGenre, sort])
+  }, [fetchFullCollection, isAuthenticated, isBootstrapping, isGuestPreview, reloadKey, requestKey, selectedGenre, sort])
 
   useEffect(() => {
     const node = sentinelRef.current
@@ -337,9 +583,7 @@ export function CollectionPage() {
                 ...current,
                 isLoadingMore: false,
                 error:
-                  fetchError instanceof Error
-                    ? fetchError.message
-                    : '추가 컬렉션을 불러오지 못했어요.',
+                  getFriendlyErrorMessage(fetchError, tr("추가 컬렉션을 불러오지 못했어요.")),
               }
             })
           } finally {
@@ -383,27 +627,40 @@ export function CollectionPage() {
     )
   }
 
-  if (!isAuthenticated) {
-    return (
-      <section className="collection-page">
-        <div className="feedback-card">
-          컬렉션은 로그인한 사용자만 볼 수 있어요. <Link to="/login">로그인</Link> 후
-          다시 확인해주세요.
-        </div>
-      </section>
-    )
-  }
-
   return (
-    <section className="collection-page">
-      <div className="explore-toolbar-shell">
+    <>
+      <CollectionCarousel
+        state={perfectScoreState}
+        location={location}
+        portalRootId="collection-carousel-root"
+      />
+
+      <section className={isGuestPreview ? 'collection-page is-sample-preview' : 'collection-page'}>
+        {isGuestPreview && (
+          <div className="guest-preview-banner">
+            <div>
+              <span className="guest-preview-eyebrow">Sample mode</span>
+              <strong>{tr("샘플 컬렉션을 둘러보고 있어요")}</strong>
+              <p>{tr("이 화면의 작품, 평점, 기록은 체험용 데이터입니다. 로그인하면 내 컬렉션으로 즉시 바뀝니다.")}</p>
+            </div>
+            <div className="guest-preview-actions">
+              <Link className="primary-button" to="/signup">{tr("시작하기")}</Link>
+              <Link className="secondary-button" to="/login">{tr("로그인")}</Link>
+            </div>
+          </div>
+        )}
+
+        <div className="explore-toolbar-shell">
         <div className="explore-toolbar">
           <div className="search-group">
+            {isGuestPreview && <span className="sample-mode-chip">{tr("샘플 컬렉션")}</span>}
+            {!isGuestPreview && <CollectionViewSwitch value={viewMode} onChange={setViewMode} />}
+            {!isGuestPreview && <ShareButton resourceType="COLLECTION" />}
             <label className="search-field minimalist-search" htmlFor="collection-search">
               <input
                 id="collection-search"
                 type="search"
-                placeholder="컬렉션에서 검색하기"
+                placeholder={viewMode === 'series' ? tr("시리즈 또는 작품 제목 검색") : tr("컬렉션에서 검색하기")}
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
               />
@@ -411,49 +668,102 @@ export function CollectionPage() {
             <button
               className="refresh-button"
               type="button"
-              aria-label="컬렉션 새로고침"
+              aria-label={isGuestPreview ? tr("샘플 컬렉션은 새로고침할 수 없어요") : tr("컬렉션 새로고침")}
               onClick={() => setReloadKey((value) => value + 1)}
+              disabled={isGuestPreview}
             >
               ↻
             </button>
           </div>
 
           <div className="catalog-control-group">
-            <label className="sort-field" htmlFor="collection-genre">
-              <select
-                id="collection-genre"
-                value={genre}
-                onChange={(event) => setGenre(event.target.value as AnimeGenre | 'all')}
-              >
-                <option value="all">전체 장르</option>
-                {genreOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+            {viewMode === 'series' && !isGuestPreview ? (
+              <>
+                <label className="sort-field" htmlFor="collection-series-scope">
+                  <select
+                    id="collection-series-scope"
+                    value={seriesScope}
+                    onChange={(event) => setSeriesScope(event.target.value as AnimeSeriesScope)}
+                  >
+                    <option value="mainline">{tr("본편 시리즈")}</option>
+                    <option value="franchise">{tr("관련 작품 전체")}</option>
+                  </select>
+                </label>
+                <label className="sort-field" htmlFor="collection-series-status">
+                  <select
+                    id="collection-series-status"
+                    value={seriesStatus}
+                    onChange={(event) => setSeriesStatus(event.target.value as UserSeriesCollectionStatus)}
+                  >
+                    <option value="all">{tr("전체 시리즈")}</option>
+                    <option value="started">{tr("시작한 시리즈")}</option>
+                    <option value="watched">{tr("본 시리즈")}</option>
+                    <option value="completed">{tr("완주한 시리즈")}</option>
+                  </select>
+                </label>
+              </>
+            ) : (
+              <>
+                <label className="sort-field" htmlFor="collection-genre">
+                  <select
+                    id="collection-genre"
+                    value={genre}
+                    onChange={(event) => setGenre(event.target.value as AnimeGenre | 'all')}
+                  >
+                    <option value="all">{tr("전체 장르")}</option>
+                    {genreOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
 
-            <label className="sort-field" htmlFor="collection-sort">
-              <select
-                id="collection-sort"
-                value={sort}
-                onChange={(event) => setSort(event.target.value as UserAnimeListSort)}
-              >
-                {sortOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+                <label className="sort-field" htmlFor="collection-sort">
+                  <select
+                    id="collection-sort"
+                    value={sort}
+                    onChange={(event) => setSort(event.target.value as UserAnimeListSort)}
+                  >
+                    {sortOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </>
+            )}
           </div>
         </div>
-      </div>
+        </div>
 
-      {error && <div className="feedback-card is-error">{error}</div>}
+      {viewMode === 'series' && !isGuestPreview && seriesState.error && (
+        <ConnectionErrorState message={seriesState.error} />
+      )}
 
-      {!error && (isLoading || isRefreshingQuery) && (
+      {viewMode === 'series' && !isGuestPreview && !seriesState.error && seriesState.isLoading && (
+        <SeriesCollectionSkeleton />
+      )}
+
+      {viewMode === 'series' && !isGuestPreview && !seriesState.error && !seriesState.isLoading && (
+        seriesState.items.length === 0 ? (
+          <div className="feedback-card">{tr("조건에 맞는 시리즈가 없어요.")}</div>
+        ) : (
+          <SeriesCollectionGrid
+            items={seriesState.items}
+            location={location}
+            fromPage="collection"
+            collectionLabel={tr("내 컬렉션")}
+          />
+        )
+      )}
+
+      {viewMode === 'anime' && !isGuestPreview && error && (
+        <ConnectionErrorState message={error} />
+      )}
+
+      {viewMode === 'anime' && !isGuestPreview && !error && (isLoading || isRefreshingQuery) && (
         <div className="collection-grid">
           {Array.from({ length: 8 }).map((_, index) => (
             <article className="collection-card skeleton-card" key={`collection-skeleton-${index}`}>
@@ -465,12 +775,21 @@ export function CollectionPage() {
         </div>
       )}
 
-      {!isLoading && !isRefreshingQuery && !error && (
+      {viewMode === 'anime' && (isGuestPreview || (!isLoading && !isRefreshingQuery && !error)) && (
         <>
           {filteredItems.length === 0 ? (
-            <div className="feedback-card">
-              아직 컬렉션에 담긴 작품이 없거나, 검색 결과가 없어요.
-            </div>
+            isCollectionEmpty ? (
+              <div className="collection-empty-state">
+                <img src={collectionEmptyMoaImage} alt={tr("컬렉션에 담길 작품을 기다리는 모아")} />
+                <p>{tr("아직 컬렉션에 담긴 작품이 없어요.")}</p>
+              </div>
+            ) : (
+              <div className="feedback-card">
+                {isGuestPreview
+                  ? tr("샘플 컬렉션에서 검색 결과가 없어요.")
+                  : tr("조건에 맞는 작품이 없어요.")}
+              </div>
+            )
           ) : (
             <div className="collection-grid">
               {filteredItems.map((item) => (
@@ -478,15 +797,24 @@ export function CollectionPage() {
                   className="collection-card"
                   key={item.id}
                   to={`/anime/${item.anime.id}`}
-                  state={{ fromPage: 'collection', backgroundLocation: location }}
+                  state={{
+                    fromPage: 'collection',
+                    backgroundLocation: location,
+                  }}
                 >
                   <div className="collection-poster-wrap">
-                    <img
-                      className="collection-poster"
-                      src={item.anime.coverImageExtraLarge || item.anime.coverImageLarge}
-                      alt={getCollectionDisplayTitle(item)}
-                      loading="lazy"
-                    />
+                    {item.anime.coverImageExtraLarge || item.anime.coverImageLarge ? (
+                      <img
+                        className="collection-poster"
+                        src={item.anime.coverImageExtraLarge || item.anime.coverImageLarge || ''}
+                        alt={getCollectionDisplayTitle(item)}
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="collection-poster-placeholder" aria-hidden="true">
+                        <span>No image</span>
+                      </div>
+                    )}
                   </div>
                   <div className="collection-copy">
                     <h3>{getCollectionDisplayTitle(item)}</h3>
@@ -504,15 +832,20 @@ export function CollectionPage() {
 
           <div ref={sentinelRef} className="scroll-sentinel" aria-hidden="true" />
 
-          {isLoadingMore && (
-            <div className="feedback-inline">컬렉션을 더 불러오는 중이에요.</div>
+          {!isGuestPreview && isLoadingMore && (
+            <div className="feedback-inline">{tr("컬렉션을 더 불러오는 중이에요.")}</div>
           )}
 
-          {!hasNext && items.length > 0 && (
-            <div className="feedback-inline">컬렉션의 마지막 작품까지 모두 확인했어요.</div>
+          {!isGuestPreview && !hasNext && items.length > 0 && (
+            <div className="feedback-inline">{tr("컬렉션의 마지막 작품까지 모두 확인했어요.")}</div>
+          )}
+
+          {isGuestPreview && (
+            <div className="feedback-inline">{tr("샘플 컬렉션의 마지막 작품까지 모두 확인했어요.")}</div>
           )}
         </>
       )}
-    </section>
+      </section>
+    </>
   )
 }

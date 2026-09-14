@@ -16,6 +16,11 @@ interface KoreanTitleRow extends RowDataPacket {
   updatedAt: string;
 }
 
+interface AdminUserRow extends RowDataPacket {
+  id: number;
+  role: string;
+}
+
 export interface UpdateAdminKoreanTitleInput {
   title: unknown;
   subtitle?: unknown;
@@ -91,6 +96,24 @@ async function ensureAnimeExists(conn: PoolConnection, animeId: number) {
 
   if (!rows[0]) {
     throw new Error('Anime not found');
+  }
+}
+
+async function ensureAdminUser(conn: PoolConnection, userId: number) {
+  const [rows] = await conn.query<AdminUserRow[]>(
+    `
+    SELECT
+      id,
+      role
+    FROM users
+    WHERE id = ?
+    LIMIT 1
+    `,
+    [userId]
+  );
+
+  if (rows[0]?.role !== 'ADMIN') {
+    throw new Error('Admin access required');
   }
 }
 
@@ -175,6 +198,7 @@ export async function updateAnimeKoreanTitleByAdmin(
 
   try {
     await conn.beginTransaction();
+    await ensureAdminUser(conn, adminUserId);
     await ensureAnimeExists(conn, animeId);
 
     await conn.execute(

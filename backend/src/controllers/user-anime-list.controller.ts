@@ -7,12 +7,20 @@ import {
   removeAnimeFromUserList,
   updateUserAnimeListItem,
   validateUserAnimeListGenre,
+  validateUserAnimeListFormat,
   validateUserAnimeListLimit,
+  validateUserAnimeListQuery,
   validateUserAnimeListScoreFilter,
   validateUserAnimeListSort,
   validateUserAnimeListTitleLanguage,
   validateUserAnimeListYear,
 } from '../services/user-anime-list.service';
+import {
+  getUserSeriesCollection,
+  validateAnimeSeriesScope,
+  validateUserSeriesCollectionStatus,
+  validateUserSeriesQuery,
+} from '../services/user-series-stats.service';
 
 function parsePositiveInteger(value: unknown, fieldName: string) {
   const parsedValue = Number(value);
@@ -32,8 +40,12 @@ function getErrorStatus(message: string) {
     message === 'Invalid cursor' ||
     message.includes('Cursor sort') ||
     message.includes('Cursor genre') ||
+    message.includes('Cursor format') ||
     message.includes('Cursor year') ||
-    message.includes('Cursor score filter')
+    message.includes('Cursor score filter') ||
+    message.includes('Cursor scope') ||
+    message.includes('Cursor status') ||
+    message.includes('Cursor query')
   ) {
     return 400;
   }
@@ -123,8 +135,10 @@ export async function getMyAnimeList(req: Request, res: Response) {
       typeof req.query.titleLanguage === 'string' ? req.query.titleLanguage : 'ko'
     );
     const genre = validateUserAnimeListGenre(req.query.genre);
+    const format = validateUserAnimeListFormat(req.query.format);
     const year = validateUserAnimeListYear(req.query.year);
     const score = validateUserAnimeListScoreFilter(req.query.score);
+    const query = validateUserAnimeListQuery(req.query.query);
     const limit = validateUserAnimeListLimit(req.query.limit);
     const cursor = typeof req.query.cursor === 'string' ? req.query.cursor : undefined;
 
@@ -133,14 +147,83 @@ export async function getMyAnimeList(req: Request, res: Response) {
       sort,
       titleLanguage,
       genre,
+      format,
       year,
       score,
+      query,
       limit,
       cursor,
     });
 
     return res.json({
       success: true,
+      ...result,
+    });
+  } catch (error) {
+    return sendError(res, error);
+  }
+}
+
+export async function getMyAnimeSeriesCollection(req: Request, res: Response) {
+  try {
+    const authUser = ensureAuth(req, res);
+
+    if (!authUser) {
+      return;
+    }
+
+    const scope = validateAnimeSeriesScope(req.query.scope);
+    const status = validateUserSeriesCollectionStatus(req.query.status);
+    const titleLanguage = validateUserAnimeListTitleLanguage(
+      typeof req.query.titleLanguage === 'string' ? req.query.titleLanguage : 'ko'
+    );
+    const query = validateUserSeriesQuery(req.query.query);
+    const limit = validateUserAnimeListLimit(req.query.limit);
+    const cursor = typeof req.query.cursor === 'string' ? req.query.cursor : undefined;
+    const result = await getUserSeriesCollection({
+      userId: authUser.userId,
+      scope,
+      status,
+      titleLanguage,
+      query,
+      limit,
+      cursor,
+    });
+
+    return res.json({
+      success: true,
+      ...result,
+    });
+  } catch (error) {
+    return sendError(res, error);
+  }
+}
+
+export async function getUserAnimeSeriesCollection(req: Request, res: Response) {
+  try {
+    const userId = parsePositiveInteger(req.params.userId, 'userId');
+    const user = await getPublicUserProfile(userId);
+    const scope = validateAnimeSeriesScope(req.query.scope);
+    const status = validateUserSeriesCollectionStatus(req.query.status);
+    const titleLanguage = validateUserAnimeListTitleLanguage(
+      typeof req.query.titleLanguage === 'string' ? req.query.titleLanguage : 'ko'
+    );
+    const query = validateUserSeriesQuery(req.query.query);
+    const limit = validateUserAnimeListLimit(req.query.limit);
+    const cursor = typeof req.query.cursor === 'string' ? req.query.cursor : undefined;
+    const result = await getUserSeriesCollection({
+      userId,
+      scope,
+      status,
+      titleLanguage,
+      query,
+      limit,
+      cursor,
+    });
+
+    return res.json({
+      success: true,
+      user,
       ...result,
     });
   } catch (error) {
@@ -157,8 +240,10 @@ export async function getUserAnimeListController(req: Request, res: Response) {
       typeof req.query.titleLanguage === 'string' ? req.query.titleLanguage : 'ko'
     );
     const genre = validateUserAnimeListGenre(req.query.genre);
+    const format = validateUserAnimeListFormat(req.query.format);
     const year = validateUserAnimeListYear(req.query.year);
     const score = validateUserAnimeListScoreFilter(req.query.score);
+    const query = validateUserAnimeListQuery(req.query.query);
     const limit = validateUserAnimeListLimit(req.query.limit);
     const cursor = typeof req.query.cursor === 'string' ? req.query.cursor : undefined;
 
@@ -167,8 +252,10 @@ export async function getUserAnimeListController(req: Request, res: Response) {
       sort,
       titleLanguage,
       genre,
+      format,
       year,
       score,
+      query,
       limit,
       cursor,
     });

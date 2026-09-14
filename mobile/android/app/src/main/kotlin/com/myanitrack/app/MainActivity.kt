@@ -1,0 +1,5 @@
+package com.myanitrack.app
+
+import io.flutter.embedding.android.FlutterActivity
+
+class MainActivity : FlutterActivity()

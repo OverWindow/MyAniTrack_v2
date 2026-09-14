@@ -1,0 +1,131 @@
+.maintenance-page {
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  padding: 32px 20px;
+  background: var(--bg-neutral);
+}
+
+.maintenance-card {
+  width: min(560px, 100%);
+  display: grid;
+  gap: 32px;
+  padding: clamp(28px, 6vw, 48px);
+  border: 1px solid rgba(120, 113, 108, 0.16);
+  border-radius: 16px;
+  background: var(--bg-card);
+}
+
+.maintenance-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid rgba(120, 113, 108, 0.14);
+}
+
+.maintenance-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.maintenance-brand img {
+  width: 38px;
+  height: 38px;
+  object-fit: contain;
+}
+
+.maintenance-brand strong {
+  font: 800 1.05rem/1 var(--display);
+}
+
+.maintenance-language {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.maintenance-language button {
+  min-width: 36px;
+  padding: 7px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: var(--bg-neutral);
+  color: var(--text-muted);
+  font: 750 0.76rem/1 var(--sans);
+  cursor: pointer;
+}
+
+.maintenance-language button.is-active {
+  border-color: var(--point-border);
+  background: var(--point-softest);
+  color: var(--point-hover);
+}
+
+.maintenance-copy {
+  display: grid;
+  gap: 14px;
+}
+
+.maintenance-copy h1 {
+  font-size: clamp(1.9rem, 5vw, 2.6rem);
+}
+
+.maintenance-copy p {
+  max-width: 48ch;
+  color: var(--text-secondary);
+  line-height: 1.75;
+  white-space: pre-wrap;
+}
+
+.maintenance-refresh {
+  width: fit-content;
+  min-width: 132px;
+}
+
+.maintenance-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(120, 113, 108, 0.14);
+}
+
+.maintenance-links a {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  text-underline-offset: 3px;
+}
+
+.maintenance-loading-page {
+  align-content: center;
+  gap: 6px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.maintenance-loading-page img {
+  width: 42px;
+  height: 42px;
+  margin: 0 auto 6px;
+  object-fit: contain;
+}
+
+.maintenance-loading-page p {
+  color: var(--text-muted);
+  font-size: 0.88rem;
+}
+
+@media (max-width: 520px) {
+  .maintenance-page {
+    padding: 0;
+  }
+
+  .maintenance-card {
+    min-height: 100svh;
+    align-content: center;
+    border: 0;
+    border-radius: 0;
+  }
+}

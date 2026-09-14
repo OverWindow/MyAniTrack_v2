@@ -2,20 +2,21 @@ import { Request, Response } from 'express';
 import { getRefreshTokenExpiresInSeconds } from '../lib/auth';
 import {
   checkUsernameAvailability,
+  deleteMyAccount,
   getMyProfile,
   login,
+  loginWithSupabaseAccessToken,
   logout,
   logoutAll,
   refreshSession,
   requestPasswordReset,
   resetPasswordWithEmailToken,
   sendSignupVerificationEmail,
-  signUp,
   verifySignupEmail,
 } from '../services/auth.service';
 
 function getErrorStatus(message: string) {
-  if (message === 'refreshToken is required') {
+  if (message === 'refreshToken is required' || message === 'accessToken is required') {
     return 401;
   }
 
@@ -46,13 +47,27 @@ function getErrorStatus(message: string) {
     message === 'Refresh token has been revoked' ||
     message === 'Authorization token is required' ||
     message === 'Invalid token' ||
-    message === 'Token expired'
+    message === 'Token expired' ||
+    message === 'Invalid Supabase token' ||
+    message === 'Invalid Supabase user'
   ) {
     return 401;
   }
 
+  if (message === 'Supabase email verification required') {
+    return 403;
+  }
+
+  if (message === 'Google OAuth session required') {
+    return 403;
+  }
+
   if (message === 'User not found') {
     return 404;
+  }
+
+  if (message.startsWith('Supabase user deletion failed')) {
+    return 502;
   }
 
   return 500;
@@ -130,6 +145,17 @@ function getRefreshTokenFromRequest(req: Request) {
     || (typeof body.refreshToken === 'string' ? body.refreshToken : '');
 }
 
+function getBearerTokenFromRequest(req: Request) {
+  const authorization = req.header('Authorization');
+
+  if (authorization?.startsWith('Bearer ')) {
+    return authorization.slice('Bearer '.length).trim();
+  }
+
+  const body = getRequestBody(req);
+  return typeof body.accessToken === 'string' ? body.accessToken : '';
+}
+
 function sendAuthResponse(res: Response, result: Awaited<ReturnType<typeof login>>, message: string) {
   const { refreshToken, ...body } = result;
   setRefreshTokenCookie(res, refreshToken);
@@ -171,24 +197,10 @@ export async function checkUsername(req: Request, res: Response) {
 }
 
 export async function signup(req: Request, res: Response) {
-  try {
-    const result = await signUp({
-      email: req.body.email,
-      username: req.body.username,
-      password: req.body.password,
-      profileImageUrl: req.body.profileImageUrl,
-      bio: req.body.bio,
-      ...getClientMetadata(req),
-    });
-
-    return res.status(201).json({
-      success: true,
-      message: 'Sign up successful. Email verification required.',
-      ...result,
-    });
-  } catch (error) {
-    return sendError(res, error);
-  }
+  return res.status(410).json({
+    success: false,
+    message: 'Email sign up is no longer available. Continue with Google.',
+  });
 }
 
 export async function resendVerificationEmail(req: Request, res: Response) {
@@ -237,6 +249,20 @@ export async function loginUser(req: Request, res: Response) {
   }
 }
 
+export async function loginWithSupabase(req: Request, res: Response) {
+  try {
+    const result = await loginWithSupabaseAccessToken(getBearerTokenFromRequest(req));
+
+    return res.json({
+      success: true,
+      message: 'Supabase login successful',
+      ...result,
+    });
+  } catch (error) {
+    return sendError(res, error);
+  }
+}
+
 export async function refreshUserSession(req: Request, res: Response) {
   try {
     const result = await refreshSession({
@@ -252,7 +278,7 @@ export async function refreshUserSession(req: Request, res: Response) {
 
 export async function requestPasswordResetEmail(req: Request, res: Response) {
   try {
-    const result = await requestPasswordReset({
+    await requestPasswordReset({
       email: typeof req.body.email === 'string' ? req.body.email : '',
       userAgent: req.get('user-agent') ?? null,
       ipAddress: req.ip ?? null,
@@ -260,8 +286,7 @@ export async function requestPasswordResetEmail(req: Request, res: Response) {
 
     return res.json({
       success: true,
-      message: 'Password reset email sent successfully',
-      ...result,
+      message: 'If the account exists, a password reset email will be sent.',
     });
   } catch (error) {
     return sendError(res, error);
@@ -315,6 +340,30 @@ export async function getCurrentUser(req: Request, res: Response) {
     return res.json({
       success: true,
       user,
+    });
+  } catch (error) {
+    return sendError(res, error);
+  }
+}
+
+export async function deleteCurrentUser(req: Request, res: Response) {
+  try {
+    const authUser = req.authUser;
+
+    if (!authUser) {
+      return res.status(401).json({
+        success: false,
+        message: 'Unauthorized',
+      });
+    }
+
+    const result = await deleteMyAccount(authUser.userId);
+    clearRefreshTokenCookie(res);
+
+    return res.json({
+      success: true,
+      message: 'Account deleted successfully',
+      ...result,
     });
   } catch (error) {
     return sendError(res, error);

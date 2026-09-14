@@ -1,19 +1,36 @@
 import express from 'express';
-import dotenv from 'dotenv';
+import { validateImageStorageEnv } from './src/config/env';
 import adminRoutes from './routes/admin.routes';
 import animeRoutes from './src/routes/anime.routes';
 import authRoutes from './src/routes/auth.routes';
 import friendRoutes from './src/routes/friend.routes';
+import contentModerationRoutes from './src/routes/content-moderation.routes';
+import { runMigrations } from './src/database/migrate';
+import guestSampleRoutes from './src/routes/guest-sample.routes';
 import platformStatsRoutes from './src/routes/platform-stats.routes';
 import recommendationRoutes from './src/routes/recommendation.routes';
+import shareRoutes from './src/routes/share.routes';
 import userAgreementRoutes from './src/routes/user-agreement.routes';
 import userAnimeListRoutes from './src/routes/user-anime-list.routes';
 import userProfileRoutes from './src/routes/user-profile.routes';
 import userVoiceActorStatsRoutes from './src/routes/user-voice-actor-stats.routes';
+import maintenanceRoutes from './src/routes/maintenance.routes';
+import catalogRoutes from './src/routes/catalog.routes';
+import { getSharePreviewHtml } from './src/controllers/share-preview.controller';
+import { startLegacyImageCleanupScheduler } from './src/services/legacy-image-cleanup.service';
+import { startCatalogDiscoveryScheduler } from './src/services/catalog-discovery.service';
 
-dotenv.config();
+validateImageStorageEnv();
 
 const app = express();
+
+if (process.env.NODE_ENV === 'production') {
+  const configuredProxyHops = Number(process.env.TRUST_PROXY_HOPS || 1);
+  const proxyHops = Number.isInteger(configuredProxyHops) && configuredProxyHops > 0
+    ? configuredProxyHops
+    : 1;
+  app.set('trust proxy', proxyHops);
+}
 
 function getAllowedOrigins() {
   const developmentOrigins = process.env.NODE_ENV === 'production'
@@ -101,12 +118,19 @@ app.get('/health', (_req, res) => {
   res.json({ ok: true });
 });
 
+app.get('/share-preview/:token', getSharePreviewHtml);
+
 app.use(adminRoutes);
 app.use('/api', animeRoutes);
 app.use('/api', authRoutes);
 app.use('/api', friendRoutes);
+app.use('/api', contentModerationRoutes);
+app.use('/api', guestSampleRoutes);
 app.use('/api', platformStatsRoutes);
+app.use('/api', maintenanceRoutes);
+app.use('/api', catalogRoutes);
 app.use('/api', recommendationRoutes);
+app.use('/api', shareRoutes);
 app.use('/api', userAgreementRoutes);
 app.use('/api', userAnimeListRoutes);
 app.use('/api', userProfileRoutes);
@@ -114,6 +138,16 @@ app.use('/api', userVoiceActorStatsRoutes);
 
 const PORT = Number(process.env.PORT || 4000);
 
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+async function startServer() {
+  await runMigrations();
+  app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+  });
+  startLegacyImageCleanupScheduler();
+  await startCatalogDiscoveryScheduler();
+}
+
+void startServer().catch((error) => {
+  console.error('Failed to start server', error);
+  process.exit(1);
 });
